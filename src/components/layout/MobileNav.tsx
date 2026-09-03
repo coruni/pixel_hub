@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import {
   Bell,
   Bookmark,
@@ -38,11 +37,6 @@ export type MobileNavItem = { id: string; label: string; href: string; newTab: b
 /** 小屏导航抽屉（<sm 显示）：汉堡按钮 + 全屏下滑面板，含导航项与分类直达 */
 export default function MobileNav({ items, catLabel, categories }: { items: MobileNavItem[]; catLabel: string; categories: NavCategory[] }) {
   const [open, setOpen] = useState(false);
-  const pathname = usePathname();
-  const btnRef = useRef<HTMLButtonElement>(null);
-
-  // 路由变化即收起抽屉
-  useEffect(() => setOpen(false), [pathname]);
 
   // 打开时锁滚动 + Esc 关闭
   useEffect(() => {
@@ -56,10 +50,14 @@ export default function MobileNav({ items, catLabel, categories }: { items: Mobi
     };
   }, [open]);
 
+  // 点击任意链接立即收起：不能依赖 usePathname——
+  // 点当前页链接或仅 searchParams 变化（/browse?cat=a → ?cat=b）时 pathname 不变，
+  // 抽屉不关、body 保持锁滚动，页面表现为「点击无反应」
+  const close = () => setOpen(false);
+
   return (
     <div className="sm:hidden">
       <button
-        ref={btnRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-label="打开导航菜单"
@@ -78,6 +76,7 @@ export default function MobileNav({ items, catLabel, categories }: { items: Mobi
                 <Link
                   key={it.id}
                   href={it.href}
+                  onClick={close}
                   target={it.newTab ? "_blank" : undefined}
                   rel={it.newTab ? "noopener noreferrer" : undefined}
                   className="flex items-center gap-3 rounded-none px-3 py-2.5 text-sm text-neutral-700 transition hover:bg-brand-50 hover:text-neutral-900"
@@ -99,6 +98,7 @@ export default function MobileNav({ items, catLabel, categories }: { items: Mobi
                     <li key={c.slug}>
                       <Link
                         href={`/browse?cat=${c.slug}`}
+                        onClick={close}
                         className="block truncate rounded-none px-3 py-2 text-sm text-neutral-600 transition hover:bg-brand-50 hover:text-neutral-900"
                       >
                         {c.name}
