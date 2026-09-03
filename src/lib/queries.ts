@@ -1,5 +1,6 @@
 import { publicUrl } from "@/lib/storage";
 import { prisma } from "@/lib/db/prisma";
+import { isOnline } from "@/lib/online";
 import type { Prisma, ResourceType } from "@prisma/client";
 
 export type FeedItem = {
@@ -226,7 +227,7 @@ export async function getResourceDetail(slug: string, viewerId?: string) {
   const resource = await prisma.resource.findFirst({
     where,
     include: {
-      author: { select: { id: true, username: true, name: true, avatarKey: true, bio: true } },
+      author: { select: { id: true, username: true, name: true, avatarKey: true, bio: true, role: true, trusted: true, createdAt: true, lastSeenAt: true, _count: { select: { resources: true, followers: true } } } },
       category: { select: { slug: true, name: true } },
       tags: { select: { tag: { select: { slug: true, name: true } } } },
       media: {
@@ -279,13 +280,13 @@ export async function getResourceDetail(slug: string, viewerId?: string) {
       media: { orderBy: { sort: "asc" }, select: { storageKey: true, width: true, height: true } },
     },
   });
-  // 用户 hover 卡片统计（作品数/关注者数），authorId 批量查一次
+  // 用户 hover 卡片统计（作品数/关注者数）+ 在线状态，authorId 批量查一次
   const authorIds = [...new Set(allComments.map((c) => c.authorId))];
   const authorStats = await prisma.user.findMany({
     where: { id: { in: authorIds } },
-    select: { id: true, _count: { select: { resources: true, followers: true } } },
+    select: { id: true, lastSeenAt: true, _count: { select: { resources: true, followers: true } } },
   });
-  const statsMap = new Map(authorStats.map((u) => [u.id, u._count]));
+  const statsMap = new Map(authorStats.map((u) => [u.id, { ...u._count, lastSeenAt: u.lastSeenAt }]));
   const commentMap = new Map(allComments.map((c) => [c.id, c]));
   const rootIdOf = (c: (typeof allComments)[number]): string => {
     let cur = c;
@@ -331,6 +332,7 @@ export async function getResourceDetail(slug: string, viewerId?: string) {
       createdAt: a.createdAt,
       resourceCount: s?.resources,
       followerCount: s?.followers,
+      online: isOnline(s?.lastSeenAt),
     };
   };
   const toCommentImages = (ms: { storageKey: string; width: number | null; height: number | null }[]) =>
@@ -339,6 +341,19 @@ export async function getResourceDetail(slug: string, viewerId?: string) {
   return {
     ...resource,
     gallery,
+    author: {
+      id: resource.author.id,
+      username: resource.author.username,
+      name: resource.author.name,
+      avatarKey: resource.author.avatarKey ? publicUrl(resource.author.avatarKey) : null,
+      bio: resource.author.bio,
+      role: resource.author.role,
+      trusted: resource.author.trusted,
+      createdAt: resource.author.createdAt,
+      resourceCount: resource.author._count.resources,
+      followerCount: resource.author._count.followers,
+      online: isOnline(resource.author.lastSeenAt),
+    },
     comments: allComments
       .filter((c) => !c.parentId)
       .map((c) => ({
@@ -413,6 +428,7 @@ export type UserProfile = {
   followingCount: number;
   isViewer: boolean;
   following: boolean;
+  online: boolean;
 };
 
 export async function getProfile(username: string, viewerId?: string): Promise<UserProfile | null> {
@@ -427,6 +443,7 @@ export async function getProfile(username: string, viewerId?: string): Promise<U
       role: true,
       trusted: true,
       createdAt: true,
+      lastSeenAt: true,
       _count: { select: { resources: true, followers: true, following: true } },
     },
   });
@@ -452,6 +469,7 @@ export async function getProfile(username: string, viewerId?: string): Promise<U
     followingCount: user._count.following,
     isViewer,
     following,
+    online: isOnline(user.lastSeenAt),
   };
 }
 
@@ -476,6 +494,7 @@ export type NotificationRow = {
   message: string | null;
   resource: { slug: string; title: string } | null;
   actor: { username: string; name: string | null } | null;
+  commentId: string | null;
 };
 
 export async function getNotifications(
@@ -504,6 +523,7 @@ export async function getNotifications(
         message: true,
         resourceId: true,
         actorId: true,
+        commentId: true,
       },
     }),
     prisma.notification.count({ where: { userId, readAt: null } }),
@@ -534,6 +554,7 @@ export async function getNotifications(
       message: r.message,
       resource: r.resourceId ? (resMap.get(r.resourceId) ?? null) : null,
       actor: r.actorId ? (actorMap.get(r.actorId) ?? null) : null,
+      commentId: r.commentId,
     })),
     unread,
   };

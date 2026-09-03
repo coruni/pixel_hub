@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* 暗色模式：class 策略（<html class="dark">），由 layout 内联脚本 + ThemeToggle 切换 */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* Fusion Pixel 中文像素字体（SIL OFL 1.1，许可见 public/fonts/OFL-LICENSE.txt） */
 @font-face {
   font-family: "Fusion Pixel";
@@ -13,6 +16,95 @@
   /* 暖白背景 + 暖黑前景（整体偏 Claude 风的温暖色调，不再纯白冷灰） */
   --background: #faf9f5;
   --foreground: #292524;
+  /* 像素风点阵纹理的颜色（暗色下换成暖浅点） */
+  --dot-color: rgba(120, 80, 50, 0.07);
+  /* 富文本排版色（.md-body 用，暗色下覆盖） */
+  --md-text: #525252;
+  --md-text-lg: #27272a;
+  --md-heading: #171717;
+  --md-muted: #737373;
+  --md-marker: #a3a3a3;
+  --md-link: #0f172a;
+  --md-code-bg: #f4f4f5;
+  --md-border: #e5e5e5;
+  /* 品牌主色：温暖橙（Claude 风赤陶橙）。用法同 Tailwind 色板：bg-brand-500 / text-brand-600 等 */
+  --surface: #fffdf9; /* 卡片/面板暖白（比页面背景 #faf9f5 略亮一档） */
+  --brand-50: #fdf5f0;
+  --brand-100: #faece3;
+  --brand-200: #f4d9c8;
+  --brand-300: #ecbfa5;
+  --brand-400: #e29a78;
+  --brand-500: #d97757;
+  --brand-600: #c25e3c;
+  --brand-700: #a84e31;
+  --brand-800: #8a4129;
+  --brand-900: #6f3523;
+  /* 内置色板中会被透明度修饰符用到的档位（如 bg-neutral-50/60）：
+     值走变量链，Tailwind 才会以 color-mix 编译、跟随暗色切换 */
+  --neutral-50: #fafafa;
+  --neutral-100: #f5f5f5;
+  --neutral-900: #171717;
+  --amber-50: #fffbeb;
+}
+
+/* ---------- 暗色主题 ----------
+   策略：Tailwind 4 的色板 utilities 编译为 var(--color-*)，
+   在 html.dark 下重定义 brand/neutral/red/amber 全色阶即可让
+   全站 bg-/text-/border- 类零改动跟随明暗（浅色阶→深暖棕，深色阶→亮暖灰）。
+   white/black（遮罩、按钮文字）与品牌主橙 brand-500 保持不动。 */
+html.dark {
+  --background: #17130e;
+  --foreground: #e8e4dd;
+  --dot-color: rgba(255, 214, 178, 0.05);
+  --md-text: #b6b1aa;
+  --md-text-lg: #c8c3bc;
+  --md-heading: #ece9e3;
+  --md-muted: #9c978f;
+  --md-marker: #6e6961;
+  --md-link: #f0c9b2;
+  --md-code-bg: #2d2925;
+  --md-border: #3a3631;
+
+  --surface: #201b15; /* 卡片/面板暖黑（比页面背景略亮一档） */
+  /* brand：50-300 是浅底/边框 → 深暖棕；600-900 是深文字/描边 → 亮暖橙（hover 关系随之反转） */
+  --brand-50: #292017;
+  --brand-100: #33281e;
+  --brand-200: #48362a;
+  --brand-300: #6d4e37;
+  --brand-400: #9a6c4c;
+  --brand-500: #d97757; /* 按钮主色不变 */
+  --brand-600: #e28b68;
+  --brand-700: #ecb39a;
+  --brand-800: #f2cdb8;
+  --brand-900: #f7e2d4;
+  --neutral-50: #1c1814;
+  --neutral-100: #252019;
+  --neutral-900: #f0ebe4;
+  --amber-50: #2b2012;
+
+  /* neutral 阶整体反转（暖灰）：text-neutral-900 自动变浅、bg-neutral-100 自动变深 */
+  --color-neutral-200: #3b352e;
+  --color-neutral-300: #4e473f;
+  --color-neutral-400: #8d877e;
+  --color-neutral-500: #aba49a;
+  --color-neutral-600: #ccc6bd;
+  --color-neutral-700: #dbd5cd;
+  --color-neutral-800: #e7e2da;
+  --color-neutral-950: #f7f4ee;
+
+  /* red/amber：浅色块（bg-red-50 等）→ 深底；深文字（text-red-600 等）→ 提亮 */
+  --color-red-50: #2c1a16;
+  --color-red-100: #3b201c;
+  --color-red-200: #4f2721;
+  --color-red-300: #71362d;
+  --color-red-600: #f07168;
+  --color-red-700: #f59790;
+  --color-amber-100: #3a2b16;
+  --color-amber-200: #4f391d;
+  --color-amber-300: #6f522a;
+  --color-amber-600: #f5a83c;
+  --color-amber-700: #f7bd6a;
+  --color-amber-900: #fad58f;
 }
 
 @theme inline {
@@ -22,25 +114,30 @@
   --font-mono: var(--font-geist-mono);
 }
 
-/* 品牌主色：温暖橙（Claude 风赤陶橙）。用法同 Tailwind 色板：bg-brand-500 / text-brand-600 等 */
+/* 色板映射：值统一走 var() 链，透明度修饰符（bg-brand-50/40 等）才能编译为
+   color-mix 跟随明暗；同时 :root 生成 --color-* 变量供全局 CSS（滚动条等）引用 */
 @theme {
-  --color-surface: #fffdf9; /* 卡片/面板暖白（比页面背景 #faf9f5 略亮一档） */
-  --color-brand-50: #fdf5f0;
-  --color-brand-100: #faece3;
-  --color-brand-200: #f4d9c8;
-  --color-brand-300: #ecbfa5;
-  --color-brand-400: #e29a78;
-  --color-brand-500: #d97757;
-  --color-brand-600: #c25e3c;
-  --color-brand-700: #a84e31;
-  --color-brand-800: #8a4129;
-  --color-brand-900: #6f3523;
+  --color-surface: var(--surface);
+  --color-brand-50: var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-200: var(--brand-200);
+  --color-brand-300: var(--brand-300);
+  --color-brand-400: var(--brand-400);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-800: var(--brand-800);
+  --color-brand-900: var(--brand-900);
+  --color-neutral-50: var(--neutral-50);
+  --color-neutral-100: var(--neutral-100);
+  --color-neutral-900: var(--neutral-900);
+  --color-amber-50: var(--amber-50);
 }
 
 body {
   background: var(--background);
   /* 像素风点阵纹理（8px 网格微点） */
-  background-image: radial-gradient(rgba(120, 80, 50, 0.07) 1px, transparent 1px);
+  background-image: radial-gradient(var(--dot-color) 1px, transparent 1px);
   background-size: 8px 8px;
   color: var(--foreground);
   /* 像素风：全站使用 Fusion Pixel 位图风字体 */
@@ -66,7 +163,7 @@ summary {
 .md-body {
   font-size: 13px;
   line-height: 1.7;
-  color: #525252;
+  color: var(--md-text);
 }
 .md-body > :first-child {
   margin-top: 0;
@@ -82,7 +179,7 @@ summary {
 .md-body h3,
 .md-body h4 {
   margin: 0.7rem 0 0.3rem;
-  color: #171717;
+  color: var(--md-heading);
   font-weight: 600;
   line-height: 1.35;
 }
@@ -109,16 +206,16 @@ summary {
   list-style: decimal;
 }
 .md-body li::marker {
-  color: #a3a3a3;
+  color: var(--md-marker);
 }
 .md-body a {
-  color: #0f172a;
+  color: var(--md-link);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 .md-body code {
   border-radius: 0;
-  background: #f4f4f5;
+  background: var(--md-code-bg);
   padding: 0.1rem 0.3rem;
   font-size: 0.85em;
 }
@@ -136,13 +233,13 @@ summary {
 }
 .md-body blockquote {
   margin: 0.4rem 0;
-  border-left: 2px solid #e5e5e5;
+  border-left: 2px solid var(--md-border);
   padding-left: 0.6rem;
-  color: #737373;
+  color: var(--md-muted);
 }
 .md-body hr {
   margin: 0.7rem 0;
-  border-color: #e5e5e5;
+  border-color: var(--md-border);
 }
 .md-body img {
   max-width: 100%;
@@ -150,20 +247,20 @@ summary {
   border-radius: 0;
 }
 .md-body strong {
-  color: #171717;
+  color: var(--md-heading);
 }
 
 /* 资源详情「描述」长文：正文字号/行距比侧栏小卡稍大（写在 .md-body 之后以覆盖同类属性） */
 .md-body--lg {
   font-size: 15px;
   line-height: 1.75;
-  color: #27272a;
+  color: var(--md-text-lg);
 }
 .md-body--lg h1,
 .md-body--lg h2,
 .md-body--lg h3,
 .md-body--lg h4 {
-  color: #18181b;
+  color: var(--md-heading);
 }
 
 /* 评论引用跳转：目标楼层闪烁高亮两下 */

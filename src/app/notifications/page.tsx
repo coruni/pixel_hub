@@ -7,6 +7,7 @@ import { getNotifications, type NotificationRow } from "@/lib/queries";
 import { timeAgo } from "@/lib/format";
 import { markAllNotificationsReadAction } from "@/lib/actions/notify";
 import { NotificationDelete, NotificationsClearAll } from "@/components/social/notify-actions";
+import NotificationCardLink from "@/components/social/notification-card-link";
 
 export const metadata: Metadata = { title: "通知" };
 
@@ -35,7 +36,12 @@ function describe(n: NotificationRow): { icon: LucideIcon; text: string; href?: 
  icon: MessageSquare,
  text: `${who} 评论了你的内容${n.resource ? `「${n.resource.title}」` : ""}`,
  color: "text-neutral-800",
- href: n.resource ? `/resources/${n.resource.slug}#comments` : undefined,
+ // 定位到触发通知的那条评论（含楼中楼）；评论已删/无 commentId 时退到评论区顶部
+ href: n.resource
+ ? n.commentId
+ ? `/resources/${n.resource.slug}#comment-${n.commentId}`
+ : `/resources/${n.resource.slug}#comments`
+ : undefined,
  };
  case "MODERATION":
  return {
@@ -140,12 +146,12 @@ export default async function NotificationsPage({
  return (
  <li key={n.id}>
  {d.href ? (
- <Link
+ <NotificationCardLink
  href={d.href}
- className={`block rounded-none px-3 py-3 transition hover:bg-neutral-100 ${n.readAt ? "opacity-60" : "bg-surface"}`}
+ className={`block cursor-pointer rounded-none px-3 py-3 transition hover:bg-neutral-100 ${n.readAt ? "opacity-60" : "bg-surface"}`}
  >
  {inner}
- </Link>
+ </NotificationCardLink>
  ) : (
  <div className={`block rounded-none px-3 py-3 ${n.readAt ? "opacity-60" : "bg-surface"}`}>{inner}</div>
  )}

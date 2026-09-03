@@ -1,6 +1,7 @@
 // 全量冒烟测试：公共页 / 登录权限 / 设置·通知 / admin 后台 / 附件 API / 封禁拦截
 // 用法：node _test/smoke.mjs   （dev server 须在 3000 端口运行）
 import { execFileSync } from "child_process";
+import { readFileSync } from "fs";
 
 const BASE = "http://localhost:3000";
 const ROOT = "E:/project/cms";
@@ -45,7 +46,7 @@ async function get(sess, path, useRedirect = "manual") {
 console.log("\n[1] 公共页面（游客）");
 const guest = makeSession();
 for (const [name, path, kw] of [
-  ["首页", "/", "资源社区"],
+  ["首页", "/", "发现"],
   ["浏览页", "/browse", ""],
   ["搜索页", "/search?q=%E5%83%8F%E7%B4%A0", ""],
   ["登录页", "/login", "登录"],
@@ -169,12 +170,22 @@ console.log("\n[4] 附件上传 API");
 
 // ---------- 5. 封禁拦截 ----------
 console.log("\n[5] 封禁拦截");
+// 方言：按 .env 的 DATABASE_URL 前缀区分（PG 需要给保留字表名/驼峰列加引号）
+const envText = readFileSync(`${ROOT}/.env`, "utf8");
+const dbUrl = envText.match(/^DATABASE_URL="?([^"\r\n]+)"?/m)?.[1] ?? "";
+const isPG = dbUrl.startsWith("postgres");
 function db(sql) {
   return execFileSync("npx", ["prisma", "db", "execute", "--stdin", "--schema", `${ROOT}/prisma/schema.prisma`],
     { input: sql, cwd: ROOT, shell: process.platform === "win32" }).toString();
 }
+const banSql = isPG
+  ? 'UPDATE "User" SET "bannedAt" = now(), "bannedReason" = $q$冒烟测试封禁$q$ WHERE email = $q$demo@example.com$q$;'
+  : "UPDATE User SET bannedAt = datetime('now'), bannedReason = '冒烟测试封禁' WHERE email = 'demo@example.com';";
+const unbanSql = isPG
+  ? 'UPDATE "User" SET "bannedAt" = NULL, "bannedReason" = NULL WHERE email = $q$demo@example.com$q$;'
+  : "UPDATE User SET bannedAt = NULL, bannedReason = NULL WHERE email = 'demo@example.com';";
 try {
-  db("UPDATE User SET bannedAt = datetime('now'), bannedReason = '冒烟测试封禁' WHERE email = 'demo@example.com';");
+  db(banSql);
   const s = makeSession();
   const st = await login(s, "demo@example.com", "test1234");
   const finalUrl = st;
@@ -182,7 +193,7 @@ try {
   const { r, text } = await get(s, "/settings");
   ok("封禁账号无登录态", r.status !== 200 || !text.includes("第三方账号"));
 } finally {
-  db("UPDATE User SET bannedAt = NULL, bannedReason = NULL WHERE email = 'demo@example.com';");
+  db(unbanSql);
   ok("demo 账号已还原", true);
 }
 

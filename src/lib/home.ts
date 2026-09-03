@@ -1,6 +1,7 @@
 // 首页板块 —— 服务端查询层（渲染 / 后台初始化共用）。
 // 板块目录与 config 校验见 home-config.ts。
 import { prisma } from "@/lib/db/prisma";
+import { isOnline } from "@/lib/online";
 import {
   DEFAULT_SECTIONS,
   HOME_SECTION_KINDS,
@@ -102,7 +103,7 @@ export async function getPublishedCountByCategory(): Promise<Map<string, number>
   return new Map(rows.map((r) => [r.categoryId as string, r._count._all]));
 }
 
-export type CreatorRow = { username: string; name: string | null; avatarKey: string | null; resources: number; followers: number };
+export type CreatorRow = { username: string; name: string | null; avatarKey: string | null; resources: number; followers: number; online: boolean };
 
 export async function getTopCreators(limit: number): Promise<CreatorRow[]> {
   const users = await prisma.user.findMany({
@@ -113,6 +114,7 @@ export async function getTopCreators(limit: number): Promise<CreatorRow[]> {
       username: true,
       name: true,
       avatarKey: true,
+      lastSeenAt: true,
       _count: { select: { resources: true, followers: true } },
     },
   });
@@ -122,6 +124,7 @@ export async function getTopCreators(limit: number): Promise<CreatorRow[]> {
     avatarKey: u.avatarKey,
     resources: u._count.resources,
     followers: u._count.followers,
+    online: isOnline(u.lastSeenAt),
   }));
 }
 

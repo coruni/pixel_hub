@@ -16,6 +16,7 @@ export type HoverCardUser = {
   resourceCount?: number;
   followerCount?: number;
   joinedAt?: string | Date;
+  online?: boolean;
 };
 
 const ROLE_LABEL: Record<string, string> = {
@@ -65,10 +66,15 @@ export default function UserHoverCard({ user, children }: { user: HoverCardUser;
         // 头像+昵称区域是链接（进主页），其余部分仅展示
         <span className="absolute top-full left-0 z-40 mt-1.5 block w-56 rounded-none border border-brand-200 bg-surface p-3 shadow-lg">
           <Link href={`/u/${user.username}`} className="flex items-center gap-2.5">
-            <Avatar name={user.name} username={user.username} avatarKey={user.avatarKey} size="md" />
+            <Avatar name={user.name} username={user.username} avatarKey={user.avatarKey} size="md" online={user.online} />
             <span className="min-w-0 flex-1">
               <span className="flex items-center gap-1.5">
                 <span className="truncate text-sm font-semibold text-neutral-900">{user.name ?? user.username}</span>
+                {user.online && (
+                  <span className="shrink-0 inline-flex items-center gap-1 rounded-none border border-emerald-600 bg-emerald-50 px-1.5 py-px text-[10px] font-medium text-emerald-700">
+                    <span className="h-1.5 w-1.5 bg-emerald-500" aria-hidden /> 在线
+                  </span>
+                )}
                 {roleLabel && (
                   <span className="shrink-0 rounded-none border border-brand-600 bg-stone-900/85 px-1.5 py-px text-[10px] font-medium text-white">
                     {roleLabel}

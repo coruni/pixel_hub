@@ -7,6 +7,7 @@ import { widgetTitle, type SidebarWidget, type Theme } from "@/lib/site-config";
 import type { FeedItem } from "@/lib/queries";
 import { formatCount, timeAgo } from "@/lib/format";
 import { prisma } from "@/lib/db/prisma";
+import { isOnline } from "@/lib/online";
 import Markdown from "@/components/rte/Markdown";
 import Avatar from "@/components/ui/Avatar";
 
@@ -228,7 +229,7 @@ async function renderCreators(w: SidebarWidget) {
  {creators.map((c) => (
  <li key={c.username}>
  <Link href={`/u/${c.username}`} className="group flex items-center gap-2.5 rounded-none px-2 py-1.5 transition hover:bg-brand-50">
- <Avatar name={c.name} username={c.username} avatarKey={c.avatarKey} size="sm" />
+ <Avatar name={c.name} username={c.username} avatarKey={c.avatarKey} size="sm" online={c.online} />
  <span className="min-w-0 flex-1">
  <span className="block truncate text-sm font-medium text-neutral-800 group-hover:text-neutral-950">{c.name ?? c.username}</span>
  <span className="block truncate text-[11px] text-neutral-400">
@@ -292,7 +293,7 @@ async function renderComments(w: SidebarWidget) {
  id: true,
  content: true,
  createdAt: true,
- author: { select: { username: true, name: true, avatarKey: true } },
+ author: { select: { username: true, name: true, avatarKey: true, lastSeenAt: true } },
  resource: { select: { slug: true, title: true } },
  },
  });
@@ -303,7 +304,7 @@ async function renderComments(w: SidebarWidget) {
  <ul className="space-y-2.5">
  {rows.map((c) => (
  <li key={c.id} className="flex gap-2">
- <Avatar name={c.author.name} username={c.author.username} avatarKey={c.author.avatarKey} size="xs" />
+ <Avatar name={c.author.name} username={c.author.username} avatarKey={c.author.avatarKey} size="xs" online={isOnline(c.author.lastSeenAt)} />
  <span className="min-w-0 flex-1">
  <span className="flex items-baseline gap-1.5">
  <span className="truncate text-xs font-medium text-neutral-800">{c.author.name ?? c.author.username}</span>

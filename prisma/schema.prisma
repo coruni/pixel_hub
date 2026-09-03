@@ -23,6 +23,7 @@ model User {
   trusted      Boolean  @default(false) // D6 白名单免审
   bannedAt     DateTime?
   bannedReason String?
+  lastSeenAt   DateTime? // 在线状态：客户端心跳间隔更新，5 分钟内视为在线
 
   accounts       Account[]
   sessions       Session[]

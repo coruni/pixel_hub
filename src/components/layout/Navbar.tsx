@@ -20,6 +20,8 @@ import { getCategories } from "@/lib/queries";
 import type { NavItem } from "@/lib/site-config";
 import UserMenu from "./UserMenu";
 import NavCategoriesMenu from "./NavCategoriesMenu";
+import ThemeToggle from "./ThemeToggle";
+import MobileNav from "./MobileNav";
 
 // 导航图标白名单（与 site-config 的 NAV_ICONS 对应）
 const ICONS: Record<string, LucideIcon> = {
@@ -57,14 +59,16 @@ export default async function Navbar() {
  }
  });
 
- // 「分类」下拉菜单（后台可配）：按配置类型筛分类
+ {/* 「分类」下拉菜单（后台可配）：按配置类型筛分类 */}
  const cm = theme.navbar.categoriesMenu;
  let catMenu = null;
+ let catList: { slug: string; name: string }[] = [];
  if (cm.enabled) {
  // 分类全类型通用
  const list = await getCategories();
  if (list.length > 0) {
- catMenu = <NavCategoriesMenu label={cm.label} items={list.map((c) => ({ slug: c.slug, name: c.name }))} />;
+ catList = list.map((c) => ({ slug: c.slug, name: c.name }));
+ catMenu = <NavCategoriesMenu label={cm.label} items={catList} />;
  }
  }
 
@@ -93,6 +97,9 @@ export default async function Navbar() {
  )}
 
  <div className="ml-auto flex items-center gap-3">
+ <ThemeToggle />
+ {/* 小屏汉堡菜单：导航项 + 分类直达（桌面端隐藏） */}
+ <MobileNav items={items.map((it) => ({ id: it.id, label: it.label, href: it.href, newTab: it.newTab, icon: it.icon ?? "" }))} catLabel={cm.label} categories={catList} />
  {u ? (
  <UserMenu
  user={{

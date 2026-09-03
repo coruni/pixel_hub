@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ImagePlus, X } from "lucide-react";
 import { addCommentAction, deleteCommentAction } from "@/lib/actions/social";
@@ -67,6 +67,142 @@ export default function Comments({
  // 评论图片查看器：所在楼层图片列表 + 点击的索引
  const [viewer, setViewer] = useState<{ images: CommentImage[]; index: number } | null>(null);
 
+ // ---- 实时刷新：每 15s 拉增量新评论合并进列表（不 router.refresh，不打断输入状态） ----
+ // 新类型：API 增量项（带 parentId，比 CommentShape.replies 多 images/replyTo 可选）
+ type NewCommentItem = {
+  id: string;
+  parentId: string | null;
+  authorId: string;
+  content: string;
+  createdAt: string | Date;
+  author: CommentAuthor;
+  images?: CommentImage[];
+  replyTo?: { id: string; name: string } | null;
+ };
+
+ // liveComments 初值直接用 props：SSR/hydration 首轮就要渲染评论，
+ // 渲染期模式只负责 props 引用变化（router.refresh 后）时重置
+ const [liveComments, setLiveComments] = useState<CommentShape[]>(comments);
+ const [baseComments, setBaseComments] = useState(comments);
+ if (baseComments !== comments) {
+  setBaseComments(comments);
+  setLiveComments(comments);
+ }
+ // 服务端时钟基准，避免客户端时钟偏差
+ const sinceRef = useRef<string>(new Date().toISOString());
+ // live/base 的最新值（poll 回调用，渲染期不读写）
+ const liveRef = useRef<CommentShape[] | null>(null);
+ const baseCommentsRef = useRef<CommentShape[]>(comments);
+ // props 变化（router.refresh）时同步 ref、重置轮询基准
+ useEffect(() => {
+  baseCommentsRef.current = comments;
+  liveRef.current = comments; // props 全量覆盖（发帖/删帖后的 refresh）
+  const times = comments.map((c) => new Date(c.createdAt).getTime()).filter((t) => !Number.isNaN(t));
+  if (times.length > 0) sinceRef.current = new Date(Math.max(...times)).toISOString();
+ }, [comments]);
+
+ useEffect(() => {
+  async function poll() {
+  if (document.visibilityState !== "visible") return;
+  try {
+  const res = await fetch(
+  `/api/comments?resourceId=${encodeURIComponent(resourceId)}&since=${encodeURIComponent(sinceRef.current)}`,
+  { cache: "no-store" }
+  );
+  if (!res.ok) return;
+  const data = (await res.json()) as {
+  items: NewCommentItem[];
+  serverTime: string;
+  liveIds: string[];
+  };
+  sinceRef.current = data.serverTime;
+
+  // 取最新的列表（effect 闭包只挂一次，state 会过期；ref 同步放 effect 里）
+  const cur = liveRef.current ?? baseCommentsRef.current;
+
+  // 删除兜底：本地有但服务端 liveIds 没有的评论 → 全量刷新
+  const localIds = new Set(cur.flatMap((c) => [c.id, ...c.replies.map((r) => r.id)]));
+  if ([...localIds].some((id) => !data.liveIds.includes(id))) {
+  router.refresh();
+  return;
+  }
+
+  if (data.items.length > 0) {
+  const byId = new Map(cur.flatMap((c) => [[c.id, c] as const]));
+  const next = cur.map((c) => ({ ...c, replies: [...c.replies] }));
+  let needFull = false;
+  for (const item of data.items) {
+  if (byId.has(item.id)) continue; // 已存在（自己刚发的，router.refresh 已带上）
+  if (!item.parentId) {
+  next.push({
+  id: item.id,
+  authorId: item.authorId,
+  content: item.content,
+  createdAt: item.createdAt,
+  author: item.author,
+  images: item.images ?? [],
+  replies: [],
+  });
+  } else {
+  // 挂到根楼层；增量回复的父楼层可能是另一条增量回复，也可能不在本地
+  let pid: string | null = item.parentId;
+  let guard = 0;
+  while (pid && guard++ < 20) {
+  const parentItem = data.items.find((x) => x.id === pid);
+  pid = parentItem?.parentId ?? null;
+  }
+  const root = next.find((c) => c.id === pid);
+  if (root) {
+  root.replies.push({
+  id: item.id,
+  authorId: item.authorId,
+  content: item.content,
+  createdAt: item.createdAt,
+  author: item.author,
+  replyTo: item.replyTo ?? null,
+  });
+  } else {
+  needFull = true;
+  break;
+  }
+  }
+  }
+  if (needFull) router.refresh();
+  else {
+  liveRef.current = next;
+  setLiveComments(next);
+  }
+  }
+  } catch {
+  // 网络抖动忽略，下一轮重试
+  }
+  }
+
+  const timer = setInterval(poll, 15000);
+  return () => clearInterval(timer);
+  // 闭包取不到最新 state，全部走 ref；interval 只挂一次
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+ }, [resourceId]);
+
+ // merged：轮询合并后的渲染源（ref 在 poll 回调里取最新值）
+ const merged = liveComments;
+
+ // 通知等外部链接带 #comment-<id>：挂载后定位到目标评论（居中 + 闪烁）。
+ // 原生锚点只滚动到贴顶且无高亮，这里统一接管；目标已删时无元素，静默不处理。
+ const didLocate = useRef(false);
+ useEffect(() => {
+ if (didLocate.current) return;
+ const m = window.location.hash.match(/^#comment-(.+)$/);
+ if (!m) return;
+ didLocate.current = true;
+ const el = document.querySelector<HTMLElement>(`[data-comment-id="${m[1]}"]`);
+ if (!el) return;
+ el.scrollIntoView({ behavior: "smooth", block: "center" });
+ el.classList.remove("comment-flash");
+ void el.offsetWidth;
+ el.classList.add("comment-flash");
+ }, []);
+
  // 点击引用跳转：滚动到目标评论并闪烁；目标不可见/不存在时退回根楼层
  function navigateToComment(commentId: string, fallbackRootId: string) {
  const el =
@@ -126,7 +262,7 @@ export default function Comments({
  "w-full rounded-none border border-brand-200 bg-surface px-3.5 py-2.5 text-sm outline-none transition focus:border-brand-500";
 
  // 总数含楼中楼回复
- const total = comments.length + comments.reduce((n, c) => n + c.replies.length, 0);
+ const total = merged.length + merged.reduce((n, c) => n + c.replies.length, 0);
 
  return (
  <section id="comments" className="mt-10 scroll-mt-24 border-t border-neutral-200 pt-8">
@@ -192,14 +328,14 @@ export default function Comments({
  )}
 
  <ul className="mt-6 space-y-6">
- {comments.map((c) => {
+ {merged.map((c) => {
  const canDel = viewerId === c.authorId || isStaff;
  return (
- <li key={c.id} data-comment-id={c.id} className="scroll-mt-24">
+ <li key={c.id} id={`comment-${c.id}`} data-comment-id={c.id} className="scroll-mt-24">
  <div className="flex items-center gap-2">
  <UserHoverCard user={c.author}>
  <Link href={`/u/${c.author.username}`} aria-label={`${c.author.name ?? c.author.username} 的主页`}>
- <Avatar name={c.author.name} username={c.author.username} avatarKey={c.author.avatarKey} size="sm" />
+ <Avatar name={c.author.name} username={c.author.username} avatarKey={c.author.avatarKey} size="sm" online={c.author.online} />
  </Link>
  </UserHoverCard>
  <Link
@@ -279,11 +415,11 @@ export default function Comments({
  {c.replies.map((rp) => {
  const canDelR = viewerId === rp.authorId || isStaff;
  return (
- <li key={rp.id} data-comment-id={rp.id} className="scroll-mt-24 rounded-none bg-neutral-100/70 p-3">
+ <li key={rp.id} id={`comment-${rp.id}`} data-comment-id={rp.id} className="scroll-mt-24 rounded-none bg-neutral-100/70 p-3">
  <div className="flex items-center gap-2">
  <UserHoverCard user={rp.author}>
  <Link href={`/u/${rp.author.username}`} aria-label={`${rp.author.name ?? rp.author.username} 的主页`}>
- <Avatar name={rp.author.name} username={rp.author.username} avatarKey={rp.author.avatarKey} size="xs" />
+ <Avatar name={rp.author.name} username={rp.author.username} avatarKey={rp.author.avatarKey} size="xs" online={rp.author.online} />
  </Link>
  </UserHoverCard>
  <Link
@@ -329,7 +465,7 @@ export default function Comments({
  </li>
  );
  })}
- {comments.length === 0 && <li className="text-sm text-neutral-400">还没有评论，来说两句？</li>}
+ {merged.length === 0 && <li className="text-sm text-neutral-400">还没有评论，来说两句？</li>}
  </ul>
 
  {viewer && (

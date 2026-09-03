@@ -4,6 +4,7 @@ import { formatCount, timeAgo } from "@/lib/format";
 import Gallery from "@/components/resource/Gallery";
 import { FollowButton } from "@/components/social/interactions";
 import Avatar from "@/components/ui/Avatar";
+import UserHoverCard from "@/components/ui/UserHoverCard";
 import {
   ActionBar,
   CommentBlock,
@@ -137,11 +138,12 @@ export default function DetailPost({ ctx }: { ctx: DetailCtx }) {
         {/* 右：作者 + 操作 */}
         <div className="flex shrink-0 flex-col items-start gap-3 lg:items-end">
           <div className="flex items-center gap-3">
+            <UserHoverCard user={a}>
             <Link
               href={`/u/${a.username}`}
               className="flex items-center gap-2.5"
             >
-              <Avatar name={a.name} username={a.username} avatarKey={a.avatarKey} size="md" />
+              <Avatar name={a.name} username={a.username} avatarKey={a.avatarKey} size="md" online={a.online} />
               <span>
                 <span className="block text-sm font-medium text-neutral-800">
                   {a.name ?? a.username}
@@ -151,6 +153,7 @@ export default function DetailPost({ ctx }: { ctx: DetailCtx }) {
                 </span>
               </span>
             </Link>
+            </UserHoverCard>
             {!isAuthor &&
               (authed ? (
                 <FollowButton

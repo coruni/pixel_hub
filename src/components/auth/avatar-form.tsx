@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { Trash2, Upload } from "lucide-react";
 import Avatar from "@/components/ui/Avatar";
 import AvatarCropper from "./AvatarCropper";
@@ -11,20 +11,24 @@ import {
 } from "@/lib/actions/settings";
 
 // 设置页头像卡：选图 → 裁剪器（方形视口/缩放/拖动）→ 预览 → 保存。
+// GIF 免裁剪直接上传（仅受信用户可选 GIF）；其余格式裁剪成 256×256。
 // blob: 预览 URL 在 publicUrl 中原样放行，避免被拼成 /uploads/blob:... 404。
 export default function AvatarForm({
   name,
   username,
   avatarKey,
+  trusted,
 }: {
   name: string | null;
   username: string;
   avatarKey: string | null;
+  trusted: boolean;
 }) {
   const [state, formAction, pending] = useActionState<SettingsActionState, FormData>(uploadAvatarAction, {});
   const [file, setFile] = useState<File | null>(null); // 原始选中的文件（进裁剪器）
-  const [cropped, setCropped] = useState<File | null>(null); // 裁剪产物（待上传）
+  const [cropped, setCropped] = useState<File | null>(null); // 待上传文件（裁剪产物或免裁剪的 GIF）
   const [preview, setPreview] = useState<string | null>(null);
+  const [gifDenied, setGifDenied] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null); // 选图入口（不提交）
   const hiddenRef = useRef<HTMLInputElement>(null); // 真正提交 name="avatar" 的隐藏 input
 
@@ -32,6 +36,20 @@ export default function AvatarForm({
     if (!f) return;
     setCropped(null);
     setPreview(null);
+    if (f.type === "image/gif") {
+      // GIF 免裁剪直接上传，仅受信用户允许
+      if (!trusted) {
+        setGifDenied(true);
+        setFile(null);
+        return;
+      }
+      setGifDenied(false);
+      setFile(null);
+      setCropped(f);
+      setPreview(URL.createObjectURL(f));
+      return;
+    }
+    setGifDenied(false);
     setFile(f);
   }
 
@@ -46,20 +64,31 @@ export default function AvatarForm({
     setPreview(URL.createObjectURL(f));
   }
 
+  // GIF 原文件直接作为提交文件
+  useEffect(() => {
+    if (cropped?.type === "image/gif" && hiddenRef.current) {
+      const dt = new DataTransfer();
+      dt.items.add(cropped);
+      hiddenRef.current.files = dt.files;
+    }
+  }, [cropped]);
+
   return (
     <div className="flex flex-wrap items-center gap-5">
       <Avatar name={name} username={username} avatarKey={preview ?? avatarKey} size="lg" />
       <form action={formAction} className="min-w-0 flex-1">
         <p className="text-xs leading-5 text-neutral-400">
-          支持 png / jpg / webp / gif，最大 5MB；选图后可拖动/缩放调整裁剪区域
+          支持 png / jpg / webp，最大 5MB；选图后可拖动/缩放调整裁剪区域
+          {trusted && "；GIF 动图免裁剪直接上传"}
         </p>
         {state.ok && <p className="mt-1 text-sm text-emerald-600">✓ 已更新</p>}
         {state.error && <p className="mt-1 text-sm text-red-500">{state.error}</p>}
+        {gifDenied && <p className="mt-1 text-sm text-red-500">GIF 头像仅对受信用户开放</p>}
         <div className="mt-3 flex flex-wrap gap-2">
           <input
             ref={inputRef}
             type="file"
-            accept="image/png,image/jpeg,image/webp,image/gif"
+            accept={trusted ? "image/png,image/jpeg,image/webp,image/gif" : "image/png,image/jpeg,image/webp"}
             className="hidden"
             onChange={(e) => {
               pick(e.target.files?.[0]);
@@ -93,7 +122,9 @@ export default function AvatarForm({
           )}
         </div>
         {cropped && (
-          <p className="mt-2 text-xs text-neutral-400">已裁剪 256×256，点「保存」上传</p>
+          <p className="mt-2 text-xs text-neutral-400">
+            {cropped.type === "image/gif" ? "GIF 原图待上传" : "已裁剪 256×256"}，点「保存」上传
+          </p>
         )}
       </form>
 

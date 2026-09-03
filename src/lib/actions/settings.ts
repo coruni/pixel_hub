@@ -65,9 +65,14 @@ export async function uploadAvatarAction(
   if (buf.byteLength > AVATAR_MAX_BYTES) return { error: "头像不能超过 5MB" };
   if (!sniffImage(buf)) return { error: "不支持的图片格式（仅 png/jpg/webp/gif）" };
 
+  const isGif = buf.length >= 6 && buf.subarray(0, 6).toString("latin1").startsWith("GIF8");
+  const canGif = user.trusted || user.role === "ADMIN" || user.role === "MODERATOR";
+  if (isGif && !canGif) return { error: "GIF 头像仅对受信用户开放" };
+
   try {
-    const key = makeKey("avatars", ".webp");
-    const out = await sharp(buf, { failOn: "none" })
+    const key = makeKey("avatars", isGif ? ".gif" : ".webp");
+    // GIF：保留动图原样落盘（不过 sharp，避免动图被压成静帧）；其余：方形居中裁切 256px webp
+    const out = isGif ? buf : await sharp(buf, { failOn: "none" })
       .rotate()
       .resize(256, 256, { fit: "cover", position: "attention" })
       .webp({ quality: 85 })

@@ -84,7 +84,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
  <section className="mt-6 rounded-none border border-brand-200 bg-surface p-6">
  <h2 className="text-sm font-semibold text-neutral-800">头像</h2>
  <p className="mb-4 mt-1 text-xs text-neutral-400">展示在个人主页、评论区与作者信息</p>
- <AvatarForm name={profile?.name ?? null} username={me.username} avatarKey={profile?.avatarKey ?? null} />
+ <AvatarForm name={profile?.name ?? null} username={me.username} avatarKey={profile?.avatarKey ?? null} trusted={!!me.trusted} />
  </section>
 
  {/* 个人资料 */}

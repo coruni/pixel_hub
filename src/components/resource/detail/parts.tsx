@@ -7,6 +7,7 @@ import type { parseMeta } from "@/lib/meta";
 import { formatCount, timeAgo } from "@/lib/format";
 import Comments from "@/components/social/Comments";
 import Avatar from "@/components/ui/Avatar";
+import UserHoverCard from "@/components/ui/UserHoverCard";
 import Markdown from "@/components/rte/Markdown";
 import {
   DownloadButton,
@@ -53,12 +54,14 @@ export function AuthorStrip({ ctx }: { ctx: DetailCtx }) {
   const a = detail.author;
   return (
     <div className="flex items-center justify-between rounded-none border border-brand-200 bg-surface p-3">
+      <UserHoverCard user={a}>
       <Link href={`/u/${a.username}`} className="flex items-center gap-2.5">
         <Avatar
           name={a.name}
           username={a.username}
           avatarKey={a.avatarKey}
           size="md"
+          online={a.online}
         />
         <span>
           <span className="block text-sm font-medium text-neutral-800">
@@ -67,6 +70,7 @@ export function AuthorStrip({ ctx }: { ctx: DetailCtx }) {
           <span className="block text-xs text-neutral-400">@{a.username}</span>
         </span>
       </Link>
+      </UserHoverCard>
       {!isAuthor &&
         (authed ? (
           <FollowButton

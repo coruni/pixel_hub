@@ -21,7 +21,7 @@ export default async function CreatorsBlock({ title, count }: { title: string | 
  href={`/u/${c.username}`}
  className="flex items-center gap-3 rounded-none border border-brand-200 bg-surface p-3 transition hover:border-brand-500"
  >
- <Avatar name={c.name} username={c.username} avatarKey={c.avatarKey} size="md" />
+ <Avatar name={c.name} username={c.username} avatarKey={c.avatarKey} size="md" online={c.online} />
  <span className="min-w-0">
  <span className="block truncate text-sm font-medium text-neutral-800">{c.name ?? c.username}</span>
  <span className="block truncate text-[11px] text-neutral-400">

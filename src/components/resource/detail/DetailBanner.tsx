@@ -46,11 +46,6 @@ export default function DetailBanner({ ctx }: { ctx: DetailCtx }) {
                 {detail.category.name}
               </Link>
             )}
-            {detail.type === "GAME" && (
-              <span className="rounded-none border border-brand-600 bg-emerald-600 px-2.5 py-0.5 text-[11px] font-semibold text-white">
-                游戏
-              </span>
-            )}
           </div>
           <h1 className="mt-2.5 text-2xl font-semibold leading-snug tracking-tight text-white sm:text-3xl">
             {detail.title}

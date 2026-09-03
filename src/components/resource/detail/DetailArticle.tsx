@@ -48,7 +48,7 @@ export default function DetailArticle({ ctx }: { ctx: DetailCtx }) {
       {/* 作者 meta 行 */}
       <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 py-1">
         <Link href={`/u/${a.username}`} className="flex items-center gap-2.5">
-          <Avatar name={a.name} username={a.username} avatarKey={a.avatarKey} size="sm" />
+          <Avatar name={a.name} username={a.username} avatarKey={a.avatarKey} size="sm" online={"online" in a ? a.online : false} />
           <span className="text-sm font-medium text-neutral-800">
             {a.name ?? a.username}
           </span>

@@ -166,7 +166,7 @@ export default function AvatarCropper({
               src={img.src}
               alt="待裁剪头像"
               draggable={false}
-              className="pointer-events-none absolute left-0 top-0 origin-top-left"
+              className="pointer-events-none absolute left-0 top-0 origin-top-left max-w-none"
               style={{ width: dw, height: dh, transform: `translate(${pos.x}px, ${pos.y}px)` }}
             />
           )}

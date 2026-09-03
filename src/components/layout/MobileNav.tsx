@@ -1,0 +1,116 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import {
+  Bell,
+  Bookmark,
+  Compass,
+  ExternalLink,
+  Home,
+  Info,
+  LayoutGrid,
+  Menu,
+  ShieldCheck,
+  Tag,
+  Upload,
+  X,
+  type LucideIcon,
+} from "lucide-react";
+import type { NavCategory } from "./NavCategoriesMenu";
+
+// 与 Navbar / site-config NAV_ICONS 键一致
+const ICONS: Record<string, LucideIcon> = {
+  home: Home,
+  compass: Compass,
+  upload: Upload,
+  bell: Bell,
+  shield: ShieldCheck,
+  tag: Tag,
+  bookmark: Bookmark,
+  external: ExternalLink,
+  info: Info,
+};
+
+export type MobileNavItem = { id: string; label: string; href: string; newTab: boolean; icon: string };
+
+/** 小屏导航抽屉（<sm 显示）：汉堡按钮 + 全屏下滑面板，含导航项与分类直达 */
+export default function MobileNav({ items, catLabel, categories }: { items: MobileNavItem[]; catLabel: string; categories: NavCategory[] }) {
+  const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  const btnRef = useRef<HTMLButtonElement>(null);
+
+  // 路由变化即收起抽屉
+  useEffect(() => setOpen(false), [pathname]);
+
+  // 打开时锁滚动 + Esc 关闭
+  useEffect(() => {
+    if (!open) return;
+    document.body.style.overflow = "hidden";
+    const onEsc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("keydown", onEsc);
+    return () => {
+      document.body.style.overflow = "";
+      document.removeEventListener("keydown", onEsc);
+    };
+  }, [open]);
+
+  return (
+    <div className="sm:hidden">
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-label="打开导航菜单"
+        aria-expanded={open}
+        className="grid h-8 w-8 place-items-center rounded-none border border-brand-200 bg-surface text-neutral-700 transition hover:border-brand-500"
+      >
+        {open ? <X size={16} /> : <Menu size={16} />}
+      </button>
+
+      {open && (
+        <div className="fixed inset-x-0 top-16 z-40 max-h-[calc(100dvh-4rem)] overflow-y-auto border-b border-brand-200 bg-surface shadow-lg">
+          <nav className="mx-auto grid max-w-7xl gap-1 px-4 py-4">
+            {items.map((it) => {
+              const Icon = it.icon ? ICONS[it.icon] : null;
+              return (
+                <Link
+                  key={it.id}
+                  href={it.href}
+                  target={it.newTab ? "_blank" : undefined}
+                  rel={it.newTab ? "noopener noreferrer" : undefined}
+                  className="flex items-center gap-3 rounded-none px-3 py-2.5 text-sm text-neutral-700 transition hover:bg-brand-50 hover:text-neutral-900"
+                >
+                  {Icon && <Icon size={16} aria-hidden />}
+                  {it.label}
+                </Link>
+              );
+            })}
+
+            {categories.length > 0 && (
+              <div className="mt-2 border-t border-brand-100 pt-3">
+                <p className="flex items-center gap-2 px-3 pb-2 text-xs font-medium text-neutral-400">
+                  <LayoutGrid size={13} aria-hidden />
+                  {catLabel}
+                </p>
+                <ul className="grid grid-cols-2 gap-1">
+                  {categories.map((c) => (
+                    <li key={c.slug}>
+                      <Link
+                        href={`/browse?cat=${c.slug}`}
+                        className="block truncate rounded-none px-3 py-2 text-sm text-neutral-600 transition hover:bg-brand-50 hover:text-neutral-900"
+                      >
+                        {c.name}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </nav>
+        </div>
+      )}
+    </div>
+  );
+}

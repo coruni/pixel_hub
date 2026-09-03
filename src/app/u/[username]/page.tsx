@@ -5,6 +5,7 @@ import { CalendarDays, Eye, MessageSquare, ThumbsUp } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { getFeed, getProfile, getCollections, toFeedCard, type FeedCard, type CollectionRow } from "@/lib/queries";
+import { isOnline } from "@/lib/online";
 import { createCollectionAction, renameCollectionAction, deleteCollectionAction } from "@/lib/actions/social";
 import { formatCount } from "@/lib/format";
 import MasonryGrid from "@/components/resource/MasonryGrid";
@@ -31,21 +32,18 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]["key"];
 
-const userSelect = { id: true, username: true, name: true, bio: true, avatarKey: true } as const;
+const userSelect = { id: true, username: true, name: true, bio: true, avatarKey: true, lastSeenAt: true } as const;
 
-function UserRow({
- u,
- following,
- meId,
-}: {
- u: { id: string; username: string; name: string | null; bio: string | null; avatarKey: string | null };
+type UserRowArgs = {
+ u: { id: string; username: string; name: string | null; bio: string | null; avatarKey: string | null; lastSeenAt: Date | null };
  following: boolean;
  meId: string | undefined;
-}) {
- return (
+};
+
+function UserRow({ u, following, meId }: UserRowArgs) { return (
  <li className="flex items-center gap-3 rounded-none p-2 transition hover:bg-brand-50">
  <Link href={`/u/${u.username}`} className="flex min-w-0 flex-1 items-center gap-3">
- <Avatar name={u.name} username={u.username} avatarKey={u.avatarKey} size="md" />
+ <Avatar name={u.name} username={u.username} avatarKey={u.avatarKey} size="md" online={isOnline(u.lastSeenAt)} />
  <span className="min-w-0">
  <span className="block truncate text-sm font-medium text-neutral-800">{u.name ?? u.username}</span>
  <span className="block truncate text-xs text-neutral-400">{u.bio || `@${u.username}`}</span>
@@ -92,7 +90,7 @@ export default async function UserPage({
  // ---- 各 tab 数据（统一每页 24 条，多取 1 条判断 hasMore） ----
  const PAGE_SIZE = 24;
  let works: FeedCard[] = [];
- let followRows: { id: string; username: string; name: string | null; bio: string | null; avatarKey: string | null }[] = [];
+ let followRows: UserRowArgs["u"][] = [];
  let viewerFollows = new Set<string>();
  let hasMore = false;
  let collections: CollectionRow[] = [];
@@ -179,7 +177,7 @@ export default async function UserPage({
  <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
  {/* 头部 */}
  <div className="flex flex-wrap items-center gap-5">
- <Avatar name={profile.name} username={profile.username} avatarKey={profile.avatarKey} size="lg" />
+ <Avatar name={profile.name} username={profile.username} avatarKey={profile.avatarKey} size="lg" online={profile.online} />
  <div className="min-w-0 flex-1">
  <div className="flex flex-wrap items-center gap-2">
  <h1 className="truncate text-2xl font-semibold tracking-tight text-neutral-900">
