@@ -1,8 +1,18 @@
 @import "tailwindcss";
 
+/* Fusion Pixel 中文像素字体（SIL OFL 1.1，许可见 public/fonts/OFL-LICENSE.txt） */
+@font-face {
+  font-family: "Fusion Pixel";
+  src: url("/fonts/fusion-pixel-12px-proportional-zh_hans.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* 暖白背景 + 暖黑前景（整体偏 Claude 风的温暖色调，不再纯白冷灰） */
+  --background: #faf9f5;
+  --foreground: #292524;
 }
 
 @theme inline {
@@ -12,15 +22,150 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* 品牌主色：温暖橙（Claude 风赤陶橙）。用法同 Tailwind 色板：bg-brand-500 / text-brand-600 等 */
+@theme {
+  --color-surface: #fffdf9; /* 卡片/面板暖白（比页面背景 #faf9f5 略亮一档） */
+  --color-brand-50: #fdf5f0;
+  --color-brand-100: #faece3;
+  --color-brand-200: #f4d9c8;
+  --color-brand-300: #ecbfa5;
+  --color-brand-400: #e29a78;
+  --color-brand-500: #d97757;
+  --color-brand-600: #c25e3c;
+  --color-brand-700: #a84e31;
+  --color-brand-800: #8a4129;
+  --color-brand-900: #6f3523;
 }
 
 body {
   background: var(--background);
+  /* 像素风点阵纹理（8px 网格微点） */
+  background-image: radial-gradient(rgba(120, 80, 50, 0.07) 1px, transparent 1px);
+  background-size: 8px 8px;
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  /* 像素风：全站使用 Fusion Pixel 位图风字体 */
+  font-family: "Fusion Pixel", "Microsoft YaHei", Arial, sans-serif;
 }
+
+/* 像素风图标：lucide 线条图标去掉圆头圆角、锐利渲染，与位图字体同一语言 */
+svg.lucide {
+  stroke-linecap: butt;
+  stroke-linejoin: miter;
+  shape-rendering: crispEdges;
+}
+
+/* 可点击元素统一手型光标（Tailwind preflight 把 button 重置成了 default） */
+button:not(:disabled),
+[role="button"]:not(:disabled),
+label:has(input[type="checkbox"], input[type="radio"], input[type="file"]),
+summary {
+  cursor: pointer;
+}
+
+/* 自定义内容 widget / 富文本正文的轻量排版（无 typography 插件） */
+.md-body {
+  font-size: 13px;
+  line-height: 1.7;
+  color: #525252;
+}
+.md-body > :first-child {
+  margin-top: 0;
+}
+.md-body > :last-child {
+  margin-bottom: 0;
+}
+.md-body p {
+  margin: 0.4rem 0;
+}
+.md-body h1,
+.md-body h2,
+.md-body h3,
+.md-body h4 {
+  margin: 0.7rem 0 0.3rem;
+  color: #171717;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.md-body h1 {
+  font-size: 1.05rem;
+}
+.md-body h2 {
+  font-size: 0.98rem;
+}
+.md-body h3 {
+  font-size: 0.9rem;
+}
+.md-body ul,
+.md-body ol {
+  margin: 0.4rem 0;
+  padding-left: 1.25rem;
+  display: grid;
+  gap: 0.15rem;
+}
+.md-body ul {
+  list-style: disc;
+}
+.md-body ol {
+  list-style: decimal;
+}
+.md-body li::marker {
+  color: #a3a3a3;
+}
+.md-body a {
+  color: #0f172a;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.md-body code {
+  border-radius: 0;
+  background: #f4f4f5;
+  padding: 0.1rem 0.3rem;
+  font-size: 0.85em;
+}
+.md-body pre {
+  overflow-x: auto;
+  border-radius: 0;
+  background: #0a0a0a;
+  padding: 0.6rem 0.75rem;
+  color: #e5e5e5;
+}
+.md-body pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+.md-body blockquote {
+  margin: 0.4rem 0;
+  border-left: 2px solid #e5e5e5;
+  padding-left: 0.6rem;
+  color: #737373;
+}
+.md-body hr {
+  margin: 0.7rem 0;
+  border-color: #e5e5e5;
+}
+.md-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0;
+}
+.md-body strong {
+  color: #171717;
+}
+
+/* 资源详情「描述」长文：正文字号/行距比侧栏小卡稍大（写在 .md-body 之后以覆盖同类属性） */
+.md-body--lg {
+  font-size: 15px;
+  line-height: 1.75;
+  color: #27272a;
+}
+.md-body--lg h1,
+.md-body--lg h2,
+.md-body--lg h3,
+.md-body--lg h4 {
+  color: #18181b;
+}
+.md-body--lg pre {
+  font-size: 0.85rem;
+}
+

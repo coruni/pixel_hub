@@ -1,0 +1,389 @@
+// Prisma schema —— CMS 资源社区（见根目录 DESIGN.md §5）
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite" // 生产切 postgresql
+  url      = env("DATABASE_URL")
+}
+
+// ---------- 认证（Auth.js v5 + prisma adapter） ----------
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  username     String   @unique
+  passwordHash String? // Credentials 登录
+  name         String?
+  avatarKey    String?
+  bio          String?
+  role         Role     @default(USER)
+  trusted      Boolean  @default(false) // D6 白名单免审
+  bannedAt     DateTime?
+  bannedReason String?
+
+  accounts       Account[]
+  sessions       Session[]
+  resources      Resource[]
+  comments       Comment[]
+  likes          Like[]
+  favorites      Favorite[]
+  collections    Collection[]
+  following      Follow[] @relation("Following")
+  followers      Follow[] @relation("Follower")
+  notifications  Notification[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@id([identifier, token])
+}
+
+// ---------- 分类与标签 ----------
+
+model Category {
+  id        String       @id @default(cuid())
+  slug      String       @unique
+  name      String
+  parentId  String?
+  sort      Int          @default(0)
+  parent    Category?    @relation("CategoryTree", fields: [parentId], references: [id])
+  children  Category[]   @relation("CategoryTree")
+  resources Resource[]
+}
+
+model Tag {
+  id    String @id @default(cuid())
+  name  String @unique
+  slug  String @unique
+  count Int    @default(0)
+  items TagOnResource[]
+}
+
+// ---------- 内容 ----------
+
+model Resource {
+  id            String         @id @default(cuid())
+  slug          String         @unique
+  title         String
+  summary       String?
+  description   String
+  type          ResourceType
+  categoryId    String?
+  category      Category?      @relation(fields: [categoryId], references: [id])
+  authorId      String
+  author        User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  status        ResourceStatus @default(PENDING) // D6：默认待审
+  rejectReason  String?
+
+  coverMediaId String?
+  coverMedia   Media?         @relation("Cover", fields: [coverMediaId], references: [id])
+  media        Media[]        @relation("ResourceMedia")
+  tags         TagOnResource[]
+  versions     ResourceVersion[]
+  comments     Comment[]
+  likes        Like[]
+  favorites    Favorite[]
+
+  viewCount     Int @default(0)
+  likeCount     Int @default(0)
+  favoriteCount Int @default(0)
+  commentCount  Int @default(0)
+  downloadCount Int @default(0)
+
+  isDownloadable Boolean @default(true)
+  loginRequired  Boolean @default(false) // D3：外链下载是否需登录
+  allowComments  Boolean @default(true)
+  externalUrl    String? // D1：游戏/整包外链（网盘/直链）
+
+  // D2 图片四类 / 游戏信息：类型化扩展，值为 JSON 文本（zod 校验后序列化）
+  meta String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  publishedAt DateTime?
+
+  @@index([status, type])
+  @@index([status, publishedAt(sort: Desc)])
+  @@index([authorId])
+  @@index([categoryId])
+}
+
+model Media {
+  id         String     @id @default(cuid())
+  resourceId String?
+  resource   Resource?  @relation("ResourceMedia", fields: [resourceId], references: [id], onDelete: Cascade)
+  coverOf    Resource[] @relation("Cover")
+  commentId  String? // V1 评论带图（D8）
+  comment    Comment?   @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  kind       MediaKind
+  storageKey String
+  thumbKey   String? // 400w 缩略图键
+  bigKey     String? // 1200w 大图键
+  // 极低分辨率占位 data URI（sharp 生成，替代需外部库的 blurhash）
+  placeholder String?
+  width      Int?
+  height     Int?
+  size       Int?
+  mime       String?
+  fileName   String?
+  checksum   String?
+  sort       Int        @default(0)
+  status     MediaStatus @default(PENDING_PROCESS)
+
+  createdAt DateTime @default(now())
+}
+
+model ResourceVersion {
+  id            String @id @default(cuid())
+  resourceId    String
+  resource      Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  version       String
+  changelog     String?
+  downloadCount Int    @default(0)
+  createdAt     DateTime @default(now())
+}
+
+model TagOnResource {
+  resourceId String
+  tagId      String
+  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([resourceId, tagId])
+  @@index([tagId])
+}
+
+// ---------- 社交 ----------
+
+model Like {
+  id         String   @id @default(cuid())
+  userId     String
+  resourceId String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, resourceId])
+}
+
+model Favorite {
+  id           String   @id @default(cuid())
+  userId       String
+  collectionId String?
+  resourceId   String
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  collection   Collection?  @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  resource     Resource     @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  createdAt    DateTime     @default(now())
+
+  @@unique([userId, resourceId])
+}
+
+model Collection {
+  id               String     @id @default(cuid())
+  ownerId          String
+  owner            User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name             String
+  description      String?
+  coverResourceId  String?
+  isPublic         Boolean    @default(true)
+  items            Favorite[]
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+}
+
+model Comment {
+  id         String        @id @default(cuid())
+  resourceId String
+  resource   Resource      @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  authorId   String
+  author     User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parentId   String?
+  parent     Comment?      @relation("CommentReplies", fields: [parentId], references: [id])
+  replies    Comment[]     @relation("CommentReplies")
+  media      Media[]
+  content    String
+  status     CommentStatus @default(PUBLIC)
+  likeCount  Int           @default(0)
+  createdAt  DateTime      @default(now())
+
+  @@index([resourceId, createdAt])
+}
+
+model Follow {
+  followerId  String
+  followingId String
+  follower    User @relation("Following", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User @relation("Follower", fields: [followingId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@id([followerId, followingId])
+  @@index([followingId])
+}
+
+model Notification {
+  id         String           @id @default(cuid())
+  userId     String
+  actorId    String?
+  type       NotificationType
+  resourceId String?
+  commentId  String?
+  message    String?
+  readAt     DateTime?
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime         @default(now())
+
+  @@index([userId, readAt])
+}
+
+// ---------- 治理 ----------
+
+model Report {
+  id                String       @id @default(cuid())
+  reporterId        String
+  type              ReportTarget
+  targetResourceId  String?
+  targetCommentId   String?
+  targetUserId      String?
+  reason            String
+  detail            String?
+  status            ReportStatus @default(OPEN)
+  handledBy         String?
+  handledAt         DateTime?
+  createdAt         DateTime     @default(now())
+
+  @@index([status])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  adminId    String
+  action     String // BAN / UNBAN / TRUST / UNTRUST / REMOVE_RESOURCE / REJECT / RESTORE ...
+  targetType String?
+  targetId   String?
+  note       String?
+  createdAt  DateTime @default(now())
+}
+
+// ---------- 首页布局（WordPress 式板块引擎） ----------
+
+model HomeSection {
+  id        String   @id @default(cuid())
+  kind      String // hero | categories | feed | stats | creators | tags
+  title     String? // 板块标题（hero 作大标语）
+  order     Int      @default(0)
+  enabled   Boolean  @default(true)
+  config    String? // 板块配置 JSON 文本（zod 校验后序列化）
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([order])
+}
+
+// ---------- 站点外观 / 布局（全局设置，值 JSON 文本经 zod 校验） ----------
+// key 约定：theme —— 站点级侧边栏 + 详情页模板默认 等外观配置
+
+model SiteSetting {
+  key   String @id
+  value String // JSON 文本
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ---------- 枚举 ----------
+
+enum Role {
+  USER
+  MODERATOR
+  ADMIN
+}
+
+enum ResourceType {
+  GAME
+  IMAGE
+  ARTICLE
+}
+
+enum ResourceStatus {
+  DRAFT
+  PENDING
+  PUBLISHED
+  REJECTED
+  REMOVED
+  BANNED
+}
+
+enum MediaKind {
+  COVER
+  GALLERY
+  ORIGINAL
+  ATTACHMENT
+}
+
+enum MediaStatus {
+  PENDING_PROCESS
+  READY
+  FAILED
+}
+
+enum CommentStatus {
+  PUBLIC
+  HIDDEN
+  DELETED
+}
+
+enum NotificationType {
+  FOLLOW
+  LIKE
+  COMMENT
+  MODERATION
+  SYSTEM
+}
+
+enum ReportTarget {
+  RESOURCE
+  COMMENT
+  USER
+}
+
+enum ReportStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
+}
