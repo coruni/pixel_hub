@@ -13,8 +13,10 @@ export function normKey(key: string): string {
 }
 
 export function absKey(key: string): string {
+  const root = path.resolve(ROOT);
   const abs = path.resolve(ROOT, normKey(key));
-  if (!abs.startsWith(path.resolve(ROOT))) throw new Error("非法存储键: 越界路径");
+  // 逐段比较（path.sep 兜底根目录）：普通 startsWith 会放过 "uploads-evil" 这类同前缀兄弟目录
+  if (abs !== root && !abs.startsWith(root + path.sep)) throw new Error("非法存储键: 越界路径");
   return abs;
 }
 

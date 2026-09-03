@@ -23,7 +23,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           GitHub({
             clientId: process.env.GITHUB_ID,
             clientSecret: process.env.GITHUB_SECRET,
-            allowDangerousEmailAccountLinking: true,
+            // 不允许 GitHub 邮箱自动并入已有站内账号（劫持他人凭邮箱抢登）；
+            // 绑定走 settings 的手动 OAuth 流（startGitHubBindAction）
+            allowDangerousEmailAccountLinking: false,
           }),
         ]
       : []),
@@ -55,6 +57,50 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   callbacks: {
     ...authConfig.callbacks,
+    // 覆盖 jwt 回调：登录瞬间写入身份（同 authConfig），此后每次请求回查 DB，
+    // 让封禁 / 降权 / 取消免审 / 改密立即生效（strategy=jwt 下 session 表删除不生效）。
+    // pw 为 passwordHash 尾部签名，改密/重置后旧 token 全部失效（含攻击者持有的旧会话）。
+    async jwt({ token, user }) {
+      const t = token as unknown as {
+        id?: string;
+        username?: string;
+        role?: "USER" | "MODERATOR" | "ADMIN";
+        trusted?: boolean;
+        pw?: string;
+      };
+      if (user) {
+        const u = user as unknown as {
+          id?: string;
+          username?: string;
+          role?: "USER" | "MODERATOR" | "ADMIN";
+          trusted?: boolean;
+        };
+        t.id = u.id;
+        t.username = u.username;
+        if (u.role) t.role = u.role;
+        t.trusted = u.trusted;
+      }
+      if (t.id) {
+        const row = await prisma.user.findUnique({
+          where: { id: t.id },
+          select: { role: true, trusted: true, bannedAt: true, passwordHash: true },
+        });
+        const sig = row?.passwordHash?.slice(-16) ?? "";
+        if (!row || row.bannedAt || (t.pw !== undefined && t.pw !== sig)) {
+          // 会话失效：清空身份，session 回调将得到未登录态
+          delete t.id;
+          delete t.username;
+          delete t.role;
+          delete t.trusted;
+          delete t.pw;
+        } else {
+          t.role = row.role;
+          t.trusted = row.trusted;
+          t.pw = sig;
+        }
+      }
+      return token;
+    },
     // 封禁用户在登录关口统一拦截（credentials + OAuth），引导到提示页
     // GitHub 绑定不需要专门逻辑：Auth.js 核心在「已登录 + OAuth」时自动 linkAccount
     //（绑定到当前用户而不切换会话）；账号已被他人绑定时抛 AccountNotLinked。

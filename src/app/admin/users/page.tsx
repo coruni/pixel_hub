@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/lib/auth";
 import { formatCount, timeAgo } from "@/lib/format";
@@ -11,6 +12,8 @@ const roleLabel: Record<string, string> = { USER: "用户", MODERATOR: "版主",
 export default async function UsersPage() {
  const session = await auth();
  const isAdmin = session?.user?.role === "ADMIN";
+ // 全站用户列表（含邮箱等 PII）仅 ADMIN 可见；MODERATOR 直接输 URL 也不放行
+ if (!isAdmin) redirect("/admin");
  const rows = await prisma.user.findMany({
  orderBy: { createdAt: "asc" },
  take: 500,
@@ -47,7 +50,8 @@ export default async function UsersPage() {
  <span>
  <span className="block font-medium text-neutral-900">{u.name ?? u.username}</span>
  <span className="block text-xs text-neutral-400">
- @{u.username} · {u.email}
+ @{u.username}
+ {isAdmin && ` · ${u.email}`}
  </span>
  </span>
  </Link>

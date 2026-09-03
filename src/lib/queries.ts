@@ -1,6 +1,7 @@
 import { publicUrl } from "@/lib/storage";
 import { prisma } from "@/lib/db/prisma";
 import { isOnline } from "@/lib/online";
+import { cache } from "react";
 import type { Prisma, ResourceType } from "@prisma/client";
 
 export type FeedItem = {
@@ -151,7 +152,7 @@ function toFeedItem(r: FeedRow): FeedItem {
 
 export async function getFeed(params: FeedParams): Promise<{ items: FeedItem[]; page: number; hasMore: boolean }> {
   const page = Math.max(1, params.page ?? 1);
-  const pageSize = Math.min(48, params.pageSize ?? 24);
+  const pageSize = Math.max(1, Math.min(48, params.pageSize ?? 24));
 
   const where: Prisma.ResourceWhereInput = {
     status: params.includeStatuses ? { in: params.includeStatuses } : "PUBLISHED",
@@ -210,13 +211,14 @@ export async function getFeed(params: FeedParams): Promise<{ items: FeedItem[]; 
   return { items: rows.slice(0, pageSize).map(toFeedItem), page, hasMore };
 }
 
-export async function getCategories() {
+// 请求内去重：Navbar 分类菜单、sidebar widget、首页 categories 板块常在同页重复取
+export const getCategories = cache(async () => {
   return prisma.category.findMany({ orderBy: [{ sort: "asc" }, { name: "asc" }] });
-}
+});
 
-export async function getTopTags(limit = 24) {
+export const getTopTags = cache(async (limit = 24) => {
   return prisma.tag.findMany({ orderBy: { count: "desc" }, take: limit, select: { slug: true, name: true, count: true } });
-}
+});
 
 export type ResourceDetail = Awaited<ReturnType<typeof getResourceDetail>>;
 
@@ -376,11 +378,6 @@ export async function getResourceDetail(slug: string, viewerId?: string) {
   };
 }
 
-// 浏览计数（会话内去重由调用方限制）
-export async function bumpView(resourceId: string) {
-  await prisma.resource.update({ where: { id: resourceId }, data: { viewCount: { increment: 1 } } });
-}
-
 // ---------- 相关推荐 ----------
 // 同分类热门优先，不足补同类型热门（排除自身与已取条目），复用 getFeed 的取数逻辑
 export async function getRelated(resource: {
@@ -494,6 +491,8 @@ export async function getCollectionDetail(id: string, viewerId?: string) {
       items: {
         orderBy: { createdAt: "desc" },
         take: 100,
+        // 只展示已上架资源：未发布/被下架内容不能经公开夹子绕过 detail 页守卫
+        where: { resource: { status: "PUBLISHED" } },
         include: {
           resource: {
             include: {
@@ -567,19 +566,13 @@ export async function getNotifications(
 
   // Notification 只存 resourceId / actorId 标量（schema 未建 relation），需二次查询补全
   const rids = [...new Set(rows.map((r) => r.resourceId).filter((x): x is string => !!x))];
-  const resMap = new Map(
-    (rids.length
-      ? await prisma.resource.findMany({ where: { id: { in: rids } }, select: { id: true, slug: true, title: true } })
-      : []
-    ).map((r) => [r.id, r] as const)
-  );
   const aIds = [...new Set(rows.map((r) => r.actorId).filter((x): x is string => !!x))];
-  const actorMap = new Map(
-    (aIds.length
-      ? await prisma.user.findMany({ where: { id: { in: aIds } }, select: { id: true, username: true, name: true } })
-      : []
-    ).map((u) => [u.id, u] as const)
-  );
+  const [resourceRows, actorRows] = await Promise.all([
+    rids.length ? prisma.resource.findMany({ where: { id: { in: rids } }, select: { id: true, slug: true, title: true } }) : [],
+    aIds.length ? prisma.user.findMany({ where: { id: { in: aIds } }, select: { id: true, username: true, name: true } }) : [],
+  ]);
+  const resMap = new Map(resourceRows.map((r) => [r.id, r] as const));
+  const actorMap = new Map(actorRows.map((u) => [u.id, u] as const));
 
   return {
     rows: rows.map((r) => ({

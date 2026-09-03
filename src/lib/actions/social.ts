@@ -100,6 +100,12 @@ export async function toggleFavoriteAction(resourceId: string): Promise<{ favori
     await prisma.resource.update({ where: { id: resourceId }, data: { favoriteCount: { decrement: 1 } } });
     return { favorited: false };
   }
+  // 与 toggleLikeAction 一致：只能收藏已上架资源（防操纵未发布/已下架内容计数）
+  const target = await prisma.resource.findFirst({
+    where: { id: resourceId, status: "PUBLISHED" },
+    select: { id: true },
+  });
+  if (!target) return { favorited: false };
   const collectionId = await ensureDefaultCollection(user.id);
   await prisma.favorite.create({ data: { userId: user.id, resourceId, collectionId } });
   await prisma.resource.update({ where: { id: resourceId }, data: { favoriteCount: { increment: 1 } } });
@@ -158,6 +164,8 @@ export async function deleteCollectionAction(fd: FormData): Promise<void> {
 export async function toggleFollowAction(targetUserId: string): Promise<{ following: boolean }> {
   const user = await requiredUser();
   if (!user || user.id === targetUserId) return { following: false };
+  // 关注切换会触发通知：限流防高频骚扰
+  if (!rateLimit(`follow:${user.id}`, 20, 60_000)) return { following: false };
   const existing = await prisma.follow.findUnique({
     where: { followerId_followingId: { followerId: user.id, followingId: targetUserId } },
   });
@@ -255,6 +263,7 @@ export async function addCommentAction(_prev: CommentActionState, fd: FormData):
           .map((m, i) => ({
             kind: "ATTACHMENT" as const,
             commentId: comment.id,
+            uploaderId: user.id,
             storageKey: m.key,
             width: m.width,
             height: m.height,

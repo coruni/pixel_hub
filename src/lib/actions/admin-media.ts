@@ -74,6 +74,7 @@ export async function uploadMediaAction(_prev: { ok?: boolean; error?: string },
     await prisma.media.create({
       data: {
         kind: "ORIGINAL",
+        uploaderId: me.id,
         storageKey: url, // chevereto 返回远端 URL，local/s3 返回站内路径
         size: buf.byteLength,
         mime: file.type || null,

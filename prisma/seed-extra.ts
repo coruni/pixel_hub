@@ -7,7 +7,11 @@ import bcrypt from "bcryptjs";
 import { createHash, randomBytes } from "crypto";
 import { prisma } from "../src/lib/db/prisma";
 
-const PASSWORD = "test1234";
+// 测试账号密码统一：test1234（仅限开发环境，生产禁跑 seed，见 seed.ts）
+const PASSWORD = process.env.SEED_PASSWORD ?? "test1234";
+if (process.env.NODE_ENV === "production" && !process.env.SEED_PASSWORD) {
+ throw new Error("生产环境跑 seed 必须设置 SEED_PASSWORD（默认弱口令被拒绝）");
+}
 
 function daysAgo(n: number, hour = 10, minute = 0): Date {
  const d = new Date();

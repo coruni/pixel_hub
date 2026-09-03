@@ -48,8 +48,13 @@ export const authConfig = {
         role?: "USER" | "MODERATOR" | "ADMIN";
         trusted?: boolean;
       };
+      // token 身份被清空（封禁/改密后的失效会话，见 lib/auth.ts 的 jwt 回查）→ 视为未登录
+      if (!t.id) {
+        session.user = undefined as never;
+        return session;
+      }
       if (session.user) {
-        session.user.id = t.id ?? "";
+        session.user.id = t.id;
         session.user.username = t.username ?? "";
         session.user.role = t.role ?? "USER";
         session.user.trusted = t.trusted ?? false;

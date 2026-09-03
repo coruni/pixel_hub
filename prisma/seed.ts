@@ -1,11 +1,16 @@
 /* eslint-disable no-console */
-// 演示种子数据。测试账号密码统一：test1234
+// 演示种子数据（仅限开发环境；测试账号密码统一：test1234）。
+// 生产部署禁止跑 seed：默认弱口令账号会直接成为管理员入口。
+// 如确需 seed，用 SEED_PASSWORD 提供强口令。
 import bcrypt from "bcryptjs";
 import { prisma } from "../src/lib/db/prisma";
 import { DEFAULT_SECTIONS } from "../src/lib/home-config";
 import { DEFAULT_THEME, THEME_KEY, serializeTheme } from "../src/lib/site-config";
 
-const PASSWORD = "test1234";
+const PASSWORD = process.env.SEED_PASSWORD ?? "test1234";
+if (process.env.NODE_ENV === "production" && !process.env.SEED_PASSWORD) {
+  throw new Error("生产环境跑 seed 必须设置 SEED_PASSWORD（默认弱口令被拒绝）");
+}
 
 // 中文简介里的英文标签用 slug 查询，故保留一份 name->slug 映射
 type CAT = { slug: string; name: string; sort: number };

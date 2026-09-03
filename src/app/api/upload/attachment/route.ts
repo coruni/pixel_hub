@@ -1,7 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { makeKey, saveFile } from "@/lib/storage";
+import { rateLimit } from "@/lib/rate-limit";
+import { sameOrigin } from "@/lib/origin";
 
 export const runtime = "nodejs";
 
@@ -19,9 +21,13 @@ const ALLOWED_EXT = new Set([
   "ttf", "otf", "woff", "woff2",
 ]);
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  if (!sameOrigin(req)) return NextResponse.json({ ok: false, error: "跨站请求被拒绝" }, { status: 403 });
   const session = await auth();
   if (!session?.user) return NextResponse.json({ ok: false, error: "请先登录" }, { status: 401 });
+  // 附件体积大（≤200MB）：比图片更紧的限流，防存储滥用
+  if (!rateLimit(`attach:${session.user.id}`, 10, 60 * 60_000))
+    return NextResponse.json({ ok: false, error: "上传过于频繁，请稍后再试" }, { status: 429 });
 
   const form = await req.formData();
   const file = form.get("file");
@@ -45,6 +51,7 @@ export async function POST(req: Request) {
     const media = await prisma.media.create({
       data: {
         kind: "ATTACHMENT",
+        uploaderId: session.user.id,
         storageKey: url,
         size: buf.byteLength,
         mime: file.type || null,

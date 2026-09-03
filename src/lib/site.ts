@@ -1,4 +1,5 @@
 // 站点外观 —— 服务端读取层（渲染 / 后台初始化共用）。配置结构校验见 site-config.ts。
+import { cache } from "react";
 import { prisma } from "@/lib/db/prisma";
 import {
   DEFAULT_THEME,
@@ -8,8 +9,8 @@ import {
   type Theme,
 } from "@/lib/site-config";
 
-/** 读取主题设置；未落库时返回代码内默认（不写库，绝不空白） */
-export async function getTheme(): Promise<Theme> {
+/** 读取主题设置；未落库时返回代码内默认（不写库，绝不空白）。请求内去重（page 与 sidebar 共用） */
+export const getTheme = cache(async (): Promise<Theme> => {
   const row = await prisma.siteSetting.findUnique({ where: { key: THEME_KEY } });
   if (!row) return parseTheme(null);
   let value: unknown = null;
@@ -19,7 +20,7 @@ export async function getTheme(): Promise<Theme> {
     value = null;
   }
   return parseTheme(value);
-}
+});
 
 /** 读取原始值是否存在（后台判空用） */
 export async function siteSettingExists(key: string): Promise<boolean> {

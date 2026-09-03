@@ -36,6 +36,7 @@ model User {
   followers      Follow[] @relation("Follower")
   notifications  Notification[]
   passwordResets PasswordResetToken[]
+  uploads        Media[]       @relation("Uploads")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -164,6 +165,8 @@ model Media {
   coverOf    Resource[] @relation("Cover")
   commentId  String? // V1 评论带图（D8）
   comment    Comment?   @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  uploaderId String? // 上传者：发布认领时校验属主（防 IDOR 抢他人素材）
+  uploader   User?      @relation("Uploads", fields: [uploaderId], references: [id], onDelete: SetNull)
 
   kind       MediaKind
   storageKey String
@@ -181,6 +184,10 @@ model Media {
   status     MediaStatus @default(PENDING_PROCESS)
 
   createdAt DateTime @default(now())
+
+  @@index([resourceId])
+  @@index([commentId])
+  @@index([uploaderId])
 }
 
 model ResourceVersion {
@@ -243,6 +250,8 @@ model Collection {
   items            Favorite[]
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
+
+  @@index([ownerId])
 }
 
 model Comment {

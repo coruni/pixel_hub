@@ -158,11 +158,18 @@ export async function createResourceAction(
         await tx.tag.update({ where: { id: tag.id }, data: { count: { increment: 1 } } });
       }
 
-      // 认领已上传的媒体并排序
+      // 认领已上传的媒体并排序（只认领本人上传、未被占用的孤儿媒体；防把他人素材挂进自己资源）
+      const claimedIds: string[] = [];
       for (let i = 0; i < mediaIds.length; i++) {
-        await tx.media.updateMany({ where: { id: mediaIds[i] }, data: { resourceId: r.id, sort: i } });
+        const res = await tx.media.updateMany({
+          where: { id: mediaIds[i], uploaderId: user.id, resourceId: null, commentId: null },
+          data: { resourceId: r.id, sort: i },
+        });
+        if (res.count > 0) claimedIds.push(mediaIds[i]);
       }
-      if (coverId) await tx.resource.update({ where: { id: r.id }, data: { coverMediaId: coverId } });
+      if (mediaIds.length > 0 && claimedIds.length === 0) throw new Error("媒体不可用或已归属其他内容");
+      const finalCover = claimedIds.includes(coverId) ? coverId : claimedIds[0] ?? null;
+      if (finalCover) await tx.resource.update({ where: { id: r.id }, data: { coverMediaId: finalCover } });
 
       // 有下载地址的资源落首个版本记录（版本号取 meta.version，缺省 1.0）
       if (externalUrl) {

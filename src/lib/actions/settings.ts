@@ -145,7 +145,7 @@ export async function changePasswordAction(
 }
 
 const emailSchema = z.object({
-  email: z.string().trim().email("邮箱格式不正确"),
+  email: z.string().trim().toLowerCase().email("邮箱格式不正确"),
   password: z.string().min(1, "请输入当前密码"),
 });
 

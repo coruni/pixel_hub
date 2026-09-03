@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { processImage, publicUrl } from "@/lib/media/process";
 import { rateLimit } from "@/lib/rate-limit";
+import { sameOrigin } from "@/lib/origin";
 
 export const runtime = "nodejs";
 
@@ -22,7 +23,8 @@ function sniff(buf: Buffer): { mime: string; ext: string } | null {
   return null;
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  if (!sameOrigin(req)) return NextResponse.json({ ok: false, error: "跨站请求被拒绝" }, { status: 403 });
   const session = await auth();
   if (!session?.user) return NextResponse.json({ ok: false, error: "请先登录" }, { status: 401 });
   // 上传限流：每用户 30 次 / 小时（防滥用存储）
@@ -53,6 +55,7 @@ export async function POST(req: Request) {
       const media = await prisma.media.create({
         data: {
           kind: "GALLERY",
+          uploaderId: session.user.id,
           storageKey: p.storageKey,
           bigKey: p.bigKey,
           thumbKey: p.thumbKey,
