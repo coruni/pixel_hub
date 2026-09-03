@@ -1,10 +1,14 @@
 import { createHash } from "crypto";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { rateLimit } from "@/lib/rate-limit";
 
 // PV/IP 采集端：PageTracker 发 beacon，失败静默（统计不能影响页面）
 export async function POST(req: NextRequest) {
  try {
+ // 采集限流：每 IP 60 次 / 分钟（防刷量）
+ if (!rateLimit(`track:${req.headers.get("x-forwarded-for")?.split(",")[0] ?? "local"}`, 60, 60_000))
+ return new Response(null, { status: 204 });
  const body = (await req.json().catch(() => null)) as { path?: unknown } | null;
  const path = typeof body?.path === "string" ? body.path.slice(0, 200) : "";
  if (!path.startsWith("/")) return new Response(null, { status: 204 });

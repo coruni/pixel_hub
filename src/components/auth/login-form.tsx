@@ -48,6 +48,12 @@ export default function LoginForm({ githubEnabled, callbackUrl = "/" }: { github
  <p className="mt-1 text-xs text-red-500">{state.fieldErrors.password[0]}</p>
  )}
  </div>
+ {/* 密码找回入口 */}
+ <div className="text-right">
+ <Link href="/forgot-password" className="text-xs text-neutral-400 hover:text-neutral-900">
+ 忘记密码？
+ </Link>
+ </div>
  <button
  type="submit"
  disabled={pending}

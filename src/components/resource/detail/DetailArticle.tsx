@@ -3,6 +3,7 @@ import { CalendarDays, Eye, MessageSquare, Newspaper } from "lucide-react";
 import { formatCount, timeAgo } from "@/lib/format";
 import Markdown from "@/components/rte/Markdown";
 import Avatar from "@/components/ui/Avatar";
+import UserHoverCard from "@/components/ui/UserHoverCard";
 import { FollowButton } from "@/components/social/interactions";
 import { ActionBar, CommentBlock, RelatedSection, type DetailCtx } from "./parts";
 
@@ -47,12 +48,14 @@ export default function DetailArticle({ ctx }: { ctx: DetailCtx }) {
 
       {/* 作者 meta 行 */}
       <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 py-1">
+        <UserHoverCard user={a}>
         <Link href={`/u/${a.username}`} className="flex items-center gap-2.5">
-          <Avatar name={a.name} username={a.username} avatarKey={a.avatarKey} size="sm" online={"online" in a ? a.online : false} />
+          <Avatar name={a.name} username={a.username} avatarKey={a.avatarKey} size="sm" online={a.online} />
           <span className="text-sm font-medium text-neutral-800">
             {a.name ?? a.username}
           </span>
         </Link>
+        </UserHoverCard>
         <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-400">
           <span className="inline-flex items-center gap-1">
             <CalendarDays size={12} aria-hidden />{" "}

@@ -324,6 +324,13 @@ export default async function UserPage({
  删除夹子
  </button>
  </form>
+ {/* 该夹子的独立页（可分享；夹子本身可设为私密） */}
+ <Link
+ href={`/collections/${colFilter}`}
+ className="text-xs text-neutral-400 hover:text-neutral-900"
+ >
+ 查看独立页 →
+ </Link>
  </div>
  )}
  </>

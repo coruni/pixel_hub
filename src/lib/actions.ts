@@ -2,10 +2,12 @@
 
 import bcrypt from "bcryptjs";
 import { AuthError } from "next-auth";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { signIn, signOut } from "@/lib/auth";
+import { rateLimit, clientIp } from "@/lib/rate-limit";
 
 // ---------- 登录 ----------
 
@@ -16,6 +18,9 @@ const loginFields = z.object({
 export type LoginState = { error?: string; fieldErrors?: { identifier?: string[]; password?: string[] } };
 
 export async function loginAction(_prev: LoginState, fd: FormData): Promise<LoginState> {
+  // 登录限流：每 IP 10 次 / 5 分钟（防爆破）
+  const ip = clientIp(await headers());
+  if (!rateLimit(`login:${ip}`, 10, 5 * 60_000)) return { error: "尝试次数过多，请 5 分钟后再试" };
   const parsed = loginFields.safeParse({
     identifier: String(fd.get("identifier") ?? ""),
     password: String(fd.get("password") ?? ""),
@@ -55,6 +60,9 @@ export type RegisterState = {
 };
 
 export async function registerAction(_prev: RegisterState, fd: FormData): Promise<RegisterState> {
+  // 注册限流：每 IP 5 次 / 小时（防批量小号）
+  const ip = clientIp(await headers());
+  if (!rateLimit(`register:${ip}`, 5, 60 * 60_000)) return { error: "注册过于频繁，请稍后再试" };
   const parsed = registerFields.safeParse({
     email: String(fd.get("email") ?? ""),
     username: String(fd.get("username") ?? ""),

@@ -7,6 +7,8 @@ import { makeKey, saveFile } from "@/lib/storage";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
+import { rateLimit } from "@/lib/rate-limit";
+import { notifyByEmail } from "@/lib/mail-notify";
 
 async function requiredUser() {
   const s = await auth();
@@ -32,6 +34,23 @@ async function notify(userId: string, actorId: string, type: "LIKE" | "COMMENT" 
       },
     })
     .catch(() => undefined);
+
+  // 评论邮件提醒（点赞/关注仅站内，避免骚扰）；fire-and-forget，不拖慢 action
+  if (type === "COMMENT" && resourceId) {
+    void (async () => {
+      const [resource, actor] = await Promise.all([
+        prisma.resource.findUnique({ where: { id: resourceId }, select: { slug: true, title: true } }),
+        prisma.user.findUnique({ where: { id: actorId }, select: { name: true, username: true } }),
+      ]);
+      if (!resource || !actor) return;
+      await notifyByEmail(
+        userId,
+        `${actor.name ?? actor.username} 评论了你的内容`,
+        `${actor.name ?? actor.username} 在《${resource.title}》下发表了新评论，快去看看吧。`,
+        `/resources/${resource.slug}#comment-${commentId ?? "comments"}`,
+      );
+    })();
+  }
 }
 
 // ---------- 点赞 ----------
@@ -192,6 +211,8 @@ async function saveCommentImage(file: File): Promise<{ key: string; width: numbe
 export async function addCommentAction(_prev: CommentActionState, fd: FormData): Promise<CommentActionState> {
   const user = await requiredUser();
   if (!user) return { error: "请先登录后再评论" };
+  // 评论限流：每用户 10 条 / 分钟（防灌水）
+  if (!rateLimit(`comment:${user.id}`, 10, 60_000)) return { error: "评论太快了，休息一下再发" };
   const parsed = commentSchema.safeParse({
     resourceId: fd.get("resourceId"),
     parentId: fd.get("parentId") || undefined,

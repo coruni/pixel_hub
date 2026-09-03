@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db/prisma";
 import { getCollections, getRelated, getResourceDetail } from "@/lib/queries";
 import { parseMeta } from "@/lib/meta";
 import { getTheme, detailTemplateFor } from "@/lib/site";
@@ -19,8 +20,12 @@ const typeLabel: Record<string, string> = { GAME: "游戏", IMAGE: "图集", ART
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
+  // 仅「slug 完全不存在」时 404：页面有 loading 流式壳，等 page 里再 notFound() 状态码已是 200。
+  // 注意不能按 status 判断——草稿/待审的作者预览也走这里
+  const exists = await prisma.resource.findUnique({ where: { slug }, select: { id: true } });
+  if (!exists) notFound();
   const r = await getResourceDetail(slug);
-  if (!r || r.status !== "PUBLISHED") return { title: "未找到资源", robots: { index: false } };
+  if (!r || r.status !== "PUBLISHED") return { title: r?.title ?? "未发布内容", robots: { index: false } };
 
   const description = r.summary ?? `${r.author.name ?? "@" + r.author.username} 分享的${typeLabel[r.type] ?? "资源"}`;
   const ogImages = r.gallery[0] ? [r.gallery[0].bigUrl] : [];

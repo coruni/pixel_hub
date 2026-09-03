@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { processImage, publicUrl } from "@/lib/media/process";
+import { rateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -24,6 +25,9 @@ function sniff(buf: Buffer): { mime: string; ext: string } | null {
 export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ ok: false, error: "请先登录" }, { status: 401 });
+  // 上传限流：每用户 30 次 / 小时（防滥用存储）
+  if (!rateLimit(`upload:${session.user.id}`, 30, 60 * 60_000))
+    return NextResponse.json({ ok: false, error: "上传过于频繁，请稍后再试" }, { status: 429 });
 
   const form = await req.formData();
   const entries = form.getAll("files").filter((f): f is File => f instanceof File);

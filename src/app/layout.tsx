@@ -38,7 +38,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
  <Navbar />
  <main className="flex-1">{children}</main>
  <footer className="mt-10 border-t border-brand-200 py-8 text-center text-xs text-neutral-400">
+ <p>
+ <a href="/rules" className="hover:text-neutral-900">社区规则</a>
+ <span className="mx-2">·</span>
  {siteName()} · 分享与发现 · 请遵守平台规则，勿上传侵权与违法内容
+ </p>
  </footer>
  </body>
  </html>

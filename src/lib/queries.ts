@@ -485,6 +485,42 @@ export async function getCollections(userId: string): Promise<CollectionRow[]> {
   return rows.map((r) => ({ id: r.id, name: r.name, count: r._count.items }));
 }
 
+// 收藏夹详情：owner 本人或 isPublic 才可见；条目按收藏时间倒序（FeedCard 形状喂 MasonryGrid）
+export async function getCollectionDetail(id: string, viewerId?: string) {
+  const col = await prisma.collection.findUnique({
+    where: { id },
+    include: {
+      owner: { select: { id: true, username: true, name: true } },
+      items: {
+        orderBy: { createdAt: "desc" },
+        take: 100,
+        include: {
+          resource: {
+            include: {
+              coverMedia: { select: coverSelect },
+              author: { select: { username: true, name: true } },
+              category: { select: { slug: true, name: true } },
+              tags: { select: { tag: { select: { slug: true, name: true } } } },
+            },
+          },
+        },
+      },
+    },
+  });
+  if (!col) return null;
+  if (!col.isPublic && col.ownerId !== viewerId) return null;
+  return {
+    id: col.id,
+    name: col.name,
+    description: col.description,
+    isPublic: col.isPublic,
+    isOwner: col.ownerId === viewerId,
+    owner: col.owner,
+    createdAt: col.createdAt,
+    items: col.items.map((f) => toFeedCard(toFeedItem({ ...f.resource, publishedAt: f.resource.publishedAt } as FeedRow))),
+  };
+}
+
 // ---------- 通知 ----------
 export type NotificationRow = {
   id: string;

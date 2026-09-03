@@ -1,48 +1,34 @@
 "use server";
 
-import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
-import { auth } from "@/lib/auth";
+import { AuthError } from "next-auth";
+import { auth, signIn } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 
-// ---- GitHub 账号绑定（手动 OAuth 流，独立于 NextAuth 登录）----
-
-const BIND_CALLBACK = "/api/auth/bind/github/callback";
+// ---- GitHub 账号绑定 ----
+// 复用 GitHub 登录的 OAuth 回调 /api/auth/callback/github（GitHub OAuth App 只能配一个
+// callback URL）。Auth.js 核心在「已登录 + OAuth 授权」时自动 linkAccount——把 GitHub
+// 账号挂到当前用户而不切换会话；账号已被他人绑定时抛 AccountNotLinked。
+// 所以绑定 = 已登录状态下走一遍 GitHub OAuth。
 
 export async function startGitHubBindAction(): Promise<void> {
   const user = (await auth())?.user;
   if (!user) redirect("/login?callbackUrl=/settings");
+  if (!process.env.GITHUB_ID || !process.env.GITHUB_SECRET) redirect("/settings?bind=err");
 
-  const clientId = process.env.GITHUB_ID;
-  if (!clientId) redirect("/settings?bind=err");
-
-  const state = randomBytes(16).toString("hex");
-  const jar = await cookies();
-  jar.set("gh_bind_state", state, {
-    httpOnly: true,
-    sameSite: "lax",
-    maxAge: 600,
-    path: BIND_CALLBACK,
-  });
-
-  // 回调地址需要绝对 URL：优先 AUTH_URL，否则从请求头拼
-  const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
-  const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
-  const base = process.env.AUTH_URL?.replace(/\/$/, "") ?? `${proto}://${host}`;
-
-  const url =
-    `https://github.com/login/oauth/authorize?` +
-    new URLSearchParams({
-      client_id: clientId,
-      redirect_uri: `${base}${BIND_CALLBACK}`,
-      state,
-      scope: "read:user",
-    });
-
-  redirect(url);
+  try {
+    // 授权后回到 /api/auth/callback/github：绑定完成，跳回设置页
+    await signIn("github", { redirectTo: "/settings?bind=ok" });
+  } catch (error) {
+    // signIn 正常流程抛 redirect（不是错误）；AuthError 才是真失败。
+    // AccountNotLinked = 该 GitHub 账号已绑其他用户，其余按通用失败处理
+    if (error instanceof AuthError) {
+      const name = (error as { code?: string }).code ?? error.name;
+      redirect(name === "OAuthAccountNotLinked" || name === "AccountNotLinked" ? "/settings?bind=taken" : "/settings?bind=err");
+    }
+    throw error;
+  }
 }
 
 export async function unbindGitHubAction(): Promise<void> {

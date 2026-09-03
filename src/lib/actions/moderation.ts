@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
+import { notifyByEmail } from "@/lib/mail-notify";
 
 type StaffUser = { id: string; role: "ADMIN" | "MODERATOR" | "USER" };
 
@@ -28,6 +29,15 @@ async function notifyMod(userId: string, actorId: string, resourceId: string, me
   await prisma.notification
     .create({ data: { userId, actorId, type: "MODERATION", resourceId, message } })
     .catch(() => undefined);
+
+  // 审核结果邮件提醒：查资源标题组装文案
+  void (async () => {
+    const resource = await prisma.resource
+      .findUnique({ where: { id: resourceId }, select: { slug: true, title: true } })
+      .catch(() => null);
+    if (!resource) return;
+    await notifyByEmail(userId, "你的投稿有审核结果", `《${resource.title}》：${message}`, `/resources/${resource.slug}`);
+  })();
 }
 
 // ---------- 审核队列 ----------

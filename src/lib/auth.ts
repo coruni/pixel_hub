@@ -56,6 +56,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     ...authConfig.callbacks,
     // 封禁用户在登录关口统一拦截（credentials + OAuth），引导到提示页
+    // GitHub 绑定不需要专门逻辑：Auth.js 核心在「已登录 + OAuth」时自动 linkAccount
+    //（绑定到当前用户而不切换会话）；账号已被他人绑定时抛 AccountNotLinked。
     async signIn({ user }) {
       if (!user?.id) return true;
       const row = await prisma.user.findUnique({
