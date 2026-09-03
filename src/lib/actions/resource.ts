@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
@@ -16,6 +17,15 @@ export type ResourceActionState = {
   resourceId?: string;
 };
 
+// 发布/改稿前确认账号未封禁（封禁用户写操作统一拦截）
+async function activeUser() {
+  const u = (await auth())?.user;
+  if (!u) return null;
+  const row = await prisma.user.findUnique({ where: { id: u.id }, select: { bannedAt: true } });
+  if (!row || row.bannedAt) return null;
+  return u;
+}
+
 const commonFields = z.object({
   type: z.enum(["GAME", "IMAGE", "ARTICLE"]),
   title: z.string().trim().min(3, "标题至少 3 个字").max(80, "标题过长"),
@@ -26,7 +36,8 @@ const commonFields = z.object({
   externalUrl: z
     .string()
     .trim()
-    .refine((v) => !v || /^https?:\/\/.+/i.test(v), "外链需以 http(s):// 开头")
+    // 站内附件路径（/uploads/...）或 http(s) 外链
+    .refine((v) => !v || /^https?:\/\/.+/i.test(v) || /^\/[^/].*$/i.test(v), "外链需以 http(s):// 开头")
     .optional()
     .default(""),
 });
@@ -35,9 +46,8 @@ export async function createResourceAction(
   _prev: ResourceActionState,
   fd: FormData
 ): Promise<ResourceActionState> {
-  const session = await auth();
-  const user = session?.user;
-  if (!user) return { error: "请先登录" };
+  const user = await activeUser();
+  if (!user) return { error: "账号不可用或已被封禁" };
 
   const common = commonFields.safeParse({
     type: fd.get("type") ?? "",
@@ -49,7 +59,7 @@ export async function createResourceAction(
     externalUrl: fd.get("externalUrl") ?? "",
   });
   if (!common.success) return { fieldErrors: common.error.flatten().fieldErrors };
-  const { type, title, summary, description, categoryId, tags, externalUrl } = common.data;
+  const { type, title, summary, description, categoryId, externalUrl } = common.data;
 
   // —— 类型化 meta ——
   const license = String(fd.get("license") ?? "").trim();
@@ -153,6 +163,28 @@ export async function createResourceAction(
         await tx.media.updateMany({ where: { id: mediaIds[i] }, data: { resourceId: r.id, sort: i } });
       }
       if (coverId) await tx.resource.update({ where: { id: r.id }, data: { coverMediaId: coverId } });
+
+      // 有下载地址的资源落首个版本记录（版本号取 meta.version，缺省 1.0）
+      if (externalUrl) {
+        const ver =
+          type === "GAME"
+            ? (() => {
+                try {
+                  return JSON.parse(metaStr).version ?? "1.0";
+                } catch {
+                  return "1.0";
+                }
+              })()
+            : "1.0";
+        await tx.resourceVersion.create({
+          data: {
+            resourceId: r.id,
+            version: ver,
+            changelog: String(fd.get("changelog") ?? "").trim() || null,
+            url: externalUrl,
+          },
+        });
+      }
       return r;
     });
   } catch (e) {
@@ -165,4 +197,77 @@ export async function createResourceAction(
     redirect(`/resources/${slug}`);
   }
   return { ok: true, pending: true, resourceId: resource.id };
+}
+
+// ---------- 版本管理：作者追加新版本 ----------
+
+const versionSchema = z.object({
+  resourceId: z.string().min(1),
+  version: z.string().trim().min(1, "请填写版本号").max(40, "版本号过长"),
+  changelog: z.string().trim().max(2000, "更新日志过长").optional().default(""),
+  url: z
+    .string()
+    .trim()
+    .refine((v) => !v || /^https?:\/\/.+/i.test(v) || /^\/[^/].*$/i.test(v), "下载地址需以 http(s):// 开头")
+    .optional()
+    .default(""),
+});
+
+export async function addVersionAction(
+  _prev: ResourceActionState,
+  fd: FormData
+): Promise<ResourceActionState> {
+  const user = await activeUser();
+  if (!user) return { error: "账号不可用或已被封禁" };
+
+  const parsed = versionSchema.safeParse({
+    resourceId: fd.get("resourceId") ?? "",
+    version: fd.get("version") ?? "",
+    changelog: fd.get("changelog") ?? "",
+    url: fd.get("url") ?? "",
+  });
+  if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
+  const { resourceId, version, changelog, url } = parsed.data;
+
+  const resource = await prisma.resource.findUnique({ where: { id: resourceId }, select: { id: true, slug: true, authorId: true, type: true, meta: true, externalUrl: true } });
+  if (!resource) return { error: "资源不存在" };
+  if (resource.authorId !== user.id && user.role !== "ADMIN") return { error: "只有作者可发布新版本" };
+
+  const finalUrl = url || resource.externalUrl;
+  if (!finalUrl) return { fieldErrors: { url: ["请填写该版本的下载地址"] } };
+
+  // GAME：同步 meta.version 供信息卡展示
+  let metaStr = resource.meta;
+  if (resource.type === "GAME" && metaStr) {
+    try {
+      metaStr = JSON.stringify({ ...JSON.parse(metaStr), version });
+    } catch {
+      // 原数据异常时不动 meta
+    }
+  }
+
+  await prisma.$transaction([
+    prisma.resourceVersion.create({
+      data: { resourceId: resource.id, version, changelog: changelog || null, url: finalUrl },
+    }),
+    prisma.resource.update({
+      where: { id: resource.id },
+      data: { meta: metaStr, externalUrl: finalUrl },
+    }),
+  ]);
+  revalidatePath(`/resources/${resource.slug}`);
+  return { ok: true };
+}
+
+/** 版本下载计数（会话内不重复计） */
+export async function bumpVersionDownloadAction(versionId: string): Promise<{ ok: boolean }> {
+  const v = await prisma.resourceVersion.findUnique({ where: { id: versionId }, select: { id: true, url: true, resourceId: true, resource: { select: { externalUrl: true } } } });
+  if (!v) return { ok: false };
+  const ck = await cookies();
+  const marker = ck.get("dl_done")?.value ?? "";
+  if (!marker.includes(versionId)) {
+    await prisma.resourceVersion.update({ where: { id: versionId }, data: { downloadCount: { increment: 1 } } });
+    ck.set("dl_done", `${marker},${versionId}`.slice(0, 1024), { path: "/", maxAge: 60 * 60 * 24 });
+  }
+  return { ok: true };
 }

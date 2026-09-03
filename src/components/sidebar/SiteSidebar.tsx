@@ -8,6 +8,7 @@ import type { FeedItem } from "@/lib/queries";
 import { formatCount, timeAgo } from "@/lib/format";
 import { prisma } from "@/lib/db/prisma";
 import Markdown from "@/components/rte/Markdown";
+import Avatar from "@/components/ui/Avatar";
 
 // 站点级侧边栏：读 theme（已由页面加载）里启用的 widgets 渲染成可 sticky 的右栏。
 // 开关位置见 lib/site-config.ts 的 sidebarVisible；sticky 由 theme.sidebar.sticky 控制。
@@ -227,9 +228,7 @@ async function renderCreators(w: SidebarWidget) {
  {creators.map((c) => (
  <li key={c.username}>
  <Link href={`/u/${c.username}`} className="group flex items-center gap-2.5 rounded-none px-2 py-1.5 transition hover:bg-brand-50">
- <span className="grid h-8 w-8 shrink-0 place-items-center rounded-none border border-brand-600 bg-brand-500 text-xs font-semibold text-white">
- {(c.name ?? c.username).slice(0, 1).toUpperCase()}
- </span>
+ <Avatar name={c.name} username={c.username} avatarKey={c.avatarKey} size="sm" />
  <span className="min-w-0 flex-1">
  <span className="block truncate text-sm font-medium text-neutral-800 group-hover:text-neutral-950">{c.name ?? c.username}</span>
  <span className="block truncate text-[11px] text-neutral-400">
@@ -293,7 +292,7 @@ async function renderComments(w: SidebarWidget) {
  id: true,
  content: true,
  createdAt: true,
- author: { select: { username: true, name: true } },
+ author: { select: { username: true, name: true, avatarKey: true } },
  resource: { select: { slug: true, title: true } },
  },
  });
@@ -304,9 +303,7 @@ async function renderComments(w: SidebarWidget) {
  <ul className="space-y-2.5">
  {rows.map((c) => (
  <li key={c.id} className="flex gap-2">
- <span className="grid h-7 w-7 shrink-0 place-items-center rounded-none border border-brand-600 bg-brand-500 text-[11px] font-semibold text-white">
- {(c.author.name ?? c.author.username).slice(0, 1).toUpperCase()}
- </span>
+ <Avatar name={c.author.name} username={c.author.username} avatarKey={c.author.avatarKey} size="xs" />
  <span className="min-w-0 flex-1">
  <span className="flex items-baseline gap-1.5">
  <span className="truncate text-xs font-medium text-neutral-800">{c.author.name ?? c.author.username}</span>

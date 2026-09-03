@@ -4,7 +4,7 @@ import sharp from "sharp";
 import { makeKey, saveFile, publicUrl } from "@/lib/storage";
 
 export type ProcessedImage = {
-  storageKey: string; // 原始文件（byte-for-byte）
+  storageKey: string; // local/s3: 相对 key；chevereto: 远端完整 URL
   bigKey: string | null; // 最长边 ≤1600 webp（灯箱）
   thumbKey: string | null; // 最长边 ≤480 webp（卡片/瀑布流）
   placeholder: string | null; // 16px PNG data URI（LQIP）
@@ -44,9 +44,9 @@ export async function processImage(input: Buffer): Promise<ProcessedImage> {
   const ext = EXT_BY_FORMAT[format] ?? "png";
   const mime = MIME_BY_EXT[ext] ?? "image/png";
 
-  // 1) 原图逐字节保存
+  // 1) 原图逐字节保存（chevereto 驱动下 saveFile 返回远端 URL，落库即 URL）
   const origKey = `${dir}/original.${ext}`;
-  await saveFile(origKey, input);
+  const storageKey = await saveFile(origKey, input);
   const size = input.byteLength;
 
   // 2) 大图
@@ -56,7 +56,7 @@ export async function processImage(input: Buffer): Promise<ProcessedImage> {
     .resize({ width: Math.min(width, 1600), withoutEnlargement: true })
     .webp({ quality: 82 })
     .toBuffer();
-  await saveFile(bigKey, big);
+  const bigUrl = await saveFile(bigKey, big);
 
   // 3) 缩略图
   const thumbKey = `${dir}/thumb.webp`;
@@ -65,7 +65,7 @@ export async function processImage(input: Buffer): Promise<ProcessedImage> {
     .resize({ width: Math.min(width, 480), withoutEnlargement: true })
     .webp({ quality: 74 })
     .toBuffer();
-  await saveFile(thumbKey, thumb);
+  const thumbUrl = await saveFile(thumbKey, thumb);
 
   // 4) LQIP
   const placeholderBuf = await oriented
@@ -75,7 +75,18 @@ export async function processImage(input: Buffer): Promise<ProcessedImage> {
     .toBuffer();
   const placeholder = `data:image/png;base64,${placeholderBuf.toString("base64")}`;
 
-  return { storageKey: origKey, bigKey, thumbKey, placeholder, width, height, size, mime, ext };
+  // storageKey/bigKey/thumbKey：chevereto 存 URL，其余存 key（publicUrl 两者都兼容）
+  return {
+    storageKey,
+    bigKey: bigUrl,
+    thumbKey: thumbUrl,
+    placeholder,
+    width,
+    height,
+    size,
+    mime,
+    ext,
+  };
 }
 
 export { publicUrl };

@@ -165,7 +165,51 @@ summary {
 .md-body--lg h4 {
   color: #18181b;
 }
+
+/* 评论引用跳转：目标楼层闪烁高亮两下 */
+.comment-flash {
+  animation: comment-flash 0.6s ease-out 2;
+}
+@keyframes comment-flash {
+  0%,
+  100% {
+    background-color: transparent;
+  }
+  50% {
+    background-color: var(--color-brand-100);
+  }
+}
+
 .md-body--lg pre {
   font-size: 0.85rem;
+}
+
+/* 全站统一滚动条：细条 + 暖灰轨道 + 品牌橙滑块（Firefox/Chromium 双写） */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-brand-300) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-brand-300);
+  /* 像素风：直角方形滑块，铺满整条轨道 */
+  border-radius: 0;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-brand-400);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
 }
 

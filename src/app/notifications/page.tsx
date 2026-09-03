@@ -6,8 +6,17 @@ import { auth } from "@/lib/auth";
 import { getNotifications, type NotificationRow } from "@/lib/queries";
 import { timeAgo } from "@/lib/format";
 import { markAllNotificationsReadAction } from "@/lib/actions/notify";
+import { NotificationDelete, NotificationsClearAll } from "@/components/social/notify-actions";
 
 export const metadata: Metadata = { title: "通知" };
+
+const FILTERS = [
+ { key: "", label: "全部", icon: Bell },
+ { key: "LIKE", label: "赞", icon: Heart },
+ { key: "COMMENT", label: "评论", icon: MessageSquare },
+ { key: "FOLLOW", label: "关注", icon: UserPlus },
+ { key: "SYSTEM", label: "系统", icon: ShieldAlert },
+] as const;
 
 function describe(n: NotificationRow): { icon: LucideIcon; text: string; href?: string; color: string } {
  const who = n.actor ? n.actor.name ?? `@${n.actor.username}` : "系统";
@@ -40,10 +49,18 @@ function describe(n: NotificationRow): { icon: LucideIcon; text: string; href?: 
  }
 }
 
-export default async function NotificationsPage() {
+export default async function NotificationsPage({
+ searchParams,
+}: {
+ searchParams: Promise<{ type?: string }>;
+}) {
  const session = await auth();
  if (!session?.user) redirect("/login?callbackUrl=/notifications");
- const { rows, unread } = await getNotifications(session.user.id);
+ const { type } = await searchParams;
+ const filter = FILTERS.some((f) => f.key === type && f.key !== "")
+ ? (type as "LIKE" | "COMMENT" | "FOLLOW" | "SYSTEM")
+ : undefined;
+ const { rows, unread } = await getNotifications(session.user.id, filter);
 
  return (
  <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
@@ -51,6 +68,7 @@ export default async function NotificationsPage() {
  <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">
  通知{unread > 0 && <span className="ml-2 text-base font-normal text-red-500">({unread} 未读)</span>}
  </h1>
+ <div className="flex items-center gap-2">
  {unread > 0 && (
  <form
  action={async () => {
@@ -66,6 +84,30 @@ export default async function NotificationsPage() {
  </button>
  </form>
  )}
+ {rows.length > 0 && <NotificationsClearAll />}
+ </div>
+ </div>
+
+ {/* 类型筛选 */}
+ <div className="mt-4 flex flex-wrap items-center gap-2">
+ {FILTERS.map((f) => {
+ const active = (filter ?? "") === f.key;
+ const Icon = f.icon;
+ return (
+ <Link
+ key={f.key || "all"}
+ href={f.key ? `/notifications?type=${f.key}` : "/notifications"}
+ className={`inline-flex items-center gap-1.5 rounded-none border px-3 py-1.5 text-xs transition ${
+ active
+ ? "border-brand-600 bg-brand-600 text-white"
+ : "border-brand-200 text-neutral-600 hover:border-brand-400 hover:bg-neutral-100"
+ }`}
+ >
+ <Icon size={13} aria-hidden />
+ {f.label}
+ </Link>
+ );
+ })}
  </div>
 
  <ul className="mt-6 space-y-1">
@@ -92,6 +134,7 @@ export default async function NotificationsPage() {
  </span>
  </span>
  {!n.readAt && <span className="mt-2 h-2 w-2 shrink-0 rounded-none bg-red-400" />}
+ <NotificationDelete id={n.id} />
  </span>
  );
  return (

@@ -1,18 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges">
-  <!-- 像素画框：品牌橙赤陶色系，呼应站点画廊主题 -->
-  <!-- 框体 -->
-  <rect x="2" y="2" width="12" height="12" fill="#8a4129"/>
-  <!-- 画布 -->
-  <rect x="4" y="4" width="8" height="8" fill="#faece3"/>
-  <!-- 太阳 -->
-  <rect x="9" y="5" width="2" height="2" fill="#e29a78"/>
-  <!-- 大山 -->
-  <rect x="6" y="8" width="1" height="1" fill="#c25e3c"/>
-  <rect x="5" y="9" width="3" height="1" fill="#c25e3c"/>
-  <rect x="4" y="10" width="4" height="2" fill="#c25e3c"/>
-  <!-- 小山 -->
-  <rect x="10" y="9" width="1" height="1" fill="#d97757"/>
-  <rect x="9" y="10" width="3" height="2" fill="#d97757"/>
-  <!-- 挂钉 -->
-  <rect x="7" y="0" width="2" height="1" fill="#8a4129"/>
+  <!-- 参考 public/seed/pixel.svg 的像素拼贴：深棕底 + 金/赤像素块 -->
+  <rect width="16" height="16" fill="#1b150f"/>
+  <!-- 左上：金赤交错棋盘 -->
+  <rect x="1" y="1" width="4" height="4" fill="#e8a33d"/>
+  <rect x="5" y="1" width="4" height="4" fill="#b5582a"/>
+  <rect x="1" y="5" width="4" height="4" fill="#b5582a"/>
+  <rect x="5" y="5" width="4" height="4" fill="#e8a33d"/>
+  <!-- 右上：深棕单块 + 金块（对应原图中右组） -->
+  <rect x="10" y="1" width="5" height="4" fill="#7a3a1c"/>
+  <rect x="10" y="5" width="5" height="4" fill="#e8a33d"/>
+  <!-- 底部：长金条 + 右段深棕 -->
+  <rect x="1" y="10" width="14" height="5" fill="#e8a33d"/>
+  <rect x="10" y="10" width="5" height="5" fill="#7a3a1c"/>
 </svg>

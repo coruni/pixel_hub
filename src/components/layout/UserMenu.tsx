@@ -4,12 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronDown, LayoutDashboard, LogOut, Bell, Settings, Upload, User } from "lucide-react";
 import { logoutAction } from "@/lib/actions";
+import Avatar from "@/components/ui/Avatar";
 
 export type MenuUser = {
  name: string | null;
  username: string;
  role: string;
  trusted: boolean;
+ avatarKey?: string | null;
 };
 
 /** 顶部导航右侧的用户菜单：头像 + 下拉（个人主页/通知/设置/发布/管理/退出） */
@@ -44,9 +46,7 @@ export default function UserMenu({ user }: { user: MenuUser }) {
  aria-expanded={open}
  className="flex items-center gap-1.5 rounded-none py-1 pl-1 pr-2 text-sm text-neutral-700 transition hover:bg-brand-50"
  >
- <span className="grid h-8 w-8 place-items-center rounded-none border border-brand-600 bg-brand-500 text-xs font-semibold text-white">
- {(user.name ?? user.username).slice(0, 1).toUpperCase()}
- </span>
+ <Avatar name={user.name} username={user.username} avatarKey={user.avatarKey} size="sm" />
  <span className="hidden max-w-[8rem] truncate sm:block">{user.name ?? user.username}</span>
  <ChevronDown size={14} className={`text-neutral-400 transition ${open ? "rotate-180" : ""}`} aria-hidden />
  </button>

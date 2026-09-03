@@ -1,13 +1,16 @@
 import Link from "next/link";
 import Gallery from "@/components/resource/Gallery";
 import { DownloadButton } from "@/components/social/interactions";
+import CollapsibleAside from "./CollapsibleAside";
 import {
   ActionBar,
   AuthorStrip,
   CommentBlock,
   DescriptionBlock,
+  RelatedSection,
   StatGrid,
   TypeInfoCard,
+  VersionSection,
   typeLabel,
   type DetailCtx,
 } from "./parts";
@@ -65,22 +68,30 @@ export default function DetailBanner({ ctx }: { ctx: DetailCtx }) {
         </div>
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="min-w-0 space-y-5">
-          <Gallery media={detail.gallery} />
-          <ActionBar ctx={ctx} />
-        </div>
-        <aside className="min-w-0 space-y-4">
-          <AuthorStrip ctx={ctx} />
-          <StatGrid ctx={ctx} />
-          <TypeInfoCard ctx={ctx} />
-        </aside>
+      <div className="relative">
+        <CollapsibleAside
+          main={
+            <>
+              <Gallery media={detail.gallery} />
+              <ActionBar ctx={ctx} />
+            </>
+          }
+          aside={
+            <>
+              <AuthorStrip ctx={ctx} />
+              <StatGrid ctx={ctx} />
+              <TypeInfoCard ctx={ctx} />
+            </>
+          }
+        />
       </div>
 
       {/* 描述与评论横跨整条内容宽度（不局限于窄主列） */}
       <div className="mt-6 space-y-5">
+        <VersionSection ctx={ctx} />
         <DescriptionBlock ctx={ctx} />
         <CommentBlock ctx={ctx} />
+        <RelatedSection ctx={ctx} />
       </div>
     </div>
   );

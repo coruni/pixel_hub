@@ -24,7 +24,7 @@ export default function SettingsForm({ name, bio }: { name: string | null; bio: 
  <textarea
  id="bio"
  name="bio"
- rows={3}
+ rows={4}
  maxLength={200}
  defaultValue={bio ?? ""}
  className={input}

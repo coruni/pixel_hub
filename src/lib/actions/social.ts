@@ -1,6 +1,9 @@
 "use server";
 
 import { cookies } from "next/headers";
+import { revalidatePath } from "next/cache";
+import sharp from "sharp";
+import { makeKey, saveFile } from "@/lib/storage";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
@@ -56,6 +59,17 @@ export async function toggleLikeAction(resourceId: string): Promise<{ liked: boo
 }
 
 // ---------- 收藏 ----------
+// 收藏时若用户还没有「默认收藏」夹子则自动创建，新收藏一律落入其中
+async function ensureDefaultCollection(userId: string): Promise<string> {
+  const existing = await prisma.collection.findFirst({
+    where: { ownerId: userId, name: "默认收藏" },
+    select: { id: true },
+  });
+  if (existing) return existing.id;
+  const created = await prisma.collection.create({ data: { ownerId: userId, name: "默认收藏" } });
+  return created.id;
+}
+
 export async function toggleFavoriteAction(resourceId: string): Promise<{ favorited: boolean }> {
   const user = await requiredUser();
   if (!user) return { favorited: false };
@@ -67,9 +81,58 @@ export async function toggleFavoriteAction(resourceId: string): Promise<{ favori
     await prisma.resource.update({ where: { id: resourceId }, data: { favoriteCount: { decrement: 1 } } });
     return { favorited: false };
   }
-  await prisma.favorite.create({ data: { userId: user.id, resourceId } });
+  const collectionId = await ensureDefaultCollection(user.id);
+  await prisma.favorite.create({ data: { userId: user.id, resourceId, collectionId } });
   await prisma.resource.update({ where: { id: resourceId }, data: { favoriteCount: { increment: 1 } } });
   return { favorited: true };
+}
+
+/** 把已收藏的资源移动到指定夹子（collectionId 为空 = 未分组） */
+export async function setFavoriteCollectionAction(
+  resourceId: string,
+  collectionId: string | null
+): Promise<{ ok: boolean }> {
+  const user = await requiredUser();
+  if (!user) return { ok: false };
+  if (collectionId) {
+    const c = await prisma.collection.findFirst({ where: { id: collectionId, ownerId: user.id }, select: { id: true } });
+    if (!c) return { ok: false };
+  }
+  await prisma.favorite.updateMany({
+    where: { userId: user.id, resourceId },
+    data: { collectionId },
+  });
+  revalidatePath(`/u/${user.username}`);
+  return { ok: true };
+}
+
+// ---------- 收藏夹 ----------
+export async function createCollectionAction(fd: FormData): Promise<void> {
+  const user = await requiredUser();
+  const name = String(fd.get("name") ?? "").trim().slice(0, 30);
+  if (!user || !name) return;
+  const count = await prisma.collection.count({ where: { ownerId: user.id } });
+  if (count >= 20) return; // 上限防滥用
+  await prisma.collection.create({ data: { ownerId: user.id, name } });
+  revalidatePath(`/u/${user.username}`);
+}
+
+export async function renameCollectionAction(fd: FormData): Promise<void> {
+  const user = await requiredUser();
+  const id = String(fd.get("id") ?? "");
+  const name = String(fd.get("name") ?? "").trim().slice(0, 30);
+  if (!user || !id || !name) return;
+  await prisma.collection.updateMany({ where: { id, ownerId: user.id }, data: { name } });
+  revalidatePath(`/u/${user.username}`);
+}
+
+/** 删除夹子：夹内收藏保留（collectionId 置空，归入「未分组」） */
+export async function deleteCollectionAction(fd: FormData): Promise<void> {
+  const user = await requiredUser();
+  const id = String(fd.get("id") ?? "");
+  if (!user || !id) return;
+  await prisma.collection.deleteMany({ where: { id, ownerId: user.id } });
+  revalidatePath(`/u/${user.username}`);
 }
 
 // ---------- 关注 ----------
@@ -98,6 +161,34 @@ const commentSchema = z.object({
 });
 export type CommentActionState = { error?: string; ok?: boolean };
 
+// 评论附图：压缩为单张 webp（最长边 ≤1200），≤3 张、各 ≤5MB
+const COMMENT_IMG_MAX_BYTES = 5 * 1024 * 1024;
+const COMMENT_IMG_MAX_COUNT = 3;
+
+function sniffImage(buf: Buffer): boolean {
+  if (buf.length < 12) return false;
+  if (buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return true;
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return true;
+  const s = (str: string, off: number) => buf.subarray(off, off + str.length).toString("latin1") === str;
+  if (s("RIFF", 0) && s("WEBP", 8)) return true;
+  if (s("GIF8", 0)) return true;
+  return false;
+}
+
+async function saveCommentImage(file: File): Promise<{ key: string; width: number; height: number; size: number } | null> {
+  const buf = Buffer.from(await file.arrayBuffer());
+  if (buf.byteLength > COMMENT_IMG_MAX_BYTES) throw new Error("单张图片不能超过 5MB");
+  if (!sniffImage(buf)) throw new Error("不支持的图片格式");
+  const out = await sharp(buf, { failOn: "none" })
+    .rotate()
+    .resize({ width: 1200, withoutEnlargement: true })
+    .webp({ quality: 82 })
+    .toBuffer({ resolveWithObject: true });
+  const key = makeKey("comments", ".webp");
+  const url = await saveFile(key, out.data);
+  return { key: url, width: out.info.width, height: out.info.height, size: out.data.byteLength };
+}
+
 export async function addCommentAction(_prev: CommentActionState, fd: FormData): Promise<CommentActionState> {
   const user = await requiredUser();
   if (!user) return { error: "请先登录后再评论" };
@@ -121,6 +212,10 @@ export async function addCommentAction(_prev: CommentActionState, fd: FormData):
     if (!parent) return { error: "回复的楼层不存在" };
   }
 
+  // 附图（仅主楼，回复不带图）
+  const images = fd.getAll("images").filter((f): f is File => f instanceof File && f.size > 0);
+  if (images.length > COMMENT_IMG_MAX_COUNT) return { error: `附图最多 ${COMMENT_IMG_MAX_COUNT} 张` };
+
   const comment = await prisma.comment.create({
     data: {
       resourceId: resource.id,
@@ -129,6 +224,31 @@ export async function addCommentAction(_prev: CommentActionState, fd: FormData):
       content: parsed.data.content,
     },
   });
+
+  if (images.length > 0) {
+    try {
+      const saved = await Promise.all(images.slice(0, COMMENT_IMG_MAX_COUNT).map(saveCommentImage));
+      await prisma.media.createMany({
+        data: saved
+          .filter((x): x is { key: string; width: number; height: number; size: number } => !!x)
+          .map((m, i) => ({
+            kind: "ATTACHMENT" as const,
+            commentId: comment.id,
+            storageKey: m.key,
+            width: m.width,
+            height: m.height,
+            size: m.size,
+            mime: "image/webp",
+            status: "READY" as const,
+            sort: i,
+          })),
+      });
+    } catch (e) {
+      // 图片失败不阻断文字评论
+      console.error("[comment-image]", e);
+    }
+  }
+
   await prisma.resource.update({ where: { id: resource.id }, data: { commentCount: { increment: 1 } } });
   await notify(resource.authorId, user.id, "COMMENT", resource.id, comment.id);
   return { ok: true };

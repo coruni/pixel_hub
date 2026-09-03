@@ -4,6 +4,7 @@ import Credentials from "next-auth/providers/credentials";
 import GitHub from "next-auth/providers/github";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
+import { redirect } from "next/navigation";
 import { authConfig } from "./auth.config";
 import { prisma } from "./db/prisma";
 
@@ -52,4 +53,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
   ],
+  callbacks: {
+    ...authConfig.callbacks,
+    // 封禁用户在登录关口统一拦截（credentials + OAuth），引导到提示页
+    async signIn({ user }) {
+      if (!user?.id) return true;
+      const row = await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { bannedAt: true },
+      });
+      if (row?.bannedAt) redirect("/banned");
+      return true;
+    },
+  },
 });

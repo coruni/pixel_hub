@@ -234,6 +234,7 @@ export async function getResourceDetail(slug: string, viewerId?: string) {
         orderBy: { sort: "asc" },
         select: { id: true, thumbKey: true, bigKey: true, storageKey: true, width: true, height: true, placeholder: true },
       },
+      versions: { orderBy: { createdAt: "desc" } },
       _count: { select: { likes: true } },
     },
   });
@@ -248,48 +249,114 @@ export async function getResourceDetail(slug: string, viewerId?: string) {
     placeholder: m.placeholder,
   }));
 
-  let viewerStates = { liked: false, favorited: false, followingAuthor: false };
+  let viewerStates = { liked: false, favorited: false, favoriteCollectionId: null as string | null, followingAuthor: false };
   if (viewerId) {
     const [lk, fv, fl] = await Promise.all([
       prisma.like.findUnique({ where: { userId_resourceId: { userId: viewerId, resourceId: resource.id } } }),
-      prisma.favorite.findUnique({ where: { userId_resourceId: { userId: viewerId, resourceId: resource.id } } }),
+      prisma.favorite.findUnique({
+        where: { userId_resourceId: { userId: viewerId, resourceId: resource.id } },
+        select: { collectionId: true },
+      }),
       prisma.follow.findUnique({
         where: { followerId_followingId: { followerId: viewerId, followingId: resource.authorId } },
       }),
     ]);
-    viewerStates = { liked: !!lk, favorited: !!fv, followingAuthor: !!fl };
+    viewerStates = {
+      liked: !!lk,
+      favorited: !!fv,
+      favoriteCollectionId: fv?.collectionId ?? null,
+      followingAuthor: !!fl,
+    };
   }
 
-  const comments = await prisma.comment.findMany({
-    where: { resourceId: resource.id, status: "PUBLIC", parentId: null },
+  // 一次取全部评论，在内存里展平：二级以下的回复全部挂到根楼层下（按时间序），
+  // 避免嵌套多层；深层回复带上 replyTo（被回复人）供 UI 显示 "回复 @xx"
+  const allComments = await prisma.comment.findMany({
+    where: { resourceId: resource.id, status: "PUBLIC" },
     orderBy: { createdAt: "asc" },
     include: {
-      author: { select: { username: true, name: true } },
-      replies: {
-        where: { status: "PUBLIC" },
-        orderBy: { createdAt: "asc" },
-        include: { author: { select: { username: true, name: true } } },
-      },
+      author: { select: { username: true, name: true, avatarKey: true, bio: true, role: true, trusted: true, createdAt: true } },
+      media: { orderBy: { sort: "asc" }, select: { storageKey: true, width: true, height: true } },
     },
   });
+  // 用户 hover 卡片统计（作品数/关注者数），authorId 批量查一次
+  const authorIds = [...new Set(allComments.map((c) => c.authorId))];
+  const authorStats = await prisma.user.findMany({
+    where: { id: { in: authorIds } },
+    select: { id: true, _count: { select: { resources: true, followers: true } } },
+  });
+  const statsMap = new Map(authorStats.map((u) => [u.id, u._count]));
+  const commentMap = new Map(allComments.map((c) => [c.id, c]));
+  const rootIdOf = (c: (typeof allComments)[number]): string => {
+    let cur = c;
+    while (cur.parentId) cur = commentMap.get(cur.parentId)!;
+    return cur.id;
+  };
+  const replyName = (a: { username: string; name: string | null }) => a.name ?? a.username;
+  const repliesByRoot = new Map<string, { c: (typeof allComments)[number]; replyTo: { id: string; name: string } | null }[]>();
+  for (const c of allComments) {
+    if (!c.parentId) continue;
+    const rootId = rootIdOf(c);
+    const list = repliesByRoot.get(rootId) ?? [];
+    const parent = commentMap.get(c.parentId)!;
+    // 二级回复 replyTo 为 null；深层回复指向被回复评论（供 UI hover 卡片定位）
+    list.push({
+      c,
+      replyTo: parent.parentId ? { id: parent.id, name: replyName(parent.author) } : null,
+    });
+    repliesByRoot.set(rootId, list);
+  }
+
+  // client 组件（Comments）拿到的 avatarKey 必须是已解析 URL：浏览器端 env 不可用
+  const toCommentAuthor = (
+    a: {
+      username: string;
+      name: string | null;
+      avatarKey: string | null;
+      bio: string | null;
+      role: string;
+      trusted: boolean;
+      createdAt: Date;
+    },
+    id: string,
+  ) => {
+    const s = statsMap.get(id);
+    return {
+      username: a.username,
+      name: a.name,
+      avatarKey: a.avatarKey ? publicUrl(a.avatarKey) : null,
+      bio: a.bio,
+      role: a.role,
+      trusted: a.trusted,
+      createdAt: a.createdAt,
+      resourceCount: s?.resources,
+      followerCount: s?.followers,
+    };
+  };
+  const toCommentImages = (ms: { storageKey: string; width: number | null; height: number | null }[]) =>
+    ms.map((m) => ({ url: publicUrl(m.storageKey), width: m.width, height: m.height }));
 
   return {
     ...resource,
     gallery,
-    comments: comments.map((c) => ({
-      id: c.id,
-      authorId: c.authorId,
-      content: c.content,
-      createdAt: c.createdAt,
-      author: c.author,
-      replies: c.replies.map((rp) => ({
-        id: rp.id,
-        authorId: rp.authorId,
-        content: rp.content,
-        createdAt: rp.createdAt,
-        author: rp.author,
+    comments: allComments
+      .filter((c) => !c.parentId)
+      .map((c) => ({
+        id: c.id,
+        authorId: c.authorId,
+        content: c.content,
+        createdAt: c.createdAt,
+        author: toCommentAuthor(c.author, c.authorId),
+        images: toCommentImages(c.media),
+        replies: (repliesByRoot.get(c.id) ?? []).map(({ c: rp, replyTo }) => ({
+          id: rp.id,
+          authorId: rp.authorId,
+          content: rp.content,
+          createdAt: rp.createdAt,
+          author: toCommentAuthor(rp.author, rp.authorId),
+          replyTo,
+        })),
       })),
-    })),
     viewer: viewerStates,
   };
 }
@@ -297,6 +364,38 @@ export async function getResourceDetail(slug: string, viewerId?: string) {
 // 浏览计数（会话内去重由调用方限制）
 export async function bumpView(resourceId: string) {
   await prisma.resource.update({ where: { id: resourceId }, data: { viewCount: { increment: 1 } } });
+}
+
+// ---------- 相关推荐 ----------
+// 同分类热门优先，不足补同类型热门（排除自身与已取条目），复用 getFeed 的取数逻辑
+export async function getRelated(resource: {
+  id: string;
+  type: ResourceType;
+  category: { slug: string } | null;
+}): Promise<FeedCard[]> {
+  const LIMIT = 6;
+  const seen = new Set<string>([resource.id]);
+  const out: FeedItem[] = [];
+  const add = (items: FeedItem[]) => {
+    for (const i of items) {
+      if (out.length >= LIMIT) break;
+      if (!seen.has(i.id)) {
+        seen.add(i.id);
+        out.push(i);
+      }
+    }
+  };
+
+  if (resource.category) {
+    const { items } = await getFeed({ categorySlug: resource.category.slug, sort: "popular", pageSize: LIMIT });
+    add(items);
+  }
+  if (out.length < LIMIT) {
+    // 同类型热门池取大一点，过滤掉已占位后仍有余量
+    const { items } = await getFeed({ type: resource.type, sort: "popular", pageSize: LIMIT * 2 });
+    add(items);
+  }
+  return out.map(toFeedCard);
 }
 
 // ---------- 个人主页 ----------
@@ -356,6 +455,18 @@ export async function getProfile(username: string, viewerId?: string): Promise<U
   };
 }
 
+// ---------- 收藏夹 ----------
+export type CollectionRow = { id: string; name: string; count: number };
+
+export async function getCollections(userId: string): Promise<CollectionRow[]> {
+  const rows = await prisma.collection.findMany({
+    where: { ownerId: userId },
+    orderBy: [{ createdAt: "asc" }],
+    select: { id: true, name: true, _count: { select: { items: true } } },
+  });
+  return rows.map((r) => ({ id: r.id, name: r.name, count: r._count.items }));
+}
+
 // ---------- 通知 ----------
 export type NotificationRow = {
   id: string;
@@ -367,10 +478,22 @@ export type NotificationRow = {
   actor: { username: string; name: string | null } | null;
 };
 
-export async function getNotifications(userId: string): Promise<{ rows: NotificationRow[]; unread: number }> {
+export async function getNotifications(
+  userId: string,
+  filter?: "LIKE" | "COMMENT" | "FOLLOW" | "SYSTEM"
+): Promise<{ rows: NotificationRow[]; unread: number }> {
+  // 「系统」筛选含 MODERATION + SYSTEM 两类
+  const where: Prisma.NotificationWhereInput = {
+    userId,
+    ...(filter === "SYSTEM"
+      ? { type: { in: ["MODERATION", "SYSTEM"] } }
+      : filter
+        ? { type: filter }
+        : {}),
+  };
   const [rows, unread] = await Promise.all([
     prisma.notification.findMany({
-      where: { userId },
+      where,
       orderBy: { createdAt: "desc" },
       take: 50,
       select: {

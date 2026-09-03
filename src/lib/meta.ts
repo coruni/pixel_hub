@@ -2,10 +2,6 @@
 // 数据库里存 JSON.stringify 的字符串（SQLite 兼容），读取出 parseMeta。
 import { z } from "zod";
 
-const base = z.object({
-  license: z.string().max(40).optional().default(""),
-});
-
 // IMAGE：覆盖原创/AI生成/壁纸素材/截图四类（D2）
 export const imageMetaSchema = z.object({
   isAiGenerated: z.boolean().default(false),

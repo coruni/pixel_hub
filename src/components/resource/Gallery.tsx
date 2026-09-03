@@ -4,7 +4,8 @@ import { useState } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Keyboard } from "swiper/modules";
 import type { Swiper as SwiperClass } from "swiper";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import ImageViewer from "@/components/ui/ImageViewer";
 import "swiper/css";
 
 export type GalleryMedia = {
@@ -21,7 +22,6 @@ export default function Gallery({ media }: { media: GalleryMedia[] }) {
   const [lightbox, setLightbox] = useState(false);
   const [swiper, setSwiper] = useState<SwiperClass | null>(null);
 
-  const current = media[index];
   const multi = media.length > 1;
   const hasPrev = index > 0;
   const hasNext = index < media.length - 1;
@@ -39,7 +39,7 @@ export default function Gallery({ media }: { media: GalleryMedia[] }) {
   return (
     <div>
       {/* 主图轮播：swiper 拖动/触摸切换，hover 出箭头 */}
-      <div className="group relative overflow-hidden rounded-none border border-brand-200 bg-neutral-900">
+      <div className="group relative overflow-hidden rounded-none border border-brand-200 bg-neutral-900 ">
         <Swiper
           modules={[Keyboard]}
           keyboard={{ enabled: true }}
@@ -49,7 +49,7 @@ export default function Gallery({ media }: { media: GalleryMedia[] }) {
           {media.map((m) => (
             <SwiperSlide
               key={m.id}
-              className="flex justify-center"
+              className="flex h-[50vh]! items-center justify-center"
               onClick={() => {
                 // swiper 的 preventClicks 会吞掉拖动后的 click，这里只处理真点击
                 setLightbox(true);
@@ -62,7 +62,7 @@ export default function Gallery({ media }: { media: GalleryMedia[] }) {
                 width={m.width ?? undefined}
                 height={m.height ?? undefined}
                 draggable={false}
-                className="max-h-[70vh] w-auto cursor-zoom-in select-none object-contain"
+                className="max-h-full max-w-full h-full cursor-zoom-in select-none object-cover"
               />
             </SwiperSlide>
           ))}
@@ -87,9 +87,6 @@ export default function Gallery({ media }: { media: GalleryMedia[] }) {
             >
               <ChevronRight size={18} aria-hidden />
             </button>
-            <span className="pointer-events-none absolute bottom-3 right-3 z-10 border border-brand-200 bg-stone-900/85 px-2 py-0.5 text-[11px] tabular-nums text-white opacity-0 transition group-hover:opacity-100">
-              {index + 1}/{media.length}
-            </span>
           </>
         )}
       </div>
@@ -118,45 +115,15 @@ export default function Gallery({ media }: { media: GalleryMedia[] }) {
       )}
 
       {lightbox && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
-          onClick={() => setLightbox(false)}
-        >
-          <button className="absolute right-5 top-5 p-1 text-white/70 transition hover:text-white" aria-label="关闭">
-            <X size={24} />
-          </button>
-          {multi && (
-            <>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  swiper?.slidePrev();
-                }}
-                className="absolute left-4 top-1/2 -translate-y-1/2 rounded-none bg-white/10 p-3 text-white hover:bg-white/20"
-                aria-label="上一张"
-              >
-                <ChevronLeft size={20} />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  swiper?.slideNext();
-                }}
-                className="absolute right-4 top-1/2 -translate-y-1/2 rounded-none bg-white/10 p-3 text-white hover:bg-white/20"
-                aria-label="下一张"
-              >
-                <ChevronRight size={20} />
-              </button>
-            </>
-          )}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={current.bigUrl}
-            alt="大图预览"
-            onClick={(e) => e.stopPropagation()}
-            className="max-h-[92vh] max-w-full object-contain"
-          />
-        </div>
+        <ImageViewer
+          images={media.map((m) => ({ url: m.bigUrl, width: m.width, height: m.height }))}
+          index={index}
+          onIndexChange={(i) => {
+            setIndex(i);
+            swiper?.slideTo(i);
+          }}
+          onClose={() => setLightbox(false)}
+        />
       )}
     </div>
   );

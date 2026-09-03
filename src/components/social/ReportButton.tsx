@@ -27,7 +27,7 @@ export default function ReportButton({ resourceId, resourceTitle }: { resourceId
  }
 
  return (
- <span className="relative inline-block">
+ <span className="relative inline-flex">
  <button
  type="button"
  onClick={() => setOpen((v) => !v)}

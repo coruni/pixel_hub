@@ -20,7 +20,8 @@ export default function SidebarLayout({
         style={{ "--rail": `${railWidth ?? 320}px` } as CSSProperties}
       >
         <div className="min-w-0">{children}</div>
-        <div>{rail}</div>
+        {/* 移动端 rail 折叠到内容下方：补左右/底部边距，与主列自带 px-4 对齐；桌面端回零 */}
+        <div className="px-4 pb-6 lg:px-0 lg:pb-0">{rail}</div>
       </div>
     </div>
   );

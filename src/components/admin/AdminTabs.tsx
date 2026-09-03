@@ -7,6 +7,7 @@ import {
  Flag,
  FolderOpen,
  FolderTree,
+ Images,
  LayoutDashboard,
  LayoutTemplate,
  PanelsTopLeft,
@@ -29,6 +30,7 @@ const TAB_ICONS: Record<string, LucideIcon> = {
  "/admin/site": PanelsTopLeft,
  "/admin/categories": FolderTree,
  "/admin/tags": Tag,
+ "/admin/media": Images,
 };
 
 /** 后台侧栏导航：桌面左侧竖排（sticky），移动端横向滚动；当前路由橙色高亮 */

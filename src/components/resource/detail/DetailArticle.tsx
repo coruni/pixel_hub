@@ -2,8 +2,9 @@ import Link from "next/link";
 import { CalendarDays, Eye, MessageSquare, Newspaper } from "lucide-react";
 import { formatCount, timeAgo } from "@/lib/format";
 import Markdown from "@/components/rte/Markdown";
+import Avatar from "@/components/ui/Avatar";
 import { FollowButton } from "@/components/social/interactions";
-import { ActionBar, CommentBlock, type DetailCtx } from "./parts";
+import { ActionBar, CommentBlock, RelatedSection, type DetailCtx } from "./parts";
 
 /** D · 杂志阅读式 —— 文章专属：编辑部排版（左对齐大标题 + 作者 meta 行 + 阅读列正文），无下载/信息卡等资源向面板 */
 export default function DetailArticle({ ctx }: { ctx: DetailCtx }) {
@@ -47,9 +48,7 @@ export default function DetailArticle({ ctx }: { ctx: DetailCtx }) {
       {/* 作者 meta 行 */}
       <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 py-1">
         <Link href={`/u/${a.username}`} className="flex items-center gap-2.5">
-          <span className="grid h-8 w-8 place-items-center rounded-none border border-brand-600 bg-brand-500 text-xs font-semibold text-white">
-            {(a.name ?? a.username).slice(0, 1).toUpperCase()}
-          </span>
+          <Avatar name={a.name} username={a.username} avatarKey={a.avatarKey} size="sm" />
           <span className="text-sm font-medium text-neutral-800">
             {a.name ?? a.username}
           </span>
@@ -138,6 +137,9 @@ export default function DetailArticle({ ctx }: { ctx: DetailCtx }) {
 
       <div className="mt-8">
         <CommentBlock ctx={ctx} />
+      </div>
+      <div className="mt-8">
+        <RelatedSection ctx={ctx} />
       </div>
     </div>
   );

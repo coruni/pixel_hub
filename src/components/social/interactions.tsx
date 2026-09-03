@@ -7,10 +7,11 @@ import {
  toggleFavoriteAction,
  toggleFollowAction,
  incrementDownloadAction,
+ setFavoriteCollectionAction,
 } from "@/lib/actions/social";
 
 const baseBtn =
- "inline-flex items-center gap-1.5 rounded-none border px-3.5 py-1.5 text-sm transition disabled:opacity-60";
+ "inline-flex items-center gap-1.5 rounded-none border px-3.5 py-2 text-sm transition disabled:opacity-60";
 
 export function LikeButton({
  resourceId,
@@ -53,15 +54,22 @@ export function FavoriteButton({
  resourceId,
  initialFavorited,
  count,
+ collections,
+ initialCollectionId,
 }: {
  resourceId: string;
  initialFavorited: boolean;
  count: number;
+ collections?: { id: string; name: string }[];
+ initialCollectionId?: string | null;
 }) {
  const [fav, setFav] = useState(initialFavorited);
  const [n, setN] = useState(count);
+ const [colId, setColId] = useState<string | null>(initialCollectionId ?? null);
  const [pending, start] = useTransition();
+ const list = collections ?? [];
  return (
+ <span className="inline-flex items-stretch gap-1.5">
  <button
  type="button"
  disabled={pending}
@@ -83,6 +91,30 @@ export function FavoriteButton({
  <Star size={15} aria-hidden className={fav ? "fill-current" : ""} />
  {n > 0 ? ` 收藏 ${n}` : "收藏"}
  </button>
+ {/* 已收藏且已有夹子可选：下拉切换所属夹子 */}
+ {fav && list.length > 0 && (
+ <select
+ value={colId ?? ""}
+ disabled={pending}
+ onChange={(e) => {
+ const next = e.target.value || null;
+ setColId(next);
+ start(async () => {
+ await setFavoriteCollectionAction(resourceId, next);
+ });
+ }}
+ title="所属收藏夹"
+ className="max-w-28 rounded-none border border-brand-200 bg-surface px-1.5 py-1.5 text-xs text-neutral-600 hover:border-brand-500"
+ >
+ <option value="">未分组</option>
+ {list.map((c) => (
+ <option key={c.id} value={c.id}>
+ {c.name}
+ </option>
+ ))}
+ </select>
+ )}
+ </span>
  );
 }
 

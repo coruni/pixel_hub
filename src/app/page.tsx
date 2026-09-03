@@ -6,7 +6,10 @@ import HomeRenderer from "@/components/home/HomeRenderer";
 import SiteSidebar from "@/components/sidebar/SiteSidebar";
 import SidebarLayout from "@/components/layout/SidebarLayout";
 
-export const metadata = { title: "发现" };
+import { siteName } from "@/lib/site-url";
+
+// root layout 的 title.template 不作用于与其同段的首页，需自行拼接站点名
+export const metadata = { title: `发现 · ${siteName()}` };
 
 type SP = Record<string, string | string[] | undefined>;
 export default async function HomePage({ searchParams }: { searchParams: Promise<SP> }) {

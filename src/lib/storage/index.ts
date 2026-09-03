@@ -1,22 +1,20 @@
-// StorageService：本地磁盘实现（开发/单机）。
-// 生产切换对象存储(S3/R2)时替换本文件的 saveFile 等实现，调用方无感知。
-// key 一律为相对路径（无前导斜杠），数据库只存 key，URL 由 publicUrl 生成。
+// 存储统一入口：按 STORAGE_DRIVER（local|s3|chevereto，默认 local）分发。
+// 兼容旧 API（saveFile/loadFile/fileSize/publicUrl/makeKey/absKey），新增 del()。
+// 约定：local/s3 落库的是相对 key；chevereto 落库的是远端完整 URL（publicUrl 对 URL 原样返回）。
+// publicUrl 的纯函数实现放 ./url（无 node 依赖，client 组件经它间接可用时不会被拖入 node:fs）。
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile, readFile, stat } from "node:fs/promises";
-import path from "node:path";
+import { localDriver, absKey } from "./local";
+import { s3Driver } from "./s3";
+import { cheveretoDriver } from "./chevereto";
+import type { StorageDriver } from "./types";
 
-const ROOT = path.join(process.cwd(), "public", "uploads");
+export type { StorageDriver };
+export { absKey };
+export { publicUrl, isUrl as isStorageUrl } from "./url";
 
-export function absKey(key: string): string {
-  const abs = path.resolve(ROOT, key);
-  if (!abs.startsWith(path.resolve(ROOT))) throw new Error("非法存储键: 越界路径");
-  return abs;
-}
-
-/** key → 可直接用于 <img src> 的公开 URL */
-export function publicUrl(key: string): string {
-  return "/" + key.replace(/\\/g, "/");
-}
+const DRIVER = (process.env.STORAGE_DRIVER ?? "local").toLowerCase();
+export const driver: StorageDriver =
+  DRIVER === "s3" ? s3Driver : DRIVER === "chevereto" ? cheveretoDriver : localDriver;
 
 export function makeKey(dir: string, ext: string): string {
   const d = new Date();
@@ -24,17 +22,19 @@ export function makeKey(dir: string, ext: string): string {
   return `${dir}/${yyyymm}/${randomUUID()}${ext}`;
 }
 
-export async function saveFile(key: string, buf: Buffer): Promise<void> {
-  const abs = absKey(key);
-  await mkdir(path.dirname(abs), { recursive: true });
-  await writeFile(abs, buf);
+/** 写入并返回公开 URL（chevereto 返回远端 URL，其余返回本地/CDN 路径） */
+export async function saveFile(key: string, buf: Buffer): Promise<string> {
+  return driver.put(key, buf);
 }
 
 export async function loadFile(key: string): Promise<Buffer> {
-  return readFile(absKey(key));
+  return driver.get(key);
 }
 
 export async function fileSize(key: string): Promise<number> {
-  const s = await stat(absKey(key));
-  return s.size;
+  return driver.size(key);
+}
+
+export async function delFile(key: string): Promise<void> {
+  return driver.del(key);
 }

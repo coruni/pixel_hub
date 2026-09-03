@@ -4,7 +4,6 @@ import {
  Bookmark,
  Compass,
  ExternalLink,
- Gamepad2,
  Home,
  Info,
  ShieldCheck,
@@ -13,6 +12,9 @@ import {
  type LucideIcon,
 } from "lucide-react";
 import { auth } from "@/lib/auth";
+import { siteName, siteLogo } from "@/lib/site-url";
+import { prisma } from "@/lib/db/prisma";
+import { publicUrl } from "@/lib/storage";
 import { getTheme } from "@/lib/site";
 import { getCategories } from "@/lib/queries";
 import type { NavItem } from "@/lib/site-config";
@@ -66,14 +68,19 @@ export default async function Navbar() {
  }
  }
 
+ // 头像取库内最新值（JWT 里不带，避免换头像后过期）；传给 client 前解析成 URL
+ const me = u ? await prisma.user.findUnique({ where: { id: u.id }, select: { avatarKey: true } }) : null;
+ const avatarKey = me?.avatarKey ? publicUrl(me.avatarKey) : null;
+
  return (
  <header className="sticky top-0 z-40 border-b border-brand-200 bg-surface">
  <div className="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4 sm:px-6">
  <Link href="/" className="flex items-center gap-2 text-lg font-semibold tracking-tight text-neutral-900">
- <span className="grid h-8 w-8 place-items-center rounded-none border border-brand-600 bg-brand-500 text-white">
- <Gamepad2 size={18} />
+ <span className="grid h-8 w-8 place-items-center overflow-hidden rounded-none border border-brand-600 bg-surface">
+ {/* eslint-disable-next-line @next/next/no-img-element -- 站点徽标来自 env/静态 svg，不走 next/image */}
+ <img src={siteLogo()} alt={siteName()} className="h-full w-full object-contain" />
  </span>
- <span>资源社区</span>
+ <span>{siteName()}</span>
  </Link>
 
  {(items.length > 0 || catMenu) && (
@@ -88,7 +95,13 @@ export default async function Navbar() {
  <div className="ml-auto flex items-center gap-3">
  {u ? (
  <UserMenu
- user={{ name: u.name ?? null, username: u.username ?? "", role: u.role ?? "USER", trusted: !!u.trusted }}
+ user={{
+ name: u.name ?? null,
+ username: u.username ?? "",
+ role: u.role ?? "USER",
+ trusted: !!u.trusted,
+ avatarKey,
+ }}
  />
  ) : (
  <>

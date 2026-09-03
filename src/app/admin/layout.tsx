@@ -8,6 +8,7 @@ const tabs: { href: string; label: string; adminOnly?: boolean }[] = [
   { href: "/admin/content", label: "内容库" },
   { href: "/admin/reports", label: "举报" },
   { href: "/admin/users", label: "用户管理" },
+  { href: "/admin/media", label: "媒体库" },
   { href: "/admin/logs", label: "操作日志" },
   { href: "/admin/categories", label: "分类管理", adminOnly: true },
   { href: "/admin/tags", label: "标签管理", adminOnly: true },

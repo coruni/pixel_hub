@@ -3,10 +3,13 @@ import { CalendarDays, Download, Eye } from "lucide-react";
 import { formatCount, timeAgo } from "@/lib/format";
 import Gallery from "@/components/resource/Gallery";
 import { FollowButton } from "@/components/social/interactions";
+import Avatar from "@/components/ui/Avatar";
 import {
   ActionBar,
   CommentBlock,
   DescriptionBlock,
+  RelatedSection,
+  VersionSection,
   typeLabel,
   type DetailCtx,
 } from "./parts";
@@ -85,7 +88,7 @@ export default function DetailPost({ ctx }: { ctx: DetailCtx }) {
       <Gallery media={detail.gallery} />
 
       {/* 展签 */}
-      <div className="mt-6 flex flex-wrap items-start justify-between gap-x-8 gap-y-5">
+      <div className="mt-6 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between lg:gap-x-8">
         {/* 左：作品信息 */}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -138,9 +141,7 @@ export default function DetailPost({ ctx }: { ctx: DetailCtx }) {
               href={`/u/${a.username}`}
               className="flex items-center gap-2.5"
             >
-              <span className="grid h-9 w-9 place-items-center rounded-none border border-brand-600 bg-brand-500 text-sm font-semibold text-white">
-                {(a.name ?? a.username).slice(0, 1).toUpperCase()}
-              </span>
+              <Avatar name={a.name} username={a.username} avatarKey={a.avatarKey} size="md" />
               <span>
                 <span className="block text-sm font-medium text-neutral-800">
                   {a.name ?? a.username}
@@ -170,10 +171,16 @@ export default function DetailPost({ ctx }: { ctx: DetailCtx }) {
       </div>
 
       <div className="mt-8">
+        <VersionSection ctx={ctx} />
+      </div>
+      <div className="mt-8">
         <DescriptionBlock ctx={ctx} />
       </div>
       <div className="mt-6">
         <CommentBlock ctx={ctx} />
+      </div>
+      <div className="mt-8">
+        <RelatedSection ctx={ctx} />
       </div>
     </div>
   );

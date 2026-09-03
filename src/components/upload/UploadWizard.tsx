@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Gamepad2, Image as ImageIcon, Newspaper, X } from "lucide-react";
+import { Gamepad2, Image as ImageIcon, Newspaper, UploadCloud, X } from "lucide-react";
 import { useActionState, useRef, useState } from "react";
 import { createResourceAction, type ResourceActionState } from "@/lib/actions/resource";
 
@@ -33,6 +33,30 @@ export default function UploadWizard({ categories }: { categories: Cat[] }) {
  const [uploadMsg, setUploadMsg] = useState<string | null>(null);
  const fileRef = useRef<HTMLInputElement>(null);
  const [catId, setCatId] = useState("");
+ // GAME：下载外链（受控，附件直传成功后回填站内路径）
+ const [extUrl, setExtUrl] = useState("");
+ const [attUploading, setAttUploading] = useState(false);
+
+ async function onAttachment(file: File | null) {
+ if (!file) return;
+ setAttUploading(true);
+ setUploadMsg(null);
+ try {
+ const fd = new FormData();
+ fd.set("file", file);
+ const res = await fetch("/api/upload/attachment", { method: "POST", body: fd });
+ const data = await res.json();
+ if (!data.ok) {
+ setUploadMsg(data.error ?? "附件上传失败");
+ return;
+ }
+ setExtUrl(data.url as string);
+ } catch {
+ setUploadMsg("附件上传失败，请重试");
+ } finally {
+ setAttUploading(false);
+ }
+ }
 
  const [state, formAction, pending] = useActionState<ResourceActionState, FormData>(
  createResourceAction,
@@ -223,10 +247,26 @@ export default function UploadWizard({ categories }: { categories: Cat[] }) {
  id="externalUrl"
  name="externalUrl"
  required
+ value={extUrl}
+ onChange={(e) => setExtUrl(e.target.value)}
  placeholder="https://pan.xxx / 官网直链…"
  className={input}
  />
  {fieldErr(state.fieldErrors?.externalUrl)}
+ <div className="mt-2 flex flex-wrap items-center gap-2">
+ <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-none border border-brand-200 bg-surface px-3 py-1.5 text-xs text-neutral-600 hover:border-brand-500 hover:text-neutral-900">
+ <UploadCloud size={14} aria-hidden />
+ {attUploading ? "上传中…" : "或直接上传文件"}
+ <input
+ type="file"
+ hidden
+ disabled={attUploading}
+ onChange={(e) => onAttachment(e.target.files?.[0] ?? null)}
+ />
+ </label>
+ {extUrl.startsWith("/") && <span className="text-xs text-emerald-600">✓ 已上传站内附件</span>}
+ <span className="text-xs text-neutral-400">zip/7z/pdf/音频视频等，≤200MB</span>
+ </div>
  </div>
  <div className="grid gap-4 sm:grid-cols-2">
  <div>
@@ -237,6 +277,10 @@ export default function UploadWizard({ categories }: { categories: Cat[] }) {
  <label className={label} htmlFor="size">大小</label>
  <input id="size" name="size" maxLength={40} placeholder="1.2 GB" className={input} />
  </div>
+ </div>
+ <div>
+ <label className={label} htmlFor="changelog">更新日志</label>
+ <textarea id="changelog" name="changelog" rows={3} maxLength={2000} placeholder="这个版本包含什么内容…" className={input} />
  </div>
  <div className="grid gap-4 sm:grid-cols-2">
  <div>

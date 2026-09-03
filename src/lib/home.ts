@@ -102,7 +102,7 @@ export async function getPublishedCountByCategory(): Promise<Map<string, number>
   return new Map(rows.map((r) => [r.categoryId as string, r._count._all]));
 }
 
-export type CreatorRow = { username: string; name: string | null; resources: number; followers: number };
+export type CreatorRow = { username: string; name: string | null; avatarKey: string | null; resources: number; followers: number };
 
 export async function getTopCreators(limit: number): Promise<CreatorRow[]> {
   const users = await prisma.user.findMany({
@@ -119,6 +119,7 @@ export async function getTopCreators(limit: number): Promise<CreatorRow[]> {
   return users.map((u) => ({
     username: u.username,
     name: u.name,
+    avatarKey: u.avatarKey,
     resources: u._count.resources,
     followers: u._count.followers,
   }));

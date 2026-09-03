@@ -2,6 +2,7 @@
 
 import bcrypt from "bcryptjs";
 import { AuthError } from "next-auth";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { signIn, signOut } from "@/lib/auth";
@@ -23,6 +24,12 @@ export async function loginAction(_prev: LoginState, fd: FormData): Promise<Logi
   const rawCb = String(fd.get("callbackUrl") ?? "/");
   const callbackUrl = rawCb.startsWith("/") && !rawCb.startsWith("//") ? rawCb : "/";
   try {
+    // 封禁用户在密码校验前先行拦截，引导到封禁提示页（带原因）
+    const id = parsed.data.identifier;
+    const u = id.includes("@")
+      ? await prisma.user.findUnique({ where: { email: id.toLowerCase() }, select: { bannedAt: true } })
+      : await prisma.user.findUnique({ where: { username: id }, select: { bannedAt: true } });
+    if (u?.bannedAt) redirect("/banned");
     await signIn("credentials", { identifier: parsed.data.identifier, password: parsed.data.password, redirectTo: callbackUrl });
     return {};
   } catch (error) {

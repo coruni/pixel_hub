@@ -174,8 +174,11 @@ model ResourceVersion {
   resource      Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
   version       String
   changelog     String?
+  url           String? // 该版本下载地址（缺省沿用资源 externalUrl）
   downloadCount Int    @default(0)
   createdAt     DateTime @default(now())
+
+  @@index([resourceId, createdAt])
 }
 
 model TagOnResource {
@@ -207,7 +210,7 @@ model Favorite {
   collectionId String?
   resourceId   String
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  collection   Collection?  @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  collection   Collection?  @relation(fields: [collectionId], references: [id], onDelete: SetNull)
   resource     Resource     @relation(fields: [resourceId], references: [id], onDelete: Cascade)
   createdAt    DateTime     @default(now())
 
@@ -386,4 +389,16 @@ enum ReportStatus {
   OPEN
   RESOLVED
   DISMISSED
+}
+
+// 站点访问统计（PV / IP）：每次页面浏览一行；ipHash 为加盐哈希不存明文 IP
+model Visit {
+  id        Int      @id @default(autoincrement())
+  day       String   // 本地日期 YYYY-MM-DD，按天聚合用
+  ipHash    String
+  path      String
+  createdAt DateTime @default(now())
+
+  @@index([day])
+  @@index([day, ipHash])
 }

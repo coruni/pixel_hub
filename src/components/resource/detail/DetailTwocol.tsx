@@ -5,8 +5,10 @@ import {
  AuthorStrip,
  CommentBlock,
  DescriptionBlock,
+ RelatedSection,
  StatGrid,
  TypeInfoCard,
+ VersionSection,
  typeLabel,
  type DetailCtx,
 } from "./parts";
@@ -53,8 +55,10 @@ export default function DetailTwocol({ ctx }: { ctx: DetailCtx }) {
 
  {/* 描述与评论横跨整条内容宽度 */}
  <div className="mt-8 space-y-5">
+ <VersionSection ctx={ctx} />
  <DescriptionBlock ctx={ctx} />
  <CommentBlock ctx={ctx} />
+ <RelatedSection ctx={ctx} />
  </div>
  </div>
  );
