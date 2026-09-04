@@ -89,6 +89,14 @@ export const SIDEBAR_KIND_META: Record<
 // ---------- 各类 widget 的 config ----------
 // 缺省值均为安全默认，坏数据在 parseSidebarConfig 内兜底。
 
+/** URL 白名单校验：http(s) 外链或站内 / 路径（拒绝 javascript: 等危险协议）；空串合法 */
+export const safeUrlSchema = (max: number) =>
+  z
+    .string()
+    .max(max)
+    .default("")
+    .refine((v) => !v || /^(https?:\/\/|\/)/i.test(v), "仅允许 http(s):// 或站内 / 路径");
+
 const hotCfg = z.object({
   type: z.enum(["ALL", "IMAGE", "GAME", "ARTICLE"]).default("ALL"),
   sort: z.enum(["latest", "popular", "downloads"]).default("popular"),
@@ -134,7 +142,7 @@ const customCfg = z.object({
     .array(
       z.object({
         label: z.string().trim().min(1).max(60),
-        href: z.string().trim().min(1).max(300),
+        href: safeUrlSchema(300).refine((v) => !!v, "链接不能为空"),
       })
     )
     .max(20)
@@ -148,8 +156,8 @@ const sameCategoryCfg = z.object({
 });
 const adCfg = z.object({
   mode: z.enum(["image", "html"]).default("image"),
-  image: z.string().max(2000).default(""), // 图片 URL 或站内 /uploads 路径
-  link: z.string().max(500).default(""), // 点击跳转（可空 = 纯展示）
+  image: safeUrlSchema(2000), // 图片 URL 或站内 /uploads 路径
+  link: safeUrlSchema(500), // 点击跳转（可空 = 纯展示）
   alt: z.string().max(120).default(""),
   html: z.string().max(8000).default(""), // 任意 HTML/JS 片段（AdSense 等联盟广告）
   badge: z.boolean().default(true), // 是否显示「广告」角标

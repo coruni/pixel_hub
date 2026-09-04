@@ -1,13 +1,13 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import sharp from "sharp";
 import { makeKey, saveFile } from "@/lib/storage";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
-import { rateLimit } from "@/lib/rate-limit";
+import { clientIp, rateLimit } from "@/lib/rate-limit";
 import { notifyByEmail } from "@/lib/mail-notify";
 
 async function requiredUser() {
@@ -306,6 +306,8 @@ export async function deleteCommentAction(commentId: string): Promise<{ ok: bool
 export async function incrementDownloadAction(resourceId: string): Promise<{ ok: boolean }> {
   const resource = await prisma.resource.findUnique({ where: { id: resourceId } });
   if (!resource || !resource.externalUrl) return { ok: false };
+  // 内存限流兜底 cookie 伪造：每 IP 60 次 / 分钟，超限静默不计数（下载本身不受影响）
+  if (!rateLimit(`dl:${clientIp(await headers())}`, 60, 60_000)) return { ok: true };
   const ck = await cookies();
   const marker = ck.get("dl_done")?.value ?? "";
   if (!marker.includes(resourceId)) {

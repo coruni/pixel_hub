@@ -348,6 +348,8 @@ model HomeSection {
 model SiteSetting {
   key   String @id
   value String // JSON 文本
+  // 乐观锁版本号：后台并发编辑 theme 时后写者检测到版本变动即拒绝（updateMany where version）
+  version Int @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

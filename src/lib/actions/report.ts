@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
+import { rateLimit } from "@/lib/rate-limit";
 import { REASONS, REPORT_AUTO_HIDE_AT } from "@/lib/report-options";
 
 export async function reportResourceAction(
@@ -12,6 +13,8 @@ export async function reportResourceAction(
 ): Promise<{ ok: boolean; error?: string }> {
   const user = (await auth())?.user;
   if (!user) return { ok: false, error: "请先登录" };
+  // 举报限流：每用户 10 次 / 10 分钟（防刷举报压垮审核队列）
+  if (!rateLimit(`report:${user.id}`, 10, 10 * 60_000)) return { ok: false, error: "举报过于频繁，请稍后再试" };
   const clean = reason.trim().slice(0, 40) || "其他";
   if (!(REASONS as readonly string[]).includes(clean)) return { ok: false, error: "举报理由不合法" };
 

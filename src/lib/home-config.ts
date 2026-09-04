@@ -2,6 +2,7 @@
 // 板块类型目录、每类 config 的 zod 校验、默认布局。
 import { z } from "zod";
 import type { CardRatio } from "./display";
+import { safeUrlSchema } from "./site-config";
 
 export type HomeSectionKind =
   | "hero"
@@ -79,8 +80,8 @@ const tagsCfg = z.object({
 });
 const adCfg = z.object({
   mode: z.enum(["image", "html"]).default("image"),
-  image: z.string().max(2000).default(""), // 图片地址（image 模式）
-  link: z.string().max(500).default(""), // 跳转链接，可空 = 纯展示
+  image: safeUrlSchema(2000), // 图片地址（image 模式）
+  link: safeUrlSchema(500), // 跳转链接，可空 = 纯展示
   alt: z.string().max(120).default(""),
   html: z.string().max(8000).default(""), // 联盟广告代码片段（html 模式）
   badge: z.boolean().default(true), // 是否显示「广告」角标

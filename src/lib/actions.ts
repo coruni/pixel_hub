@@ -81,12 +81,13 @@ export async function registerAction(_prev: RegisterState, fd: FormData): Promis
   if (byName) return { fieldErrors: { username: ["该用户名已被占用"] } };
 
   try {
+    const passwordHash = await bcrypt.hash(password, 10);
     await prisma.user.create({
       data: {
         email,
         username,
         name: name || username,
-        passwordHash: bcrypt.hashSync(password, 10),
+        passwordHash,
         role: "USER",
         trusted: false,
       },

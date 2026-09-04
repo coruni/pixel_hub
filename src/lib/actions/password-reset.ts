@@ -65,10 +65,11 @@ export async function resetPasswordAction(_prev: ResetState, fd: FormData): Prom
   const row = await prisma.passwordResetToken.findUnique({ where: { tokenHash } });
   if (!row || row.usedAt || row.expiresAt < new Date()) return { error: "链接无效或已过期，请重新发起找回" };
 
+  const passwordHash = await bcrypt.hash(parsed.data.password, 10);
   await prisma.$transaction([
     prisma.user.update({
       where: { id: row.userId },
-      data: { passwordHash: bcrypt.hashSync(parsed.data.password, 10) },
+      data: { passwordHash },
     }),
     prisma.passwordResetToken.update({ where: { id: row.id }, data: { usedAt: new Date() } }),
     // 该用户其余未用 token 一并作废 + 全部 session 踢下线（密码已换，旧会话不应存活）
