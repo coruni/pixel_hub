@@ -28,13 +28,6 @@ export function rateLimit(key: string, limit: number, periodMs: number): boolean
   return true;
 }
 
-/** 距离窗口重置的毫秒数（用于重试提示，可选） */
-export function retryAfterMs(key: string, periodMs: number): number {
-  const b = buckets.get(key);
-  if (!b || b.hits.length === 0) return 0;
-  return Math.max(0, periodMs - (Date.now() - Math.min(...b.hits)));
-}
-
 /** 从请求头取客户端 IP（同 track route 的取法） */
 export function clientIp(headers: Headers): string {
   const fwd = headers.get("x-forwarded-for");

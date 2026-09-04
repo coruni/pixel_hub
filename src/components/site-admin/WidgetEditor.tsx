@@ -14,6 +14,10 @@ import AdConfigFields, { initAdConfig } from "@/components/admin-shared/ad-confi
 import ChipPicker from "@/components/ui/ChipPicker";
 import type { SiteCategories, SiteTags } from "./shared";
 
+// 可编辑行（公告/链接）的稳定 key：模块级自增序号，行内增删改时保持 DOM 复用、避免输入焦点错位
+let rowKeySeq = 0;
+const nextRowKey = () => `row-${++rowKeySeq}`;
+
 /** 侧栏组件内联编辑：按 kind 渲染对应配置字段，保存调用 updateSidebarWidgetAction */
 export default function WidgetEditor({
   widget,
@@ -51,19 +55,20 @@ export default function WidgetEditor({
   const [cats, setCats] = useState<string[]>((cfg.slugs as string[]) ?? []);
   const [text, setText] = useState<string>(typeof cfg.text === "string" ? cfg.text : "");
   const [content, setContent] = useState<string>(typeof cfg.content === "string" ? cfg.content : "");
-  const [links, setLinks] = useState<{ label: string; href: string }[]>(
+  const [links, setLinks] = useState<{ key: string; label: string; href: string }[]>(
     Array.isArray(cfg.links)
       ? (cfg.links as unknown[]).map((l) => {
           const o = (l && typeof l === "object" ? l : {}) as Record<string, unknown>;
-          return { label: typeof o.label === "string" ? o.label : "", href: typeof o.href === "string" ? o.href : "" };
+          return { key: nextRowKey(), label: typeof o.label === "string" ? o.label : "", href: typeof o.href === "string" ? o.href : "" };
         })
       : []
   );
-  const [notices, setNotices] = useState<{ level: string; text: string }[]>(
+  const [notices, setNotices] = useState<{ key: string; level: string; text: string }[]>(
     Array.isArray(cfg.items)
       ? (cfg.items as unknown[]).map((l) => {
           const o = (l && typeof l === "object" ? l : {}) as Record<string, unknown>;
           return {
+            key: nextRowKey(),
             level: typeof o.level === "string" && ["info", "warn", "event"].includes(o.level) ? o.level : "info",
             text: typeof o.text === "string" ? o.text : "",
           };
@@ -279,7 +284,7 @@ export default function WidgetEditor({
             <label className={LABEL_STRONG}>公告列表（最多 10 条；空内容不显示）</label>
             <div className="space-y-1.5">
               {notices.map((n, i) => (
-                <div key={i} className="flex items-center gap-1.5">
+                <div key={n.key} className="flex items-center gap-1.5">
                   <select
                     value={n.level}
                     onChange={(e) => setNotice(i, "level", e.target.value)}
@@ -311,7 +316,7 @@ export default function WidgetEditor({
             {notices.length < 10 && (
               <button
                 type="button"
-                onClick={() => setNotices((arr) => [...arr, { level: "info", text: "" }])}
+                onClick={() => setNotices((arr) => [...arr, { key: nextRowKey(), level: "info", text: "" }])}
                 className="mt-1.5 inline-flex items-center gap-1 rounded-none border border-brand-200 px-2.5 py-1 text-xs text-neutral-500 transition hover:border-brand-400 hover:text-brand-700"
               >
                 <Plus size={12} /> 添加公告
@@ -340,7 +345,7 @@ export default function WidgetEditor({
               <label className={LABEL_STRONG}>链接列表（选填）</label>
               <div className="space-y-1.5">
                 {links.map((l, i) => (
-                  <div key={i} className="flex items-center gap-1.5">
+                  <div key={l.key} className="flex items-center gap-1.5">
                     <input
                       value={l.label}
                       onChange={(e) => setLink(i, "label", e.target.value.slice(0, 60))}
@@ -369,7 +374,7 @@ export default function WidgetEditor({
               {links.length < 20 && (
                 <button
                   type="button"
-                  onClick={() => setLinks((arr) => [...arr, { label: "", href: "" }])}
+                  onClick={() => setLinks((arr) => [...arr, { key: nextRowKey(), label: "", href: "" }])}
                   className="mt-1.5 inline-flex items-center gap-1 rounded-none border border-brand-200 px-2.5 py-1 text-xs text-neutral-500 transition hover:border-brand-400 hover:text-brand-700"
                 >
                   <Plus size={12} /> 添加链接

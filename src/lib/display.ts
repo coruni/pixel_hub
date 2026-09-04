@@ -19,13 +19,6 @@ export const TYPE_LABEL: Record<string, string> = { GAME: "游戏", IMAGE: "图�
 
 export type ContentTypeFilter = ContentType | "ALL";
 
-export const TYPE_OPTIONS: { value: ContentTypeFilter; label: string }[] = [
-  { value: "ALL", label: "全部内容" },
-  { value: "IMAGE", label: "图片作品" },
-  { value: "GAME", label: "游戏" },
-  { value: "ARTICLE", label: "文章" },
-];
-
 // 卡片封面的裁剪比例（供卡片网格 / 可选比例的瀑布板块使用）
 export type CardRatio = "auto" | "1:1" | "4:3" | "3:2" | "16:9" | "3:4";
 

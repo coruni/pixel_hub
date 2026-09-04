@@ -1,7 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Maximize, Minus, Plus, RotateCcw, RotateCw, X } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Maximize,
+  Minus,
+  Plus,
+  RotateCcw,
+  RotateCw,
+  X,
+} from "lucide-react";
 
 export type ViewerImage = {
   url: string;
@@ -37,6 +46,12 @@ export default function ImageViewer({
   }
   const draggingRef = useRef(false);
   const lastPtRef = useRef({ x: 0, y: 0 });
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // 对话框打开时把焦点收进浮层（Esc/Tab 键盘操作以它为起点）
+  useEffect(() => {
+    rootRef.current?.focus();
+  }, []);
 
   const current = images[index];
   const multi = images.length > 1;
@@ -44,7 +59,10 @@ export default function ImageViewer({
   const hasNext = index < images.length - 1;
 
   const clampZoom = (z: number) => Math.min(8, Math.max(0.2, z));
-  const zoomTo = useCallback((factor: number) => setZoom((z) => clampZoom(z * factor)), []);
+  const zoomTo = useCallback(
+    (factor: number) => setZoom((z) => clampZoom(z * factor)),
+    [],
+  );
   const reset = () => {
     setZoom(1);
     setRotation(0);
@@ -133,7 +151,12 @@ export default function ImageViewer({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
+      ref={rootRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="图片查看器"
+      tabIndex={-1}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 outline-none"
       onClick={onClose}
       onWheel={onWheel}
     >
@@ -192,7 +215,13 @@ export default function ImageViewer({
           <Plus size={16} aria-hidden />
         </button>
         <span className="mx-1 h-5 w-px bg-white/15" />
-        <button type="button" onClick={reset} className="grid h-9 w-9 place-items-center hover:bg-white/10" aria-label="复位" title="复位">
+        <button
+          type="button"
+          onClick={reset}
+          className="grid h-9 w-9 place-items-center hover:bg-white/10"
+          aria-label="复位"
+          title="复位"
+        >
           <Maximize size={16} aria-hidden />
         </button>
       </div>
@@ -200,6 +229,7 @@ export default function ImageViewer({
       {multi && (
         <>
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               if (hasPrev) onIndexChange(index - 1);
@@ -212,6 +242,7 @@ export default function ImageViewer({
             <ChevronLeft size={20} />
           </button>
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               if (hasNext) onIndexChange(index + 1);

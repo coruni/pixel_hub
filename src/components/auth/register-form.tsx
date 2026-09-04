@@ -22,24 +22,24 @@ export default function RegisterForm() {
 
  <form action={formAction} className="mt-6 space-y-4">
  <div>
- <label className="mb-1.5 block text-sm font-medium text-neutral-700">邮箱</label>
- <input name="email" type="email" autoComplete="email" required className={inputCls} placeholder="you@example.com" />
+ <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-neutral-700">邮箱</label>
+ <input id="email" name="email" type="email" autoComplete="email" required className={inputCls} placeholder="you@example.com" />
  {state.fieldErrors?.email && <p className="mt-1 text-xs text-red-500">{state.fieldErrors.email[0]}</p>}
  </div>
  <div className="grid grid-cols-2 gap-4">
  <div>
- <label className="mb-1.5 block text-sm font-medium text-neutral-700">用户名</label>
- <input name="username" required className={inputCls} placeholder="用英文，用于主页" />
+ <label htmlFor="username" className="mb-1.5 block text-sm font-medium text-neutral-700">用户名</label>
+ <input id="username" name="username" required className={inputCls} placeholder="用英文，用于主页" />
  {state.fieldErrors?.username && <p className="mt-1 text-xs text-red-500">{state.fieldErrors.username[0]}</p>}
  </div>
  <div>
- <label className="mb-1.5 block text-sm font-medium text-neutral-700">昵称</label>
- <input name="name" className={inputCls} placeholder="显示名（可选）" />
+ <label htmlFor="name" className="mb-1.5 block text-sm font-medium text-neutral-700">昵称</label>
+ <input id="name" name="name" className={inputCls} placeholder="显示名（可选）" />
  </div>
  </div>
  <div>
- <label className="mb-1.5 block text-sm font-medium text-neutral-700">密码</label>
- <input name="password" type="password" autoComplete="new-password" required className={inputCls} placeholder="至少 8 位" />
+ <label htmlFor="reg-password" className="mb-1.5 block text-sm font-medium text-neutral-700">密码</label>
+ <input id="reg-password" name="password" type="password" autoComplete="new-password" required className={inputCls} placeholder="至少 8 位" />
  {state.fieldErrors?.password && <p className="mt-1 text-xs text-red-500">{state.fieldErrors.password[0]}</p>}
  </div>
  <button

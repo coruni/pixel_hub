@@ -21,8 +21,9 @@ export default function ResetPasswordForm({ token }: { token: string }) {
         <form action={formAction} className="mt-6 space-y-4">
           <input type="hidden" name="token" value={token} />
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-neutral-700">新密码</label>
+            <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-neutral-700">新密码</label>
             <input
+              id="password"
               name="password"
               type="password"
               autoComplete="new-password"

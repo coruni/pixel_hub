@@ -27,7 +27,11 @@ export default function Gallery({ media }: { media: GalleryMedia[] }) {
   const hasNext = index < media.length - 1;
 
   if (media.length === 0) {
-    return <div className="grid aspect-[3/2] place-items-center rounded-none border border-brand-200 bg-neutral-100 text-sm text-neutral-400">暂无预览图</div>;
+    return (
+      <div className="grid aspect-[3/2] place-items-center rounded-none border border-brand-200 bg-neutral-100 text-sm text-neutral-400">
+        暂无预览图
+      </div>
+    );
   }
 
   // hover 才出现：opacity-0 + group-hover:opacity-100；首末张对应方向禁用并隐藏
@@ -96,18 +100,25 @@ export default function Gallery({ media }: { media: GalleryMedia[] }) {
           <div className="flex flex-1 gap-2 overflow-x-auto pb-1">
             {media.map((m, i) => (
               <button
+                type="button"
                 key={m.id}
                 onClick={() => {
                   setIndex(i);
                   swiper?.slideTo(i);
                 }}
                 className={`h-16 w-24 shrink-0 overflow-hidden rounded-none border transition ${
-                  i === index ? "border-brand-500" : "border-transparent opacity-70 hover:opacity-100"
+                  i === index
+                    ? "border-brand-500"
+                    : "border-transparent opacity-70 hover:opacity-100"
                 }`}
                 aria-label={`第 ${i + 1} 张`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={m.thumbUrl} alt="" className="h-full w-full object-cover" />
+                <img
+                  src={m.thumbUrl}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
               </button>
             ))}
           </div>
@@ -116,7 +127,11 @@ export default function Gallery({ media }: { media: GalleryMedia[] }) {
 
       {lightbox && (
         <ImageViewer
-          images={media.map((m) => ({ url: m.bigUrl, width: m.width, height: m.height }))}
+          images={media.map((m) => ({
+            url: m.bigUrl,
+            width: m.width,
+            height: m.height,
+          }))}
           index={index}
           onIndexChange={(i) => {
             setIndex(i);

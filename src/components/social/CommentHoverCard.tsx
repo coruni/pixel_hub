@@ -59,14 +59,20 @@ export default function CommentHoverCard({
         if (timerRef.current) clearTimeout(timerRef.current);
         setVisible(false);
       }}
-      onClick={(e) => {
-        e.stopPropagation();
-        onNavigate(data.id, rootId);
-      }}
     >
-      <span className="cursor-pointer underline decoration-neutral-300 underline-offset-2 hover:text-neutral-700">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onNavigate(data.id, rootId);
+        }}
+        onFocus={open}
+        onBlur={() => setVisible(false)}
+        className="cursor-pointer underline decoration-neutral-300 underline-offset-2 hover:text-neutral-700"
+        aria-label={`跳转到 ${data.author} 的评论`}
+      >
         @{data.author}
-      </span>
+      </button>
       {visible && style && (
         <span
           role="tooltip"

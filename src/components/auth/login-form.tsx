@@ -28,8 +28,9 @@ export default function LoginForm({ githubEnabled, callbackUrl = "/" }: { github
                 <form action={formAction} className="mt-6 space-y-4">
                     <input type="hidden" name="callbackUrl" value={callbackUrl} />
                     <div>
-                        <label className="mb-1.5 block text-sm font-medium text-neutral-700">邮箱或用户名</label>
+                        <label htmlFor="identifier" className="mb-1.5 block text-sm font-medium text-neutral-700">邮箱或用户名</label>
                         <input
+                            id="identifier"
                             name="identifier"
                             type="text"
                             autoComplete="username"
@@ -42,8 +43,8 @@ export default function LoginForm({ githubEnabled, callbackUrl = "/" }: { github
                         )}
                     </div>
                     <div>
-                        <label className="mb-1.5 block text-sm font-medium text-neutral-700">密码</label>
-                        <input name="password" type="password" autoComplete="current-password" required className={inputCls} placeholder="••••••••" />
+                        <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-neutral-700">密码</label>
+                        <input id="password" name="password" type="password" autoComplete="current-password" required className={inputCls} placeholder="••••••••" />
                         {state.fieldErrors?.password && (
                             <p className="mt-1 text-xs text-red-500">{state.fieldErrors.password[0]}</p>
                         )}

@@ -109,7 +109,9 @@ export default function SiteLayoutManager({
                 key={t.key}
                 type="button"
                 role="tab"
+                id={`widget-tab-${t.key}`}
                 aria-selected={on}
+                aria-controls="widget-panel"
                 title={t.hint}
                 onClick={() => {
                   setActiveArea(t.key);
@@ -128,6 +130,8 @@ export default function SiteLayoutManager({
           })}
         </div>
 
+        {/* 当前区域的配置面板 */}
+        <div role="tabpanel" id="widget-panel" aria-labelledby={`widget-tab-${activeArea}`} className="focus:outline-none">
         {!areaOn && (
           <div className="mt-3 flex items-center justify-between rounded-none border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs text-amber-800">
             <span>该页侧边栏已整体关闭，以下组件不会在前台显示。</span>
@@ -254,6 +258,7 @@ export default function SiteLayoutManager({
               );
             })}
           </div>
+        </div>
         </div>
       </section>
     </div>

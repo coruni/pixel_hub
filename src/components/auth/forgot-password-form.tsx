@@ -36,8 +36,9 @@ export default function ForgotPasswordForm() {
         ) : (
           <form action={formAction} className="mt-6 space-y-4">
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-neutral-700">注册邮箱</label>
+              <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-neutral-700">注册邮箱</label>
               <input
+                id="email"
                 name="email"
                 type="email"
                 autoComplete="email"
