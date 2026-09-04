@@ -3,12 +3,11 @@ import type { ReactNode } from "react";
 import { CalendarDays, Download, Eye } from "lucide-react";
 import { formatCount, timeAgo } from "@/lib/format";
 import Gallery from "@/components/resource/Gallery";
-import { FollowButton } from "@/components/social/interactions";
-import Avatar from "@/components/ui/Avatar";
-import UserHoverCard from "@/components/ui/UserHoverCard";
 import {
   ActionBar,
+  AuthorIdentity,
   CommentBlock,
+  FollowControl,
   DescriptionBlock,
   RelatedSection,
   VersionSection,
@@ -81,7 +80,7 @@ function MetaChips({ ctx }: { ctx: DetailCtx }) {
 
 /** A · 展厅式 —— 图集开屏做第一视觉，信息以美术馆展签形式聚合在图下：左作品信息、右作者+操作 */
 export default function DetailPost({ ctx, middleSlot }: { ctx: DetailCtx; middleSlot?: ReactNode }) {
-  const { detail, authed, isAuthor } = ctx;
+  const { detail } = ctx;
   const a = detail.author;
 
   return (
@@ -139,36 +138,8 @@ export default function DetailPost({ ctx, middleSlot }: { ctx: DetailCtx; middle
         {/* 右：作者 + 操作 */}
         <div className="flex shrink-0 flex-col items-start gap-3 lg:items-end">
           <div className="flex items-center gap-3">
-            <UserHoverCard user={a}>
-            <Link
-              href={`/u/${a.username}`}
-              className="flex items-center gap-2.5"
-            >
-              <Avatar name={a.name} username={a.username} avatarKey={a.avatarKey} size="md" online={a.online} />
-              <span>
-                <span className="block text-sm font-medium text-neutral-800">
-                  {a.name ?? a.username}
-                </span>
-                <span className="block text-[11px] text-neutral-400">
-                  @{a.username}
-                </span>
-              </span>
-            </Link>
-            </UserHoverCard>
-            {!isAuthor &&
-              (authed ? (
-                <FollowButton
-                  targetUserId={detail.authorId}
-                  initialFollowing={detail.viewer.followingAuthor}
-                />
-              ) : (
-                <Link
-                  href="/login"
-                  className="rounded-none border border-brand-600 bg-brand-500 px-3 py-1.5 text-xs text-white hover:bg-brand-600"
-                >
-                  关注
-                </Link>
-              ))}
+            <AuthorIdentity a={a} />
+            <FollowControl ctx={ctx} variant="primary" />
           </div>
           <ActionBar ctx={ctx} />
         </div>

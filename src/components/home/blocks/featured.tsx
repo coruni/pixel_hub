@@ -1,9 +1,7 @@
 import ResourceGrid from "@/components/resource/ResourceGrid";
-import SectionTitle from "@/components/home/SectionTitle";
+import BlockShell from "@/components/home/BlockShell";
 import { getFeed, type FeedItem } from "@/lib/queries";
 import type { CardRatio, ContentDisplay } from "@/lib/display";
-
-const frame = "mx-auto max-w-7xl px-4 sm:px-6";
 
 export type FeaturedBlockCfg = {
   featuredIds: string[];
@@ -36,11 +34,8 @@ export default async function FeaturedBlock({
   const showAs: ContentDisplay = uniformRatio ? "card" : cfg.display;
 
   return (
-    <section className="mt-8">
-      <div className={frame}>
-        {title && <SectionTitle>{title}</SectionTitle>}
+<BlockShell title={title}>
         <ResourceGrid items={items} display={showAs} ratio={uniformRatio} />
-      </div>
-    </section>
+    </BlockShell>
   );
 }

@@ -3,9 +3,7 @@
 import { useActionState, useState, useTransition } from "react";
 import { Download, Plus, UploadCloud } from "lucide-react";
 import { addVersionAction, bumpVersionDownloadAction, type ResourceActionState } from "@/lib/actions/resource";
-
-const input =
- "w-full rounded-none border border-brand-200 bg-surface px-3 py-2 text-sm outline-none transition focus:border-brand-500";
+import { INPUT } from "@/lib/ui/cls";
 
 /** 单个版本的下载：新窗口打开地址 + 计数（会话去重） */
 export function VersionDownloadButton({
@@ -77,7 +75,7 @@ export function VersionForm({ resourceId }: { resourceId: string }) {
  <label className="mb-1 block text-xs text-neutral-500" htmlFor="v-version">
  版本号 *
  </label>
- <input id="v-version" name="version" required maxLength={40} className={input} placeholder="如 1.1.0" />
+ <input id="v-version" name="version" required maxLength={40} className={INPUT} placeholder="如 1.1.0" />
  {state.fieldErrors?.version && <p className="mt-1 text-xs text-red-500">{state.fieldErrors.version[0]}</p>}
  </div>
  <div>
@@ -89,7 +87,7 @@ export function VersionForm({ resourceId }: { resourceId: string }) {
  name="url"
  value={url}
  onChange={(e) => setUrl(e.target.value)}
- className={input}
+ className={INPUT}
  placeholder="https://… 或上传文件"
  />
  {state.fieldErrors?.url && <p className="mt-1 text-xs text-red-500">{state.fieldErrors.url[0]}</p>}
@@ -108,7 +106,7 @@ export function VersionForm({ resourceId }: { resourceId: string }) {
  <label className="mb-1 block text-xs text-neutral-500" htmlFor="v-changelog">
  更新日志
  </label>
- <textarea id="v-changelog" name="changelog" rows={3} maxLength={2000} className={input} placeholder="这个版本改了什么…" />
+ <textarea id="v-changelog" name="changelog" rows={3} maxLength={2000} className={INPUT} placeholder="这个版本改了什么…" />
  </div>
  {state.ok && <p className="text-xs text-emerald-600">✓ 新版本已发布</p>}
  {state.error && <p className="text-xs text-red-500">{state.error}</p>}

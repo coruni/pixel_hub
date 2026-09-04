@@ -1,16 +1,14 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import BlockShell from "@/components/home/BlockShell";
 import { ChevronDown } from "lucide-react";
 import type { ContentType } from "@/lib/display";
 import { loadListPageAction } from "@/lib/actions/feedmore";
 import type { FeedCard } from "@/lib/queries";
 import MasonryGrid from "@/components/resource/MasonryGrid";
-import SectionTitle from "@/components/home/SectionTitle";
 
 type Sort = "latest" | "popular" | "downloads";
-
-const frame = "mx-auto max-w-7xl px-4 sm:px-6";
 
 /**
  * 首页「内容板块 · 瀑布流」一体化客户端：首屏 initial 由 SSR 注入，点击「下一页」按板块相同
@@ -55,9 +53,7 @@ export default function ListMasonry({
  }
 
  return (
- <section className="mt-8">
- <div className={frame}>
- {title && <SectionTitle>{title}</SectionTitle>}
+<BlockShell title={title}>
  <MasonryGrid items={items} />
  {err && <p className="mt-2 text-center text-xs text-red-500">{err}</p>}
  {done ? (
@@ -79,7 +75,6 @@ export default function ListMasonry({
  </div>
  )
  )}
- </div>
- </section>
+ </BlockShell>
  );
 }

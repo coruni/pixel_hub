@@ -1,4 +1,5 @@
 import Link from "next/link";
+import MiniBadge from "@/components/ui/MiniBadge";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/lib/auth";
@@ -65,7 +66,7 @@ export default async function UsersPage() {
  {u.bannedAt ? (
  <span className="rounded-none bg-red-50 px-1.5 py-0.5 text-[10px] font-medium text-red-600">已封禁</span>
  ) : (
- <span className="rounded-none bg-neutral-100 px-1.5 py-0.5 text-[10px] text-neutral-500">正常</span>
+ <MiniBadge>正常</MiniBadge>
  )}
  {u.bannedReason && <span className="text-[10px] text-neutral-400">· {u.bannedReason}</span>}
  </div>

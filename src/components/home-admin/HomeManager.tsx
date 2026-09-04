@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import MiniBadge from "@/components/ui/MiniBadge";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -216,9 +217,7 @@ export default function HomeManager({
  <span className="text-sm font-medium text-neutral-800">
  {row.title || <span className="text-neutral-400">{HOME_KIND_META[row.kind].defaultTitle ?? "（未命名）"}</span>}
  </span>
- <span className="rounded-none bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500">
- {homeKindLabel(row.kind)}
- </span>
+ <MiniBadge strong>{homeKindLabel(row.kind)}</MiniBadge>
  {!row.enabled && (
  <span className="rounded-none bg-neutral-200 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500">已停用</span>
  )}

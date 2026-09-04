@@ -1,4 +1,5 @@
 import Link from "next/link";
+import MiniBadge from "@/components/ui/MiniBadge";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db/prisma";
 import { timeAgo } from "@/lib/format";
@@ -117,7 +118,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
  <li key={keyOf(first)} className="rounded-none border border-brand-200 bg-surface p-4">
  <div className="flex flex-wrap items-center gap-2 text-sm">
  <span className={`rounded-none px-1.5 py-0.5 text-[10px] font-medium ${st.cls}`}>{st.text}</span>
- <span className="rounded-none bg-neutral-100 px-1.5 py-0.5 text-[10px] text-neutral-500">{typeText[first.type]}</span>
+ <MiniBadge>{typeText[first.type]}</MiniBadge>
  {group.length > 1 && (
  <span className="rounded-none bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600">
  同类举报 ×{group.length}

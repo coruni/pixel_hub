@@ -48,43 +48,55 @@ export function PendingBanner({ ctx }: { ctx: DetailCtx }) {
   );
 }
 
-/** 作者名片 + 关注按钮 */
-export function AuthorStrip({ ctx }: { ctx: DetailCtx }) {
-  const { detail, authed, isAuthor } = ctx;
-  const a = detail.author;
+/** 作者头像 + 昵称（hover 信息卡包裹，点击进主页）；size/handle 由各版式微调 */
+export function AuthorIdentity({
+  a,
+  size = "md",
+  handle = true,
+}: {
+  a: DetailCtx["detail"]["author"];
+  size?: "sm" | "md";
+  handle?: boolean;
+}) {
   return (
-    <div className="flex items-center justify-between rounded-none border border-brand-200 bg-surface p-3">
-      <UserHoverCard user={a}>
+    <UserHoverCard user={a}>
       <Link href={`/u/${a.username}`} className="flex items-center gap-2.5">
-        <Avatar
-          name={a.name}
-          username={a.username}
-          avatarKey={a.avatarKey}
-          size="md"
-          online={a.online}
-        />
+        <Avatar name={a.name} username={a.username} avatarKey={a.avatarKey} size={size} online={a.online} />
         <span>
-          <span className="block text-sm font-medium text-neutral-800">
-            {a.name ?? a.username}
-          </span>
-          <span className="block text-xs text-neutral-400">@{a.username}</span>
+          <span className="block text-sm font-medium text-neutral-800">{a.name ?? a.username}</span>
+          {handle && <span className="block text-xs text-neutral-400">@{a.username}</span>}
         </span>
       </Link>
-      </UserHoverCard>
-      {!isAuthor &&
-        (authed ? (
-          <FollowButton
-            targetUserId={detail.authorId}
-            initialFollowing={detail.viewer.followingAuthor}
-          />
-        ) : (
-          <Link
-            href="/login"
-            className="rounded-none border border-brand-200 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100"
-          >
-            关注
-          </Link>
-        ))}
+    </UserHoverCard>
+  );
+}
+
+/** 关注入口：本人隐藏；已登录给 FollowButton，未登录给登录链接 */
+export function FollowControl({ ctx, variant = "ghost" }: { ctx: DetailCtx; variant?: "ghost" | "primary" }) {
+  const { detail, authed, isAuthor } = ctx;
+  if (isAuthor) return null;
+  if (authed)
+    return <FollowButton targetUserId={detail.authorId} initialFollowing={detail.viewer.followingAuthor} />;
+  return (
+    <Link
+      href="/login"
+      className={
+        variant === "primary"
+          ? "rounded-none border border-brand-600 bg-brand-500 px-3 py-1.5 text-xs text-white hover:bg-brand-600"
+          : "rounded-none border border-brand-200 px-3 py-1.5 text-xs text-neutral-700 hover:bg-neutral-100"
+      }
+    >
+      关注
+    </Link>
+  );
+}
+
+/** 作者名片 + 关注按钮 */
+export function AuthorStrip({ ctx }: { ctx: DetailCtx }) {
+  return (
+    <div className="flex items-center justify-between rounded-none border border-brand-200 bg-surface p-3">
+      <AuthorIdentity a={ctx.detail.author} />
+      <FollowControl ctx={ctx} />
     </div>
   );
 }

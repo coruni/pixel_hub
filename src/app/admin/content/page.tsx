@@ -1,4 +1,5 @@
 import Link from "next/link";
+import MiniBadge from "@/components/ui/MiniBadge";
 import { Download, Heart, MessageSquare } from "lucide-react";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db/prisma";
@@ -78,7 +79,7 @@ export default async function ContentPage({ searchParams }: { searchParams: Prom
                                         <Link href={`/resources/${r.slug}`} className="truncate text-sm font-medium text-neutral-900 hover:underline">
                                             {r.title}
                                         </Link>
-                                        <span className="rounded-none bg-neutral-100 px-1.5 py-0.5 text-[10px] text-neutral-500">{TYPE_LABEL[r.type]}</span>
+                                        <MiniBadge>{TYPE_LABEL[r.type]}</MiniBadge>
                                         {st && <span className={`rounded-none px-1.5 py-0.5 text-[10px] font-medium ${st.cls}`}>{st.text}</span>}
                                     </div>
                                     <p className="mt-0.5 truncate text-xs text-neutral-400">

@@ -1,19 +1,15 @@
 import Link from "next/link";
+import BlockShell from "@/components/home/BlockShell";
 import { getTopCreators } from "@/lib/home";
 import { formatCount } from "@/lib/format";
-import SectionTitle from "@/components/home/SectionTitle";
 import Avatar from "@/components/ui/Avatar";
-
-const frame = "mx-auto max-w-7xl px-4 sm:px-6";
 
 export default async function CreatorsBlock({ title, count }: { title: string | null; count: number }) {
  const creators = await getTopCreators(count);
  if (creators.length === 0) return null;
 
  return (
- <section className="mt-8">
- <div className={frame}>
- {title && <SectionTitle>{title}</SectionTitle>}
+<BlockShell title={title}>
  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
  {creators.map((c) => (
  <Link
@@ -31,7 +27,6 @@ export default async function CreatorsBlock({ title, count }: { title: string | 
  </Link>
  ))}
  </div>
- </div>
- </section>
+ </BlockShell>
  );
 }

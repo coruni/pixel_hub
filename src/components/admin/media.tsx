@@ -1,27 +1,21 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useActionState, useState } from "react";
+import { useAction } from "@/lib/hooks";
+import { BTN_DANGER_SM } from "@/lib/ui/cls";
 import { deleteMediaAction, uploadMediaAction } from "@/lib/actions/admin-media";
 
-const b = "rounded-none px-3 py-1.5 text-xs font-medium transition disabled:opacity-50";
-
 export function MediaDeleteButton({ mediaId, used }: { mediaId: string; used: boolean }) {
- const router = useRouter();
- const [pending, start] = useTransition();
+ const { run, pending } = useAction();
  if (used) return <span className="text-xs text-neutral-400">使用中</span>;
  return (
  <button
  disabled={pending}
  onClick={() => {
  if (!window.confirm("确认删除该图片？文件将一并移除。")) return;
- start(async () => {
- const r = await deleteMediaAction(mediaId);
- if (!r.ok) window.alert(r.error ?? "操作失败");
- else router.refresh();
- });
+ run(() => deleteMediaAction(mediaId));
  }}
- className={`${b} border border-red-300 text-red-600 hover:bg-red-50`}
+ className={BTN_DANGER_SM}
  >
  删除
  </button>

@@ -6,7 +6,10 @@ import { HOME_KIND_META } from "@/lib/home-config";
 import { updateHomeSectionAction } from "@/lib/actions/home";
 import { CARD_RATIO_KEYS, CARD_RATIOS, DISPLAY_META, DISPLAY_OPTIONS } from "@/lib/display";
 import type { CardRatio, ContentType } from "@/lib/display";
+import { INPUT, LABEL_STRONG } from "@/lib/ui/cls";
 import type { HomeSectionConfig, HomeSectionKind } from "@/lib/home-config";
+import AdConfigFields, { initAdConfig } from "@/components/admin-shared/ad-config-fields";
+import ChipPicker from "@/components/ui/ChipPicker";
 import HeroPick from "./hero-pick";
 
 export type ManagerRow = {
@@ -22,9 +25,8 @@ export type HeroPickMeta = { id: string; title: string; slug: string };
 export type PickOptionCat = { slug: string; name: string };
 export type PickOptionTag = { slug: string; name: string };
 
-const input =
- "w-full rounded-none border border-brand-200 bg-surface px-3 py-2 text-sm outline-none transition focus:border-brand-500";
-const field = "mb-1 block text-xs font-medium text-neutral-500";
+const input = INPUT;
+const field = LABEL_STRONG;
 
 type TypeFilter = "ALL" | ContentType;
 type SortKey = "latest" | "popular" | "downloads";
@@ -79,13 +81,8 @@ export default function SectionEditor({
  (CARD_RATIO_KEYS as string[]).includes(String(cfg.ratio)) ? (cfg.ratio as CardRatio) : "auto"
  );
  const [paged, setPaged] = useState(kind === "list" && cfg.paged === true);
- // 广告位
- const [adMode, setAdMode] = useState<"image" | "html">(cfg.mode === "html" ? "html" : "image");
- const [adImage, setAdImage] = useState(typeof cfg.image === "string" ? cfg.image : "");
- const [adLink, setAdLink] = useState(typeof cfg.link === "string" ? cfg.link : "");
- const [adAlt, setAdAlt] = useState(typeof cfg.alt === "string" ? cfg.alt : "");
- const [adHtml, setAdHtml] = useState(typeof cfg.html === "string" ? cfg.html : "");
- const [adBadge, setAdBadge] = useState(cfg.badge !== false);
+ // 广告位（共享编辑字段，草稿见 admin-shared/ad-config-fields）
+ const [ad, setAd] = useState(() => initAdConfig(cfg));
  const [pending, start] = useTransition();
  const [msg, setMsg] = useState<string | null>(null);
 
@@ -113,7 +110,7 @@ export default function SectionEditor({
  case "stats":
  return {};
  case "ad":
- return { mode: adMode, image: adImage.trim(), link: adLink.trim(), alt: adAlt.trim(), html: adHtml, badge: adBadge };
+ return { ...ad, image: ad.image.trim(), link: ad.link.trim(), alt: ad.alt.trim() };
  }
  }
 
@@ -334,55 +331,9 @@ export default function SectionEditor({
  {/* 数据一览：无需配置 */}
  {kind === "stats" && <p className="text-xs text-neutral-400">自动读取：已上架内容 / 注册用户 / 累计下载 / 累计浏览。</p>}
 
- {/* 广告位：图片+链接 或 HTML/联盟代码 */}
+ {/* 广告位：图片+链接 或 HTML/联盟代码（共享字段） */}
  {kind === "ad" && (
- <>
- <div>
- <label className={field} htmlFor={`am-${row.id}`}>形式</label>
- <select id={`am-${row.id}`} value={adMode} onChange={(e) => setAdMode(e.target.value as "image" | "html")} className={input}>
- <option value="image">图片 + 链接</option>
- <option value="html">HTML / JS 代码</option>
- </select>
- </div>
- {adMode === "image" ? (
- <>
- <div>
- <label className={field} htmlFor={`ai-${row.id}`}>图片地址</label>
- <input id={`ai-${row.id}`} value={adImage} onChange={(e) => setAdImage(e.target.value)} maxLength={2000} placeholder="/uploads/… 或 https://…" className={input} />
- </div>
- <div>
- <label className={field} htmlFor={`al-${row.id}`}>跳转链接（可空 = 纯展示）</label>
- <input id={`al-${row.id}`} value={adLink} onChange={(e) => setAdLink(e.target.value)} maxLength={500} placeholder="https://…" className={input} />
- </div>
- <div>
- <label className={field} htmlFor={`aa-${row.id}`}>图片替代文字</label>
- <input id={`aa-${row.id}`} value={adAlt} onChange={(e) => setAdAlt(e.target.value)} maxLength={120} className={input} />
- </div>
- </>
- ) : (
- <div className="sm:col-span-2">
- <label className={field} htmlFor={`ah-${row.id}`}>HTML / JS 代码（可接 AdSense 等联盟广告）</label>
- <textarea
- id={`ah-${row.id}`}
- value={adHtml}
- onChange={(e) => setAdHtml(e.target.value)}
- rows={6}
- maxLength={8000}
- className={`${input} resize-y font-mono text-xs leading-relaxed`}
- placeholder={'<a href="https://…"><img src="https://…/banner.png"/></a>\n或联盟广告代码片段…'}
- />
- <p className="mt-1 text-[11px] text-neutral-400">代码将原样注入页面，仅管理员可配置。</p>
- </div>
- )}
- <p className="text-xs text-neutral-400 sm:col-span-2">未配置（无图、无代码）时该板块前台不显示。</p>
- <div className="sm:col-span-2">
- <label className={`${field} flex items-center gap-2`}>
- <input type="checkbox" checked={adBadge} onChange={(e) => setAdBadge(e.target.checked)} className="h-4 w-4 accent-brand-500" />
- 显示「广告」角标（右上角标识）
- </label>
- <p className="mt-1 text-[11px] text-neutral-400">按广告法惯例建议保留；关闭后前台将无任何广告标识。</p>
- </div>
- </>
+ <AdConfigFields idPrefix={`ad-${row.id}`} value={ad} onChange={setAd} emptyNote="未配置（无图、无代码）时该板块前台不显示。" />
  )}
  </div>
 
@@ -401,48 +352,6 @@ export default function SectionEditor({
  {pending ? "保存中…" : "保存板块"}
  </button>
  </div>
- </div>
- );
-}
-
-function ChipPicker({
- label,
- options,
- selected,
- onChange,
- empty,
-}: {
- label: string;
- options: { key: string; label: string }[];
- selected: string[];
- onChange: (next: string[]) => void;
- empty: string;
-}) {
- const set = new Set(selected);
- return (
- <div>
- <label className={field}>{label}</label>
- {options.length === 0 ? (
- <p className="rounded-none border-2 border-dashed border-brand-300 bg-surface px-3 py-3 text-xs text-neutral-400">{empty}</p>
- ) : (
- <div className="flex max-h-40 flex-wrap gap-1.5 overflow-auto rounded-none border border-brand-200 bg-surface p-2">
- {options.map((o) => {
- const on = set.has(o.key);
- return (
- <button
- key={o.key}
- type="button"
- onClick={() => onChange(on ? selected.filter((s) => s !== o.key) : [...selected, o.key])}
- className={`rounded-none border px-2.5 py-1 text-xs transition ${
- on ? "border-brand-500 bg-brand-500 text-white" : "border-neutral-200 bg-surface text-neutral-600 hover:border-brand-500"
- }`}
- >
- {o.label}
- </button>
- );
- })}
- </div>
- )}
  </div>
  );
 }

@@ -3,14 +3,11 @@ import type { ReactNode } from "react";
 import { CalendarDays, Eye, MessageSquare, Newspaper } from "lucide-react";
 import { formatCount, timeAgo } from "@/lib/format";
 import Markdown from "@/components/rte/Markdown";
-import Avatar from "@/components/ui/Avatar";
-import UserHoverCard from "@/components/ui/UserHoverCard";
-import { FollowButton } from "@/components/social/interactions";
-import { ActionBar, CommentBlock, RelatedSection, type DetailCtx } from "./parts";
+import { ActionBar, AuthorIdentity, CommentBlock, FollowControl, RelatedSection, type DetailCtx } from "./parts";
 
 /** D · 杂志阅读式 —— 文章专属：编辑部排版（左对齐大标题 + 作者 meta 行 + 阅读列正文），无下载/信息卡等资源向面板 */
 export default function DetailArticle({ ctx, middleSlot }: { ctx: DetailCtx; middleSlot?: ReactNode }) {
-  const { detail, authed, isAuthor } = ctx;
+  const { detail } = ctx;
   const a = detail.author;
   const cover = detail.gallery[0];
   const rest = detail.gallery.slice(1);
@@ -49,14 +46,7 @@ export default function DetailArticle({ ctx, middleSlot }: { ctx: DetailCtx; mid
 
       {/* 作者 meta 行 */}
       <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 py-1">
-        <UserHoverCard user={a}>
-        <Link href={`/u/${a.username}`} className="flex items-center gap-2.5">
-          <Avatar name={a.name} username={a.username} avatarKey={a.avatarKey} size="sm" online={a.online} />
-          <span className="text-sm font-medium text-neutral-800">
-            {a.name ?? a.username}
-          </span>
-        </Link>
-        </UserHoverCard>
+        <AuthorIdentity a={a} size="sm" handle={false} />
         <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-400">
           <span className="inline-flex items-center gap-1">
             <CalendarDays size={12} aria-hidden />{" "}
@@ -71,22 +61,9 @@ export default function DetailArticle({ ctx, middleSlot }: { ctx: DetailCtx; mid
           </span>
           <span>约 {minutes} 分钟</span>
         </span>
-        {!isAuthor &&
-          (authed ? (
-            <div className="ml-auto">
-              <FollowButton
-                targetUserId={detail.authorId}
-                initialFollowing={detail.viewer.followingAuthor}
-              />
-            </div>
-          ) : (
-            <Link
-              href="/login"
-              className="rounded-none border border-brand-200 px-3 py-1.5 text-xs text-neutral-700 hover:bg-neutral-100"
-            >
-              关注
-            </Link>
-          ))}
+        <div className="ml-auto">
+          <FollowControl ctx={ctx} />
+        </div>
       </div>
 
       {/* 封面 */}

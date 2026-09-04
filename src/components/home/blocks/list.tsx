@@ -1,11 +1,9 @@
 import ResourceGrid from "@/components/resource/ResourceGrid";
+import BlockShell from "@/components/home/BlockShell";
 import { getFeed } from "@/lib/queries";
 import type { CardRatio, ContentDisplay, ContentType } from "@/lib/display";
 import ListMore from "./list-more";
 import ListMasonry from "./list-masonry";
-import SectionTitle from "@/components/home/SectionTitle";
-
-const frame = "mx-auto max-w-7xl px-4 sm:px-6";
 
 export type ListBlockCfg = {
   type: "ALL" | ContentType;
@@ -59,9 +57,7 @@ export default async function ListBlock({
   }
 
   return (
-    <section className="mt-8">
-      <div className={frame}>
-        {title && <SectionTitle>{title}</SectionTitle>}
+<BlockShell title={title}>
         <ResourceGrid items={items} display={showAs} ratio={uniformRatio} />
         {cfg.paged && (
           <ListMore
@@ -74,7 +70,6 @@ export default async function ListBlock({
             ratio={uniformRatio}
           />
         )}
-      </div>
-    </section>
+    </BlockShell>
   );
 }

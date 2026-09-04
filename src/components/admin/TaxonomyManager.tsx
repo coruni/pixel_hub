@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
+import MiniBadge from "@/components/ui/MiniBadge";
 import { Plus, Save, Search, Trash2 } from "lucide-react";
 import {
  createCategoryAction,
@@ -10,25 +10,8 @@ import {
  renameTagAction,
  updateCategoryAction,
 } from "@/lib/actions/taxonomy";
-
-type Op = { ok: boolean; error?: string };
-
-function useOps() {
- const router = useRouter();
- const [pending, start] = useTransition();
- const run = (fn: () => Promise<Op>) =>
- start(async () => {
- const r = await fn();
- if (!r.ok) window.alert(r.error ?? "操作失败");
- else router.refresh();
- });
- return { run, pending };
-}
-
-const btnGhost =
- "inline-flex items-center gap-1 rounded-none border border-brand-200 px-2.5 py-1.5 text-xs text-neutral-600 transition hover:border-brand-400 hover:text-brand-700 disabled:opacity-40";
-const field =
- "rounded-none border border-brand-200 bg-surface px-2.5 py-1.5 text-sm outline-none focus:border-brand-500";
+import { useAction } from "@/lib/hooks";
+import { BTN_DANGER_SM, BTN_GHOST_SM, BTN_PRIMARY_SM, INPUT_SM } from "@/lib/ui/cls";
 
 // ---------- 分类管理 ----------
 
@@ -41,7 +24,7 @@ export type CategoryRow = {
 };
 
 export function CategoryManager({ rows }: { rows: CategoryRow[] }) {
- const { run, pending } = useOps();
+ const { run, pending } = useAction();
  const [name, setName] = useState("");
  const [slug, setSlug] = useState("");
  const [edits, setEdits] = useState<Record<string, string>>({});
@@ -55,8 +38,8 @@ export function CategoryManager({ rows }: { rows: CategoryRow[] }) {
  <h3 className="text-sm font-semibold text-neutral-900">新建分类</h3>
  <p className="mt-1 text-xs text-neutral-400">分类对所有类型通用（图片/游戏共用一套分类）。</p>
  <div className="mt-3 flex flex-wrap items-center gap-2">
- <input value={name} onChange={(e) => setName(e.target.value)} placeholder="名称（如：像素艺术）" className={`${field} w-44`} />
- <input value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="slug（如 pixel-art，留空按名称生成）" className={`${field} w-64`} />
+ <input value={name} onChange={(e) => setName(e.target.value)} placeholder="名称（如：像素艺术）" className={`${INPUT_SM} w-44`} />
+ <input value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="slug（如 pixel-art，留空按名称生成）" className={`${INPUT_SM} w-64`} />
  <button
  type="button"
  disabled={pending || !name.trim()}
@@ -70,7 +53,7 @@ export function CategoryManager({ rows }: { rows: CategoryRow[] }) {
  return r;
  })
  }
- className="inline-flex items-center gap-1 rounded-none border border-brand-600 bg-brand-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-600 disabled:opacity-40"
+ className={BTN_PRIMARY_SM}
  >
  <Plus size={13} /> 新建
  </button>
@@ -92,10 +75,10 @@ export function CategoryManager({ rows }: { rows: CategoryRow[] }) {
  <input
  value={edit ?? r.name}
  onChange={(e) => setEdit(r.id, e.target.value)}
- className={`${field} w-44`}
+ className={`${INPUT_SM} w-44`}
  />
  <span className="text-xs text-neutral-400">/{r.slug}</span>
- <span className="rounded-none bg-neutral-100 px-1.5 py-0.5 text-[10px] text-neutral-500">{r.resourceCount} 内容</span>
+ <MiniBadge>{r.resourceCount} 内容</MiniBadge>
  <div className="ml-auto flex items-center gap-2">
  <button
  type="button"
@@ -111,7 +94,7 @@ export function CategoryManager({ rows }: { rows: CategoryRow[] }) {
  return r2;
  })
  }
- className={btnGhost}
+ className={BTN_GHOST_SM}
  >
  <Save size={12} /> 保存
  </button>
@@ -122,7 +105,7 @@ export function CategoryManager({ rows }: { rows: CategoryRow[] }) {
  if (!window.confirm(`删除分类「${r.name}」？`)) return;
  run(() => deleteCategoryAction({ id: r.id }));
  }}
- className="inline-flex items-center gap-1 rounded-none border border-brand-200 px-2.5 py-1.5 text-xs text-neutral-500 transition hover:border-red-300 hover:text-red-600 disabled:opacity-40"
+ className={BTN_DANGER_SM}
  >
  <Trash2 size={12} /> 删除
  </button>
@@ -141,7 +124,7 @@ export function CategoryManager({ rows }: { rows: CategoryRow[] }) {
 export type TagRow = { id: string; name: string; slug: string; count: number };
 
 export function TagManager({ rows }: { rows: TagRow[] }) {
- const { run, pending } = useOps();
+ const { run, pending } = useAction();
  const [q, setQ] = useState("");
  const [edits, setEdits] = useState<Record<string, string>>({});
 
@@ -164,7 +147,7 @@ export function TagManager({ rows }: { rows: TagRow[] }) {
  value={q}
  onChange={(e) => setQ(e.target.value)}
  placeholder="搜索标签…"
- className={`${field} w-56 pl-8`}
+ className={`${INPUT_SM} w-56 pl-8`}
  />
  </div>
  </div>
@@ -178,10 +161,10 @@ export function TagManager({ rows }: { rows: TagRow[] }) {
  <input
  value={edit ?? t.name}
  onChange={(e) => setEdits((prev) => ({ ...prev, [t.id]: e.target.value }))}
- className={`${field} w-44`}
+ className={`${INPUT_SM} w-44`}
  />
  <span className="text-xs text-neutral-400">/{t.slug}</span>
- <span className="rounded-none bg-neutral-100 px-1.5 py-0.5 text-[10px] text-neutral-500">{t.count} 内容</span>
+ <MiniBadge>{t.count} 内容</MiniBadge>
  <div className="ml-auto flex items-center gap-2">
  <button
  type="button"
@@ -197,7 +180,7 @@ export function TagManager({ rows }: { rows: TagRow[] }) {
  return r;
  })
  }
- className={btnGhost}
+ className={BTN_GHOST_SM}
  >
  <Save size={12} /> 保存
  </button>
@@ -208,7 +191,7 @@ export function TagManager({ rows }: { rows: TagRow[] }) {
  if (!window.confirm(`删除标签「${t.name}」？(${t.count} 个内容将移除该标签)`)) return;
  run(() => deleteTagAction({ id: t.id }));
  }}
- className="inline-flex items-center gap-1 rounded-none border border-brand-200 px-2.5 py-1.5 text-xs text-neutral-500 transition hover:border-red-300 hover:text-red-600 disabled:opacity-40"
+ className={BTN_DANGER_SM}
  >
  <Trash2 size={12} /> 删除
  </button>

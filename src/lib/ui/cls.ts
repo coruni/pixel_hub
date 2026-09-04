@@ -1,0 +1,29 @@
+// 共享 class 常量：全站反复出现的按钮/输入框/卡片样式收敛于此（rounded-none 直角设计语言）。
+// 用法：className={`${BTN_PRIMARY_SM}`}，需要叠加尺寸/颜色微调时再拼额外类。
+
+/** 表单输入框（全宽） */
+export const INPUT =
+  "w-full rounded-none border border-brand-200 bg-surface px-3 py-2 text-sm outline-none transition focus:border-brand-500";
+/** 表单输入框（紧凑，后台行内编辑用） */
+export const INPUT_SM =
+  "rounded-none border border-brand-200 bg-surface px-2.5 py-1.5 text-sm outline-none transition focus:border-brand-500";
+/** 表单 label */
+export const LABEL = "mb-1 block text-xs text-neutral-500";
+/** 表单 label（编辑器内强调样式） */
+export const LABEL_STRONG = "mb-1 block text-xs font-medium text-neutral-500";
+
+/** 主按钮（默认尺寸） */
+export const BTN_PRIMARY =
+  "inline-flex items-center gap-1.5 rounded-none border border-brand-600 bg-brand-500 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-brand-600 disabled:opacity-60";
+/** 主按钮（小尺寸，后台操作） */
+export const BTN_PRIMARY_SM =
+  "inline-flex items-center gap-1 rounded-none border border-brand-600 bg-brand-500 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-brand-600 disabled:opacity-50";
+/** 幽灵按钮（小尺寸） */
+export const BTN_GHOST_SM =
+  "inline-flex items-center gap-1 rounded-none border border-brand-200 bg-surface px-3 py-1.5 text-xs text-neutral-600 transition hover:border-brand-400 hover:text-brand-700 disabled:opacity-50";
+/** 危险按钮（小尺寸，删除/封禁类确认操作） */
+export const BTN_DANGER_SM =
+  "inline-flex items-center gap-1 rounded-none border border-red-300 px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-50";
+
+/** 卡片容器 */
+export const CARD = "rounded-none border border-brand-200 bg-surface";

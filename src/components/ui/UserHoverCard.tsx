@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import Avatar from "@/components/ui/Avatar";
 import { formatCount } from "@/lib/format";
+import { useHoverDelay } from "@/lib/hooks";
 
 export type HoverCardUser = {
   username: string;
@@ -29,15 +30,7 @@ const ROLE_LABEL: Record<string, string> = {
  * 延迟 300ms 出现，展示昵称/用户名/简介/身份徽标/统计，点击卡片进入主页。
  */
 export default function UserHoverCard({ user, children }: { user: HoverCardUser; children: ReactNode }) {
-  const [open, setOpen] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const wrapRef = useRef<HTMLSpanElement>(null);
-
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, []);
+  const { open, openDelayed, close, setOpen } = useHoverDelay(300);
 
   const roleLabel = user.role ? ROLE_LABEL[user.role] : undefined;
   const stats: [string, number][] = [
@@ -48,18 +41,11 @@ export default function UserHoverCard({ user, children }: { user: HoverCardUser;
 
   return (
     <span
-      ref={wrapRef}
       className="relative inline-flex"
-      onMouseEnter={() => {
-        if (timerRef.current) clearTimeout(timerRef.current);
-        timerRef.current = setTimeout(() => setOpen(true), 300);
-      }}
-      onMouseLeave={() => {
-        if (timerRef.current) clearTimeout(timerRef.current);
-        setOpen(false);
-      }}
+      onMouseEnter={openDelayed}
+      onMouseLeave={close}
       onFocus={() => setOpen(true)}
-      onBlur={() => setOpen(false)}
+      onBlur={close}
     >
       {children}
       {open && (

@@ -1,17 +1,6 @@
 import Link from "next/link";
-import {
- Bell,
- Bookmark,
- Compass,
- ExternalLink,
- Home,
- Info,
- ShieldCheck,
- Tag,
- Upload,
- type LucideIcon,
-} from "lucide-react";
 import { auth } from "@/lib/auth";
+import { NAV_ICON_MAP } from "@/lib/nav-icons";
 import { siteName, siteLogo } from "@/lib/site-url";
 import { prisma } from "@/lib/db/prisma";
 import { publicUrl } from "@/lib/storage";
@@ -22,19 +11,6 @@ import UserMenu from "./UserMenu";
 import NavCategoriesMenu from "./NavCategoriesMenu";
 import ThemeToggle from "./ThemeToggle";
 import MobileNav from "./MobileNav";
-
-// 导航图标白名单（与 site-config 的 NAV_ICONS 对应）
-const ICONS: Record<string, LucideIcon> = {
- home: Home,
- compass: Compass,
- upload: Upload,
- bell: Bell,
- shield: ShieldCheck,
- tag: Tag,
- bookmark: Bookmark,
- external: ExternalLink,
- info: Info,
-};
 
 const navBtn = "inline-flex items-center gap-1.5 transition hover:text-neutral-900";
 const iconSize = 15;
@@ -128,7 +104,7 @@ export default async function Navbar() {
 }
 
 function NavLink({ item }: { item: NavItem }) {
- const Icon = item.icon ? ICONS[item.icon] : null;
+ const Icon = item.icon ? NAV_ICON_MAP[item.icon] : null;
  return (
  <Link
  href={item.href}

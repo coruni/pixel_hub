@@ -624,3 +624,42 @@ export async function getNotifications(
     unread,
   };
 }
+
+// ---------- 侧边栏组件取数（SiteSidebar widgets 共用） ----------
+
+/** 按 slug 列表取标签（保持传入顺序；不存在的 slug 忽略） */
+export async function getTagsBySlugs(slugs: string[]) {
+  const rows = await prisma.tag.findMany({
+    where: { slug: { in: slugs } },
+    select: { slug: true, name: true, count: true },
+  });
+  const order = new Map(rows.map((t) => [t.slug, t]));
+  return slugs.flatMap((s) => (order.get(s) ? [order.get(s)!] : []));
+}
+
+/** 最新公开评论（仅已上架资源；含作者与所属资源摘要） */
+export function getRecentComments(limit: number) {
+  return prisma.comment.findMany({
+    where: { status: "PUBLIC", resource: { status: "PUBLISHED" } },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+    select: {
+      id: true,
+      content: true,
+      createdAt: true,
+      author: { select: { username: true, name: true, avatarKey: true, lastSeenAt: true } },
+      resource: { select: { slug: true, title: true } },
+    },
+  });
+}
+
+/** 随机「手气不错」id 池：轻量 id 池洗牌后精取（SQLite 无原生 random 排序；池子封顶 500） */
+export async function getRandomResourceIds(count: number) {
+  const pool = await prisma.resource.findMany({
+    where: { status: "PUBLISHED" },
+    select: { id: true },
+    take: 500,
+    orderBy: { createdAt: "desc" },
+  });
+  return [...pool].sort(() => Math.random() - 0.5).slice(0, count).map((r) => r.id);
+}

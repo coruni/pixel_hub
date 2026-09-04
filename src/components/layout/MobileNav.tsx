@@ -3,34 +3,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  Bell,
-  Bookmark,
-  Compass,
-  ExternalLink,
-  Home,
-  Info,
   LayoutGrid,
   Menu,
-  ShieldCheck,
-  Tag,
-  Upload,
   X,
-  type LucideIcon,
 } from "lucide-react";
+import { NAV_ICON_MAP } from "@/lib/nav-icons";
 import type { NavCategory } from "./NavCategoriesMenu";
-
-// 与 Navbar / site-config NAV_ICONS 键一致
-const ICONS: Record<string, LucideIcon> = {
-  home: Home,
-  compass: Compass,
-  upload: Upload,
-  bell: Bell,
-  shield: ShieldCheck,
-  tag: Tag,
-  bookmark: Bookmark,
-  external: ExternalLink,
-  info: Info,
-};
 
 export type MobileNavItem = { id: string; label: string; href: string; newTab: boolean; icon: string };
 
@@ -71,7 +49,7 @@ export default function MobileNav({ items, catLabel, categories }: { items: Mobi
         <div className="fixed inset-x-0 top-16 z-40 max-h-[calc(100dvh-4rem)] overflow-y-auto border-b border-brand-200 bg-surface shadow-lg">
           <nav className="mx-auto grid max-w-7xl gap-1 px-4 py-4">
             {items.map((it) => {
-              const Icon = it.icon ? ICONS[it.icon] : null;
+              const Icon = it.icon ? NAV_ICON_MAP[it.icon] : null;
               return (
                 <Link
                   key={it.id}

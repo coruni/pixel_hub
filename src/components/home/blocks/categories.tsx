@@ -1,10 +1,8 @@
 import Link from "next/link";
+import BlockShell from "@/components/home/BlockShell";
 import { ChevronRight } from "lucide-react";
 import { getCategories } from "@/lib/queries";
 import { getPublishedCountByCategory } from "@/lib/home";
-import SectionTitle from "@/components/home/SectionTitle";
-
-const frame = "mx-auto max-w-7xl px-4 sm:px-6";
 
 // 像素分段条（RPG 数值条）：把数量归一到 10 格方块
 const SEGS = 10;
@@ -29,9 +27,7 @@ export default async function CategoriesBlock({
   const max = Math.max(1, ...list.map((c) => counts.get(c.id) ?? 0));
 
   return (
-    <section className="mt-8">
-      <div className={frame}>
-        {title && <SectionTitle>{title}</SectionTitle>}
+<BlockShell title={title}>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {list.map((c) => {
             const n = counts.get(c.id) ?? 0;
@@ -86,7 +82,6 @@ export default async function CategoriesBlock({
             );
           })}
         </div>
-      </div>
-    </section>
+    </BlockShell>
   );
 }

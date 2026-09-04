@@ -1,9 +1,7 @@
 import { Database, Download, Eye, Users } from "lucide-react";
+import BlockShell from "@/components/home/BlockShell";
 import { getHomeStats } from "@/lib/home";
 import { formatCount } from "@/lib/format";
-import SectionTitle from "@/components/home/SectionTitle";
-
-const frame = "mx-auto max-w-7xl px-4 sm:px-6";
 
 export default async function StatsBlock({ title }: { title: string | null }) {
  const stats = await getHomeStats();
@@ -14,9 +12,7 @@ export default async function StatsBlock({ title }: { title: string | null }) {
  { Icon: Eye, label: "累计浏览", v: stats.views },
  ];
  return (
- <section className="mt-8">
- <div className={frame}>
- {title && <SectionTitle>{title}</SectionTitle>}
+<BlockShell title={title}>
  <div className="grid grid-cols-2 gap-3 rounded-none border border-brand-200 bg-surface p-5 sm:grid-cols-4 sm:p-6">
  {items.map((it) => (
  <div key={it.label} className="flex items-center gap-3">
@@ -30,7 +26,6 @@ export default async function StatsBlock({ title }: { title: string | null }) {
  </div>
  ))}
  </div>
- </div>
- </section>
+ </BlockShell>
  );
 }

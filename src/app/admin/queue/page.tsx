@@ -1,4 +1,5 @@
 import Link from "next/link";
+import MiniBadge from "@/components/ui/MiniBadge";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db/prisma";
 import { publicUrl } from "@/lib/storage";
@@ -90,9 +91,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
  <Link href={`/resources/${r.slug}`} className="text-base font-semibold text-neutral-900 hover:underline">
  {r.title}
  </Link>
- <span className="rounded-none bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500">
- {TYPE_LABEL[r.type]}
- </span>
+ <MiniBadge strong>{TYPE_LABEL[r.type]}</MiniBadge>
  {r.category && <span className="text-xs text-neutral-400">{r.category.name}</span>}
  {spot && (
  <span className="rounded-none border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-600">

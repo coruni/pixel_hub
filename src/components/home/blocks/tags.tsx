@@ -1,10 +1,8 @@
 import Link from "next/link";
+import BlockShell from "@/components/home/BlockShell";
 import { prisma } from "@/lib/db/prisma";
 import { getTopTags } from "@/lib/queries";
 import { formatCount } from "@/lib/format";
-import SectionTitle from "@/components/home/SectionTitle";
-
-const frame = "mx-auto max-w-7xl px-4 sm:px-6";
 
 export default async function TagsBlock({
  title,
@@ -29,9 +27,7 @@ export default async function TagsBlock({
  if (tags.length === 0) return null;
 
  return (
- <section className="mt-8 pb-8">
- <div className={frame}>
- {title && <SectionTitle>{title}</SectionTitle>}
+<BlockShell title={title} className="mt-8 pb-8">
  <div className="flex flex-wrap gap-2">
  {tags.map((t) => (
  <Link
@@ -44,7 +40,6 @@ export default async function TagsBlock({
  </Link>
  ))}
  </div>
- </div>
- </section>
+ </BlockShell>
  );
 }
