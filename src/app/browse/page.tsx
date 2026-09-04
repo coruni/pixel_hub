@@ -11,7 +11,7 @@ export default async function BrowsePage({ searchParams }: { searchParams: Promi
   const u = (await auth())?.user;
   return (
     <ArchiveShell>
-      <FeedBrowser base="/browse" searchParams={sp} authed={!!u} userId={u?.id} />
+      <FeedBrowser base="/browse" searchParams={sp} authed={!!u} userId={u?.id} infinite />
     </ArchiveShell>
   );
 }

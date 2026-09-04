@@ -1,8 +1,10 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { getCategories, getFeed, getTopTags } from "@/lib/queries";
+import { getCategories, getFeed, getTopTags, toFeedCard } from "@/lib/queries";
 import { enumParam, intParam, str, type SP } from "@/lib/search-params";
 import MasonryGrid from "@/components/resource/MasonryGrid";
+import FeedPager from "@/components/feed/FeedPager";
+import FeedInfinite from "@/components/feed/FeedInfinite";
 
 type Props = {
   base: string; // 当前页路径
@@ -11,6 +13,8 @@ type Props = {
   userId?: string;
   heading?: ReactNode;
   showTags?: boolean;
+  /** true = 无限滚动替代数字分页（当前仅 /browse 使用） */
+  infinite?: boolean;
 };
 
 export default async function FeedBrowser({
@@ -20,6 +24,7 @@ export default async function FeedBrowser({
   userId,
   heading,
   showTags,
+  infinite,
 }: Props) {
   const sp = searchParams;
   const type = enumParam(sp, "type", ["ALL", "GAME", "IMAGE", "ARTICLE"] as const, "ALL");
@@ -29,7 +34,17 @@ export default async function FeedBrowser({
   const period = enumParam(sp, "period", ["all", "day", "week", "month"] as const, "all");
   const q = str(sp, "q")?.trim();
   const follow = str(sp, "follow") === "1" && !!authed && !!userId;
-  const page = intParam(sp, "page", 1);
+  // 无限滚动无 URL 页码：始终从第 1 页起，追加态只存在客户端
+  const page = infinite ? 1 : intParam(sp, "page", 1);
+
+  // 板块顶部锚点 id（翻页后滚到这里）：按当前路径生成唯一 id，避免同页出现多个分页模块时冲突
+  const moduleId =
+    (base === "/"
+      ? "home"
+      : base
+          .replace(/^\/+/, "")
+          .replace(/[^a-zA-Z0-9]+/g, "-")
+          .replace(/^-+|-+$/g, "")) + "-feed";
 
   const [categories, feed, topTags] = await Promise.all([
     getCategories(),
@@ -48,6 +63,11 @@ export default async function FeedBrowser({
     showTags ? getTopTags() : Promise.resolve([] as Awaited<ReturnType<typeof getTopTags>>),
   ]);
   const { items, hasMore } = feed;
+  const emptyText = follow
+    ? "关注的作者还没有新内容"
+    : q
+      ? `没有找到与「${q}」相关的内容`
+      : "这里还没有内容";
 
   // 构造过滤链接
   function href(patch: Record<string, string | null>): string {
@@ -64,6 +84,8 @@ export default async function FeedBrowser({
     const keep = { sort, period, q } as Record<string, string | undefined>;
     for (const [k, v] of Object.entries(keep)) if (v) usp.set(k, v);
     for (const [k, v] of Object.entries(patch)) {
+      // 无限滚动不写 page 参数（页码只在客户端追加态里前进）
+      if (infinite && k === "page") continue;
       if (v === null) usp.delete(k);
       else if (k !== "type" && k !== "follow") usp.set(k, v);
       else if (k === "follow") {
@@ -71,8 +93,13 @@ export default async function FeedBrowser({
         else usp.delete("follow");
       }
     }
-    if (patch.page) usp.set("page", patch.page);
-    else if (!("follow" in patch)) usp.set("page", String(page));
+    // 分页翻页/筛选换集合时的页码处理：无限滚动不需要页码参数（追加态在客户端）
+    if (!infinite) {
+      // 分类/标签切换会改变当前列表集合，页码应回到第 1 页；纯排序/时间调整保留原页位置
+      if (patch.page) usp.set("page", patch.page);
+      else if ("cat" in patch || "tag" in patch) usp.set("page", "1");
+      else if (!("follow" in patch)) usp.set("page", String(page));
+    }
     const qs = usp.toString();
     return qs ? `${base}?${qs}` : base;
   }
@@ -84,8 +111,40 @@ export default async function FeedBrowser({
         : "border-brand-200 bg-surface text-neutral-600 hover:border-brand-500"
     }`;
 
+  // 无限滚动：首屏注入客户端流，后续页由 IntersectionObserver 自动追加；否则数字分页
+  const feedArea = infinite ? (
+    <FeedInfinite
+      initial={items.map(toFeedCard)}
+      initialHasMore={hasMore}
+      params={{
+        type,
+        sort,
+        period,
+        categorySlug: follow ? undefined : cat || undefined,
+        tagSlug: follow ? undefined : tag || undefined,
+        q: follow ? undefined : q || undefined,
+        follow,
+      }}
+      emptyText={emptyText}
+    />
+  ) : (
+    <>
+      <MasonryGrid className="mt-4" items={items} maxCols={5} gap={12} />
+      {items.length === 0 && (
+        <div className="mt-20 text-center text-sm text-neutral-400">{emptyText}</div>
+      )}
+      {/* 分页：上一页/下一页点击后滚动到板块顶部（见 FeedPager） */}
+      <FeedPager
+        moduleId={moduleId}
+        prevHref={page > 1 ? href({ page: String(page - 1) }) : null}
+        nextHref={hasMore ? href({ page: String(page + 1) }) : null}
+        page={page}
+      />
+    </>
+  );
+
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+    <div id={moduleId} className="mx-auto max-w-7xl scroll-mt-20 px-4 py-6 sm:px-6">
       {heading}
 
       {/* 主 Tab：类型 + 关注 */}
@@ -238,39 +297,8 @@ export default async function FeedBrowser({
         </div>
       )}
 
-      {/* 瀑布流（归档大屏最多五列） */}
-      <MasonryGrid className="mt-4" items={items} maxCols={5} gap={12} />
-
-      {items.length === 0 && (
-        <div className="mt-20 text-center text-sm text-neutral-400">
-          {follow
-            ? "关注的作者还没有新内容"
-            : q
-              ? `没有找到与「${q}」相关的内容`
-              : "这里还没有内容"}
-        </div>
-      )}
-
-      {/* 分页 */}
-      <div className="mt-6 flex items-center justify-center gap-3 text-sm">
-        {page > 1 && (
-          <Link
-            href={href({ page: String(page - 1) })}
-            className="rounded-none border border-brand-200 px-3 py-1.5 hover:bg-neutral-100"
-          >
-            上一页
-          </Link>
-        )}
-        <span className="text-xs text-neutral-400">第 {page} 页</span>
-        {hasMore && (
-          <Link
-            href={href({ page: String(page + 1) })}
-            className="rounded-none border border-brand-200 px-3 py-1.5 hover:bg-neutral-100"
-          >
-            下一页
-          </Link>
-        )}
-      </div>
+      {/* 瀑布流：无限滚动(客户端流)或数字分页（见 feedArea） */}
+      {feedArea}
     </div>
   );
 }
