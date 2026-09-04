@@ -8,6 +8,7 @@ import FeedBlock from "./blocks/feed";
 import StatsBlock from "./blocks/stats";
 import CreatorsBlock from "./blocks/creators";
 import TagsBlock from "./blocks/tags";
+import AdSectionBlock from "./blocks/ad";
 
 type SP = Record<string, string | string[] | undefined>;
 
@@ -92,6 +93,21 @@ export default async function HomeRenderer({
                 title={s.title}
                 count={typeof cfg.count === "number" ? cfg.count : 12}
                 slugs={(cfg.slugs as string[]) ?? []}
+              />
+            );
+          case "ad":
+            // 广告位：无标题外壳，未配置（无图无代码）时板块返回 null
+            return (
+              <AdSectionBlock
+                key={s.id}
+                cfg={{
+                  mode: cfg.mode === "html" ? "html" : "image",
+                  image: typeof cfg.image === "string" ? cfg.image : "",
+                  link: typeof cfg.link === "string" ? cfg.link : "",
+                  alt: typeof cfg.alt === "string" ? cfg.alt : "",
+                  html: typeof cfg.html === "string" ? cfg.html : "",
+                  badge: cfg.badge !== false,
+                }}
               />
             );
           default:

@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 import { getTheme } from "@/lib/site";
 import { sidebarVisible } from "@/lib/site-config";
 import FeedBrowser from "@/components/feed/FeedBrowser";
-import SiteSidebar from "@/components/sidebar/SiteSidebar";
+import SiteSidebar, { WidgetArea } from "@/components/sidebar/SiteSidebar";
 import SidebarLayout from "@/components/layout/SidebarLayout";
 
 export const metadata = { title: "搜索" };
@@ -15,9 +15,16 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
  const q = typeof sp.q === "string" ? sp.q.trim() : "";
  const theme = await getTheme();
  const showSidebar = sidebarVisible(theme, "archive");
+ // 归档页内容槽位（搜索框之前/结果流之后）
+ const hasSlot = (area: "archiveTop" | "archiveBottom") => theme.slots[area].some((w) => w.enabled);
 
  return (
- <SidebarLayout railWidth={theme.sidebar.width} rail={showSidebar ? <SiteSidebar theme={theme} /> : undefined}>
+ <SidebarLayout railWidth={theme.sidebar.width} rail={showSidebar ? <SiteSidebar theme={theme} page="archive" /> : undefined}>
+ {hasSlot("archiveTop") && (
+ <div className="mx-auto max-w-7xl px-4 pt-6 sm:px-6">
+ <WidgetArea theme={theme} area="archiveTop" />
+ </div>
+ )}
  <div className="mx-auto max-w-7xl px-4 pt-8 sm:px-6">
  <form action="/search" method="get" className="flex max-w-xl gap-2">
  <input
@@ -37,6 +44,11 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
  )}
  </div>
  {q && <FeedBrowser base="/search" searchParams={sp} authed={!!u} userId={u?.id} />}
+ {hasSlot("archiveBottom") && (
+ <div className="mx-auto max-w-7xl px-4 pb-12 sm:px-6">
+ <WidgetArea theme={theme} area="archiveBottom" />
+ </div>
+ )}
  </SidebarLayout>
  );
 }

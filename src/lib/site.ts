@@ -34,11 +34,6 @@ export async function ensureSiteTheme(): Promise<void> {
   await prisma.siteSetting.create({ data: { key: THEME_KEY, value: serializeTheme(DEFAULT_THEME) } });
 }
 
-/** 读取完整 Theme 并把 widgets 里禁用的剔除（前台渲染用） */
-export function enabledWidgets(theme: Theme) {
-  return theme.sidebar.widgets.filter((w) => w.enabled);
-}
-
 export type ThemeView = Theme;
 
 /** 详情页当前生效模板：type 覆盖 > 全站默认 */

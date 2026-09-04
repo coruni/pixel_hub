@@ -11,7 +11,8 @@ export type HomeSectionKind =
   | "feed"
   | "stats"
   | "creators"
-  | "tags";
+  | "tags"
+  | "ad";
 
 export const HOME_SECTION_KINDS: HomeSectionKind[] = [
   "hero",
@@ -22,6 +23,7 @@ export const HOME_SECTION_KINDS: HomeSectionKind[] = [
   "stats",
   "creators",
   "tags",
+  "ad",
 ];
 
 export const HOME_KIND_META: Record<HomeSectionKind, { label: string; desc: string; defaultTitle: string | null }> = {
@@ -33,6 +35,7 @@ export const HOME_KIND_META: Record<HomeSectionKind, { label: string; desc: stri
   stats: { label: "数据一览", desc: "社区规模数字横幅", defaultTitle: "社区数据" },
   creators: { label: "人气创作者", desc: "按粉丝数排行展示创作者", defaultTitle: "人气创作者" },
   tags: { label: "热门标签", desc: "标签云快捷入口；可按热度，或手动挑选特定标签", defaultTitle: "热门标签" },
+  ad: { label: "广告位", desc: "图片+链接 或 HTML/联盟广告代码，带「广告」角标；可插在板块流任意位置", defaultTitle: null },
 };
 
 export function homeKindLabel(kind: HomeSectionKind): string {
@@ -74,6 +77,14 @@ const tagsCfg = z.object({
   count: z.number().int().min(1).max(24).default(12),
   slugs: z.array(z.string()).max(30).default([]), // 空 = 按热度 top count；否则仅展示所选标签
 });
+const adCfg = z.object({
+  mode: z.enum(["image", "html"]).default("image"),
+  image: z.string().max(2000).default(""), // 图片地址（image 模式）
+  link: z.string().max(500).default(""), // 跳转链接，可空 = 纯展示
+  alt: z.string().max(120).default(""),
+  html: z.string().max(8000).default(""), // 联盟广告代码片段（html 模式）
+  badge: z.boolean().default(true), // 是否显示「广告」角标
+});
 
 export const homeConfigSchemas: Record<HomeSectionKind, z.ZodTypeAny> = {
   hero: heroCfg,
@@ -84,6 +95,7 @@ export const homeConfigSchemas: Record<HomeSectionKind, z.ZodTypeAny> = {
   stats: statsCfg,
   creators: creatorsCfg,
   tags: tagsCfg,
+  ad: adCfg,
 };
 
 export type HomeSectionConfig =
@@ -94,7 +106,8 @@ export type HomeSectionConfig =
   | { showTags: boolean } // feed
   | Record<string, never> // stats
   | { count: number } // creators
-  | { count: number; slugs: string[] }; // tags
+  | { count: number; slugs: string[] } // tags
+  | { mode: "image" | "html"; image: string; link: string; alt: string; html: string; badge: boolean }; // ad
 
 // 后端传给编辑器的类型化 config
 export type EditableConfig<T extends HomeSectionKind> = z.infer<(typeof homeConfigSchemas)[T]>;

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { CalendarDays, Download, Eye } from "lucide-react";
 import { formatCount, timeAgo } from "@/lib/format";
 import Gallery from "@/components/resource/Gallery";
@@ -79,7 +80,7 @@ function MetaChips({ ctx }: { ctx: DetailCtx }) {
 }
 
 /** A · 展厅式 —— 图集开屏做第一视觉，信息以美术馆展签形式聚合在图下：左作品信息、右作者+操作 */
-export default function DetailPost({ ctx }: { ctx: DetailCtx }) {
+export default function DetailPost({ ctx, middleSlot }: { ctx: DetailCtx; middleSlot?: ReactNode }) {
   const { detail, authed, isAuthor } = ctx;
   const a = detail.author;
 
@@ -179,6 +180,7 @@ export default function DetailPost({ ctx }: { ctx: DetailCtx }) {
       <div className="mt-8">
         <DescriptionBlock ctx={ctx} />
       </div>
+      {middleSlot && <div className="mt-6">{middleSlot}</div>}
       <div className="mt-6">
         <CommentBlock ctx={ctx} />
       </div>

@@ -6,7 +6,7 @@ import { getCollections, getRelated, getResourceDetail } from "@/lib/queries";
 import { parseMeta } from "@/lib/meta";
 import { getTheme, detailTemplateFor } from "@/lib/site";
 import { sidebarVisible } from "@/lib/site-config";
-import SiteSidebar from "@/components/sidebar/SiteSidebar";
+import SiteSidebar, { WidgetArea, type DetailWidgetCtx } from "@/components/sidebar/SiteSidebar";
 import SidebarLayout from "@/components/layout/SidebarLayout";
 import DetailPost from "@/components/resource/detail/DetailPost";
 import DetailBanner from "@/components/resource/detail/DetailBanner";
@@ -79,28 +79,64 @@ export default async function ResourcePage({ params }: PageProps) {
   const showSidebar = sidebarVisible(theme, "detail") && detail.status === "PUBLISHED";
   const isPreview = detail.status !== "PUBLISHED";
 
+  // 详情页正文槽位（上/中/下，仅已发布内容；中部节点传给模板插在描述与评论之间）
+  const detailCtx: DetailWidgetCtx = {
+    id: detail.id,
+    type: detail.type,
+    authorUsername: detail.author.username,
+    categorySlug: detail.category?.slug ?? null,
+  };
+  const hasSlot = (area: "detailTop" | "detailMiddle" | "detailBottom") =>
+    theme.slots[area].some((w) => w.enabled);
+  const topSlot = !isPreview && hasSlot("detailTop") ? (
+    <WidgetArea theme={theme} area="detailTop" detail={detailCtx} />
+  ) : null;
+  const bottomSlot = !isPreview && hasSlot("detailBottom") ? (
+    <WidgetArea theme={theme} area="detailBottom" detail={detailCtx} />
+  ) : null;
+  const middleSlot = !isPreview && hasSlot("detailMiddle") ? (
+    <WidgetArea theme={theme} area="detailMiddle" detail={detailCtx} />
+  ) : null;
+
   const body =
     template === "banner" ? (
-      <DetailBanner ctx={ctx} />
+      <DetailBanner ctx={ctx} middleSlot={middleSlot} />
     ) : template === "twocol" ? (
-      <DetailTwocol ctx={ctx} />
+      <DetailTwocol ctx={ctx} middleSlot={middleSlot} />
     ) : template === "article" ? (
-      <DetailArticle ctx={ctx} />
+      <DetailArticle ctx={ctx} middleSlot={middleSlot} />
     ) : (
-      <DetailPost ctx={ctx} />
+      <DetailPost ctx={ctx} middleSlot={middleSlot} />
     );
 
   // 提醒条与各模板内容列同为 max-w-6xl 居中，宽度一致
-  const previewCls = "mx-auto max-w-6xl px-4 pt-6 sm:px-6";
+  const previewCls = "mx-auto max-w-6xl px-4 pt-8 sm:px-6";
 
   return (
-    <SidebarLayout railWidth={theme.sidebar.width} rail={showSidebar ? <SiteSidebar theme={theme} /> : undefined}>
+    <SidebarLayout
+      railWidth={theme.sidebar.width}
+      rail={
+        showSidebar ? (
+          <SiteSidebar
+            theme={theme}
+            page="detail"
+            detail={detailCtx}
+          />
+        ) : undefined
+      }
+    >
+      {topSlot && (
+        <div className="mx-auto max-w-6xl px-4 pt-6 sm:px-6">{topSlot}</div>
+      )}
       {isPreview && (
         <div className={previewCls}>
           <PendingBanner ctx={ctx} />
         </div>
       )}
       {body}
+      {bottomSlot && (
+        <div className="mx-auto max-w-6xl px-4 pb-12 sm:px-6">{bottomSlot}</div>
+      )}
     </SidebarLayout>
   );
 }

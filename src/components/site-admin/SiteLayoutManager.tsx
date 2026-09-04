@@ -14,14 +14,17 @@ import {
  Eye,
  EyeOff,
  FileText,
+ FolderTree,
  GripVertical,
  Home,
  Info,
+ Layers,
  LayoutGrid,
  Megaphone,
  Menu,
  MessageSquare,
  Plus,
+ RectangleHorizontal,
  ShieldCheck,
  Shuffle,
  Tag,
@@ -34,6 +37,7 @@ import {
 } from "lucide-react";
 import type { ContentType } from "@/lib/display";
 import {
+ DETAIL_ONLY_KINDS,
  DETAIL_TEMPLATE_IDS,
  DETAIL_TEMPLATE_META,
  NAV_ICONS,
@@ -41,7 +45,9 @@ import {
  NAV_VISIBILITY_LABELS,
  SIDEBAR_KIND_META,
  SIDEBAR_WIDGET_KINDS,
+ getAreaWidgets,
  widgetTitle,
+ withAreaWidgets,
  type CategoriesMenuCfg,
  type DetailTemplateId,
  type NavItem,
@@ -49,6 +55,7 @@ import {
  type SidebarWidgetConfig,
  type SidebarWidgetKind,
  type Theme,
+ type WidgetAreaKey,
 } from "@/lib/site-config";
 import {
  addSidebarWidgetAction,
@@ -76,10 +83,25 @@ function KindIcon({ kind, size = 15 }: { kind: SidebarWidgetKind; size?: number 
  random: Shuffle,
  notice: Megaphone,
  custom: FileText,
+ authorWorks: Layers,
+ sameCategory: FolderTree,
+ ad: RectangleHorizontal,
  };
  const Icon = map[kind] ?? TrendingUp;
  return <Icon size={size} aria-hidden />;
 }
+
+/** 组件可投放区域页签：3 个侧边栏页面 + 5 个内容槽位（详情上/中/下 + 归档上/下）；首页布局在 /admin/home 专门管理 */
+const AREA_TABS: { key: WidgetAreaKey; label: string; hint: string }[] = [
+ { key: "home", label: "首页侧栏", hint: "首页右侧边栏" },
+ { key: "archive", label: "归档侧栏", hint: "浏览 / 搜索 / 标签页右侧边栏" },
+ { key: "archiveTop", label: "归档·上方", hint: "浏览 / 搜索 / 标签页内容之前" },
+ { key: "archiveBottom", label: "归档·下方", hint: "浏览 / 搜索 / 标签页内容之后（页尾）" },
+ { key: "detail", label: "详情侧栏", hint: "资源详情页右侧边栏" },
+ { key: "detailTop", label: "详情·上方", hint: "详情页正文上方（横幅下方）" },
+ { key: "detailMiddle", label: "详情·中部", hint: "详情页描述与评论之间" },
+ { key: "detailBottom", label: "详情·下方", hint: "详情页页尾（相关推荐之后）" },
+];
 
 // 导航图标预览映射（与 lib/site-config 的 NAV_ICONS key 一一对应，供后台展示真实图标）
 const ICON_OPTIONS: Record<string, LucideIcon> = {
@@ -107,6 +129,7 @@ export default function SiteLayoutManager({
  const [theme, setTheme] = useState(initial);
  const [prev, setPrev] = useState(initial);
  const [editingId, setEditingId] = useState<string | null>(null);
+ const [activeArea, setActiveArea] = useState<WidgetAreaKey>("home");
  const [pending, start] = useTransition();
 
  // 服务端 refresh 后以最新 props 为准（渲染期派生 state，避免 effect 内 setState）
@@ -122,7 +145,10 @@ export default function SiteLayoutManager({
  else router.refresh();
  });
 
- const widgets = theme.sidebar.widgets;
+ const widgets = getAreaWidgets(theme, activeArea);
+ // showOn 开关只作用于侧边栏区域（详情页正文槽位常开）
+ const isSidebarArea = activeArea === "home" || activeArea === "archive" || activeArea === "detail";
+ const areaOn = !isSidebarArea || theme.sidebar.showOn[activeArea];
 
  function moveBy(index: number, delta: number) {
  const target = index + delta;
@@ -130,8 +156,8 @@ export default function SiteLayoutManager({
  const next = [...widgets];
  const [m] = next.splice(index, 1);
  next.splice(target, 0, m);
- setTheme({ ...theme, sidebar: { ...theme.sidebar, widgets: next } });
- run(() => reorderSidebarWidgetsAction(next.map((w) => w.id)));
+ setTheme(withAreaWidgets(theme, activeArea, next));
+ run(() => reorderSidebarWidgetsAction(activeArea, next.map((w) => w.id)));
  }
 
  return (
@@ -145,19 +171,63 @@ export default function SiteLayoutManager({
  {/* 侧边栏范围与外观 */}
  <FlagsCard theme={theme} pending={pending} run={run} />
 
- {/* 侧边栏组件 */}
+ {/* 组件区域（侧边栏页面 + 详情页正文槽位，按区域页签配置） */}
  <section className="rounded-none border border-brand-200 bg-surface p-5">
  <div className="flex items-center justify-between">
  <div>
- <h2 className="text-base font-semibold text-neutral-900">侧边栏组件</h2>
+ <h2 className="text-base font-semibold text-neutral-900">页面组件</h2>
  <p className="mt-0.5 text-xs text-neutral-500">
- 这些组件在开启侧边栏的页面上按顺序渲染；可上移/下移排序、开关与删除。
+ 按区域分别配置：侧边栏三类页面 + 归档页上/下、详情页上/中/下正文槽位，各自独立一套组件，可排序、开关与删除。
+ 首页板块流布局在<Link href="/admin/home" className="mx-0.5 text-brand-600 hover:underline">首页布局</Link>页专门管理。
  </p>
  </div>
  <Link href="/" className="text-sm text-neutral-600 hover:text-neutral-900 hover:underline">
  预览 →（首页）
  </Link>
  </div>
+
+ {/* 区域页签 */}
+ <div className="mt-4 flex flex-wrap gap-1 border-b border-neutral-200" role="tablist">
+ {AREA_TABS.map((t) => {
+ const on = activeArea === t.key;
+ const n = getAreaWidgets(theme, t.key).length;
+ return (
+ <button
+ key={t.key}
+ type="button"
+ role="tab"
+ aria-selected={on}
+ title={t.hint}
+ onClick={() => {
+ setActiveArea(t.key);
+ setEditingId(null);
+ }}
+ className={`-mb-px border-b-2 px-3 py-2 text-sm transition ${
+ on
+ ? "border-brand-500 font-medium text-brand-700"
+ : "border-transparent text-neutral-500 hover:text-neutral-800"
+ }`}
+ >
+ {t.label}
+ <span className={`ml-1.5 text-[10px] tabular-nums ${on ? "text-brand-500" : "text-neutral-400"}`}>{n}</span>
+ </button>
+ );
+ })}
+ </div>
+
+ {!areaOn && (
+ <div className="mt-3 flex items-center justify-between rounded-none border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs text-amber-800">
+ <span>该页侧边栏已整体关闭，以下组件不会在前台显示。</span>
+ <button
+ type="button"
+ disabled={pending}
+ onClick={() => run(() => updateSidebarFlagsAction({ showOn: { [activeArea]: true } }))}
+ className="rounded-none border border-amber-400 bg-amber-100 px-2.5 py-1 font-medium text-amber-800 transition hover:bg-amber-200 disabled:opacity-50"
+ >
+ 开启该页侧边栏
+ </button>
+ </div>
+ )}
 
  {widgets.length === 0 ? (
  <p className="mt-4 rounded-none border-2 border-dashed border-brand-300 bg-brand-50/40 px-4 py-8 text-center text-sm text-neutral-400">
@@ -253,18 +323,25 @@ export default function SiteLayoutManager({
  <div className="mt-5 rounded-none border-2 border-dashed border-brand-300 p-3">
  <p className="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-400">添加组件</p>
  <div className="flex flex-wrap gap-2">
- {SIDEBAR_WIDGET_KINDS.map((kind) => (
+ {SIDEBAR_WIDGET_KINDS.map((kind) => {
+ // 详情页专用组件在非详情区域置灰（配了也不会渲染）
+ const detailOnly = (DETAIL_ONLY_KINDS as string[]).includes(kind);
+ const detailArea = activeArea === "detail" || activeArea === "detailTop" || activeArea === "detailMiddle" || activeArea === "detailBottom";
+ const disabled = pending || (detailOnly && !detailArea);
+ return (
  <button
  key={kind}
  type="button"
- disabled={pending}
- onClick={() => run(() => addSidebarWidgetAction(kind))}
- className="inline-flex items-center gap-1.5 rounded-none border border-brand-200 bg-surface px-3 py-1.5 text-xs text-neutral-700 transition hover:border-brand-400 hover:text-brand-700 disabled:opacity-50"
+ disabled={disabled}
+ title={detailOnly && !detailArea ? "仅详情页（侧栏或正文槽位）可用" : SIDEBAR_KIND_META[kind].desc}
+ onClick={() => run(() => addSidebarWidgetAction(kind, activeArea))}
+ className="inline-flex items-center gap-1.5 rounded-none border border-brand-200 bg-surface px-3 py-1.5 text-xs text-neutral-700 transition hover:border-brand-400 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
  >
  <Plus size={12} />
  {SIDEBAR_KIND_META[kind].label}
  </button>
- ))}
+ );
+ })}
  </div>
  </div>
  </section>
@@ -603,7 +680,7 @@ function WidgetEditor({
  ? 3
  : kind === "comments"
  ? 5
- : kind === "random"
+ : kind === "random" || kind === "authorWorks" || kind === "sameCategory"
  ? 4
  : 6
  );
@@ -635,6 +712,14 @@ function WidgetEditor({
  const [msg, setMsg] = useState<string | null>(null);
  const [pending, start] = useTransition();
 
+ // 广告位
+ const [adMode, setAdMode] = useState<"image" | "html">(cfg.mode === "html" ? "html" : "image");
+ const [adImage, setAdImage] = useState(typeof cfg.image === "string" ? cfg.image : "");
+ const [adLink, setAdLink] = useState(typeof cfg.link === "string" ? cfg.link : "");
+ const [adAlt, setAdAlt] = useState(typeof cfg.alt === "string" ? cfg.alt : "");
+ const [adHtml, setAdHtml] = useState(typeof cfg.html === "string" ? cfg.html : "");
+ const [adBadge, setAdBadge] = useState(cfg.badge !== false);
+
  const setLink = (i: number, key: "label" | "href", v: string) =>
  setLinks((arr) => arr.map((l, idx) => (idx === i ? { ...l, [key]: v } : l)));
  const setNotice = (i: number, key: "level" | "text", v: string) =>
@@ -664,6 +749,12 @@ function WidgetEditor({
  return { count };
  case "random":
  return { count };
+ case "authorWorks":
+ return { count };
+ case "sameCategory":
+ return { count };
+ case "ad":
+ return { mode: adMode, image: adImage.trim(), link: adLink.trim(), alt: adAlt.trim(), html: adHtml, badge: adBadge };
  case "notice":
  // 提交前剔除空行；level 白名单校验（坏值兜底 info）
  return {
@@ -799,6 +890,16 @@ function WidgetEditor({
  </div>
  )}
 
+ {(kind === "authorWorks" || kind === "sameCategory") && (
+ <div className="sm:col-span-2">
+ <label className={field}>展示数量（2–8）</label>
+ <input type="number" min={2} max={8} value={count} onChange={(e) => setCount(Math.max(2, Math.min(8, Number(e.target.value) || 2)))} className={fieldCls} />
+ <p className="mt-1 text-[11px] text-neutral-400">
+ 仅详情页侧边栏生效（{kind === "authorWorks" ? "按热度展示当前作者的其它作品，自动排除本资源" : "同分类其它内容优先，不足补同类型热门，自动排除本资源"}）。
+ </p>
+ </div>
+ )}
+
  {kind === "notice" && (
  <div className="sm:col-span-2">
  <label className={field}>公告列表（最多 10 条；空内容不显示）</label>
@@ -893,6 +994,53 @@ function WidgetEditor({
  <Plus size={12} /> 添加链接
  </button>
  )}
+ </div>
+ </>
+ )}
+
+ {kind === "ad" && (
+ <>
+ <div>
+ <label className={field}>形式</label>
+ <select value={adMode} onChange={(e) => setAdMode(e.target.value as "image" | "html")} className={fieldCls}>
+ <option value="image">图片 + 链接</option>
+ <option value="html">HTML / JS 代码</option>
+ </select>
+ </div>
+ {adMode === "image" ? (
+ <>
+ <div>
+ <label className={field}>图片地址</label>
+ <input value={adImage} onChange={(e) => setAdImage(e.target.value)} maxLength={2000} placeholder="/uploads/… 或 https://…" className={fieldCls} />
+ </div>
+ <div>
+ <label className={field}>跳转链接（可空 = 纯展示）</label>
+ <input value={adLink} onChange={(e) => setAdLink(e.target.value)} maxLength={500} placeholder="https://…" className={fieldCls} />
+ </div>
+ <div>
+ <label className={field}>图片替代文字</label>
+ <input value={adAlt} onChange={(e) => setAdAlt(e.target.value)} maxLength={120} className={fieldCls} />
+ </div>
+ </>
+ ) : (
+ <div className="sm:col-span-2">
+ <label className={field}>HTML / JS 代码（可接 AdSense 等联盟广告）</label>
+ <textarea
+ value={adHtml}
+ onChange={(e) => setAdHtml(e.target.value)}
+ rows={6}
+ maxLength={8000}
+ className={`${fieldCls} resize-y font-mono text-xs leading-relaxed`}
+ placeholder={'<a href="https://…"><img src="https://…/banner.png"/></a>\n或联盟广告代码片段…'}
+ />
+ <p className="mt-1 text-[11px] text-neutral-400">代码将原样注入页面，仅管理员可配置。</p>
+ </div>
+ )}
+ <div className="sm:col-span-2">
+ <label className={`${field} flex items-center gap-2`}>
+ <input type="checkbox" checked={adBadge} onChange={(e) => setAdBadge(e.target.checked)} className="h-4 w-4 accent-brand-500" />
+ 显示「广告」角标（右上角标识）
+ </label>
  </div>
  </>
  )}

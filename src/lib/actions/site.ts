@@ -7,16 +7,20 @@ import {
   SIDEBAR_KIND_META,
   SIDEBAR_WIDGET_KINDS,
   THEME_KEY,
+  WIDGET_AREA_KEYS,
+  getAreaWidgets,
   parseNavItem,
   parseTheme,
   safeSidebarConfig,
   serializeTheme,
+  withAreaWidgets,
   type DetailTemplateId,
   type NavItem,
   type SidebarWidget,
   type SidebarWidgetConfig,
   type SidebarWidgetKind,
   type Theme,
+  type WidgetAreaKey,
 } from "@/lib/site-config";
 import type { ContentType } from "@/lib/display";
 
@@ -103,15 +107,31 @@ export async function updateSidebarFlagsAction(patch: {
   return { ok: true };
 }
 
-// ---------- 侧边栏 widget CRUD ----------
+// ---------- 侧边栏 / 内容槽位 widget CRUD ----------
+// 区域 = 3 个侧边栏页面（home/archive/detail）+ 5 个内容槽位（详情上/中/下 + 归档上/下）
 
-/** 追加一个侧边栏 widget（默认配置，追加到末尾） */
+function validArea(a: unknown): a is WidgetAreaKey {
+  return (WIDGET_AREA_KEYS as string[]).includes(a as WidgetAreaKey);
+}
+
+/** 在全部区域列表里定位 widget：返回区域 key 与下标（id 由 uid() 生成全局唯一） */
+function findWidget(theme: Theme, id: string): { area: WidgetAreaKey; idx: number } | null {
+  for (const area of WIDGET_AREA_KEYS) {
+    const idx = getAreaWidgets(theme, area).findIndex((w) => w.id === id);
+    if (idx >= 0) return { area, idx };
+  }
+  return null;
+}
+
+/** 追加一个 widget（默认配置，追加到指定区域的末尾） */
 export async function addSidebarWidgetAction(
-  kind: SidebarWidgetKind
+  kind: SidebarWidgetKind,
+  area: WidgetAreaKey
 ): Promise<{ ok: boolean; error?: string }> {
   const admin = await adminOnly();
   if (!admin) return { ok: false, error: "仅管理员可操作" };
   if (!(SIDEBAR_WIDGET_KINDS as string[]).includes(kind)) return { ok: false, error: "未知组件类型" };
+  if (!validArea(area)) return { ok: false, error: "区域不合法" };
 
   const theme = await readThemeDoc();
   const cfg = safeSidebarConfig(kind, {});
@@ -123,9 +143,8 @@ export async function addSidebarWidgetAction(
     enabled: true,
     config: cfg.data,
   };
-  theme.sidebar.widgets.push(widget);
-  await writeThemeDoc(theme);
-  await audit(admin.id, "ADD_THEME_WIDGET", `${SIDEBAR_KIND_META[kind].label}`);
+  await writeThemeDoc(withAreaWidgets(theme, area, [...getAreaWidgets(theme, area), widget]));
+  await audit(admin.id, "ADD_THEME_WIDGET", `${area}/${SIDEBAR_KIND_META[kind].label}`);
   themeRevalidate();
   return { ok: true };
 }
@@ -134,11 +153,11 @@ export async function removeSidebarWidgetAction(id: string): Promise<{ ok: boole
   const admin = await adminOnly();
   if (!admin) return { ok: false, error: "仅管理员可操作" };
   const theme = await readThemeDoc();
-  const w = theme.sidebar.widgets.find((x) => x.id === id);
-  if (!w) return { ok: false, error: "组件不存在" };
-  theme.sidebar.widgets = theme.sidebar.widgets.filter((x) => x.id !== id);
-  await writeThemeDoc(theme);
-  await audit(admin.id, "REMOVE_THEME_WIDGET", w.kind);
+  const at = findWidget(theme, id);
+  if (!at) return { ok: false, error: "组件不存在" };
+  const w = getAreaWidgets(theme, at.area)[at.idx];
+  await writeThemeDoc(withAreaWidgets(theme, at.area, getAreaWidgets(theme, at.area).filter((x) => x.id !== id)));
+  await audit(admin.id, "REMOVE_THEME_WIDGET", `${at.area}/${w.kind}`);
   themeRevalidate();
   return { ok: true };
 }
@@ -149,9 +168,10 @@ export async function updateSidebarWidgetAction(patch: SidebarWidgetPatch): Prom
   const admin = await adminOnly();
   if (!admin) return { ok: false, error: "仅管理员可操作" };
   const theme = await readThemeDoc();
-  const idx = theme.sidebar.widgets.findIndex((x) => x.id === patch.id);
-  if (idx < 0) return { ok: false, error: "组件不存在" };
-  const widget = theme.sidebar.widgets[idx];
+  const at = findWidget(theme, patch.id);
+  if (!at) return { ok: false, error: "组件不存在" };
+  const list = getAreaWidgets(theme, at.area);
+  const widget = { ...list[at.idx] };
 
   if (patch.title !== undefined) widget.title = cleanTitle(patch.title);
   if (patch.enabled !== undefined) widget.enabled = patch.enabled;
@@ -160,28 +180,32 @@ export async function updateSidebarWidgetAction(patch: SidebarWidgetPatch): Prom
     if (!v.ok) return { ok: false, error: v.error };
     widget.config = v.data as SidebarWidgetConfig;
   }
-  theme.sidebar.widgets[idx] = widget;
-  await writeThemeDoc(theme);
-  await audit(admin.id, "EDIT_THEME_WIDGET", widget.kind);
+  list[at.idx] = widget;
+  await writeThemeDoc(withAreaWidgets(theme, at.area, list));
+  await audit(admin.id, "EDIT_THEME_WIDGET", `${at.area}/${widget.kind}`);
   themeRevalidate();
   return { ok: true };
 }
 
-/** 保存 widget 顺序（ids 为最终顺序） */
-export async function reorderSidebarWidgetsAction(ids: string[]): Promise<{ ok: boolean; error?: string }> {
+/** 保存指定区域的 widget 顺序（ids 为该区域最终顺序） */
+export async function reorderSidebarWidgetsAction(
+  area: WidgetAreaKey,
+  ids: string[]
+): Promise<{ ok: boolean; error?: string }> {
   const admin = await adminOnly();
   if (!admin) return { ok: false, error: "仅管理员可操作" };
+  if (!validArea(area)) return { ok: false, error: "区域不合法" };
   const theme = await readThemeDoc();
-  const map = new Map(theme.sidebar.widgets.map((w) => [w.id, w]));
+  const list = getAreaWidgets(theme, area);
+  const map = new Map(list.map((w) => [w.id, w]));
   const next: SidebarWidget[] = [];
   for (const id of ids) {
     const w = map.get(id);
     if (w) next.push(w);
   }
-  for (const w of theme.sidebar.widgets) if (!next.includes(w)) next.push(w);
-  theme.sidebar.widgets = next;
-  await writeThemeDoc(theme);
-  await audit(admin.id, "REORDER_THEME_WIDGET", ids.join(","));
+  for (const w of list) if (!next.includes(w)) next.push(w);
+  await writeThemeDoc(withAreaWidgets(theme, area, next));
+  await audit(admin.id, "REORDER_THEME_WIDGET", `${area}:${ids.join(",")}`);
   themeRevalidate();
   return { ok: true };
 }

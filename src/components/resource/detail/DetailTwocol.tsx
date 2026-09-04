@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import Gallery from "@/components/resource/Gallery";
 import {
  ActionBar,
@@ -14,7 +15,7 @@ import {
 } from "./parts";
 
 /** C · 左右两栏式 —— 左列(图集/操作/描述/评论)、右栏(作者/统计/信息)，块宽各自统一，无跨列孤岛 */
-export default function DetailTwocol({ ctx }: { ctx: DetailCtx }) {
+export default function DetailTwocol({ ctx, middleSlot }: { ctx: DetailCtx; middleSlot?: ReactNode }) {
  const { detail } = ctx;
  return (
  <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
@@ -57,6 +58,7 @@ export default function DetailTwocol({ ctx }: { ctx: DetailCtx }) {
  <div className="mt-8 space-y-5">
  <VersionSection ctx={ctx} />
  <DescriptionBlock ctx={ctx} />
+ {middleSlot}
  <CommentBlock ctx={ctx} />
  <RelatedSection ctx={ctx} />
  </div>

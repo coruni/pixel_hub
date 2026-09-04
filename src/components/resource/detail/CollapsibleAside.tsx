@@ -19,7 +19,7 @@ export default function CollapsibleAside({ main, aside }: { main: ReactNode; asi
     >
       <div className="min-w-0 space-y-5">{main}</div>
 
-      <aside className="mt-6 min-w-0 space-y-4 overflow-hidden lg:mt-0">{aside}</aside>
+      <aside className="mt-6 min-w-0 space-y-4 overflow-hidden lg:mt-0 text-nowrap">{aside}</aside>
 
       {/* 桌面把手 */}
       <button

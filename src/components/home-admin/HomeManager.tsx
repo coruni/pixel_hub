@@ -14,6 +14,7 @@ import {
  LayoutGrid,
  List as ListRows,
  Plus,
+ RectangleHorizontal,
  Rss,
  Sparkles,
  Tags as TagsIcon,
@@ -44,6 +45,7 @@ function KindIcon({ kind, size = 15 }: { kind: HomeSectionKind; size?: number })
  stats: BarChart3,
  creators: Users,
  tags: TagsIcon,
+ ad: RectangleHorizontal,
  };
  const Icon = map[kind] ?? Sparkles;
  return <Icon size={size} aria-hidden />;
@@ -83,6 +85,11 @@ function cfgSummary(row: ManagerRow): string {
  return `按粉丝数展示 ${c.count ?? 6} 位创作者`;
  case "tags":
  return n(c.slugs) ? `展示所选 ${n(c.slugs)} 个标签` : `展示 ${c.count ?? 12} 个热门标签`;
+ case "ad": {
+ const suffix = c.badge === false ? "（无角标）" : "";
+ if (c.mode === "html") return (String(c.html ?? "").trim() ? "HTML / 联盟广告代码" : "未配置 · 前台不显示") + suffix;
+ return (String(c.image ?? "").trim() ? `图片广告${String(c.link ?? "").trim() ? " + 跳转链接" : ""}` : "未配置 · 前台不显示") + suffix;
+ }
  default:
  return HOME_KIND_META[row.kind].desc;
  }

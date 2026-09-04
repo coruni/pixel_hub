@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { CalendarDays, Eye, MessageSquare, Newspaper } from "lucide-react";
 import { formatCount, timeAgo } from "@/lib/format";
 import Markdown from "@/components/rte/Markdown";
@@ -8,7 +9,7 @@ import { FollowButton } from "@/components/social/interactions";
 import { ActionBar, CommentBlock, RelatedSection, type DetailCtx } from "./parts";
 
 /** D · 杂志阅读式 —— 文章专属：编辑部排版（左对齐大标题 + 作者 meta 行 + 阅读列正文），无下载/信息卡等资源向面板 */
-export default function DetailArticle({ ctx }: { ctx: DetailCtx }) {
+export default function DetailArticle({ ctx, middleSlot }: { ctx: DetailCtx; middleSlot?: ReactNode }) {
   const { detail, authed, isAuthor } = ctx;
   const a = detail.author;
   const cover = detail.gallery[0];
@@ -138,6 +139,7 @@ export default function DetailArticle({ ctx }: { ctx: DetailCtx }) {
         </div>
       )}
 
+      {middleSlot && <div className="mt-8">{middleSlot}</div>}
       <div className="mt-8">
         <CommentBlock ctx={ctx} />
       </div>

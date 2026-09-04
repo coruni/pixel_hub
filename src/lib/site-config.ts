@@ -2,7 +2,8 @@
 // 主题文档（存于 SiteSetting["theme"]，JSON 文本）：侧边栏系统 + 详情页模板默认。
 // 结构：
 // {
-//   sidebar: { showOn:{home,archive,detail}, sticky, width, widgets:[SidebarWidget] },
+//   sidebar: { showOn:{home,archive,detail}, sticky, width, widgetsByPage:{home,archive,detail} },
+//   slots: { detailTop, detailMiddle, detailBottom, archiveTop, archiveBottom },
 //   detailTemplate: { default, byType? }
 // }
 import { z } from "zod";
@@ -38,7 +39,10 @@ export type SidebarWidgetKind =
   | "comments"
   | "random"
   | "notice"
-  | "custom";
+  | "custom"
+  | "authorWorks"
+  | "sameCategory"
+  | "ad";
 
 export const SIDEBAR_WIDGET_KINDS: SidebarWidgetKind[] = [
   "hot",
@@ -51,7 +55,13 @@ export const SIDEBAR_WIDGET_KINDS: SidebarWidgetKind[] = [
   "random",
   "notice",
   "custom",
+  "authorWorks",
+  "sameCategory",
+  "ad",
 ];
+
+/** 仅详情页侧边栏有渲染上下文的 widget kind（配到其它页不渲染） */
+export const DETAIL_ONLY_KINDS: SidebarWidgetKind[] = ["authorWorks", "sameCategory"];
 
 export const SIDEBAR_KIND_META: Record<
   SidebarWidgetKind,
@@ -71,6 +81,9 @@ export const SIDEBAR_KIND_META: Record<
     desc: "自由内容卡片：Markdown 富文本 + 可选链接列表，可展示公告/指引/任意信息",
     defaultTitle: null,
   },
+  authorWorks: { label: "作者其它作品", desc: "仅详情页生效：当前资源作者的其它作品（按热度）", defaultTitle: "作者其它作品" },
+  sameCategory: { label: "同分类推荐", desc: "仅详情页生效：同分类其它内容，不足补同类型热门", defaultTitle: "同分类推荐" },
+  ad: { label: "广告位", desc: "图片+链接 或 HTML/JS 代码片段（可接联盟广告），可放侧边栏或详情页槽位", defaultTitle: null },
 };
 
 // ---------- 各类 widget 的 config ----------
@@ -127,6 +140,20 @@ const customCfg = z.object({
     .max(20)
     .default([]), // 结构化链接行（http(s):// 自动新窗口）
 });
+const authorWorksCfg = z.object({
+  count: z.number().int().min(2).max(8).default(4),
+});
+const sameCategoryCfg = z.object({
+  count: z.number().int().min(2).max(8).default(4),
+});
+const adCfg = z.object({
+  mode: z.enum(["image", "html"]).default("image"),
+  image: z.string().max(2000).default(""), // 图片 URL 或站内 /uploads 路径
+  link: z.string().max(500).default(""), // 点击跳转（可空 = 纯展示）
+  alt: z.string().max(120).default(""),
+  html: z.string().max(8000).default(""), // 任意 HTML/JS 片段（AdSense 等联盟广告）
+  badge: z.boolean().default(true), // 是否显示「广告」角标
+});
 
 export const sidebarConfigSchemas: Record<SidebarWidgetKind, z.ZodTypeAny> = {
   hot: hotCfg,
@@ -139,6 +166,9 @@ export const sidebarConfigSchemas: Record<SidebarWidgetKind, z.ZodTypeAny> = {
   random: randomCfg,
   notice: noticeCfg,
   custom: customCfg,
+  authorWorks: authorWorksCfg,
+  sameCategory: sameCategoryCfg,
+  ad: adCfg,
 };
 
 export type SidebarWidgetConfig =
@@ -151,7 +181,9 @@ export type SidebarWidgetConfig =
   | { count: number } // comments
   | { count: number } // random
   | { items: { level: NoticeLevel; text: string }[] } // notice
-  | { content: string; links: { label: string; href: string }[] }; // custom
+  | { content: string; links: { label: string; href: string }[] } // custom
+  | { count: number } // authorWorks / sameCategory
+  | { mode: "image" | "html"; image: string; link: string; alt: string; html: string; badge: boolean }; // ad
 
 export type SidebarWidget = {
   id: string;
@@ -254,33 +286,76 @@ export type CategoriesMenuCfg = {
   label: string;
 };
 
+/** 侧边栏页面分组：首页 / 归档页(浏览·搜索·标签) / 资源详情页 */
+export type SidebarPageKey = "home" | "archive" | "detail";
+
+export const SIDEBAR_PAGE_KEYS: SidebarPageKey[] = ["home", "archive", "detail"];
+
+/** 详情页正文槽位：上（正文前）/ 中（描述与评论之间）/ 下（页尾） */
+export type DetailSlotKey = "detailTop" | "detailMiddle" | "detailBottom";
+
+/** 归档页正文槽位：上（内容流之前）/ 下（内容流之后）——动态信息流无固定中部；首页布局由 /admin/home 专门管理，无槽位 */
+export type FeedSlotKey = "archiveTop" | "archiveBottom";
+
+/** 全部内容槽位 key */
+export type ContentSlotKey = DetailSlotKey | FeedSlotKey;
+
+export const CONTENT_SLOT_KEYS: ContentSlotKey[] = [
+  "detailTop",
+  "detailMiddle",
+  "detailBottom",
+  "archiveTop",
+  "archiveBottom",
+];
+
+/** 组件可投放的全部区域：3 个侧边栏页面 + 5 个内容槽位 */
+export type WidgetAreaKey = SidebarPageKey | ContentSlotKey;
+
+export const WIDGET_AREA_KEYS: WidgetAreaKey[] = [...SIDEBAR_PAGE_KEYS, ...CONTENT_SLOT_KEYS];
+
 export type Theme = {
   navbar: {
     items: NavItem[];
     categoriesMenu: CategoriesMenuCfg;
   };
   sidebar: {
-    showOn: { home: boolean; archive: boolean; detail: boolean };
+    showOn: Record<SidebarPageKey, boolean>;
     sticky: boolean;
     width: number;
-    widgets: SidebarWidget[];
+    /** 每类页面独立一套组件 */
+    widgetsByPage: Record<SidebarPageKey, SidebarWidget[]>;
   };
+  /** 内容槽位组件（详情页上/中/下 + 归档页上/下） */
+  slots: Record<ContentSlotKey, SidebarWidget[]>;
   detailTemplate: {
     default: DetailTemplateId;
     byType: Partial<Record<ContentType, DetailTemplateId>>;
   };
 };
 
+/** 读取某区域的组件列表（侧边栏页面或内容槽位） */
+export function getAreaWidgets(theme: Theme, area: WidgetAreaKey): SidebarWidget[] {
+  return (CONTENT_SLOT_KEYS as string[]).includes(area)
+    ? theme.slots[area as ContentSlotKey]
+    : theme.sidebar.widgetsByPage[area as SidebarPageKey];
+}
+
+/** 返回替换了指定区域列表的新 Theme（不可变更新） */
+export function withAreaWidgets(theme: Theme, area: WidgetAreaKey, list: SidebarWidget[]): Theme {
+  if ((CONTENT_SLOT_KEYS as string[]).includes(area)) {
+    return { ...theme, slots: { ...theme.slots, [area]: list } };
+  }
+  const page = area as SidebarPageKey;
+  return { ...theme, sidebar: { ...theme.sidebar, widgetsByPage: { ...theme.sidebar.widgetsByPage, [page]: list } } };
+}
+
 export function widgetTitle(w: SidebarWidget): string {
   return w.title || SIDEBAR_KIND_META[w.kind].defaultTitle || SIDEBAR_KIND_META[w.kind].label;
 }
 
-/** 某类页面是否应展示侧边栏：该页开关开启 且 至少有一个启用的 widget */
-export function sidebarVisible(
-  theme: Theme,
-  page: keyof Theme["sidebar"]["showOn"]
-): boolean {
-  return theme.sidebar.showOn[page] && theme.sidebar.widgets.some((w) => w.enabled);
+/** 某类页面是否应展示侧边栏：该页开关开启 且 该页至少有一个启用的 widget */
+export function sidebarVisible(theme: Theme, page: SidebarPageKey): boolean {
+  return theme.sidebar.showOn[page] && theme.sidebar.widgetsByPage[page].some((w) => w.enabled);
 }
 
 function clampWidth(v: unknown): number {
@@ -319,6 +394,35 @@ export const DEFAULT_SIDEBAR_WIDGETS: SidebarWidget[] = [
   },
 ];
 
+/** 详情页默认：两个上下文组件 + 热门兜底 */
+export const DEFAULT_DETAIL_WIDGETS: SidebarWidget[] = [
+  {
+    id: "sw-detail-author-works",
+    kind: "authorWorks",
+    title: null,
+    enabled: true,
+    config: { count: 4 },
+  },
+  {
+    id: "sw-detail-same-category",
+    kind: "sameCategory",
+    title: null,
+    enabled: true,
+    config: { count: 4 },
+  },
+  {
+    id: "sw-detail-hot",
+    kind: "hot",
+    title: "热门内容",
+    enabled: true,
+    config: { type: "ALL", sort: "popular", count: 6, display: "list" },
+  },
+];
+
+function cloneWidgets(list: SidebarWidget[]): SidebarWidget[] {
+  return list.map((w) => ({ ...w, config: { ...w.config } }));
+}
+
 export const DEFAULT_THEME: Theme = {
   navbar: {
     items: DEFAULT_NAV_ITEMS.map((x) => ({ ...x })),
@@ -328,7 +432,18 @@ export const DEFAULT_THEME: Theme = {
     showOn: { home: true, archive: true, detail: true },
     sticky: true,
     width: 320,
-    widgets: DEFAULT_SIDEBAR_WIDGETS.map((w) => ({ ...w, config: { ...w.config } })),
+    widgetsByPage: {
+      home: cloneWidgets(DEFAULT_SIDEBAR_WIDGETS),
+      archive: cloneWidgets(DEFAULT_SIDEBAR_WIDGETS),
+      detail: cloneWidgets(DEFAULT_DETAIL_WIDGETS),
+    },
+  },
+  slots: {
+    detailTop: [],
+    detailMiddle: [],
+    detailBottom: [],
+    archiveTop: [],
+    archiveBottom: [],
   },
   detailTemplate: {
     default: "post",
@@ -345,10 +460,23 @@ export function parseTheme(raw: unknown): Theme {
   const so = (sb.showOn && typeof sb.showOn === "object" ? sb.showOn : {}) as Record<string, unknown>;
   const dt = (o.detailTemplate && typeof o.detailTemplate === "object" ? o.detailTemplate : {}) as Record<string, unknown>;
 
-  const widgetsRaw = sb.widgets;
-  const widgets: SidebarWidget[] = Array.isArray(widgetsRaw)
-    ? widgetsRaw.map(parseWidget).filter((w): w is SidebarWidget => w !== null)
-    : DEFAULT_SIDEBAR_WIDGETS.map((w) => ({ ...w, config: { ...w.config } }));
+  const wbpRaw = (sb.widgetsByPage && typeof sb.widgetsByPage === "object" ? sb.widgetsByPage : null) as Record<
+    string,
+    unknown
+  > | null;
+
+  const parseList = (raw: unknown): SidebarWidget[] | null =>
+    Array.isArray(raw) ? raw.map(parseWidget).filter((w): w is SidebarWidget => w !== null) : null;
+
+  // 兼容旧结构（全站单列表 widgets）：迁移时复制到三个页面
+  const legacy = parseList(sb.widgets);
+  const pageWidgets = (key: SidebarPageKey): SidebarWidget[] =>
+    parseList(wbpRaw?.[key]) ?? legacy ?? cloneWidgets(DEFAULT_THEME.sidebar.widgetsByPage[key]);
+
+  // 内容槽位（详情上/中/下 + 首页/归档上/下），缺省空（不配置不显示）
+  // 旧文档字段名 detailSlots（仅详情三槽）迁入 slots
+  const slotsRaw = (o.slots && typeof o.slots === "object" ? o.slots : o.detailSlots ?? {}) as Record<string, unknown>;
+  const slotWidgets = (key: ContentSlotKey): SidebarWidget[] => parseList(slotsRaw[key]) ?? [];
 
   const pickTemplate = (v: unknown, fallback: DetailTemplateId): DetailTemplateId =>
     typeof v === "string" && (VALID_TEMPLATES as string[]).includes(v) ? (v as DetailTemplateId) : fallback;
@@ -386,7 +514,18 @@ export function parseTheme(raw: unknown): Theme {
       },
       sticky: typeof sb.sticky === "boolean" ? sb.sticky : true,
       width: clampWidth(sb.width),
-      widgets,
+      widgetsByPage: {
+        home: pageWidgets("home"),
+        archive: pageWidgets("archive"),
+        detail: pageWidgets("detail"),
+      },
+    },
+    slots: {
+      detailTop: slotWidgets("detailTop"),
+      detailMiddle: slotWidgets("detailMiddle"),
+      detailBottom: slotWidgets("detailBottom"),
+      archiveTop: slotWidgets("archiveTop"),
+      archiveBottom: slotWidgets("archiveBottom"),
     },
     detailTemplate: {
       default: defaultTpl,

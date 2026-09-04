@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import Gallery from "@/components/resource/Gallery";
 import { DownloadButton } from "@/components/social/interactions";
 import CollapsibleAside from "./CollapsibleAside";
@@ -16,12 +17,12 @@ import {
 } from "./parts";
 
 /** B · 顶栏横幅式 —— 顶部封面 + 关键信息横幅，下方接图集与描述，适合游戏 */
-export default function DetailBanner({ ctx }: { ctx: DetailCtx }) {
+export default function DetailBanner({ ctx, middleSlot }: { ctx: DetailCtx; middleSlot?: ReactNode }) {
   const { detail } = ctx;
   const cover = detail.gallery[0];
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+    <div className="mx-auto max-w-6xl px-4 pt-8 pb-6 sm:px-6">
       {/* 顶部横幅 */}
       <div className="relative overflow-hidden rounded-none bg-neutral-900">
         {cover ? (
@@ -85,6 +86,7 @@ export default function DetailBanner({ ctx }: { ctx: DetailCtx }) {
       <div className="mt-6 space-y-5">
         <VersionSection ctx={ctx} />
         <DescriptionBlock ctx={ctx} />
+        {middleSlot}
         <CommentBlock ctx={ctx} />
         <RelatedSection ctx={ctx} />
       </div>

@@ -79,6 +79,13 @@ export default function SectionEditor({
  (CARD_RATIO_KEYS as string[]).includes(String(cfg.ratio)) ? (cfg.ratio as CardRatio) : "auto"
  );
  const [paged, setPaged] = useState(kind === "list" && cfg.paged === true);
+ // 广告位
+ const [adMode, setAdMode] = useState<"image" | "html">(cfg.mode === "html" ? "html" : "image");
+ const [adImage, setAdImage] = useState(typeof cfg.image === "string" ? cfg.image : "");
+ const [adLink, setAdLink] = useState(typeof cfg.link === "string" ? cfg.link : "");
+ const [adAlt, setAdAlt] = useState(typeof cfg.alt === "string" ? cfg.alt : "");
+ const [adHtml, setAdHtml] = useState(typeof cfg.html === "string" ? cfg.html : "");
+ const [adBadge, setAdBadge] = useState(cfg.badge !== false);
  const [pending, start] = useTransition();
  const [msg, setMsg] = useState<string | null>(null);
 
@@ -105,6 +112,8 @@ export default function SectionEditor({
  return { count, slugs: tagSel };
  case "stats":
  return {};
+ case "ad":
+ return { mode: adMode, image: adImage.trim(), link: adLink.trim(), alt: adAlt.trim(), html: adHtml, badge: adBadge };
  }
  }
 
@@ -138,7 +147,11 @@ export default function SectionEditor({
  {/* 标题（通用） */}
  <div className="sm:col-span-2">
  <label className={field} htmlFor={`t-${row.id}`}>
- {kind === "hero" ? "大标语（可选，留空则不显示文字标题）" : "板块标题（留空隐藏）"}
+ {kind === "hero"
+ ? "大标语（可选，留空则不显示文字标题）"
+ : kind === "ad"
+ ? "备注名（仅后台列表标识，前台不显示）"
+ : "板块标题（留空隐藏）"}
  </label>
  <input
  id={`t-${row.id}`}
@@ -320,6 +333,57 @@ export default function SectionEditor({
 
  {/* 数据一览：无需配置 */}
  {kind === "stats" && <p className="text-xs text-neutral-400">自动读取：已上架内容 / 注册用户 / 累计下载 / 累计浏览。</p>}
+
+ {/* 广告位：图片+链接 或 HTML/联盟代码 */}
+ {kind === "ad" && (
+ <>
+ <div>
+ <label className={field} htmlFor={`am-${row.id}`}>形式</label>
+ <select id={`am-${row.id}`} value={adMode} onChange={(e) => setAdMode(e.target.value as "image" | "html")} className={input}>
+ <option value="image">图片 + 链接</option>
+ <option value="html">HTML / JS 代码</option>
+ </select>
+ </div>
+ {adMode === "image" ? (
+ <>
+ <div>
+ <label className={field} htmlFor={`ai-${row.id}`}>图片地址</label>
+ <input id={`ai-${row.id}`} value={adImage} onChange={(e) => setAdImage(e.target.value)} maxLength={2000} placeholder="/uploads/… 或 https://…" className={input} />
+ </div>
+ <div>
+ <label className={field} htmlFor={`al-${row.id}`}>跳转链接（可空 = 纯展示）</label>
+ <input id={`al-${row.id}`} value={adLink} onChange={(e) => setAdLink(e.target.value)} maxLength={500} placeholder="https://…" className={input} />
+ </div>
+ <div>
+ <label className={field} htmlFor={`aa-${row.id}`}>图片替代文字</label>
+ <input id={`aa-${row.id}`} value={adAlt} onChange={(e) => setAdAlt(e.target.value)} maxLength={120} className={input} />
+ </div>
+ </>
+ ) : (
+ <div className="sm:col-span-2">
+ <label className={field} htmlFor={`ah-${row.id}`}>HTML / JS 代码（可接 AdSense 等联盟广告）</label>
+ <textarea
+ id={`ah-${row.id}`}
+ value={adHtml}
+ onChange={(e) => setAdHtml(e.target.value)}
+ rows={6}
+ maxLength={8000}
+ className={`${input} resize-y font-mono text-xs leading-relaxed`}
+ placeholder={'<a href="https://…"><img src="https://…/banner.png"/></a>\n或联盟广告代码片段…'}
+ />
+ <p className="mt-1 text-[11px] text-neutral-400">代码将原样注入页面，仅管理员可配置。</p>
+ </div>
+ )}
+ <p className="text-xs text-neutral-400 sm:col-span-2">未配置（无图、无代码）时该板块前台不显示。</p>
+ <div className="sm:col-span-2">
+ <label className={`${field} flex items-center gap-2`}>
+ <input type="checkbox" checked={adBadge} onChange={(e) => setAdBadge(e.target.checked)} className="h-4 w-4 accent-brand-500" />
+ 显示「广告」角标（右上角标识）
+ </label>
+ <p className="mt-1 text-[11px] text-neutral-400">按广告法惯例建议保留；关闭后前台将无任何广告标识。</p>
+ </div>
+ </>
+ )}
  </div>
 
  {msg && <p className="mt-2 text-xs text-red-500">{msg}</p>}
