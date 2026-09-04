@@ -27,8 +27,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
  });
  type Row = (typeof rows)[number];
 
- // Report 关联均为标量，二次查询补可读名称
- const reporterIds = [...new Set(rows.map((r) => r.reporterId))];
+ // Report 关联均为标量，二次查询补可读名称（reporterId 可空：举报人删号后显示匿名）
+ const reporterIds = [...new Set(rows.map((r) => r.reporterId).filter((x): x is string => !!x))];
  const reporterMap = new Map(
  (reporterIds.length
  ? await prisma.user.findMany({ where: { id: { in: reporterIds } }, select: { id: true, username: true, name: true } })
@@ -134,7 +134,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
  <ul className="mt-2 divide-y divide-neutral-100">
  {group.map((r) => {
- const rep = reporterMap.get(r.reporterId);
+ const rep = r.reporterId ? reporterMap.get(r.reporterId) : undefined;
  return (
  <li key={r.id} className="py-2 text-sm first:pt-1.5 last:pb-0">
  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-neutral-400">

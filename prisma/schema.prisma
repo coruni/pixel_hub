@@ -35,6 +35,9 @@ model User {
   following      Follow[] @relation("Following")
   followers      Follow[] @relation("Follower")
   notifications  Notification[]
+  actedNotifications Notification[] @relation("NotificationActor") // 作为触发者产生的通知
+  filedReports   Report[] @relation("ReportReporter") // 发起的举报
+  accusedReports Report[] @relation("ReportTargetUser") // 被举报记录
   passwordResets PasswordResetToken[]
   uploads        Media[]       @relation("Uploads")
 
@@ -133,6 +136,7 @@ model Resource {
   comments     Comment[]
   likes        Like[]
   favorites    Favorite[]
+  reports      Report[]       @relation("ReportResource") // 被举报目标
 
   viewCount     Int @default(0)
   likeCount     Int @default(0)
@@ -224,6 +228,7 @@ model Like {
   createdAt  DateTime @default(now())
 
   @@unique([userId, resourceId])
+  @@index([resourceId]) // 按资源删点赞（级联）/ 统计查询
 }
 
 model Favorite {
@@ -237,19 +242,20 @@ model Favorite {
   createdAt    DateTime     @default(now())
 
   @@unique([userId, resourceId])
+  @@index([resourceId]) // 按资源删收藏（级联）
+  @@index([collectionId]) // 删夹子置空 / 按夹子取成员
 }
 
 model Collection {
-  id               String     @id @default(cuid())
-  ownerId          String
-  owner            User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  name             String
-  description      String?
-  coverResourceId  String?
-  isPublic         Boolean    @default(true)
-  items            Favorite[]
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
+  id          String     @id @default(cuid())
+  ownerId     String
+  owner       User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  isPublic    Boolean    @default(true)
+  items       Favorite[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
   @@unique([ownerId, name]) // 同一用户夹子名唯一：默认夹 upsert 与重命名防重的依据
   @@index([ownerId])
@@ -262,15 +268,17 @@ model Comment {
   authorId   String
   author     User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
   parentId   String?
-  parent     Comment?      @relation("CommentReplies", fields: [parentId], references: [id])
+  parent     Comment?      @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
   replies    Comment[]     @relation("CommentReplies")
   media      Media[]
   content    String
   status     CommentStatus @default(PUBLIC)
   likeCount  Int           @default(0)
   createdAt  DateTime      @default(now())
+  reports    Report[] @relation("ReportComment") // 举报目标（见 Report）
 
   @@index([resourceId, createdAt])
+  @@index([parentId]) // 楼中楼按 parent 取回复
 }
 
 model Follow {
@@ -294,16 +302,19 @@ model Notification {
   message    String?
   readAt     DateTime?
   user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // 触发者被删号 → actorId 置空（通知保留，显示为「系统」）
+  actor      User?            @relation("NotificationActor", fields: [actorId], references: [id], onDelete: SetNull)
   createdAt  DateTime         @default(now())
 
   @@index([userId, readAt])
+  @@index([actorId])
 }
 
 // ---------- 治理 ----------
 
 model Report {
   id                String       @id @default(cuid())
-  reporterId        String
+  reporterId        String?
   type              ReportTarget
   targetResourceId  String?
   targetCommentId   String?
@@ -314,8 +325,14 @@ model Report {
   handledBy         String?
   handledAt         DateTime?
   createdAt         DateTime     @default(now())
+  // 目标/举报人是软引用：被删号或内容删除后置空，举报记录保留可追溯
+  reporter          User?        @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: SetNull)
+  targetResource    Resource?    @relation("ReportResource", fields: [targetResourceId], references: [id], onDelete: SetNull)
+  targetComment     Comment?     @relation("ReportComment", fields: [targetCommentId], references: [id], onDelete: SetNull)
+  targetUser        User?        @relation("ReportTargetUser", fields: [targetUserId], references: [id], onDelete: SetNull)
 
-  @@index([status])
+  @@index([type, status]) // 后台按类型+状态筛选
+  @@index([createdAt])
 }
 
 model AuditLog {
@@ -326,6 +343,9 @@ model AuditLog {
   targetId   String?
   note       String?
   createdAt  DateTime @default(now())
+
+  @@index([adminId]) // 按操作人追溯
+  @@index([createdAt]) // 后台日志按时间倒序翻页
 }
 
 // ---------- 首页布局（WordPress 式板块引擎） ----------
@@ -376,7 +396,6 @@ enum ResourceStatus {
   PUBLISHED
   REJECTED
   REMOVED
-  BANNED
 }
 
 enum MediaKind {

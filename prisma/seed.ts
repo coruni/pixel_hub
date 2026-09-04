@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 // 演示种子数据（仅限开发环境；测试账号密码统一：test1234）。
 // 生产部署禁止跑 seed：默认弱口令账号会直接成为管理员入口。
 // 如确需 seed，用 SEED_PASSWORD 提供强口令。
@@ -58,9 +57,11 @@ const SEED_FILES = ["cyber", "forest", "ocean", "pixel", "nebula", "minimal"] as
 
 async function main() {
   console.log("🌱 开始写入种子数据…");
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(
+    async (tx) => {
     // —— 清空（幂等重跑）——
     await tx.auditLog.deleteMany();
+    await tx.visit.deleteMany(); // 访问统计一并清空，避免演示库里混入陈旧 PV
     await tx.siteSetting.deleteMany();
     await tx.homeSection.deleteMany();
     await tx.notification.deleteMany();
@@ -124,13 +125,18 @@ async function main() {
         await tx.tag.update({ where: { id: tag.id }, data: { count: { increment: 1 } } });
       }
     }
-    // 追加封面/图集媒体
+    // 追加封面/图集媒体（uploaderId = 资源作者，发布认领校验属主时口径一致）
     const fileIdx = new Map(SEED_FILES.map((f, i) => [f, i]));
-    async function addMedia(resourceId: string, kind: "COVER" | "GALLERY", file: (typeof SEED_FILES)[number], sort = 0) {
-      const palettes = ["#0ea5e9", "#22c55e", "#e879f9", "#f59e0b", "#64748b"];
+    async function addMedia(
+      resourceId: string,
+      kind: "COVER" | "GALLERY",
+      file: (typeof SEED_FILES)[number],
+      uploaderId: string,
+      sort = 0
+    ) {
       return tx.media.create({
         data: {
-          resourceId, kind,
+          resourceId, kind, uploaderId,
           storageKey: `seed/${file}.svg`, thumbKey: null, bigKey: null, placeholder: null,
           width: 1500, height: 1000, size: 900 + (fileIdx.get(file) ?? 0) * 100,
           mime: "image/svg+xml", sort,
@@ -178,9 +184,9 @@ async function main() {
       meta: { isAiGenerated: false, original: false, license: "freeware", sourceNote: "公开素材整理" },
       counts: { view: 320, like: 2, fav: 1, download: 210 },
     });
-    const img1_cover = await addMedia(img1.id, "COVER", "minimal");
-    const img1_g1 = await addMedia(img1.id, "GALLERY", "ocean", 1);
-    const img1_g2 = await addMedia(img1.id, "GALLERY", "forest", 2);
+    const img1_cover = await addMedia(img1.id, "COVER", "minimal", creator.id);
+    await addMedia(img1.id, "GALLERY", "ocean", creator.id, 1);
+    await addMedia(img1.id, "GALLERY", "forest", creator.id, 2);
     await tx.resource.update({ where: { id: img1.id }, data: { coverMediaId: img1_cover.id } });
     await tagResource(img1.id, ["wallpaper", "4k", "minimal", "nature"]);
 
@@ -197,8 +203,8 @@ async function main() {
       meta: { version: "1.3.2", size: "96 MB", platforms: ["windows", "mac", "linux"], lang: "中文", license: "freeware" },
       counts: { view: 500, like: 3, fav: 0, comment: 2, download: 890 },
     });
-    const game1_cover = await addMedia(game1.id, "COVER", "pixel");
-    const game1_g1 = await addMedia(game1.id, "GALLERY", "cyber", 1);
+    const game1_cover = await addMedia(game1.id, "COVER", "pixel", creator.id);
+    await addMedia(game1.id, "GALLERY", "cyber", creator.id, 1);
     await tx.resource.update({ where: { id: game1.id }, data: { coverMediaId: game1_cover.id } });
     await tagResource(game1.id, ["indie", "pixel-art", "retro", "adventure"]);
 
@@ -213,9 +219,9 @@ async function main() {
       meta: { isAiGenerated: true, aiTool: "Midjourney", aiModel: "v6", original: true, license: "CC-BY-NC" },
       counts: { view: 210, like: 1, fav: 1, comment: 0, download: 66 },
     });
-    const img2_cover = await addMedia(img2.id, "COVER", "cyber");
-    const img2_g1 = await addMedia(img2.id, "GALLERY", "nebula", 1);
-    const img2_g2 = await addMedia(img2.id, "GALLERY", "pixel", 2);
+    const img2_cover = await addMedia(img2.id, "COVER", "cyber", creator.id);
+    await addMedia(img2.id, "GALLERY", "nebula", creator.id, 1);
+    await addMedia(img2.id, "GALLERY", "pixel", creator.id, 2);
     await tx.resource.update({ where: { id: img2.id }, data: { coverMediaId: img2_cover.id } });
     await tagResource(img2.id, ["cyberpunk", "neon", "ai-generated", "original"]);
 
@@ -229,7 +235,7 @@ async function main() {
       meta: { isAiGenerated: false, original: true, license: "CC-BY" },
       counts: {},
     });
-    const img3_cover = await addMedia(img3.id, "COVER", "ocean");
+    const img3_cover = await addMedia(img3.id, "COVER", "ocean", demo.id);
     await tx.resource.update({ where: { id: img3.id }, data: { coverMediaId: img3_cover.id } });
     await tagResource(img3.id, ["nature", "ocean"]);
 
@@ -244,7 +250,7 @@ async function main() {
       meta: { isAiGenerated: false, original: false, license: "unknown", sourceNote: "转发，来源水印" },
       counts: {},
     });
-    const img4_cover = await addMedia(img4.id, "COVER", "nebula");
+    const img4_cover = await addMedia(img4.id, "COVER", "nebula", demo.id);
     await tx.resource.update({ where: { id: img4.id }, data: { coverMediaId: img4_cover.id } });
     await tagResource(img4.id, ["fantasy"]);
 
@@ -260,8 +266,8 @@ async function main() {
       meta: { version: "0.9.0-demo", size: "1.2 GB", platforms: ["windows"], lang: "中文 / English", license: "commercial-demo" },
       counts: { view: 900, like: 8, fav: 2, comment: 0, download: 1200 },
     });
-    const game2_cover = await addMedia(game2.id, "COVER", "forest");
-    const game2_g1 = await addMedia(game2.id, "GALLERY", "nebula", 1);
+    const game2_cover = await addMedia(game2.id, "COVER", "forest", admin.id);
+    await addMedia(game2.id, "GALLERY", "nebula", admin.id, 1);
     await tx.resource.update({ where: { id: game2.id }, data: { coverMediaId: game2_cover.id } });
     await tagResource(game2.id, ["open-world", "fantasy", "indie"]);
 
@@ -276,7 +282,7 @@ async function main() {
       meta: { license: "原创" },
       counts: { view: 640, like: 5, fav: 2, comment: 1 },
     });
-    const art1_cover = await addMedia(art1.id, "COVER", "pixel");
+    const art1_cover = await addMedia(art1.id, "COVER", "pixel", creator.id);
     await tx.resource.update({ where: { id: art1.id }, data: { coverMediaId: art1_cover.id } });
     await tagResource(art1.id, ["pixel-art", "original"]);
 
@@ -336,7 +342,10 @@ async function main() {
 
     // —— 站点外观默认（侧边栏 + 详情模板，见 site-config.ts）——
     await tx.siteSetting.create({ data: { key: THEME_KEY, value: serializeTheme(DEFAULT_THEME) } });
-  });
+    },
+    // 全量重建 + SQLite 默认 5s 超时不够，放宽到 60s
+    { timeout: 60_000 }
+  );
 
   const counts = {
     用户: await prisma.user.count(),
