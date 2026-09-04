@@ -21,7 +21,12 @@ export type FeedItem = {
   category: { slug: string; name: string } | null;
   tags: { slug: string; name: string }[];
   author: { username: string; name: string | null };
-  cover: { url: string; width: number | null; height: number | null; placeholder: string | null } | null;
+  cover: {
+    url: string;
+    width: number | null;
+    height: number | null;
+    placeholder: string | null;
+  } | null;
 };
 
 // 资源卡组件实际渲染所需的最小字段（无 Date，可安全跨 server action 序列化）。
@@ -39,7 +44,12 @@ export type FeedCard = {
   loginRequired: boolean;
   category: { slug: string; name: string } | null;
   author: { username: string; name: string | null };
-  cover: { url: string; width: number | null; height: number | null; placeholder: string | null } | null;
+  cover: {
+    url: string;
+    width: number | null;
+    height: number | null;
+    placeholder: string | null;
+  } | null;
 };
 
 export function toFeedCard(i: FeedItem): FeedCard {
@@ -88,7 +98,11 @@ const coverSelect = {
   height: true,
 } as const;
 
-function coverUrl(m: { thumbKey: string | null; bigKey: string | null; storageKey: string }): string {
+function coverUrl(m: {
+  thumbKey: string | null;
+  bigKey: string | null;
+  storageKey: string;
+}): string {
   if (m.thumbKey) return publicUrl(m.thumbKey);
   if (m.bigKey) return publicUrl(m.bigKey);
   return publicUrl(m.storageKey);
@@ -171,7 +185,9 @@ function toFeedItem(r: FeedRow): FeedItem {
   };
 }
 
-export async function getFeed(params: FeedParams): Promise<{ items: FeedItem[]; page: number; hasMore: boolean }> {
+export async function getFeed(
+  params: FeedParams,
+): Promise<{ items: FeedItem[]; page: number; hasMore: boolean }> {
   const page = Math.max(1, params.page ?? 1);
   const pageSize = Math.max(1, Math.min(48, params.pageSize ?? 24));
 
@@ -236,7 +252,11 @@ export const getCategories = cache(async () => {
 });
 
 export const getTopTags = cache(async (limit = 24) => {
-  return prisma.tag.findMany({ orderBy: { count: "desc" }, take: limit, select: { slug: true, name: true, count: true } });
+  return prisma.tag.findMany({
+    orderBy: { count: "desc" },
+    take: limit,
+    select: { slug: true, name: true, count: true },
+  });
 });
 
 export type ResourceDetail = Awaited<ReturnType<typeof getResourceDetail>>;
@@ -249,13 +269,34 @@ export const getResourceDetail = cache(async (slug: string, viewerId?: string) =
   const resource = await prisma.resource.findFirst({
     where,
     include: {
-      author: { select: { id: true, username: true, name: true, avatarKey: true, bio: true, role: true, trusted: true, createdAt: true, lastSeenAt: true, _count: { select: { resources: true, followers: true } } } },
+      author: {
+        select: {
+          id: true,
+          username: true,
+          name: true,
+          avatarKey: true,
+          bio: true,
+          role: true,
+          trusted: true,
+          createdAt: true,
+          lastSeenAt: true,
+          _count: { select: { resources: true, followers: true } },
+        },
+      },
       category: { select: { slug: true, name: true } },
       tags: { select: { tag: { select: { slug: true, name: true } } } },
       media: {
         where: { resourceId: { not: null } },
         orderBy: { sort: "asc" },
-        select: { id: true, thumbKey: true, bigKey: true, storageKey: true, width: true, height: true, placeholder: true },
+        select: {
+          id: true,
+          thumbKey: true,
+          bigKey: true,
+          storageKey: true,
+          width: true,
+          height: true,
+          placeholder: true,
+        },
       },
       versions: { orderBy: { createdAt: "desc" }, take: 20 },
       _count: { select: { likes: true } },
@@ -272,7 +313,12 @@ export const getResourceDetail = cache(async (slug: string, viewerId?: string) =
     placeholder: m.placeholder,
   }));
 
-  let viewerStates = { liked: false, favorited: false, favoriteCollectionId: null as string | null, followingAuthor: false };
+  let viewerStates = {
+    liked: false,
+    favorited: false,
+    favoriteCollectionId: null as string | null,
+    followingAuthor: false,
+  };
   if (viewerId) {
     const [lk, fv, fl] = await Promise.all([
       prisma.like.findUnique({
@@ -304,8 +350,21 @@ export const getResourceDetail = cache(async (slug: string, viewerId?: string) =
       orderBy: { createdAt: "desc" },
       take: 200,
       include: {
-        author: { select: { username: true, name: true, avatarKey: true, bio: true, role: true, trusted: true, createdAt: true } },
-        media: { orderBy: { sort: "asc" }, select: { storageKey: true, width: true, height: true } },
+        author: {
+          select: {
+            username: true,
+            name: true,
+            avatarKey: true,
+            bio: true,
+            role: true,
+            trusted: true,
+            createdAt: true,
+          },
+        },
+        media: {
+          orderBy: { sort: "asc" },
+          select: { storageKey: true, width: true, height: true },
+        },
       },
     })
   ).reverse();
@@ -313,9 +372,15 @@ export const getResourceDetail = cache(async (slug: string, viewerId?: string) =
   const authorIds = [...new Set(allComments.map((c) => c.authorId))];
   const authorStats = await prisma.user.findMany({
     where: { id: { in: authorIds } },
-    select: { id: true, lastSeenAt: true, _count: { select: { resources: true, followers: true } } },
+    select: {
+      id: true,
+      lastSeenAt: true,
+      _count: { select: { resources: true, followers: true } },
+    },
   });
-  const statsMap = new Map(authorStats.map((u) => [u.id, { ...u._count, lastSeenAt: u.lastSeenAt }]));
+  const statsMap = new Map(
+    authorStats.map((u) => [u.id, { ...u._count, lastSeenAt: u.lastSeenAt }]),
+  );
   const commentMap = new Map(allComments.map((c) => [c.id, c]));
   const rootIdOf = (c: (typeof allComments)[number]): string => {
     let cur = c;
@@ -330,7 +395,10 @@ export const getResourceDetail = cache(async (slug: string, viewerId?: string) =
   const replyName = (a: { username: string; name: string | null }) => a.name ?? a.username;
   const repliesByRoot = new Map<
     string,
-    { c: (typeof allComments)[number]; replyTo: { id: string; name: string; content: string } | null }[]
+    {
+      c: (typeof allComments)[number];
+      replyTo: { id: string; name: string; content: string } | null;
+    }[]
   >();
   for (const c of allComments) {
     if (!c.parentId) continue;
@@ -374,8 +442,9 @@ export const getResourceDetail = cache(async (slug: string, viewerId?: string) =
       online: isOnline(s?.lastSeenAt),
     };
   };
-  const toCommentImages = (ms: { storageKey: string; width: number | null; height: number | null }[]) =>
-    ms.map((m) => ({ url: publicUrl(m.storageKey), width: m.width, height: m.height }));
+  const toCommentImages = (
+    ms: { storageKey: string; width: number | null; height: number | null }[],
+  ) => ms.map((m) => ({ url: publicUrl(m.storageKey), width: m.width, height: m.height }));
 
   // media 已映射为 gallery，不再随返回值重复序列化（原对象含多个 storage key 字段）
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -439,7 +508,11 @@ export async function getRelated(resource: {
   };
 
   if (resource.category) {
-    const { items } = await getFeed({ categorySlug: resource.category.slug, sort: "popular", pageSize: LIMIT });
+    const { items } = await getFeed({
+      categorySlug: resource.category.slug,
+      sort: "popular",
+      pageSize: LIMIT,
+    });
     add(items);
   }
   if (out.length < LIMIT) {
@@ -469,48 +542,50 @@ export type UserProfile = {
 };
 
 // cache()：同请求内 metadata 与 page 各调一次时只查一遍库（两处须传相同 viewerId）
-export const getProfile = cache(async (username: string, viewerId?: string): Promise<UserProfile | null> => {
-  const user = await prisma.user.findUnique({
-    where: { username },
-    select: {
-      id: true,
-      username: true,
-      name: true,
-      bio: true,
-      avatarKey: true,
-      role: true,
-      trusted: true,
-      createdAt: true,
-      lastSeenAt: true,
-      _count: { select: { resources: true, followers: true, following: true } },
-    },
-  });
-  if (!user) return null;
-  const isViewer = viewerId === user.id;
-  let following = false;
-  if (viewerId && !isViewer) {
-    following = !!(await prisma.follow.findUnique({
-      where: { followerId_followingId: { followerId: viewerId, followingId: user.id } },
-      select: { followerId: true },
-    }));
-  }
-  return {
-    id: user.id,
-    username: user.username,
-    name: user.name,
-    bio: user.bio,
-    avatarKey: user.avatarKey,
-    role: user.role,
-    trusted: user.trusted,
-    createdAt: user.createdAt,
-    resourceCount: user._count.resources,
-    followerCount: user._count.followers,
-    followingCount: user._count.following,
-    isViewer,
-    following,
-    online: isOnline(user.lastSeenAt),
-  };
-});
+export const getProfile = cache(
+  async (username: string, viewerId?: string): Promise<UserProfile | null> => {
+    const user = await prisma.user.findUnique({
+      where: { username },
+      select: {
+        id: true,
+        username: true,
+        name: true,
+        bio: true,
+        avatarKey: true,
+        role: true,
+        trusted: true,
+        createdAt: true,
+        lastSeenAt: true,
+        _count: { select: { resources: true, followers: true, following: true } },
+      },
+    });
+    if (!user) return null;
+    const isViewer = viewerId === user.id;
+    let following = false;
+    if (viewerId && !isViewer) {
+      following = !!(await prisma.follow.findUnique({
+        where: { followerId_followingId: { followerId: viewerId, followingId: user.id } },
+        select: { followerId: true },
+      }));
+    }
+    return {
+      id: user.id,
+      username: user.username,
+      name: user.name,
+      bio: user.bio,
+      avatarKey: user.avatarKey,
+      role: user.role,
+      trusted: user.trusted,
+      createdAt: user.createdAt,
+      resourceCount: user._count.resources,
+      followerCount: user._count.followers,
+      followingCount: user._count.following,
+      isViewer,
+      following,
+      online: isOnline(user.lastSeenAt),
+    };
+  },
+);
 
 // ---------- 收藏夹 ----------
 export type CollectionRow = { id: string; name: string; count: number };
@@ -570,7 +645,7 @@ export type NotificationRow = {
 
 export async function getNotifications(
   userId: string,
-  filter?: "LIKE" | "COMMENT" | "FOLLOW" | "SYSTEM"
+  filter?: "LIKE" | "COMMENT" | "FOLLOW" | "SYSTEM",
 ): Promise<{ rows: NotificationRow[]; unread: number }> {
   // 「系统」筛选含 MODERATION + SYSTEM 两类
   const where: Prisma.NotificationWhereInput = {
@@ -604,8 +679,18 @@ export async function getNotifications(
   const rids = [...new Set(rows.map((r) => r.resourceId).filter((x): x is string => !!x))];
   const aIds = [...new Set(rows.map((r) => r.actorId).filter((x): x is string => !!x))];
   const [resourceRows, actorRows] = await Promise.all([
-    rids.length ? prisma.resource.findMany({ where: { id: { in: rids } }, select: { id: true, slug: true, title: true } }) : [],
-    aIds.length ? prisma.user.findMany({ where: { id: { in: aIds } }, select: { id: true, username: true, name: true } }) : [],
+    rids.length
+      ? prisma.resource.findMany({
+          where: { id: { in: rids } },
+          select: { id: true, slug: true, title: true },
+        })
+      : [],
+    aIds.length
+      ? prisma.user.findMany({
+          where: { id: { in: aIds } },
+          select: { id: true, username: true, name: true },
+        })
+      : [],
   ]);
   const resMap = new Map(resourceRows.map((r) => [r.id, r] as const));
   const actorMap = new Map(actorRows.map((u) => [u.id, u] as const));
@@ -661,5 +746,8 @@ export async function getRandomResourceIds(count: number) {
     take: 500,
     orderBy: { createdAt: "desc" },
   });
-  return [...pool].sort(() => Math.random() - 0.5).slice(0, count).map((r) => r.id);
+  return [...pool]
+    .sort(() => Math.random() - 0.5)
+    .slice(0, count)
+    .map((r) => r.id);
 }

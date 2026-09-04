@@ -34,8 +34,8 @@ export default async function FeaturedBlock({
   const showAs: ContentDisplay = uniformRatio ? "card" : cfg.display;
 
   return (
-<BlockShell title={title}>
-        <ResourceGrid items={items} display={showAs} ratio={uniformRatio} />
+    <BlockShell title={title}>
+      <ResourceGrid items={items} display={showAs} ratio={uniformRatio} />
     </BlockShell>
   );
 }

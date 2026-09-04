@@ -25,7 +25,11 @@ export async function startGitHubBindAction(): Promise<void> {
     // AccountNotLinked = 该 GitHub 账号已绑其他用户，其余按通用失败处理
     if (error instanceof AuthError) {
       const name = (error as { code?: string }).code ?? error.name;
-      redirect(name === "OAuthAccountNotLinked" || name === "AccountNotLinked" ? "/settings?bind=taken" : "/settings?bind=err");
+      redirect(
+        name === "OAuthAccountNotLinked" || name === "AccountNotLinked"
+          ? "/settings?bind=taken"
+          : "/settings?bind=err",
+      );
     }
     throw error;
   }

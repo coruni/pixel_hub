@@ -12,7 +12,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { id } = await params;
   // 与 page 同参（含 viewerId）：cache() 同请求去重，私有夹 owner 也能拿到正确标题
   const session = await auth();
-  const meId = typeof session?.user?.id === "string" && session.user.id ? session.user.id : undefined;
+  const meId =
+    typeof session?.user?.id === "string" && session.user.id ? session.user.id : undefined;
   const col = await getCollectionDetail(id, meId);
   if (!col || !col.isPublic) return { title: "收藏夹不存在", robots: { index: false } };
   return {
@@ -24,7 +25,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function CollectionPage({ params }: PageProps) {
   const { id } = await params;
   const session = await auth();
-  const meId = typeof session?.user?.id === "string" && session.user.id ? session.user.id : undefined;
+  const meId =
+    typeof session?.user?.id === "string" && session.user.id ? session.user.id : undefined;
 
   const col = await getCollectionDetail(id, meId);
   if (!col) notFound();
@@ -43,8 +45,8 @@ export default async function CollectionPage({ params }: PageProps) {
         <span className="text-sm text-neutral-500">
           <a href={`/u/${col.owner.username}`} className="hover:text-neutral-900">
             {col.owner.name ?? col.owner.username}
-          </a>
-          {" "}收藏的 {formatCount(col.items.length)} 个内容
+          </a>{" "}
+          收藏的 {formatCount(col.items.length)} 个内容
         </span>
       </div>
       {col.description && <p className="mt-2 text-sm text-neutral-500">{col.description}</p>}

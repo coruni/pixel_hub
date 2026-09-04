@@ -6,7 +6,15 @@ import { updateSidebarFlagsAction } from "@/lib/actions/site";
 import { PAGE_LABELS, type RunFn } from "./shared";
 
 /** 侧边栏在哪些页面显示（showOn）+ sticky / 栏宽外观 */
-export default function FlagsCard({ theme, pending, run }: { theme: Theme; pending: boolean; run: RunFn }) {
+export default function FlagsCard({
+  theme,
+  pending,
+  run,
+}: {
+  theme: Theme;
+  pending: boolean;
+  run: RunFn;
+}) {
   const [sticky, setSticky] = useState(theme.sidebar.sticky);
   const [width, setWidth] = useState(theme.sidebar.width);
 
@@ -27,15 +35,21 @@ export default function FlagsCard({ theme, pending, run }: { theme: Theme; pendi
               disabled={pending}
               onClick={() => run(() => updateSidebarFlagsAction({ showOn: { [p.key]: !on } }))}
               className={`flex items-start gap-2 rounded-none border px-3.5 py-3 text-left transition disabled:opacity-50 ${
-                on ? "border-brand-500 bg-brand-500 text-white" : "border-neutral-200 bg-surface hover:border-brand-500"
+                on
+                  ? "border-brand-500 bg-brand-500 text-white"
+                  : "border-neutral-200 bg-surface hover:border-brand-500"
               }`}
             >
-              <span className={`mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-none border text-[10px] ${on ? "border-white bg-surface text-neutral-900" : "border-neutral-300 text-transparent"}`}>
+              <span
+                className={`mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-none border text-[10px] ${on ? "border-white bg-surface text-neutral-900" : "border-neutral-300 text-transparent"}`}
+              >
                 ✓
               </span>
               <span>
                 <span className="block text-sm font-medium">{p.label}</span>
-                <span className={`block text-xs ${on ? "text-white/70" : "text-neutral-400"}`}>{p.hint}</span>
+                <span className={`block text-xs ${on ? "text-white/70" : "text-neutral-400"}`}>
+                  {p.hint}
+                </span>
               </span>
             </button>
           );

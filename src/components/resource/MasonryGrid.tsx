@@ -92,7 +92,9 @@ export default function MasonryGrid({
       {colItems.map((col, i) => (
         // 列内卡片垂直间距 = gap（grid rowGap；与列高估算中的 per-card gap 一致）
         <div key={i} className="min-w-0 flex-1" style={{ display: "grid", rowGap: gap }}>
-          {col.list.map((it) => (<ResourceCard key={it.id} item={it} />))}
+          {col.list.map((it) => (
+            <ResourceCard key={it.id} item={it} />
+          ))}
         </div>
       ))}
     </div>

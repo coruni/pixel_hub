@@ -108,7 +108,9 @@ export default function AdConfigFields({
             rows={6}
             maxLength={8000}
             className={`${INPUT} resize-y font-mono text-xs leading-relaxed`}
-            placeholder={'<a href="https://…"><img src="https://…/banner.png"/></a>\n或联盟广告代码片段…'}
+            placeholder={
+              '<a href="https://…"><img src="https://…/banner.png"/></a>\n或联盟广告代码片段…'
+            }
           />
           <p className="mt-1 text-[11px] text-neutral-400">代码将原样注入页面，仅管理员可配置。</p>
         </div>
@@ -124,7 +126,9 @@ export default function AdConfigFields({
           />
           显示「广告」角标（右上角标识）
         </label>
-        <p className="mt-1 text-[11px] text-neutral-400">按广告法惯例建议保留；关闭后前台将无任何广告标识。</p>
+        <p className="mt-1 text-[11px] text-neutral-400">
+          按广告法惯例建议保留；关闭后前台将无任何广告标识。
+        </p>
       </div>
     </>
   );

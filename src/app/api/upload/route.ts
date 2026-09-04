@@ -16,7 +16,8 @@ function sniff(buf: Buffer): { mime: string; ext: string } | null {
   const a = (s: string, off: number) => buf.subarray(off, off + s.length).toString("latin1") === s;
   if (buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])))
     return { mime: "image/png", ext: "png" };
-  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return { mime: "image/jpeg", ext: "jpg" };
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff)
+    return { mime: "image/jpeg", ext: "jpg" };
   if (a("RIFF", 0) && a("WEBP", 8)) return { mime: "image/webp", ext: "webp" };
   if (a("GIF8", 0)) return { mime: "image/gif", ext: "gif" };
   if (a("ftyp", 4)) return { mime: "image/avif", ext: "avif" };
@@ -24,7 +25,8 @@ function sniff(buf: Buffer): { mime: string; ext: string } | null {
 }
 
 export async function POST(req: NextRequest) {
-  if (!sameOrigin(req)) return NextResponse.json({ ok: false, error: "跨站请求被拒绝" }, { status: 403 });
+  if (!sameOrigin(req))
+    return NextResponse.json({ ok: false, error: "跨站请求被拒绝" }, { status: 403 });
   const session = await auth();
   if (!session?.user) return NextResponse.json({ ok: false, error: "请先登录" }, { status: 401 });
   // 上传限流：每用户 30 次 / 小时（防滥用存储）
@@ -33,7 +35,8 @@ export async function POST(req: NextRequest) {
 
   const form = await req.formData();
   const entries = form.getAll("files").filter((f): f is File => f instanceof File);
-  if (entries.length === 0) return NextResponse.json({ ok: false, error: "未收到文件" }, { status: 400 });
+  if (entries.length === 0)
+    return NextResponse.json({ ok: false, error: "未收到文件" }, { status: 400 });
   if (entries.length > MAX_FILES)
     return NextResponse.json({ ok: false, error: `单次最多上传 ${MAX_FILES} 张` }, { status: 400 });
 

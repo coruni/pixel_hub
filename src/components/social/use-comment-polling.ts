@@ -27,7 +27,9 @@ export function useCommentPolling(resourceId: string, comments: CommentShape[]) 
   useEffect(() => {
     baseCommentsRef.current = comments;
     liveRef.current = comments; // props 全量覆盖（发帖/删帖后的 refresh）
-    const times = comments.map((c) => new Date(c.createdAt).getTime()).filter((t) => !Number.isNaN(t));
+    const times = comments
+      .map((c) => new Date(c.createdAt).getTime())
+      .filter((t) => !Number.isNaN(t));
     if (times.length > 0) sinceRef.current = new Date(Math.max(...times)).toISOString();
   }, [comments]);
 
@@ -37,7 +39,7 @@ export function useCommentPolling(resourceId: string, comments: CommentShape[]) 
       try {
         const res = await fetch(
           `/api/comments?resourceId=${encodeURIComponent(resourceId)}&since=${encodeURIComponent(sinceRef.current)}`,
-          { cache: "no-store" }
+          { cache: "no-store" },
         );
         if (!res.ok) return;
         const data = (await res.json()) as {

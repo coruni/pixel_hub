@@ -114,11 +114,7 @@ export default function Gallery({ media }: { media: GalleryMedia[] }) {
                 aria-label={`第 ${i + 1} 张`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={m.thumbUrl}
-                  alt=""
-                  className="h-full w-full object-cover"
-                />
+                <img src={m.thumbUrl} alt="" className="h-full w-full object-cover" />
               </button>
             ))}
           </div>

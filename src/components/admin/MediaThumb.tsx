@@ -4,7 +4,15 @@ import { useState } from "react";
 import ImageViewer from "@/components/ui/ImageViewer";
 
 /** 媒体库缩略图：点击进图片查看器（大图查看/缩放/旋转） */
-export function MediaThumb({ url, bigUrl, fileName }: { url: string; bigUrl: string; fileName: string | null }) {
+export function MediaThumb({
+  url,
+  bigUrl,
+  fileName,
+}: {
+  url: string;
+  bigUrl: string;
+  fileName: string | null;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -23,7 +31,12 @@ export function MediaThumb({ url, bigUrl, fileName }: { url: string; bigUrl: str
         />
       </button>
       {open && (
-        <ImageViewer images={[{ url: bigUrl, width: null, height: null }]} index={0} onIndexChange={() => {}} onClose={() => setOpen(false)} />
+        <ImageViewer
+          images={[{ url: bigUrl, width: null, height: null }]}
+          index={0}
+          onIndexChange={() => {}}
+          onClose={() => setOpen(false)}
+        />
       )}
     </>
   );

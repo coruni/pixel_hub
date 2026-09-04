@@ -29,9 +29,14 @@ export async function siteSettingExists(key: string): Promise<boolean> {
 
 /** 空表落库默认主题（后台站点布局页打开前调用），幂等 */
 export async function ensureSiteTheme(): Promise<void> {
-  const row = await prisma.siteSetting.findUnique({ where: { key: THEME_KEY }, select: { key: true } });
+  const row = await prisma.siteSetting.findUnique({
+    where: { key: THEME_KEY },
+    select: { key: true },
+  });
   if (row) return;
-  await prisma.siteSetting.create({ data: { key: THEME_KEY, value: serializeTheme(DEFAULT_THEME) } });
+  await prisma.siteSetting.create({
+    data: { key: THEME_KEY, value: serializeTheme(DEFAULT_THEME) },
+  });
 }
 
 export type ThemeView = Theme;

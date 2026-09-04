@@ -40,7 +40,8 @@ export default function NavbarCard({
     setMenu(initialMenu);
   }
   const dirty =
-    JSON.stringify(items) !== JSON.stringify(initialItems) || JSON.stringify(menu) !== JSON.stringify(initialMenu);
+    JSON.stringify(items) !== JSON.stringify(initialItems) ||
+    JSON.stringify(menu) !== JSON.stringify(initialMenu);
   const setAt = (i: number, patch: Partial<NavItem>) =>
     setItems((arr) => arr.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
   const move = (i: number, d: number) =>
@@ -55,10 +56,19 @@ export default function NavbarCard({
   const add = () =>
     setItems((arr) => [
       ...arr,
-      { id: `nav-${Math.random().toString(36).slice(2, 8)}`, label: "新链接", href: "/", icon: null, newTab: false, showTo: "all", enabled: true },
+      {
+        id: `nav-${Math.random().toString(36).slice(2, 8)}`,
+        label: "新链接",
+        href: "/",
+        icon: null,
+        newTab: false,
+        showTo: "all",
+        enabled: true,
+      },
     ]);
 
-  const iconBtn = "grid h-7 w-7 shrink-0 place-items-center rounded-none text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-800 disabled:opacity-30";
+  const iconBtn =
+    "grid h-7 w-7 shrink-0 place-items-center rounded-none text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-800 disabled:opacity-30";
 
   return (
     <section className="rounded-none border border-brand-200 bg-surface p-5">
@@ -66,7 +76,11 @@ export default function NavbarCard({
         <div className="flex items-center gap-2">
           <Menu size={16} className="text-neutral-400" aria-hidden />
           <h2 className="text-base font-semibold text-neutral-900">顶部导航栏</h2>
-          {dirty && <span className="rounded-none bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-600">有未保存修改</span>}
+          {dirty && (
+            <span className="rounded-none bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-600">
+              有未保存修改
+            </span>
+          )}
         </div>
         <button
           type="button"
@@ -88,11 +102,26 @@ export default function NavbarCard({
         {items.map((it, i) => {
           const Icon = it.icon ? (NAV_ICON_MAP[it.icon] ?? null) : null;
           return (
-            <div key={it.id} className="flex flex-wrap items-center gap-1.5 rounded-none border border-brand-200 px-2 py-1.5">
-              <button type="button" disabled={pending || i === 0} onClick={() => move(i, -1)} aria-label="上移" className={iconBtn}>
+            <div
+              key={it.id}
+              className="flex flex-wrap items-center gap-1.5 rounded-none border border-brand-200 px-2 py-1.5"
+            >
+              <button
+                type="button"
+                disabled={pending || i === 0}
+                onClick={() => move(i, -1)}
+                aria-label="上移"
+                className={iconBtn}
+              >
                 <ChevronUp size={14} />
               </button>
-              <button type="button" disabled={pending || i === items.length - 1} onClick={() => move(i, 1)} aria-label="下移" className={iconBtn}>
+              <button
+                type="button"
+                disabled={pending || i === items.length - 1}
+                onClick={() => move(i, 1)}
+                aria-label="下移"
+                className={iconBtn}
+              >
                 <ChevronDown size={14} />
               </button>
               <button
@@ -114,11 +143,19 @@ export default function NavbarCard({
                 <Trash2 size={14} />
               </button>
 
-              <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-none ${it.enabled ? "bg-brand-500 text-white" : "bg-neutral-100 text-neutral-400"}`}>
+              <span
+                className={`grid h-7 w-7 shrink-0 place-items-center rounded-none ${it.enabled ? "bg-brand-500 text-white" : "bg-neutral-100 text-neutral-400"}`}
+              >
                 {Icon ? <Icon size={14} /> : <span className="text-[10px]">·</span>}
               </span>
 
-              <input value={it.label} onChange={(e) => setAt(i, { label: e.target.value.slice(0, 24) })} placeholder="名称" className={`w-24 ${INPUT_SM}`} aria-label="名称" />
+              <input
+                value={it.label}
+                onChange={(e) => setAt(i, { label: e.target.value.slice(0, 24) })}
+                placeholder="名称"
+                className={`w-24 ${INPUT_SM}`}
+                aria-label="名称"
+              />
               <input
                 value={it.href}
                 onChange={(e) => setAt(i, { href: e.target.value.slice(0, 300) })}
@@ -126,7 +163,12 @@ export default function NavbarCard({
                 className={`min-w-40 flex-1 ${INPUT_SM}`}
                 aria-label="地址"
               />
-              <select value={it.icon ?? ""} onChange={(e) => setAt(i, { icon: e.target.value || null })} className={`w-28 ${INPUT_SM}`} aria-label="图标">
+              <select
+                value={it.icon ?? ""}
+                onChange={(e) => setAt(i, { icon: e.target.value || null })}
+                className={`w-28 ${INPUT_SM}`}
+                aria-label="图标"
+              >
                 <option value="">无图标</option>
                 {NAV_ICONS.map((ic) => (
                   <option key={ic} value={ic}>
@@ -134,7 +176,12 @@ export default function NavbarCard({
                   </option>
                 ))}
               </select>
-              <select value={it.showTo} onChange={(e) => setAt(i, { showTo: e.target.value as NavItem["showTo"] })} className={`w-28 ${INPUT_SM}`} aria-label="可见性">
+              <select
+                value={it.showTo}
+                onChange={(e) => setAt(i, { showTo: e.target.value as NavItem["showTo"] })}
+                className={`w-28 ${INPUT_SM}`}
+                aria-label="可见性"
+              >
                 {NAV_VISIBILITY_KEYS.map((v) => (
                   <option key={v} value={v}>
                     {NAV_VISIBILITY_LABELS[v]}
@@ -147,7 +194,12 @@ export default function NavbarCard({
       </div>
 
       <div className="mt-3 flex gap-2">
-        <button type="button" disabled={pending} onClick={add} className="inline-flex items-center gap-1 rounded-none border border-brand-200 px-3 py-1.5 text-xs text-neutral-600 transition hover:border-brand-400 hover:text-brand-700 disabled:opacity-50">
+        <button
+          type="button"
+          disabled={pending}
+          onClick={add}
+          className="inline-flex items-center gap-1 rounded-none border border-brand-200 px-3 py-1.5 text-xs text-neutral-600 transition hover:border-brand-400 hover:text-brand-700 disabled:opacity-50"
+        >
           <Plus size={12} /> 添加导航项
         </button>
         <span className="self-center text-[11px] text-neutral-400">外链需以 http(s):// 开头</span>

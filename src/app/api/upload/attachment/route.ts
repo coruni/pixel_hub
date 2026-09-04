@@ -13,16 +13,40 @@ const MAX_BYTES = 200 * 1024 * 1024;
 
 // 扩展名白名单（不信任客户端 mime，按文件名扩展判断；可执行文件禁止）
 const ALLOWED_EXT = new Set([
-  "zip", "rar", "7z", "tar", "gz", "bz2", "xz",
-  "pdf", "md", "txt", "epub", "mobi",
-  "mp3", "wav", "ogg", "flac",
-  "mp4", "webm", "mkv",
-  "obj", "fbx", "blend", "aseprite", "godot", "unitypackage",
-  "ttf", "otf", "woff", "woff2",
+  "zip",
+  "rar",
+  "7z",
+  "tar",
+  "gz",
+  "bz2",
+  "xz",
+  "pdf",
+  "md",
+  "txt",
+  "epub",
+  "mobi",
+  "mp3",
+  "wav",
+  "ogg",
+  "flac",
+  "mp4",
+  "webm",
+  "mkv",
+  "obj",
+  "fbx",
+  "blend",
+  "aseprite",
+  "godot",
+  "unitypackage",
+  "ttf",
+  "otf",
+  "woff",
+  "woff2",
 ]);
 
 export async function POST(req: NextRequest) {
-  if (!sameOrigin(req)) return NextResponse.json({ ok: false, error: "跨站请求被拒绝" }, { status: 403 });
+  if (!sameOrigin(req))
+    return NextResponse.json({ ok: false, error: "跨站请求被拒绝" }, { status: 403 });
   const session = await auth();
   if (!session?.user) return NextResponse.json({ ok: false, error: "请先登录" }, { status: 401 });
   // 附件体积大（≤200MB）：比图片更紧的限流，防存储滥用
@@ -41,7 +65,10 @@ export async function POST(req: NextRequest) {
   const name = (file.name || "file").replace(/[\\/]/g, "_");
   const ext = (name.match(/\.([a-z0-9]+)$/i)?.[1] ?? "").toLowerCase();
   if (!ALLOWED_EXT.has(ext)) {
-    return NextResponse.json({ ok: false, error: `不支持的附件格式（.${ext || "?"}）` }, { status: 400 });
+    return NextResponse.json(
+      { ok: false, error: `不支持的附件格式（.${ext || "?"}）` },
+      { status: 400 },
+    );
   }
 
   try {

@@ -21,7 +21,9 @@ export default function ChipPicker({
     <div>
       <label className={LABEL_STRONG}>{label}</label>
       {options.length === 0 ? (
-        <p className="rounded-none border-2 border-dashed border-brand-300 bg-surface px-3 py-3 text-xs text-neutral-400">{empty}</p>
+        <p className="rounded-none border-2 border-dashed border-brand-300 bg-surface px-3 py-3 text-xs text-neutral-400">
+          {empty}
+        </p>
       ) : (
         <div className="flex max-h-40 flex-wrap gap-1.5 overflow-auto rounded-none border border-brand-200 bg-surface p-2">
           {options.map((o) => {
@@ -30,9 +32,13 @@ export default function ChipPicker({
               <button
                 key={o.key}
                 type="button"
-                onClick={() => onChange(on ? selected.filter((s) => s !== o.key) : [...selected, o.key])}
+                onClick={() =>
+                  onChange(on ? selected.filter((s) => s !== o.key) : [...selected, o.key])
+                }
                 className={`rounded-none border px-2.5 py-1 text-xs transition ${
-                  on ? "border-brand-500 bg-brand-500 text-white" : "border-neutral-200 bg-surface text-neutral-600 hover:border-brand-500"
+                  on
+                    ? "border-brand-500 bg-brand-500 text-white"
+                    : "border-neutral-200 bg-surface text-neutral-600 hover:border-brand-500"
                 }`}
               >
                 {o.label}

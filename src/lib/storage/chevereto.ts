@@ -12,14 +12,19 @@ type CheveretoImage = { url?: string; id?: string };
 export const cheveretoDriver: StorageDriver = {
   name: "chevereto",
   async put(_key, buf) {
-    if (!base() || !apiKey()) throw new Error("chevereto 存储未配置：缺少 CHEVERETO_BASE / CHEVERETO_API_KEY");
+    if (!base() || !apiKey())
+      throw new Error("chevereto 存储未配置：缺少 CHEVERETO_BASE / CHEVERETO_API_KEY");
     const form = new FormData();
     form.append("source", new Blob([new Uint8Array(buf)]));
     form.append("key", apiKey());
     form.append("format", "json");
     const res = await fetch(`${base()}/api/1/upload`, { method: "POST", body: form });
     if (!res.ok) throw new Error(`chevereto 上传失败: HTTP ${res.status}`);
-    const data = (await res.json()) as { status_code?: number; image?: CheveretoImage; error?: { message?: string } };
+    const data = (await res.json()) as {
+      status_code?: number;
+      image?: CheveretoImage;
+      error?: { message?: string };
+    };
     const url = data.image?.url;
     if (data.status_code !== 200 || !url) {
       throw new Error(`chevereto 上传失败: ${data.error?.message ?? "未知错误"}`);
@@ -40,7 +45,9 @@ export const cheveretoDriver: StorageDriver = {
       const id = new URL(key).pathname.split("/").filter(Boolean).pop() ?? "";
       const imageId = id.replace(/\.[a-z0-9]+$/i, "");
       if (!imageId) return;
-      await fetch(`${base()}/api/1/image/${imageId}?key=${encodeURIComponent(apiKey())}`, { method: "DELETE" });
+      await fetch(`${base()}/api/1/image/${imageId}?key=${encodeURIComponent(apiKey())}`, {
+        method: "DELETE",
+      });
     } catch (e) {
       console.warn("[storage:chevereto] 远端删除失败（可在图床媒体库手动清理）:", key, e);
     }

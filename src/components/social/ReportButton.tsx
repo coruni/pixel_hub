@@ -47,9 +47,7 @@ export default function ReportButton({
 
       {open && (
         <div className="absolute right-0 top-9 z-30 w-72 rounded-none border border-brand-200 bg-surface p-4">
-          <p className="text-sm font-medium text-neutral-900">
-            举报「{resourceTitle}」
-          </p>
+          <p className="text-sm font-medium text-neutral-900">举报「{resourceTitle}」</p>
           <div className="mt-3 space-y-2">
             <select
               value={reason}
@@ -88,9 +86,7 @@ export default function ReportButton({
               提交举报
             </button>
           </div>
-          {msg && !msg.startsWith("✓") && (
-            <p className="mt-2 text-xs text-red-500">{msg}</p>
-          )}
+          {msg && !msg.startsWith("✓") && <p className="mt-2 text-xs text-red-500">{msg}</p>}
         </div>
       )}
     </span>

@@ -106,7 +106,7 @@ export default function AvatarCropper({
         else canvas.toBlob((pb) => (pb ? onConfirm(pb) : setBusy(false)), "image/png");
       },
       "image/webp",
-      0.92
+      0.92,
     );
   }
 
@@ -125,7 +125,11 @@ export default function AvatarCropper({
   }, [img, zoom, pos, busy]);
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" role="dialog" aria-label="头像裁剪">
+    <div
+      className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4"
+      role="dialog"
+      aria-label="头像裁剪"
+    >
       <div className="w-full max-w-sm rounded-none border border-brand-300 bg-surface p-5">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-neutral-800">裁剪头像</h3>
@@ -150,7 +154,9 @@ export default function AvatarCropper({
           onPointerMove={(e) => {
             const d = dragRef.current;
             if (!d) return;
-            setPos(clampPos({ x: d.pos.x + (e.clientX - d.sx), y: d.pos.y + (e.clientY - d.sy) }, zoom));
+            setPos(
+              clampPos({ x: d.pos.x + (e.clientX - d.sx), y: d.pos.y + (e.clientY - d.sy) }, zoom),
+            );
           }}
           onPointerUp={() => {
             dragRef.current = null;

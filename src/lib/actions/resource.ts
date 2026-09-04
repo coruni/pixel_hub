@@ -37,14 +37,17 @@ const commonFields = z.object({
     .string()
     .trim()
     // 站内附件路径（/uploads/...）或 http(s) 外链
-    .refine((v) => !v || /^https?:\/\/.+/i.test(v) || /^\/[^/].*$/i.test(v), "外链需以 http(s):// 开头")
+    .refine(
+      (v) => !v || /^https?:\/\/.+/i.test(v) || /^\/[^/].*$/i.test(v),
+      "外链需以 http(s):// 开头",
+    )
     .optional()
     .default(""),
 });
 
 export async function createResourceAction(
   _prev: ResourceActionState,
-  fd: FormData
+  fd: FormData,
 ): Promise<ResourceActionState> {
   const user = await activeUser();
   if (!user) return { error: "账号不可用或已被封禁" };
@@ -98,23 +101,26 @@ export async function createResourceAction(
   }
 
   // GAME 必填外链；文章可以无图（正文即内容）
-  if (type === "GAME" && !externalUrl) return { fieldErrors: { externalUrl: ["游戏资源需填写网盘/外链地址"] } };
+  if (type === "GAME" && !externalUrl)
+    return { fieldErrors: { externalUrl: ["游戏资源需填写网盘/外链地址"] } };
 
   // —— 媒体认领 ——
   let mediaIds: string[] = [];
   try {
     const parsed = JSON.parse(String(fd.get("mediaIds") ?? "[]"));
-    mediaIds = Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === "string") : [];
+    mediaIds = Array.isArray(parsed)
+      ? parsed.filter((x): x is string => typeof x === "string")
+      : [];
   } catch {
     mediaIds = [];
   }
   const coverRaw = String(fd.get("coverId") ?? "").trim();
   const coverId = coverRaw || mediaIds[0] || "";
-  if (type !== "ARTICLE" && mediaIds.length === 0) return { fieldErrors: { mediaIds: ["请至少上传一张图片"] } };
+  if (type !== "ARTICLE" && mediaIds.length === 0)
+    return { fieldErrors: { mediaIds: ["请至少上传一张图片"] } };
 
   // D6：可信/管理员免审直发，否则进审核队列
-  const directPublish =
-    user.trusted || user.role === "ADMIN" || user.role === "MODERATOR";
+  const directPublish = user.trusted || user.role === "ADMIN" || user.role === "MODERATOR";
   const status = directPublish ? "PUBLISHED" : "PENDING";
 
   const slug = await uniqueSlug(title);
@@ -146,13 +152,17 @@ export async function createResourceAction(
           String(fd.get("tags") ?? "")
             .split(/[,，、\s]+/)
             .map((t) => t.trim())
-            .filter(Boolean)
+            .filter(Boolean),
         ),
       ].slice(0, 12);
       for (const name of names) {
         // 标签 slug：直接取名称 slugify；纯符号名 slugify 为空时用随机串兜底（不走 uniqueSlug——它查的是 resource 表）
         const slugName = slugify(name) || `tag-${randomTail()}`;
-        const tag = await tx.tag.upsert({ where: { slug: slugName }, update: {}, create: { slug: slugName, name } });
+        const tag = await tx.tag.upsert({
+          where: { slug: slugName },
+          update: {},
+          create: { slug: slugName, name },
+        });
         const link = await tx.tagOnResource
           .create({ data: { resourceId: r.id, tagId: tag.id } })
           .catch(() => null); // 并发去重
@@ -169,9 +179,11 @@ export async function createResourceAction(
         });
         if (res.count > 0) claimedIds.push(mediaIds[i]);
       }
-      if (mediaIds.length > 0 && claimedIds.length === 0) throw new Error("媒体不可用或已归属其他内容");
-      const finalCover = claimedIds.includes(coverId) ? coverId : claimedIds[0] ?? null;
-      if (finalCover) await tx.resource.update({ where: { id: r.id }, data: { coverMediaId: finalCover } });
+      if (mediaIds.length > 0 && claimedIds.length === 0)
+        throw new Error("媒体不可用或已归属其他内容");
+      const finalCover = claimedIds.includes(coverId) ? coverId : (claimedIds[0] ?? null);
+      if (finalCover)
+        await tx.resource.update({ where: { id: r.id }, data: { coverMediaId: finalCover } });
 
       // 有下载地址的资源落首个版本记录（版本号取 meta.version，缺省 1.0）
       if (externalUrl) {
@@ -217,14 +229,17 @@ const versionSchema = z.object({
   url: z
     .string()
     .trim()
-    .refine((v) => !v || /^https?:\/\/.+/i.test(v) || /^\/[^/].*$/i.test(v), "下载地址需以 http(s):// 开头")
+    .refine(
+      (v) => !v || /^https?:\/\/.+/i.test(v) || /^\/[^/].*$/i.test(v),
+      "下载地址需以 http(s):// 开头",
+    )
     .optional()
     .default(""),
 });
 
 export async function addVersionAction(
   _prev: ResourceActionState,
-  fd: FormData
+  fd: FormData,
 ): Promise<ResourceActionState> {
   const user = await activeUser();
   if (!user) return { error: "账号不可用或已被封禁" };
@@ -238,9 +253,13 @@ export async function addVersionAction(
   if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
   const { resourceId, version, changelog, url } = parsed.data;
 
-  const resource = await prisma.resource.findUnique({ where: { id: resourceId }, select: { id: true, slug: true, authorId: true, type: true, meta: true, externalUrl: true } });
+  const resource = await prisma.resource.findUnique({
+    where: { id: resourceId },
+    select: { id: true, slug: true, authorId: true, type: true, meta: true, externalUrl: true },
+  });
   if (!resource) return { error: "资源不存在" };
-  if (resource.authorId !== user.id && user.role !== "ADMIN") return { error: "只有作者可发布新版本" };
+  if (resource.authorId !== user.id && user.role !== "ADMIN")
+    return { error: "只有作者可发布新版本" };
 
   const finalUrl = url || resource.externalUrl;
   if (!finalUrl) return { fieldErrors: { url: ["请填写该版本的下载地址"] } };
@@ -270,12 +289,18 @@ export async function addVersionAction(
 
 /** 版本下载计数（会话内不重复计） */
 export async function bumpVersionDownloadAction(versionId: string): Promise<{ ok: boolean }> {
-  const v = await prisma.resourceVersion.findUnique({ where: { id: versionId }, select: { id: true, url: true, resourceId: true, resource: { select: { externalUrl: true } } } });
+  const v = await prisma.resourceVersion.findUnique({
+    where: { id: versionId },
+    select: { id: true, url: true, resourceId: true, resource: { select: { externalUrl: true } } },
+  });
   if (!v) return { ok: false };
   const ck = await cookies();
   const marker = ck.get("dl_done")?.value ?? "";
   if (!marker.includes(versionId)) {
-    await prisma.resourceVersion.update({ where: { id: versionId }, data: { downloadCount: { increment: 1 } } });
+    await prisma.resourceVersion.update({
+      where: { id: versionId },
+      data: { downloadCount: { increment: 1 } },
+    });
     ck.set("dl_done", `${marker},${versionId}`.slice(0, 1024), { path: "/", maxAge: 60 * 60 * 24 });
   }
   return { ok: true };

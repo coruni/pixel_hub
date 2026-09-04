@@ -24,7 +24,10 @@ export default function AvatarForm({
   avatarKey: string | null;
   trusted: boolean;
 }) {
-  const [state, formAction, pending] = useActionState<SettingsActionState, FormData>(uploadAvatarAction, {});
+  const [state, formAction, pending] = useActionState<SettingsActionState, FormData>(
+    uploadAvatarAction,
+    {},
+  );
   const [file, setFile] = useState<File | null>(null); // 原始选中的文件（进裁剪器）
   const [cropped, setCropped] = useState<File | null>(null); // 待上传文件（裁剪产物或免裁剪的 GIF）
   const [preview, setPreview] = useState<string | null>(null);
@@ -88,7 +91,11 @@ export default function AvatarForm({
           <input
             ref={inputRef}
             type="file"
-            accept={trusted ? "image/png,image/jpeg,image/webp,image/gif" : "image/png,image/jpeg,image/webp"}
+            accept={
+              trusted
+                ? "image/png,image/jpeg,image/webp,image/gif"
+                : "image/png,image/jpeg,image/webp"
+            }
             className="hidden"
             onChange={(e) => {
               pick(e.target.files?.[0]);

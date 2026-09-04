@@ -55,6 +55,8 @@ export const s3Driver: StorageDriver = {
     return res.ContentLength ?? 0;
   },
   async del(key) {
-    await s3().send(new DeleteObjectCommand({ Bucket: bucket, Key: key })).catch(() => {});
+    await s3()
+      .send(new DeleteObjectCommand({ Bucket: bucket, Key: key }))
+      .catch(() => {});
   },
 };

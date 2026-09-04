@@ -59,10 +59,7 @@ export default function ImageViewer({
   const hasNext = index < images.length - 1;
 
   const clampZoom = (z: number) => Math.min(8, Math.max(0.2, z));
-  const zoomTo = useCallback(
-    (factor: number) => setZoom((z) => clampZoom(z * factor)),
-    [],
-  );
+  const zoomTo = useCallback((factor: number) => setZoom((z) => clampZoom(z * factor)), []);
   const reset = () => {
     setZoom(1);
     setRotation(0);

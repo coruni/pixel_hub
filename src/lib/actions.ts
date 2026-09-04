@@ -15,7 +15,10 @@ const loginFields = z.object({
   identifier: z.string().trim().min(1, "请输入邮箱或用户名"),
   password: z.string().min(1, "请输入密码"),
 });
-export type LoginState = { error?: string; fieldErrors?: { identifier?: string[]; password?: string[] } };
+export type LoginState = {
+  error?: string;
+  fieldErrors?: { identifier?: string[]; password?: string[] };
+};
 
 export async function loginAction(_prev: LoginState, fd: FormData): Promise<LoginState> {
   // 登录限流：每 IP 10 次 / 5 分钟（防爆破）
@@ -32,10 +35,17 @@ export async function loginAction(_prev: LoginState, fd: FormData): Promise<Logi
     // 封禁用户在密码校验前先行拦截，引导到封禁提示页（带原因）
     const id = parsed.data.identifier;
     const u = id.includes("@")
-      ? await prisma.user.findUnique({ where: { email: id.toLowerCase() }, select: { bannedAt: true } })
+      ? await prisma.user.findUnique({
+          where: { email: id.toLowerCase() },
+          select: { bannedAt: true },
+        })
       : await prisma.user.findUnique({ where: { username: id }, select: { bannedAt: true } });
     if (u?.bannedAt) redirect("/banned");
-    await signIn("credentials", { identifier: parsed.data.identifier, password: parsed.data.password, redirectTo: callbackUrl });
+    await signIn("credentials", {
+      identifier: parsed.data.identifier,
+      password: parsed.data.password,
+      redirectTo: callbackUrl,
+    });
     return {};
   } catch (error) {
     if (error instanceof AuthError) return { error: "邮箱/用户名或密码不正确，或账号已被封禁" };

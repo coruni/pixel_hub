@@ -12,11 +12,19 @@ import { siteName, siteUrl } from "@/lib/site-url";
 
 // ---------- 请求重置（忘记密码页） ----------
 
-export type ForgotState = { ok?: boolean; error?: string; fieldErrors?: { email?: string[] }; previewLink?: string };
+export type ForgotState = {
+  ok?: boolean;
+  error?: string;
+  fieldErrors?: { email?: string[] };
+  previewLink?: string;
+};
 
 const forgotFields = z.object({ email: z.string().trim().toLowerCase().email("邮箱格式不正确") });
 
-export async function requestPasswordResetAction(_prev: ForgotState, fd: FormData): Promise<ForgotState> {
+export async function requestPasswordResetAction(
+  _prev: ForgotState,
+  fd: FormData,
+): Promise<ForgotState> {
   // 限流：每 IP 5 次 / 小时（防枚举与邮件轰炸）
   const ip = clientIp(await headers());
   if (!rateLimit(`pwreset:${ip}`, 5, 60 * 60_000)) return { error: "请求过于频繁，请稍后再试" };
@@ -24,7 +32,10 @@ export async function requestPasswordResetAction(_prev: ForgotState, fd: FormDat
   const parsed = forgotFields.safeParse({ email: String(fd.get("email") ?? "") });
   if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
 
-  const user = await prisma.user.findUnique({ where: { email: parsed.data.email }, select: { id: true } });
+  const user = await prisma.user.findUnique({
+    where: { email: parsed.data.email },
+    select: { id: true },
+  });
   // 账号不存在也返回成功文案（防枚举）；真实用户才会生成 token 并发信
   if (!user) return { ok: true };
 
@@ -63,7 +74,8 @@ export async function resetPasswordAction(_prev: ResetState, fd: FormData): Prom
 
   const tokenHash = createHash("sha256").update(parsed.data.token).digest("hex");
   const row = await prisma.passwordResetToken.findUnique({ where: { tokenHash } });
-  if (!row || row.usedAt || row.expiresAt < new Date()) return { error: "链接无效或已过期，请重新发起找回" };
+  if (!row || row.usedAt || row.expiresAt < new Date())
+    return { error: "链接无效或已过期，请重新发起找回" };
 
   const passwordHash = await bcrypt.hash(parsed.data.password, 10);
   await prisma.$transaction([

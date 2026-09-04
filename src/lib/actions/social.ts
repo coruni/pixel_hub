@@ -23,7 +23,14 @@ async function requiredUser() {
   return u;
 }
 
-async function notify(userId: string, actorId: string, type: "LIKE" | "COMMENT" | "FOLLOW", resourceId?: string, commentId?: string, message?: string) {
+async function notify(
+  userId: string,
+  actorId: string,
+  type: "LIKE" | "COMMENT" | "FOLLOW",
+  resourceId?: string,
+  commentId?: string,
+  message?: string,
+) {
   if (!userId || userId === actorId) return;
   await prisma.notification
     .create({
@@ -42,7 +49,10 @@ async function notify(userId: string, actorId: string, type: "LIKE" | "COMMENT" 
   if (type === "COMMENT" && resourceId) {
     after(async () => {
       const [resource, actor] = await Promise.all([
-        prisma.resource.findUnique({ where: { id: resourceId }, select: { slug: true, title: true } }),
+        prisma.resource.findUnique({
+          where: { id: resourceId },
+          select: { slug: true, title: true },
+        }),
         prisma.user.findUnique({ where: { id: actorId }, select: { name: true, username: true } }),
       ]);
       if (!resource || !actor) return;
@@ -75,18 +85,25 @@ export async function toggleLikeAction(resourceId: string): Promise<{ liked: boo
       });
       if (existing) {
         await tx.like.delete({ where: { id: existing.id } });
-        await tx.resource.update({ where: { id: resourceId }, data: { likeCount: { decrement: 1 } } });
+        await tx.resource.update({
+          where: { id: resourceId },
+          data: { likeCount: { decrement: 1 } },
+        });
         return false;
       }
       await tx.like.create({ data: { userId: user.id, resourceId } });
-      await tx.resource.update({ where: { id: resourceId }, data: { likeCount: { increment: 1 } } });
+      await tx.resource.update({
+        where: { id: resourceId },
+        data: { likeCount: { increment: 1 } },
+      });
       return true;
     });
     if (liked) await notify(resource.authorId, user.id, "LIKE", resourceId);
     return { liked };
   } catch (e) {
     // 并发双击：唯一键冲突 → 已是点赞态，幂等返回
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") return { liked: true };
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002")
+      return { liked: true };
     throw e;
   }
 }
@@ -120,17 +137,24 @@ export async function toggleFavoriteAction(resourceId: string): Promise<{ favori
       });
       if (existing) {
         await tx.favorite.delete({ where: { id: existing.id } });
-        await tx.resource.update({ where: { id: resourceId }, data: { favoriteCount: { decrement: 1 } } });
+        await tx.resource.update({
+          where: { id: resourceId },
+          data: { favoriteCount: { decrement: 1 } },
+        });
         return false;
       }
       const collectionId = await ensureDefaultCollection(user.id);
       await tx.favorite.create({ data: { userId: user.id, resourceId, collectionId } });
-      await tx.resource.update({ where: { id: resourceId }, data: { favoriteCount: { increment: 1 } } });
+      await tx.resource.update({
+        where: { id: resourceId },
+        data: { favoriteCount: { increment: 1 } },
+      });
       return true;
     });
     return { favorited };
   } catch (e) {
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") return { favorited: true };
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002")
+      return { favorited: true };
     throw e;
   }
 }
@@ -138,12 +162,15 @@ export async function toggleFavoriteAction(resourceId: string): Promise<{ favori
 /** 把已收藏的资源移动到指定夹子（collectionId 为空 = 未分组） */
 export async function setFavoriteCollectionAction(
   resourceId: string,
-  collectionId: string | null
+  collectionId: string | null,
 ): Promise<{ ok: boolean }> {
   const user = await requiredUser();
   if (!user) return { ok: false };
   if (collectionId) {
-    const c = await prisma.collection.findFirst({ where: { id: collectionId, ownerId: user.id }, select: { id: true } });
+    const c = await prisma.collection.findFirst({
+      where: { id: collectionId, ownerId: user.id },
+      select: { id: true },
+    });
     if (!c) return { ok: false };
   }
   await prisma.favorite.updateMany({
@@ -157,7 +184,9 @@ export async function setFavoriteCollectionAction(
 // ---------- 收藏夹 ----------
 export async function createCollectionAction(fd: FormData): Promise<void> {
   const user = await requiredUser();
-  const name = String(fd.get("name") ?? "").trim().slice(0, 30);
+  const name = String(fd.get("name") ?? "")
+    .trim()
+    .slice(0, 30);
   if (!user || !name) return;
   const count = await prisma.collection.count({ where: { ownerId: user.id } });
   if (count >= 20) return; // 上限防滥用
@@ -168,7 +197,9 @@ export async function createCollectionAction(fd: FormData): Promise<void> {
 export async function renameCollectionAction(fd: FormData): Promise<void> {
   const user = await requiredUser();
   const id = String(fd.get("id") ?? "");
-  const name = String(fd.get("name") ?? "").trim().slice(0, 30);
+  const name = String(fd.get("name") ?? "")
+    .trim()
+    .slice(0, 30);
   if (!user || !id || !name) return;
   await prisma.collection.updateMany({ where: { id, ownerId: user.id }, data: { name } });
   revalidatePath(`/u/${user.username}`);
@@ -203,7 +234,8 @@ export async function toggleFollowAction(targetUserId: string): Promise<{ follow
     await prisma.follow.create({ data: { followerId: user.id, followingId: targetUserId } });
   } catch (e) {
     // 并发双击：唯一键冲突 → 已是关注态，幂等返回
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") return { following: true };
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002")
+      return { following: true };
     throw e;
   }
   await notify(targetUserId, user.id, "FOLLOW");
@@ -224,15 +256,19 @@ const COMMENT_IMG_MAX_COUNT = 3;
 
 function sniffImage(buf: Buffer): boolean {
   if (buf.length < 12) return false;
-  if (buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return true;
+  if (buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])))
+    return true;
   if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return true;
-  const s = (str: string, off: number) => buf.subarray(off, off + str.length).toString("latin1") === str;
+  const s = (str: string, off: number) =>
+    buf.subarray(off, off + str.length).toString("latin1") === str;
   if (s("RIFF", 0) && s("WEBP", 8)) return true;
   if (s("GIF8", 0)) return true;
   return false;
 }
 
-async function saveCommentImage(file: File): Promise<{ key: string; width: number; height: number; size: number } | null> {
+async function saveCommentImage(
+  file: File,
+): Promise<{ key: string; width: number; height: number; size: number } | null> {
   const buf = Buffer.from(await file.arrayBuffer());
   if (buf.byteLength > COMMENT_IMG_MAX_BYTES) throw new Error("单张图片不能超过 5MB");
   if (!sniffImage(buf)) throw new Error("不支持的图片格式");
@@ -246,7 +282,10 @@ async function saveCommentImage(file: File): Promise<{ key: string; width: numbe
   return { key: url, width: out.info.width, height: out.info.height, size: out.data.byteLength };
 }
 
-export async function addCommentAction(_prev: CommentActionState, fd: FormData): Promise<CommentActionState> {
+export async function addCommentAction(
+  _prev: CommentActionState,
+  fd: FormData,
+): Promise<CommentActionState> {
   const user = await requiredUser();
   if (!user) return { error: "请先登录后再评论" };
   // 评论限流：每用户 10 条 / 分钟（防灌水）
@@ -273,13 +312,14 @@ export async function addCommentAction(_prev: CommentActionState, fd: FormData):
 
   // 附图（仅主楼，回复不带图）：先落盘，成功与否不阻断文字评论
   const images = fd.getAll("images").filter((f): f is File => f instanceof File && f.size > 0);
-  if (images.length > COMMENT_IMG_MAX_COUNT) return { error: `附图最多 ${COMMENT_IMG_MAX_COUNT} 张` };
+  if (images.length > COMMENT_IMG_MAX_COUNT)
+    return { error: `附图最多 ${COMMENT_IMG_MAX_COUNT} 张` };
   let saved: { key: string; width: number; height: number; size: number }[] = [];
   if (images.length > 0) {
     try {
-      saved = (await Promise.all(images.slice(0, COMMENT_IMG_MAX_COUNT).map(saveCommentImage))).filter(
-        (x): x is { key: string; width: number; height: number; size: number } => !!x
-      );
+      saved = (
+        await Promise.all(images.slice(0, COMMENT_IMG_MAX_COUNT).map(saveCommentImage))
+      ).filter((x): x is { key: string; width: number; height: number; size: number } => !!x);
     } catch (e) {
       // 图片失败不阻断文字评论
       console.error("[comment-image]", e);
@@ -312,7 +352,10 @@ export async function addCommentAction(_prev: CommentActionState, fd: FormData):
         })),
       });
     }
-    await tx.resource.update({ where: { id: resource.id }, data: { commentCount: { increment: 1 } } });
+    await tx.resource.update({
+      where: { id: resource.id },
+      data: { commentCount: { increment: 1 } },
+    });
     return c;
   });
 
@@ -323,10 +366,14 @@ export async function addCommentAction(_prev: CommentActionState, fd: FormData):
 export async function deleteCommentAction(commentId: string): Promise<{ ok: boolean }> {
   const user = await requiredUser();
   if (!user) return { ok: false };
-  const comment = await prisma.comment.findUnique({ where: { id: commentId }, include: { resource: { select: { authorId: true } } } });
+  const comment = await prisma.comment.findUnique({
+    where: { id: commentId },
+    include: { resource: { select: { authorId: true } } },
+  });
   if (!comment) return { ok: false };
   const isStaff = user.role === "ADMIN" || user.role === "MODERATOR";
-  if (comment.authorId !== user.id && !isStaff && comment.resource.authorId !== user.id) return { ok: false };
+  if (comment.authorId !== user.id && !isStaff && comment.resource.authorId !== user.id)
+    return { ok: false };
   // 条件更新 + 计数扣减同事务：只有原本公开的评论被删除才扣；重复删除/非公开评论不重复扣
   const deleted = await prisma.$transaction(async (tx) => {
     const upd = await tx.comment.updateMany({
@@ -334,7 +381,10 @@ export async function deleteCommentAction(commentId: string): Promise<{ ok: bool
       data: { status: "DELETED", content: "" },
     });
     if (upd.count > 0) {
-      await tx.resource.update({ where: { id: comment.resourceId }, data: { commentCount: { decrement: 1 } } });
+      await tx.resource.update({
+        where: { id: comment.resourceId },
+        data: { commentCount: { decrement: 1 } },
+      });
       return true;
     }
     return false;
@@ -355,8 +405,14 @@ export async function incrementDownloadAction(resourceId: string): Promise<{ ok:
   const ck = await cookies();
   const marker = ck.get("dl_done")?.value ?? "";
   if (!marker.includes(resourceId)) {
-    await prisma.resource.update({ where: { id: resourceId }, data: { downloadCount: { increment: 1 } } });
-    ck.set("dl_done", `${marker},${resourceId}`.slice(0, 1024), { path: "/", maxAge: 60 * 60 * 24 });
+    await prisma.resource.update({
+      where: { id: resourceId },
+      data: { downloadCount: { increment: 1 } },
+    });
+    ck.set("dl_done", `${marker},${resourceId}`.slice(0, 1024), {
+      path: "/",
+      maxAge: 60 * 60 * 24,
+    });
   }
   return { ok: true };
 }

@@ -44,13 +44,7 @@ export function QueueActions({ resourceId }: { resourceId: string }) {
   );
 }
 
-export function ContentActions({
-  resourceId,
-  status,
-}: {
-  resourceId: string;
-  status: string;
-}) {
+export function ContentActions({ resourceId, status }: { resourceId: string; status: string }) {
   const { run, pending } = useAction();
   if (status === "PUBLISHED")
     return (
@@ -99,10 +93,8 @@ export function ReportActions({
     commentId: type === "COMMENT" ? targetId : null,
     userId: type === "USER" ? targetId : null,
   };
-  const confirm = () =>
-    run(() => handleReportBatchAction({ ...base, decision: "confirm" }));
-  const dismiss = () =>
-    run(() => handleReportBatchAction({ ...base, decision: "dismiss" }));
+  const confirm = () => run(() => handleReportBatchAction({ ...base, decision: "confirm" }));
+  const dismiss = () => run(() => handleReportBatchAction({ ...base, decision: "dismiss" }));
   return (
     <div className="flex flex-wrap gap-2">
       <button
@@ -120,11 +112,7 @@ export function ReportActions({
         type="button"
         disabled={pending}
         onClick={() => {
-          if (
-            !removed &&
-            !window.confirm("确认违规（内容将被下架）并关闭全部同类举报？")
-          )
-            return;
+          if (!removed && !window.confirm("确认违规（内容将被下架）并关闭全部同类举报？")) return;
           confirm();
         }}
         className={`rounded-none px-3 py-1.5 text-xs font-medium transition disabled:opacity-50 ${
@@ -173,12 +161,7 @@ export function UserActions({
           defaultValue={role}
           disabled={pending}
           onChange={(e) =>
-            run(() =>
-              setUserRole(
-                userId,
-                e.target.value as "USER" | "MODERATOR" | "ADMIN",
-              ),
-            )
+            run(() => setUserRole(userId, e.target.value as "USER" | "MODERATOR" | "ADMIN"))
           }
           className="rounded-none border border-brand-200 bg-surface px-2 py-1.5 text-xs disabled:opacity-50"
         >

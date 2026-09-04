@@ -3,18 +3,9 @@
 import { useActionState, useState } from "react";
 import { useAction } from "@/lib/hooks";
 import { BTN_DANGER_SM } from "@/lib/ui/cls";
-import {
-  deleteMediaAction,
-  uploadMediaAction,
-} from "@/lib/actions/admin-media";
+import { deleteMediaAction, uploadMediaAction } from "@/lib/actions/admin-media";
 
-export function MediaDeleteButton({
-  mediaId,
-  used,
-}: {
-  mediaId: string;
-  used: boolean;
-}) {
+export function MediaDeleteButton({ mediaId, used }: { mediaId: string; used: boolean }) {
   const { run, pending } = useAction();
   if (used) return <span className="text-xs text-neutral-400">使用中</span>;
   return (
@@ -55,9 +46,7 @@ export function MediaUploadForm() {
         {pending ? "上传中…" : "直传"}
       </button>
       {state.ok && <span className="text-xs text-emerald-600">✓ 已上传</span>}
-      {state.error && (
-        <span className="text-xs text-red-500">{state.error}</span>
-      )}
+      {state.error && <span className="text-xs text-red-500">{state.error}</span>}
     </form>
   );
 }

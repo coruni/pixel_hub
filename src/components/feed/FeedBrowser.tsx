@@ -22,26 +22,11 @@ export default async function FeedBrowser({
   showTags,
 }: Props) {
   const sp = searchParams;
-  const type = enumParam(
-    sp,
-    "type",
-    ["ALL", "GAME", "IMAGE", "ARTICLE"] as const,
-    "ALL",
-  );
+  const type = enumParam(sp, "type", ["ALL", "GAME", "IMAGE", "ARTICLE"] as const, "ALL");
   const cat = str(sp, "cat");
   const tag = str(sp, "tag");
-  const sort = enumParam(
-    sp,
-    "sort",
-    ["latest", "popular", "downloads"] as const,
-    "latest",
-  );
-  const period = enumParam(
-    sp,
-    "period",
-    ["all", "day", "week", "month"] as const,
-    "all",
-  );
+  const sort = enumParam(sp, "sort", ["latest", "popular", "downloads"] as const, "latest");
+  const period = enumParam(sp, "period", ["all", "day", "week", "month"] as const, "all");
   const q = str(sp, "q")?.trim();
   const follow = str(sp, "follow") === "1" && !!authed && !!userId;
   const page = intParam(sp, "page", 1);
@@ -60,9 +45,7 @@ export default async function FeedBrowser({
       pageSize: 30,
     }),
     // 热门标签仅浏览页需要，其余页直接空数组
-    showTags
-      ? getTopTags()
-      : Promise.resolve([] as Awaited<ReturnType<typeof getTopTags>>),
+    showTags ? getTopTags() : Promise.resolve([] as Awaited<ReturnType<typeof getTopTags>>),
   ]);
   const { items, hasMore } = feed;
 
@@ -123,11 +106,7 @@ export default async function FeedBrowser({
           </Link>
         ))}
         {authed && userId && (
-          <Link
-            scroll={false}
-            href={href({ follow: "1", page: "1" })}
-            className={chip(follow)}
-          >
+          <Link scroll={false} href={href({ follow: "1", page: "1" })} className={chip(follow)}>
             关注
           </Link>
         )}
@@ -180,13 +159,7 @@ export default async function FeedBrowser({
                   : "text-neutral-500 hover:text-neutral-800"
               }
             >
-              {p === "all"
-                ? "全部时间"
-                : p === "day"
-                  ? "今天"
-                  : p === "week"
-                    ? "本周"
-                    : "本月"}
+              {p === "all" ? "全部时间" : p === "day" ? "今天" : p === "week" ? "本周" : "本月"}
             </Link>
           ))}
         </span>
@@ -209,11 +182,7 @@ export default async function FeedBrowser({
           return (
             <div className="mt-3 flex flex-wrap items-center gap-1.5">
               <span className="text-xs text-neutral-400">分类</span>
-              <Link
-                scroll={false}
-                href={href({ cat: null })}
-                className={chip(!cat)}
-              >
+              <Link scroll={false} href={href({ cat: null })} className={chip(!cat)}>
                 全部分类
               </Link>
               {visible.map((c) => (
@@ -232,9 +201,7 @@ export default async function FeedBrowser({
                     className={`${chip(false)} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}
                   >
                     {/* 展开后按钮文案切换为「收起」 */}
-                    <span className="group-open:hidden">
-                      +{rest.length} 个分类
-                    </span>
+                    <span className="group-open:hidden">+{rest.length} 个分类</span>
                     <span className="hidden group-open:inline">收起分类</span>
                   </summary>
                   <div className="w-full">

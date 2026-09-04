@@ -16,12 +16,18 @@ export default function ResetPasswordForm({ token }: { token: string }) {
         <h1 className="text-xl font-semibold text-neutral-900">设置新密码</h1>
         <p className="mt-1 text-sm text-neutral-500">重置成功后所有已登录设备将被踢下线</p>
 
-        {state.error && <p className="mt-4 rounded-none bg-red-50 px-3 py-2 text-sm text-red-600">{state.error}</p>}
+        {state.error && (
+          <p className="mt-4 rounded-none bg-red-50 px-3 py-2 text-sm text-red-600">
+            {state.error}
+          </p>
+        )}
 
         <form action={formAction} className="mt-6 space-y-4">
           <input type="hidden" name="token" value={token} />
           <div>
-            <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-neutral-700">新密码</label>
+            <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-neutral-700">
+              新密码
+            </label>
             <input
               id="password"
               name="password"

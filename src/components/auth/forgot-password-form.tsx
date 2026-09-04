@@ -14,9 +14,15 @@ export default function ForgotPasswordForm() {
     <div className="w-full max-w-md">
       <div className="rounded-none border border-brand-200 bg-surface p-8">
         <h1 className="text-xl font-semibold text-neutral-900">找回密码</h1>
-        <p className="mt-1 text-sm text-neutral-500">输入注册邮箱，我们会发送重置链接（30 分钟内有效）</p>
+        <p className="mt-1 text-sm text-neutral-500">
+          输入注册邮箱，我们会发送重置链接（30 分钟内有效）
+        </p>
 
-        {state.error && <p className="mt-4 rounded-none bg-red-50 px-3 py-2 text-sm text-red-600">{state.error}</p>}
+        {state.error && (
+          <p className="mt-4 rounded-none bg-red-50 px-3 py-2 text-sm text-red-600">
+            {state.error}
+          </p>
+        )}
 
         {state.ok ? (
           <div className="mt-6">
@@ -27,7 +33,10 @@ export default function ForgotPasswordForm() {
             {state.previewLink && (
               <div className="mt-3 rounded-none border-2 border-dashed border-brand-300 bg-brand-50/40 px-3 py-2.5 text-xs leading-5 text-neutral-600">
                 开发环境（SMTP 未配置）重置链接：
-                <a href={state.previewLink} className="mt-1 block break-all font-medium text-brand-600 hover:underline">
+                <a
+                  href={state.previewLink}
+                  className="mt-1 block break-all font-medium text-brand-600 hover:underline"
+                >
                   {state.previewLink}
                 </a>
               </div>
@@ -36,7 +45,9 @@ export default function ForgotPasswordForm() {
         ) : (
           <form action={formAction} className="mt-6 space-y-4">
             <div>
-              <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-neutral-700">注册邮箱</label>
+              <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-neutral-700">
+                注册邮箱
+              </label>
               <input
                 id="email"
                 name="email"
@@ -46,7 +57,9 @@ export default function ForgotPasswordForm() {
                 className={inputCls}
                 placeholder="you@example.com"
               />
-              {state.fieldErrors?.email && <p className="mt-1 text-xs text-red-500">{state.fieldErrors.email[0]}</p>}
+              {state.fieldErrors?.email && (
+                <p className="mt-1 text-xs text-red-500">{state.fieldErrors.email[0]}</p>
+              )}
             </div>
             <button
               type="submit"

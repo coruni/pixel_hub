@@ -11,7 +11,9 @@ export function publicUrl(key: string): string {
   // 浏览器本地预览（blob:）与 data URI 原样返回
   if (isUrl(key) || /^(blob:|data:)/i.test(key)) return key;
   if (process.env.STORAGE_DRIVER === "s3") {
-    const base = (process.env.S3_PUBLIC_BASE ?? `${process.env.S3_ENDPOINT}/${process.env.S3_BUCKET ?? ""}`).replace(/\/$/, "");
+    const base = (
+      process.env.S3_PUBLIC_BASE ?? `${process.env.S3_ENDPOINT}/${process.env.S3_BUCKET ?? ""}`
+    ).replace(/\/$/, "");
     return `${base}/${key}`;
   }
   const k = key.replace(/\\/g, "/").replace(/^\/+/, "");

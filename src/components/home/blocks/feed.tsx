@@ -22,11 +22,7 @@ export default async function FeedBlock({
       authed={authed}
       userId={userId}
       showTags={cfg.showTags}
-      heading={
-        title ? (
-          <SectionTitle>{title}</SectionTitle>
-        ) : undefined
-      }
+      heading={title ? <SectionTitle>{title}</SectionTitle> : undefined}
     />
   );
 }

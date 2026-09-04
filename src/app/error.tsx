@@ -3,7 +3,13 @@
 import { useEffect } from "react";
 import { RotateCcw, TriangleAlert } from "lucide-react";
 
-export default function PageError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+export default function PageError({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
   useEffect(() => {
     console.error("[page-error]", error);
   }, [error]);

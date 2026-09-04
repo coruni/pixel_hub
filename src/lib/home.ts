@@ -33,7 +33,9 @@ export async function getHomeSections(): Promise<HomeSectionView[]> {
     }));
   }
   return rows.map((r) => {
-    const kind = (HOME_SECTION_KINDS as string[]).includes(r.kind) ? (r.kind as HomeSectionKind) : "feed";
+    const kind = (HOME_SECTION_KINDS as string[]).includes(r.kind)
+      ? (r.kind as HomeSectionKind)
+      : "feed";
     return {
       id: r.id,
       kind,
@@ -69,7 +71,9 @@ export function toView(r: {
   enabled: boolean;
   config: string | null;
 }): HomeSectionView {
-  const kind = (HOME_SECTION_KINDS as string[]).includes(r.kind) ? (r.kind as HomeSectionKind) : "feed";
+  const kind = (HOME_SECTION_KINDS as string[]).includes(r.kind)
+    ? (r.kind as HomeSectionKind)
+    : "feed";
   return {
     id: r.id,
     kind,
@@ -88,9 +92,17 @@ export async function getHomeStats(): Promise<HomeStats> {
   const [resources, users, agg] = await Promise.all([
     prisma.resource.count({ where: { status: "PUBLISHED" } }),
     prisma.user.count({ where: { bannedAt: null } }),
-    prisma.resource.aggregate({ where: { status: "PUBLISHED" }, _sum: { downloadCount: true, viewCount: true } }),
+    prisma.resource.aggregate({
+      where: { status: "PUBLISHED" },
+      _sum: { downloadCount: true, viewCount: true },
+    }),
   ]);
-  return { resources, users, downloads: agg._sum.downloadCount ?? 0, views: agg._sum.viewCount ?? 0 };
+  return {
+    resources,
+    users,
+    downloads: agg._sum.downloadCount ?? 0,
+    views: agg._sum.viewCount ?? 0,
+  };
 }
 
 /** 分类 id → 已上架资源数 */
@@ -103,7 +115,14 @@ export async function getPublishedCountByCategory(): Promise<Map<string, number>
   return new Map(rows.map((r) => [r.categoryId as string, r._count._all]));
 }
 
-export type CreatorRow = { username: string; name: string | null; avatarKey: string | null; resources: number; followers: number; online: boolean };
+export type CreatorRow = {
+  username: string;
+  name: string | null;
+  avatarKey: string | null;
+  resources: number;
+  followers: number;
+  online: boolean;
+};
 
 export async function getTopCreators(limit: number): Promise<CreatorRow[]> {
   const users = await prisma.user.findMany({
@@ -129,7 +148,9 @@ export async function getTopCreators(limit: number): Promise<CreatorRow[]> {
 }
 
 /** 供 hero 后台挑选时补全标题等展示信息 */
-export async function getResourcePickMeta(ids: string[]): Promise<{ id: string; title: string; slug: string }[]> {
+export async function getResourcePickMeta(
+  ids: string[],
+): Promise<{ id: string; title: string; slug: string }[]> {
   if (ids.length === 0) return [];
   const rows = await prisma.resource.findMany({
     where: { id: { in: ids }, status: "PUBLISHED" },

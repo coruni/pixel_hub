@@ -60,7 +60,8 @@ export default function SiteLayoutManager({
 
   const widgets = getAreaWidgets(theme, activeArea);
   // showOn 开关只作用于侧边栏区域（详情页正文槽位常开）
-  const isSidebarArea = activeArea === "home" || activeArea === "archive" || activeArea === "detail";
+  const isSidebarArea =
+    activeArea === "home" || activeArea === "archive" || activeArea === "detail";
   const areaOn = !isSidebarArea || theme.sidebar.showOn[activeArea];
 
   function moveBy(index: number, delta: number) {
@@ -70,13 +71,23 @@ export default function SiteLayoutManager({
     const [m] = next.splice(index, 1);
     next.splice(target, 0, m);
     setTheme(withAreaWidgets(theme, activeArea, next));
-    run(() => reorderSidebarWidgetsAction(activeArea, next.map((w) => w.id)));
+    run(() =>
+      reorderSidebarWidgetsAction(
+        activeArea,
+        next.map((w) => w.id),
+      ),
+    );
   }
 
   return (
     <div className="space-y-6">
       {/* 顶部导航栏 */}
-      <NavbarCard items={theme.navbar.items} menu={theme.navbar.categoriesMenu} run={run} pending={pending} />
+      <NavbarCard
+        items={theme.navbar.items}
+        menu={theme.navbar.categoriesMenu}
+        run={run}
+        pending={pending}
+      />
 
       {/* 详情模板 */}
       <DetailTemplateCard theme={theme} run={run} />
@@ -90,11 +101,19 @@ export default function SiteLayoutManager({
           <div>
             <h2 className="text-base font-semibold text-neutral-900">页面组件</h2>
             <p className="mt-0.5 text-xs text-neutral-500">
-              按区域分别配置：侧边栏三类页面 + 归档页上/下、详情页上/中/下正文槽位，各自独立一套组件，可排序、开关与删除。
-              首页板块流布局在<Link href="/admin/home" className="mx-0.5 text-brand-600 hover:underline">首页布局</Link>页专门管理。
+              按区域分别配置：侧边栏三类页面 +
+              归档页上/下、详情页上/中/下正文槽位，各自独立一套组件，可排序、开关与删除。
+              首页板块流布局在
+              <Link href="/admin/home" className="mx-0.5 text-brand-600 hover:underline">
+                首页布局
+              </Link>
+              页专门管理。
             </p>
           </div>
-          <Link href="/" className="text-sm text-neutral-600 hover:text-neutral-900 hover:underline">
+          <Link
+            href="/"
+            className="text-sm text-neutral-600 hover:text-neutral-900 hover:underline"
+          >
             预览 →（首页）
           </Link>
         </div>
@@ -124,141 +143,181 @@ export default function SiteLayoutManager({
                 }`}
               >
                 {t.label}
-                <span className={`ml-1.5 text-[10px] tabular-nums ${on ? "text-brand-500" : "text-neutral-400"}`}>{n}</span>
+                <span
+                  className={`ml-1.5 text-[10px] tabular-nums ${on ? "text-brand-500" : "text-neutral-400"}`}
+                >
+                  {n}
+                </span>
               </button>
             );
           })}
         </div>
 
         {/* 当前区域的配置面板 */}
-        <div role="tabpanel" id="widget-panel" aria-labelledby={`widget-tab-${activeArea}`} className="focus:outline-none">
-        {!areaOn && (
-          <div className="mt-3 flex items-center justify-between rounded-none border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs text-amber-800">
-            <span>该页侧边栏已整体关闭，以下组件不会在前台显示。</span>
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => run(() => updateSidebarFlagsAction({ showOn: { [activeArea]: true } }))}
-              className="rounded-none border border-amber-400 bg-amber-100 px-2.5 py-1 font-medium text-amber-800 transition hover:bg-amber-200 disabled:opacity-50"
-            >
-              开启该页侧边栏
-            </button>
-          </div>
-        )}
+        <div
+          role="tabpanel"
+          id="widget-panel"
+          aria-labelledby={`widget-tab-${activeArea}`}
+          className="focus:outline-none"
+        >
+          {!areaOn && (
+            <div className="mt-3 flex items-center justify-between rounded-none border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs text-amber-800">
+              <span>该页侧边栏已整体关闭，以下组件不会在前台显示。</span>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() =>
+                  run(() => updateSidebarFlagsAction({ showOn: { [activeArea]: true } }))
+                }
+                className="rounded-none border border-amber-400 bg-amber-100 px-2.5 py-1 font-medium text-amber-800 transition hover:bg-amber-200 disabled:opacity-50"
+              >
+                开启该页侧边栏
+              </button>
+            </div>
+          )}
 
-        {widgets.length === 0 ? (
-          <p className="mt-4 rounded-none border-2 border-dashed border-brand-300 bg-brand-50/40 px-4 py-8 text-center text-sm text-neutral-400">
-            暂无组件，从下方添加一个。
-          </p>
-        ) : (
-          <ul className="mt-4 space-y-2">
-            {widgets.map((w, index) => (
-              <li key={w.id} className="rounded-none border border-brand-200">
-                <div className="flex items-center gap-3 px-3 py-2.5">
-                  <span className="cursor-grab text-neutral-300 active:cursor-grabbing" aria-hidden>
-                    <GripVertical size={16} />
-                  </span>
-                  <span
-                    className={`grid h-9 w-9 shrink-0 place-items-center rounded-none ${
-                      w.enabled ? "bg-brand-500 text-white" : "bg-neutral-100 text-neutral-400"
-                    }`}
-                  >
-                    <KindIcon kind={w.kind} />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-medium text-neutral-800">{widgetTitle(w)}</span>
-                      <MiniBadge strong>{SIDEBAR_KIND_META[w.kind].label}</MiniBadge>
-                      {!w.enabled && <span className="rounded-none bg-neutral-200 px-1.5 py-0.5 text-[10px] text-neutral-500">已停用</span>}
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <button
-                      type="button"
-                      disabled={pending || index === 0}
-                      onClick={() => moveBy(index, -1)}
-                      aria-label="上移"
-                      className="rounded-none p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-800 disabled:opacity-30"
+          {widgets.length === 0 ? (
+            <p className="mt-4 rounded-none border-2 border-dashed border-brand-300 bg-brand-50/40 px-4 py-8 text-center text-sm text-neutral-400">
+              暂无组件，从下方添加一个。
+            </p>
+          ) : (
+            <ul className="mt-4 space-y-2">
+              {widgets.map((w, index) => (
+                <li key={w.id} className="rounded-none border border-brand-200">
+                  <div className="flex items-center gap-3 px-3 py-2.5">
+                    <span
+                      className="cursor-grab text-neutral-300 active:cursor-grabbing"
+                      aria-hidden
                     >
-                      <ChevronUp size={15} />
-                    </button>
-                    <button
-                      type="button"
-                      disabled={pending || index === widgets.length - 1}
-                      onClick={() => moveBy(index, 1)}
-                      aria-label="下移"
-                      className="rounded-none p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-800 disabled:opacity-30"
-                    >
-                      <ChevronDown size={15} />
-                    </button>
-                    <button
-                      type="button"
-                      disabled={pending}
-                      onClick={() => run(() => updateSidebarWidgetAction({ id: w.id, enabled: !w.enabled }))}
-                      aria-label={w.enabled ? "停用组件" : "启用组件"}
-                      className="rounded-none p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-800 disabled:opacity-30"
-                    >
-                      {w.enabled ? <Eye size={15} /> : <EyeOff size={15} />}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={pending}
-                      onClick={() => setEditingId(editingId === w.id ? null : w.id)}
-                      className={`rounded-none p-1.5 transition hover:bg-neutral-100 ${
-                        editingId === w.id ? "text-neutral-900" : "text-neutral-400 hover:text-neutral-800"
+                      <GripVertical size={16} />
+                    </span>
+                    <span
+                      className={`grid h-9 w-9 shrink-0 place-items-center rounded-none ${
+                        w.enabled ? "bg-brand-500 text-white" : "bg-neutral-100 text-neutral-400"
                       }`}
                     >
-                      <span className="text-xs font-medium">编辑</span>
-                    </button>
-                    <button
-                      type="button"
-                      disabled={pending}
-                      onClick={() => {
-                        if (!window.confirm(`删除组件「${SIDEBAR_KIND_META[w.kind].label}」？`)) return;
-                        run(() => removeSidebarWidgetAction(w.id));
-                      }}
-                      aria-label="删除组件"
-                      className="rounded-none p-1.5 text-neutral-400 hover:bg-red-50 hover:text-red-500 disabled:opacity-30"
-                    >
-                      <Trash2 size={15} />
-                    </button>
+                      <KindIcon kind={w.kind} />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-medium text-neutral-800">
+                          {widgetTitle(w)}
+                        </span>
+                        <MiniBadge strong>{SIDEBAR_KIND_META[w.kind].label}</MiniBadge>
+                        {!w.enabled && (
+                          <span className="rounded-none bg-neutral-200 px-1.5 py-0.5 text-[10px] text-neutral-500">
+                            已停用
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        disabled={pending || index === 0}
+                        onClick={() => moveBy(index, -1)}
+                        aria-label="上移"
+                        className="rounded-none p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-800 disabled:opacity-30"
+                      >
+                        <ChevronUp size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={pending || index === widgets.length - 1}
+                        onClick={() => moveBy(index, 1)}
+                        aria-label="下移"
+                        className="rounded-none p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-800 disabled:opacity-30"
+                      >
+                        <ChevronDown size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={pending}
+                        onClick={() =>
+                          run(() => updateSidebarWidgetAction({ id: w.id, enabled: !w.enabled }))
+                        }
+                        aria-label={w.enabled ? "停用组件" : "启用组件"}
+                        className="rounded-none p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-800 disabled:opacity-30"
+                      >
+                        {w.enabled ? <Eye size={15} /> : <EyeOff size={15} />}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={pending}
+                        onClick={() => setEditingId(editingId === w.id ? null : w.id)}
+                        className={`rounded-none p-1.5 transition hover:bg-neutral-100 ${
+                          editingId === w.id
+                            ? "text-neutral-900"
+                            : "text-neutral-400 hover:text-neutral-800"
+                        }`}
+                      >
+                        <span className="text-xs font-medium">编辑</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={pending}
+                        onClick={() => {
+                          if (!window.confirm(`删除组件「${SIDEBAR_KIND_META[w.kind].label}」？`))
+                            return;
+                          run(() => removeSidebarWidgetAction(w.id));
+                        }}
+                        aria-label="删除组件"
+                        className="rounded-none p-1.5 text-neutral-400 hover:bg-red-50 hover:text-red-500 disabled:opacity-30"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
                   </div>
-                </div>
 
-                {editingId === w.id && (
-                  <div className="border-t border-neutral-100 px-3 py-3">
-                    <WidgetEditor widget={w} categories={categories} tags={tags} onDone={() => setEditingId(null)} />
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
+                  {editingId === w.id && (
+                    <div className="border-t border-neutral-100 px-3 py-3">
+                      <WidgetEditor
+                        widget={w}
+                        categories={categories}
+                        tags={tags}
+                        onDone={() => setEditingId(null)}
+                      />
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
 
-        <div className="mt-5 rounded-none border-2 border-dashed border-brand-300 p-3">
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-400">添加组件</p>
-          <div className="flex flex-wrap gap-2">
-            {SIDEBAR_WIDGET_KINDS.map((kind) => {
-              // 详情页专用组件在非详情区域置灰（配了也不会渲染）
-              const detailOnly = (DETAIL_ONLY_KINDS as string[]).includes(kind);
-              const detailArea = activeArea === "detail" || activeArea === "detailTop" || activeArea === "detailMiddle" || activeArea === "detailBottom";
-              const disabled = pending || (detailOnly && !detailArea);
-              return (
-                <button
-                  key={kind}
-                  type="button"
-                  disabled={disabled}
-                  title={detailOnly && !detailArea ? "仅详情页（侧栏或正文槽位）可用" : SIDEBAR_KIND_META[kind].desc}
-                  onClick={() => run(() => addSidebarWidgetAction(kind, activeArea))}
-                  className="inline-flex items-center gap-1.5 rounded-none border border-brand-200 bg-surface px-3 py-1.5 text-xs text-neutral-700 transition hover:border-brand-400 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <Plus size={12} />
-                  {SIDEBAR_KIND_META[kind].label}
-                </button>
-              );
-            })}
+          <div className="mt-5 rounded-none border-2 border-dashed border-brand-300 p-3">
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-400">
+              添加组件
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {SIDEBAR_WIDGET_KINDS.map((kind) => {
+                // 详情页专用组件在非详情区域置灰（配了也不会渲染）
+                const detailOnly = (DETAIL_ONLY_KINDS as string[]).includes(kind);
+                const detailArea =
+                  activeArea === "detail" ||
+                  activeArea === "detailTop" ||
+                  activeArea === "detailMiddle" ||
+                  activeArea === "detailBottom";
+                const disabled = pending || (detailOnly && !detailArea);
+                return (
+                  <button
+                    key={kind}
+                    type="button"
+                    disabled={disabled}
+                    title={
+                      detailOnly && !detailArea
+                        ? "仅详情页（侧栏或正文槽位）可用"
+                        : SIDEBAR_KIND_META[kind].desc
+                    }
+                    onClick={() => run(() => addSidebarWidgetAction(kind, activeArea))}
+                    className="inline-flex items-center gap-1.5 rounded-none border border-brand-200 bg-surface px-3 py-1.5 text-xs text-neutral-700 transition hover:border-brand-400 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <Plus size={12} />
+                    {SIDEBAR_KIND_META[kind].label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
         </div>
       </section>
     </div>

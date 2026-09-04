@@ -7,7 +7,9 @@ export default function NotFound() {
       <div className="grid h-16 w-16 place-items-center rounded-none border border-brand-300 bg-surface">
         <Compass size={28} className="text-brand-500" aria-hidden />
       </div>
-      <h1 className="mt-6 text-2xl font-semibold tracking-tight text-neutral-900">404 · 这里什么都没有</h1>
+      <h1 className="mt-6 text-2xl font-semibold tracking-tight text-neutral-900">
+        404 · 这里什么都没有
+      </h1>
       <p className="mt-2 text-sm text-neutral-500">页面不存在、已下架，或链接输错了。</p>
       <div className="mt-6 flex items-center gap-3">
         <Link

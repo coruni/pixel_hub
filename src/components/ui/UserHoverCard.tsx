@@ -29,7 +29,13 @@ const ROLE_LABEL: Record<string, string> = {
  * hover 用户头像显示信息卡：包裹任意触发元素（通常是 Avatar），
  * 延迟 300ms 出现，展示昵称/用户名/简介/身份徽标/统计，点击卡片进入主页。
  */
-export default function UserHoverCard({ user, children }: { user: HoverCardUser; children: ReactNode }) {
+export default function UserHoverCard({
+  user,
+  children,
+}: {
+  user: HoverCardUser;
+  children: ReactNode;
+}) {
   const { open, openDelayed, close, setOpen } = useHoverDelay(300);
 
   const roleLabel = user.role ? ROLE_LABEL[user.role] : undefined;
@@ -52,10 +58,18 @@ export default function UserHoverCard({ user, children }: { user: HoverCardUser;
         // 头像+昵称区域是链接（进主页），其余部分仅展示
         <span className="absolute top-full left-0 z-40 mt-1.5 block w-56 rounded-none border border-brand-200 bg-surface p-3 shadow-lg">
           <Link href={`/u/${user.username}`} className="flex items-center gap-2.5">
-            <Avatar name={user.name} username={user.username} avatarKey={user.avatarKey} size="md" online={user.online} />
+            <Avatar
+              name={user.name}
+              username={user.username}
+              avatarKey={user.avatarKey}
+              size="md"
+              online={user.online}
+            />
             <span className="min-w-0 flex-1">
               <span className="flex items-center gap-1.5">
-                <span className="truncate text-sm font-semibold text-neutral-900">{user.name ?? user.username}</span>
+                <span className="truncate text-sm font-semibold text-neutral-900">
+                  {user.name ?? user.username}
+                </span>
                 {user.online && (
                   <span className="shrink-0 inline-flex items-center gap-1 rounded-none border border-emerald-600 bg-emerald-50 px-1.5 py-px text-[10px] font-medium text-emerald-700">
                     <span className="h-1.5 w-1.5 bg-emerald-500" aria-hidden /> 在线
@@ -75,16 +89,25 @@ export default function UserHoverCard({ user, children }: { user: HoverCardUser;
               <span className="block truncate text-xs text-neutral-500">@{user.username}</span>
             </span>
           </Link>
-          {user.bio && <span className="mt-2 block line-clamp-3 text-xs leading-5 text-neutral-600">{user.bio}</span>}
+          {user.bio && (
+            <span className="mt-2 block line-clamp-3 text-xs leading-5 text-neutral-600">
+              {user.bio}
+            </span>
+          )}
           {hasStats && (
             <span className="mt-2.5 flex items-center gap-4 border-t border-neutral-100 pt-2.5">
               {stats.map(([label, n]) => (
                 <span key={label} className="text-xs text-neutral-500">
-                  {label} <span className="font-medium text-neutral-800 tabular-nums">{formatCount(n)}</span>
+                  {label}{" "}
+                  <span className="font-medium text-neutral-800 tabular-nums">
+                    {formatCount(n)}
+                  </span>
                 </span>
               ))}
               {user.joinedAt && (
-                <span className="ml-auto text-[11px] text-neutral-400">{formatJoined(user.joinedAt)}</span>
+                <span className="ml-auto text-[11px] text-neutral-400">
+                  {formatJoined(user.joinedAt)}
+                </span>
               )}
             </span>
           )}

@@ -5,15 +5,7 @@ import type { CardRatio } from "./display";
 import { safeUrlSchema } from "./site-config";
 
 export type HomeSectionKind =
-  | "hero"
-  | "categories"
-  | "list"
-  | "featured"
-  | "feed"
-  | "stats"
-  | "creators"
-  | "tags"
-  | "ad";
+  "hero" | "categories" | "list" | "featured" | "feed" | "stats" | "creators" | "tags" | "ad";
 
 export const HOME_SECTION_KINDS: HomeSectionKind[] = [
   "hero",
@@ -27,16 +19,43 @@ export const HOME_SECTION_KINDS: HomeSectionKind[] = [
   "ad",
 ];
 
-export const HOME_KIND_META: Record<HomeSectionKind, { label: string; desc: string; defaultTitle: string | null }> = {
+export const HOME_KIND_META: Record<
+  HomeSectionKind,
+  { label: string; desc: string; defaultTitle: string | null }
+> = {
   hero: { label: "主推精选", desc: "大图主推区，可手动挑选要展示的资源", defaultTitle: null },
-  categories: { label: "分类导航", desc: "分类直达入口；可按大类筛选，或手动挑选特定分类", defaultTitle: "按分类探索" },
-  list: { label: "内容流板块", desc: "自选条件的内容列表：类型/排序/数量/分类标签多选，卡片·列表·瀑布流", defaultTitle: "精选内容" },
-  featured: { label: "专题精选", desc: "把指定资源组成一个专题网格（支持卡片/列表/瀑布流）", defaultTitle: "专题" },
-  feed: { label: "全站浏览", desc: "可翻页的瀑布流全站浏览（跟 /browse 一致，跟随页面查询参数）", defaultTitle: "发现" },
+  categories: {
+    label: "分类导航",
+    desc: "分类直达入口；可按大类筛选，或手动挑选特定分类",
+    defaultTitle: "按分类探索",
+  },
+  list: {
+    label: "内容流板块",
+    desc: "自选条件的内容列表：类型/排序/数量/分类标签多选，卡片·列表·瀑布流",
+    defaultTitle: "精选内容",
+  },
+  featured: {
+    label: "专题精选",
+    desc: "把指定资源组成一个专题网格（支持卡片/列表/瀑布流）",
+    defaultTitle: "专题",
+  },
+  feed: {
+    label: "全站浏览",
+    desc: "可翻页的瀑布流全站浏览（跟 /browse 一致，跟随页面查询参数）",
+    defaultTitle: "发现",
+  },
   stats: { label: "数据一览", desc: "社区规模数字横幅", defaultTitle: "社区数据" },
   creators: { label: "人气创作者", desc: "按粉丝数排行展示创作者", defaultTitle: "人气创作者" },
-  tags: { label: "热门标签", desc: "标签云快捷入口；可按热度，或手动挑选特定标签", defaultTitle: "热门标签" },
-  ad: { label: "广告位", desc: "图片+链接 或 HTML/联盟广告代码，带「广告」角标；可插在板块流任意位置", defaultTitle: null },
+  tags: {
+    label: "热门标签",
+    desc: "标签云快捷入口；可按热度，或手动挑选特定标签",
+    defaultTitle: "热门标签",
+  },
+  ad: {
+    label: "广告位",
+    desc: "图片+链接 或 HTML/联盟广告代码，带「广告」角标；可插在板块流任意位置",
+    defaultTitle: null,
+  },
 };
 
 export function homeKindLabel(kind: HomeSectionKind): string {
@@ -102,13 +121,29 @@ export const homeConfigSchemas: Record<HomeSectionKind, z.ZodTypeAny> = {
 export type HomeSectionConfig =
   | { featuredIds: string[] } // hero
   | { slugs: string[] } // categories
-  | { type: "ALL" | "IMAGE" | "GAME" | "ARTICLE"; sort: "latest" | "popular" | "downloads"; count: number; categorySlugs: string[]; tagSlugs: string[]; display: "card" | "list" | "masonry"; paged: boolean; ratio: CardRatio } // list
+  | {
+      type: "ALL" | "IMAGE" | "GAME" | "ARTICLE";
+      sort: "latest" | "popular" | "downloads";
+      count: number;
+      categorySlugs: string[];
+      tagSlugs: string[];
+      display: "card" | "list" | "masonry";
+      paged: boolean;
+      ratio: CardRatio;
+    } // list
   | { featuredIds: string[]; display: "card" | "list" | "masonry"; ratio: CardRatio } // featured
   | { showTags: boolean } // feed
   | Record<string, never> // stats
   | { count: number } // creators
   | { count: number; slugs: string[] } // tags
-  | { mode: "image" | "html"; image: string; link: string; alt: string; html: string; badge: boolean }; // ad
+  | {
+      mode: "image" | "html";
+      image: string;
+      link: string;
+      alt: string;
+      html: string;
+      badge: boolean;
+    }; // ad
 
 // 后端传给编辑器的类型化 config
 export type EditableConfig<T extends HomeSectionKind> = z.infer<(typeof homeConfigSchemas)[T]>;
@@ -131,7 +166,7 @@ export function parseSectionConfig(kind: HomeSectionKind, raw: string | null): H
 /** 保存前校验编辑面板提交的 config，返回规范化结果 */
 export function safeHomeConfig(
   kind: HomeSectionKind,
-  value: unknown
+  value: unknown,
 ): { ok: true; data: HomeSectionConfig } | { ok: false; error: string } {
   const schema = homeConfigSchemas[kind];
   const r = schema.safeParse(value);

@@ -53,21 +53,39 @@ export default function CommentItem({
     <li id={`comment-${c.id}`} data-comment-id={c.id} className="scroll-mt-24">
       <div className="flex items-center gap-2">
         <UserHoverCard user={c.author}>
-          <Link href={`/u/${c.author.username}`} aria-label={`${c.author.name ?? c.author.username} 的主页`}>
-            <Avatar name={c.author.name} username={c.author.username} avatarKey={c.author.avatarKey} size="sm" online={c.author.online} />
+          <Link
+            href={`/u/${c.author.username}`}
+            aria-label={`${c.author.name ?? c.author.username} 的主页`}
+          >
+            <Avatar
+              name={c.author.name}
+              username={c.author.username}
+              avatarKey={c.author.avatarKey}
+              size="sm"
+              online={c.author.online}
+            />
           </Link>
         </UserHoverCard>
-        <Link href={`/u/${c.author.username}`} className="text-sm font-medium text-neutral-800 hover:text-brand-600">
+        <Link
+          href={`/u/${c.author.username}`}
+          className="text-sm font-medium text-neutral-800 hover:text-brand-600"
+        >
           {c.author.name ?? c.author.username}
         </Link>
         <span className="text-xs text-neutral-400">· {timeAgo(c.createdAt)}</span>
         {canDel && (
-          <button type="button" onClick={() => onDelete(c.id)} className="ml-auto text-xs text-neutral-400 hover:text-red-500">
+          <button
+            type="button"
+            onClick={() => onDelete(c.id)}
+            className="ml-auto text-xs text-neutral-400 hover:text-red-500"
+          >
             删除
           </button>
         )}
       </div>
-      <p className="mt-2 whitespace-pre-wrap pl-10 text-sm leading-6 text-neutral-700">{c.content}</p>
+      <p className="mt-2 whitespace-pre-wrap pl-10 text-sm leading-6 text-neutral-700">
+        {c.content}
+      </p>
       {c.images && c.images.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-2 pl-10">
           {c.images.map((img, i) => (
@@ -92,7 +110,11 @@ export default function CommentItem({
         <button
           type="button"
           onClick={() =>
-            onReplyChange(replyOpen ? { openFor: null, text: "", target: null } : { openFor: c.id, text: "", target: null })
+            onReplyChange(
+              replyOpen
+                ? { openFor: null, text: "", target: null }
+                : { openFor: c.id, text: "", target: null },
+            )
           }
           className="mt-1.5 pl-10 text-xs text-neutral-400 hover:text-neutral-700"
         >
@@ -138,7 +160,9 @@ export default function CommentItem({
               rp={rp}
               canPost={canPost}
               canDel={viewerId === rp.authorId || !!isStaff}
-              onReplyTo={(parent, to) => onReplyChange({ openFor: c.id, text: reply.text, target: { parent, to } })}
+              onReplyTo={(parent, to) =>
+                onReplyChange({ openFor: c.id, text: reply.text, target: { parent, to } })
+              }
               onDelete={onDelete}
               onNavigate={onNavigate}
             />
@@ -167,14 +191,30 @@ function ReplyItem({
   onNavigate: (commentId: string, fallbackRootId: string) => void;
 }) {
   return (
-    <li id={`comment-${rp.id}`} data-comment-id={rp.id} className="scroll-mt-24 rounded-none bg-neutral-100/70 p-3">
+    <li
+      id={`comment-${rp.id}`}
+      data-comment-id={rp.id}
+      className="scroll-mt-24 rounded-none bg-neutral-100/70 p-3"
+    >
       <div className="flex items-center gap-2">
         <UserHoverCard user={rp.author}>
-          <Link href={`/u/${rp.author.username}`} aria-label={`${rp.author.name ?? rp.author.username} 的主页`}>
-            <Avatar name={rp.author.name} username={rp.author.username} avatarKey={rp.author.avatarKey} size="xs" online={rp.author.online} />
+          <Link
+            href={`/u/${rp.author.username}`}
+            aria-label={`${rp.author.name ?? rp.author.username} 的主页`}
+          >
+            <Avatar
+              name={rp.author.name}
+              username={rp.author.username}
+              avatarKey={rp.author.avatarKey}
+              size="xs"
+              online={rp.author.online}
+            />
           </Link>
         </UserHoverCard>
-        <Link href={`/u/${rp.author.username}`} className="text-xs font-medium text-neutral-800 hover:text-brand-600">
+        <Link
+          href={`/u/${rp.author.username}`}
+          className="text-xs font-medium text-neutral-800 hover:text-brand-600"
+        >
           {rp.author.name ?? rp.author.username}
         </Link>
         {rp.replyTo && (
@@ -189,7 +229,11 @@ function ReplyItem({
         )}
         <span className="text-[11px] text-neutral-400">· {timeAgo(rp.createdAt)}</span>
         {canDel && (
-          <button type="button" onClick={() => onDelete(rp.id)} className="ml-auto text-[11px] text-neutral-400 hover:text-red-500">
+          <button
+            type="button"
+            onClick={() => onDelete(rp.id)}
+            className="ml-auto text-[11px] text-neutral-400 hover:text-red-500"
+          >
             删除
           </button>
         )}

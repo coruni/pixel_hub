@@ -21,11 +21,15 @@ export async function deleteMediaAction(mediaId: string): Promise<{ ok: boolean;
     (m._count.coverOf ?? 0) > 0 || // 某资源封面
     !!m.resourceId || // 图集成员
     !!m.commentId; // 评论附图
-  if (used) return { ok: false, error: "该图片正被内容引用（封面/图集/评论），请先在对应内容中移除" };
+  if (used)
+    return { ok: false, error: "该图片正被内容引用（封面/图集/评论），请先在对应内容中移除" };
 
   // 头像引用是裸 key（不在 Media 表），删除前单独校验
   const keys = [m.storageKey, m.thumbKey, m.bigKey].filter((k): k is string => !!k);
-  const avatarUser = await prisma.user.findFirst({ where: { avatarKey: { in: keys } }, select: { id: true } });
+  const avatarUser = await prisma.user.findFirst({
+    where: { avatarKey: { in: keys } },
+    select: { id: true },
+  });
   if (avatarUser) return { ok: false, error: "该图片正被用户用作头像" };
 
   await prisma.media.delete({ where: { id: mediaId } });
@@ -40,16 +44,21 @@ const UPLOAD_MAX = 20 * 1024 * 1024;
 
 function sniffImage(buf: Buffer): boolean {
   if (buf.length < 12) return false;
-  if (buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return true;
+  if (buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])))
+    return true;
   if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return true;
-  const s = (str: string, off: number) => buf.subarray(off, off + str.length).toString("latin1") === str;
+  const s = (str: string, off: number) =>
+    buf.subarray(off, off + str.length).toString("latin1") === str;
   if (s("RIFF", 0) && s("WEBP", 8)) return true;
   if (s("GIF8", 0)) return true;
   return false;
 }
 
 /** 管理员直传：原图直存统一存储层，落 Media 记录（不关联资源） */
-export async function uploadMediaAction(_prev: { ok?: boolean; error?: string }, fd: FormData): Promise<{ ok?: boolean; error?: string }> {
+export async function uploadMediaAction(
+  _prev: { ok?: boolean; error?: string },
+  fd: FormData,
+): Promise<{ ok?: boolean; error?: string }> {
   const me = await staff();
   if (me?.role !== "ADMIN") return { error: "仅管理员可直传" };
 

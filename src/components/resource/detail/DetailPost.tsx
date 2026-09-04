@@ -45,17 +45,14 @@ function MetaChips({ ctx }: { ctx: DetailCtx }) {
         label: `v${meta.version.replace(/^v/i, "")}`,
         cls: "bg-neutral-100 text-neutral-600",
       });
-    if (meta.size)
-      chips.push({ label: meta.size, cls: "bg-neutral-100 text-neutral-600" });
+    if (meta.size) chips.push({ label: meta.size, cls: "bg-neutral-100 text-neutral-600" });
     if (meta.platforms && meta.platforms.length > 0)
       chips.push({
         label: meta.platforms.join(" / "),
         cls: "bg-neutral-100 text-neutral-600",
       });
-    if (meta.lang)
-      chips.push({ label: meta.lang, cls: "bg-neutral-100 text-neutral-600" });
-    if (meta.note)
-      chips.push({ label: meta.note, cls: "bg-neutral-100 text-neutral-600" });
+    if (meta.lang) chips.push({ label: meta.lang, cls: "bg-neutral-100 text-neutral-600" });
+    if (meta.note) chips.push({ label: meta.note, cls: "bg-neutral-100 text-neutral-600" });
   }
   if (chips.length === 0 && detail.tags.length === 0) return null;
   return (
@@ -79,7 +76,13 @@ function MetaChips({ ctx }: { ctx: DetailCtx }) {
 }
 
 /** A · 展厅式 —— 图集开屏做第一视觉，信息以美术馆展签形式聚合在图下：左作品信息、右作者+操作 */
-export default function DetailPost({ ctx, middleSlot }: { ctx: DetailCtx; middleSlot?: ReactNode }) {
+export default function DetailPost({
+  ctx,
+  middleSlot,
+}: {
+  ctx: DetailCtx;
+  middleSlot?: ReactNode;
+}) {
   const { detail } = ctx;
   const a = detail.author;
 
@@ -109,9 +112,7 @@ export default function DetailPost({ ctx, middleSlot }: { ctx: DetailCtx; middle
             {detail.title}
           </h1>
           {detail.summary && (
-            <p className="mt-2 text-sm leading-6 text-neutral-500">
-              {detail.summary}
-            </p>
+            <p className="mt-2 text-sm leading-6 text-neutral-500">{detail.summary}</p>
           )}
 
           {/* 展签数据行：年代 / 观展 / （游戏的）获取 */}
@@ -125,8 +126,7 @@ export default function DetailPost({ ctx, middleSlot }: { ctx: DetailCtx; middle
             </span>
             {detail.type === "GAME" && (
               <span className="inline-flex items-center gap-1">
-                <Download size={12} aria-hidden />{" "}
-                {formatCount(detail.downloadCount)}
+                <Download size={12} aria-hidden /> {formatCount(detail.downloadCount)}
               </span>
             )}
           </div>

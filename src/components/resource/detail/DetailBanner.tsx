@@ -17,7 +17,13 @@ import {
 } from "./parts";
 
 /** B · 顶栏横幅式 —— 顶部封面 + 关键信息横幅，下方接图集与描述，适合游戏 */
-export default function DetailBanner({ ctx, middleSlot }: { ctx: DetailCtx; middleSlot?: ReactNode }) {
+export default function DetailBanner({
+  ctx,
+  middleSlot,
+}: {
+  ctx: DetailCtx;
+  middleSlot?: ReactNode;
+}) {
   const { detail } = ctx;
   const cover = detail.gallery[0];
 
@@ -27,7 +33,11 @@ export default function DetailBanner({ ctx, middleSlot }: { ctx: DetailCtx; midd
       <div className="relative overflow-hidden rounded-none bg-neutral-900">
         {cover ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={cover.bigUrl} alt="" className="h-72 w-full object-cover opacity-90 sm:h-80 md:h-[22rem]" />
+          <img
+            src={cover.bigUrl}
+            alt=""
+            className="h-72 w-full object-cover opacity-90 sm:h-80 md:h-[22rem]"
+          />
         ) : (
           <div className="grid h-72 w-full place-items-center text-5xl font-bold text-white/20 sm:h-80 md:h-[22rem]">
             {detail.title.slice(0, 1).toUpperCase()}
@@ -51,7 +61,9 @@ export default function DetailBanner({ ctx, middleSlot }: { ctx: DetailCtx; midd
           <h1 className="mt-2.5 text-2xl font-semibold leading-snug tracking-tight text-white sm:text-3xl">
             {detail.title}
           </h1>
-          {detail.summary && <p className="mt-1.5 max-w-2xl text-sm leading-6 text-white/80">{detail.summary}</p>}
+          {detail.summary && (
+            <p className="mt-1.5 max-w-2xl text-sm leading-6 text-white/80">{detail.summary}</p>
+          )}
           {detail.externalUrl && (
             <DownloadButton
               resourceId={detail.id}

@@ -7,29 +7,29 @@ import type { ReactNode } from "react";
 // HTML 不允许 <a> 嵌套 <a>（会 hydration 报错），改为 div + 编程式导航；
 // 点击内部 a/button 时由其自身处理，不触发外层跳转。
 export default function NotificationCardLink({
- href,
- className,
- children,
+  href,
+  className,
+  children,
 }: {
- href: string;
- className?: string;
- children: ReactNode;
+  href: string;
+  className?: string;
+  children: ReactNode;
 }) {
- const router = useRouter();
- return (
- <div
- role="link"
- tabIndex={0}
- className={className}
- onClick={(e) => {
- if ((e.target as HTMLElement).closest("a,button")) return;
- router.push(href);
- }}
- onKeyDown={(e) => {
- if (e.key === "Enter" && !(e.target as HTMLElement).closest("a,button")) router.push(href);
- }}
- >
- {children}
- </div>
- );
+  const router = useRouter();
+  return (
+    <div
+      role="link"
+      tabIndex={0}
+      className={className}
+      onClick={(e) => {
+        if ((e.target as HTMLElement).closest("a,button")) return;
+        router.push(href);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" && !(e.target as HTMLElement).closest("a,button")) router.push(href);
+      }}
+    >
+      {children}
+    </div>
+  );
 }

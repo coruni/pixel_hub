@@ -20,7 +20,7 @@ export function useAction() {
         if (!r.ok) window.alert(r.error ?? "操作失败");
         else if (opts?.refresh !== false) router.refresh();
       }),
-    [router, start]
+    [router, start],
   );
   return { run, pending };
 }

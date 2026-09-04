@@ -35,7 +35,10 @@ export type ResourceMetaOutput =
   | ({ kind: "GAME" } & GameMeta)
   | ({ kind: "ARTICLE" } & ArticleMeta);
 
-export function parseMeta(kind: "GAME" | "IMAGE" | "ARTICLE", raw: string | null): ResourceMetaOutput {
+export function parseMeta(
+  kind: "GAME" | "IMAGE" | "ARTICLE",
+  raw: string | null,
+): ResourceMetaOutput {
   if (kind === "GAME") {
     const parsed = z.unknown().safeParse(raw);
     let obj: unknown = {};

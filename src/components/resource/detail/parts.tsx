@@ -41,9 +41,7 @@ export function PendingBanner({ ctx }: { ctx: DetailCtx }) {
     <div className="mb-4 rounded-none border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-700">
       ⏳ 该内容状态：
       {detail.status === "PENDING" ? "审核中（仅你可预览）" : detail.status}。
-      {detail.rejectReason && (
-        <span className="ml-1">打回原因：{detail.rejectReason}</span>
-      )}
+      {detail.rejectReason && <span className="ml-1">打回原因：{detail.rejectReason}</span>}
     </div>
   );
 }
@@ -61,7 +59,13 @@ export function AuthorIdentity({
   return (
     <UserHoverCard user={a}>
       <Link href={`/u/${a.username}`} className="flex items-center gap-2.5">
-        <Avatar name={a.name} username={a.username} avatarKey={a.avatarKey} size={size} online={a.online} />
+        <Avatar
+          name={a.name}
+          username={a.username}
+          avatarKey={a.avatarKey}
+          size={size}
+          online={a.online}
+        />
         <span>
           <span className="block text-sm font-medium text-neutral-800">{a.name ?? a.username}</span>
           {handle && <span className="block text-xs text-neutral-400">@{a.username}</span>}
@@ -72,11 +76,22 @@ export function AuthorIdentity({
 }
 
 /** 关注入口：本人隐藏；已登录给 FollowButton，未登录给登录链接 */
-export function FollowControl({ ctx, variant = "ghost" }: { ctx: DetailCtx; variant?: "ghost" | "primary" }) {
+export function FollowControl({
+  ctx,
+  variant = "ghost",
+}: {
+  ctx: DetailCtx;
+  variant?: "ghost" | "primary";
+}) {
   const { detail, authed, isAuthor } = ctx;
   if (isAuthor) return null;
   if (authed)
-    return <FollowButton targetUserId={detail.authorId} initialFollowing={detail.viewer.followingAuthor} />;
+    return (
+      <FollowButton
+        targetUserId={detail.authorId}
+        initialFollowing={detail.viewer.followingAuthor}
+      />
+    );
   return (
     <Link
       href="/login"
@@ -148,14 +163,10 @@ export function ActionBar({ ctx }: { ctx: DetailCtx }) {
             </Link>
           </>
         )}
-        {meId && !isAuthor && (
-          <ReportButton resourceId={detail.id} resourceTitle={detail.title} />
-        )}
+        {meId && !isAuthor && <ReportButton resourceId={detail.id} resourceTitle={detail.title} />}
       </div>
       {detail.loginRequired && !authed && (
-        <p className="mt-1.5 text-xs text-neutral-400">
-          该资源需登录后获取下载地址。
-        </p>
+        <p className="mt-1.5 text-xs text-neutral-400">该资源需登录后获取下载地址。</p>
       )}
       {!isStaff && !detail.allowComments && !isAuthor && (
         <p className="mt-1.5 text-xs text-neutral-400">作者已关闭评论。</p>
@@ -174,16 +185,12 @@ export function StatGrid({ ctx }: { ctx: DetailCtx }) {
     <div className="grid grid-cols-3 gap-2 text-center text-sm">
       <div className={statItem}>
         <Eye size={14} className="text-neutral-400" aria-hidden />
-        <span className="font-semibold text-neutral-900">
-          {formatCount(detail.viewCount)}
-        </span>
+        <span className="font-semibold text-neutral-900">{formatCount(detail.viewCount)}</span>
         <span className="text-[11px] text-neutral-400">浏览</span>
       </div>
       <div className={statItem}>
         <Download size={14} className="text-neutral-400" aria-hidden />
-        <span className="font-semibold text-neutral-900">
-          {formatCount(detail.downloadCount)}
-        </span>
+        <span className="font-semibold text-neutral-900">{formatCount(detail.downloadCount)}</span>
         <span className="text-[11px] text-neutral-400">下载</span>
       </div>
       <div className={statItem}>
@@ -233,9 +240,7 @@ export function TypeInfoCard({ ctx }: { ctx: DetailCtx }) {
         {meta.kind === "IMAGE" && meta.isAiGenerated && (
           <div className="rounded-none bg-amber-50 px-3 py-1.5 text-xs text-amber-700">
             ✨ AI 生成
-            {meta.aiTool
-              ? ` · ${meta.aiTool}${meta.aiModel ? ` ${meta.aiModel}` : ""}`
-              : ""}
+            {meta.aiTool ? ` · ${meta.aiTool}${meta.aiModel ? ` ${meta.aiModel}` : ""}` : ""}
           </div>
         )}
         {meta.kind === "IMAGE" && meta.original && (
@@ -245,9 +250,7 @@ export function TypeInfoCard({ ctx }: { ctx: DetailCtx }) {
           </div>
         )}
         {meta.license && <KV k="授权" v={meta.license} />}
-        {"sourceNote" in meta && meta.sourceNote && (
-          <KV k="来源" v={meta.sourceNote} />
-        )}
+        {"sourceNote" in meta && meta.sourceNote && <KV k="来源" v={meta.sourceNote} />}
         {"note" in meta && meta.note && <KV k="说明" v={meta.note} />}
       </dl>
 
@@ -278,7 +281,10 @@ export function VersionSection({ ctx }: { ctx: DetailCtx }) {
       <h2 className="text-sm font-semibold text-neutral-400">版本历史（{versions.length}）</h2>
       <ul className="mt-3 divide-y divide-neutral-100">
         {versions.map((v) => (
-          <li key={v.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3 first:pt-0 last:pb-0">
+          <li
+            key={v.id}
+            className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3 first:pt-0 last:pb-0"
+          >
             <span className="rounded-none border border-brand-600 bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">
               v{v.version}
             </span>
@@ -289,7 +295,9 @@ export function VersionSection({ ctx }: { ctx: DetailCtx }) {
               </span>
             )}
             <span className={v.changelog ? "" : "min-w-0 flex-1"} />
-            {v.url && <VersionDownloadButton versionId={v.id} url={v.url} count={v.downloadCount} />}
+            {v.url && (
+              <VersionDownloadButton versionId={v.id} url={v.url} count={v.downloadCount} />
+            )}
           </li>
         ))}
       </ul>

@@ -26,11 +26,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   if (!exists) notFound();
   // 与 page 同参（含 viewerId）：cache() 同请求去重，草稿预览也能拿到真实标题
   const session = await auth();
-  const meId = typeof session?.user?.id === "string" && session.user.id ? session.user.id : undefined;
+  const meId =
+    typeof session?.user?.id === "string" && session.user.id ? session.user.id : undefined;
   const r = await getResourceDetail(slug, meId);
-  if (!r || r.status !== "PUBLISHED") return { title: r?.title ?? "未发布内容", robots: { index: false } };
+  if (!r || r.status !== "PUBLISHED")
+    return { title: r?.title ?? "未发布内容", robots: { index: false } };
 
-  const description = r.summary ?? `${r.author.name ?? "@" + r.author.username} 分享的${TYPE_LABEL[r.type] ?? "资源"}`;
+  const description =
+    r.summary ??
+    `${r.author.name ?? "@" + r.author.username} 分享的${TYPE_LABEL[r.type] ?? "资源"}`;
   const ogImages = r.gallery[0] ? [r.gallery[0].bigUrl] : [];
   return {
     title: r.title,
@@ -93,15 +97,18 @@ export default async function ResourcePage({ params }: PageProps) {
   };
   const hasSlot = (area: "detailTop" | "detailMiddle" | "detailBottom") =>
     theme.slots[area].some((w) => w.enabled);
-  const topSlot = !isPreview && hasSlot("detailTop") ? (
-    <WidgetArea theme={theme} area="detailTop" detail={detailCtx} />
-  ) : null;
-  const bottomSlot = !isPreview && hasSlot("detailBottom") ? (
-    <WidgetArea theme={theme} area="detailBottom" detail={detailCtx} />
-  ) : null;
-  const middleSlot = !isPreview && hasSlot("detailMiddle") ? (
-    <WidgetArea theme={theme} area="detailMiddle" detail={detailCtx} />
-  ) : null;
+  const topSlot =
+    !isPreview && hasSlot("detailTop") ? (
+      <WidgetArea theme={theme} area="detailTop" detail={detailCtx} />
+    ) : null;
+  const bottomSlot =
+    !isPreview && hasSlot("detailBottom") ? (
+      <WidgetArea theme={theme} area="detailBottom" detail={detailCtx} />
+    ) : null;
+  const middleSlot =
+    !isPreview && hasSlot("detailMiddle") ? (
+      <WidgetArea theme={theme} area="detailMiddle" detail={detailCtx} />
+    ) : null;
 
   const body =
     template === "banner" ? (
@@ -121,27 +128,17 @@ export default async function ResourcePage({ params }: PageProps) {
     <SidebarLayout
       railWidth={theme.sidebar.width}
       rail={
-        showSidebar ? (
-          <SiteSidebar
-            theme={theme}
-            page="detail"
-            detail={detailCtx}
-          />
-        ) : undefined
+        showSidebar ? <SiteSidebar theme={theme} page="detail" detail={detailCtx} /> : undefined
       }
     >
-      {topSlot && (
-        <div className="mx-auto max-w-6xl px-4 pt-6 sm:px-6">{topSlot}</div>
-      )}
+      {topSlot && <div className="mx-auto max-w-6xl px-4 pt-6 sm:px-6">{topSlot}</div>}
       {isPreview && (
         <div className={previewCls}>
           <PendingBanner ctx={ctx} />
         </div>
       )}
       {body}
-      {bottomSlot && (
-        <div className="mx-auto max-w-6xl px-4 pb-12 sm:px-6">{bottomSlot}</div>
-      )}
+      {bottomSlot && <div className="mx-auto max-w-6xl px-4 pb-12 sm:px-6">{bottomSlot}</div>}
     </SidebarLayout>
   );
 }

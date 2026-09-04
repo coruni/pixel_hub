@@ -18,15 +18,25 @@ async function notifyMod(userId: string, actorId: string, resourceId: string, me
       .findUnique({ where: { id: resourceId }, select: { slug: true, title: true } })
       .catch(() => null);
     if (!resource) return;
-    await notifyByEmail(userId, "你的投稿有审核结果", `《${resource.title}》：${message}`, `/resources/${resource.slug}`);
+    await notifyByEmail(
+      userId,
+      "你的投稿有审核结果",
+      `《${resource.title}》：${message}`,
+      `/resources/${resource.slug}`,
+    );
   });
 }
 
 // ---------- 审核队列 ----------
-export async function approveResourceAction(resourceId: string): Promise<{ ok: boolean; error?: string }> {
+export async function approveResourceAction(
+  resourceId: string,
+): Promise<{ ok: boolean; error?: string }> {
   const admin = await staff();
   if (!admin) return { ok: false, error: "无权限" };
-  const r = await prisma.resource.findUnique({ where: { id: resourceId }, select: { id: true, authorId: true } });
+  const r = await prisma.resource.findUnique({
+    where: { id: resourceId },
+    select: { id: true, authorId: true },
+  });
   if (!r) return { ok: false, error: "资源不存在" };
 
   await prisma.resource.update({
@@ -43,13 +53,16 @@ export async function approveResourceAction(resourceId: string): Promise<{ ok: b
 
 export async function rejectResourceAction(
   resourceId: string,
-  reason: string
+  reason: string,
 ): Promise<{ ok: boolean; error?: string }> {
   const admin = await staff();
   if (!admin) return { ok: false, error: "无权限" };
   const clean = reason.trim().slice(0, 300);
   if (!clean) return { ok: false, error: "请填写打回原因" };
-  const r = await prisma.resource.findUnique({ where: { id: resourceId }, select: { id: true, authorId: true } });
+  const r = await prisma.resource.findUnique({
+    where: { id: resourceId },
+    select: { id: true, authorId: true },
+  });
   if (!r) return { ok: false, error: "资源不存在" };
 
   await prisma.resource.update({
@@ -64,7 +77,9 @@ export async function rejectResourceAction(
 }
 
 // ---------- 内容库：下架 / 恢复 ----------
-export async function setResourceRemoved(resourceId: string): Promise<{ ok: boolean; error?: string }> {
+export async function setResourceRemoved(
+  resourceId: string,
+): Promise<{ ok: boolean; error?: string }> {
   const admin = await staff();
   if (!admin) return { ok: false, error: "无权限" };
   const r = await prisma.resource.updateMany({
@@ -77,14 +92,17 @@ export async function setResourceRemoved(resourceId: string): Promise<{ ok: bool
     select: { title: true, authorId: true },
   });
   await audit(admin.id, "REMOVE_RESOURCE", "RESOURCE", resourceId, res?.title);
-  if (res) await notifyMod(res.authorId, admin.id, resourceId, "你的内容已被下架，如有疑问请联系管理员");
+  if (res)
+    await notifyMod(res.authorId, admin.id, resourceId, "你的内容已被下架，如有疑问请联系管理员");
   revalidatePath("/admin");
   revalidatePath("/admin/content");
   revalidatePath("/", "layout");
   return { ok: true };
 }
 
-export async function restoreResource(resourceId: string): Promise<{ ok: boolean; error?: string }> {
+export async function restoreResource(
+  resourceId: string,
+): Promise<{ ok: boolean; error?: string }> {
   const admin = await staff();
   if (!admin) return { ok: false, error: "无权限" };
   const r = await prisma.resource.updateMany({
@@ -128,10 +146,19 @@ export async function handleReportBatchAction(input: {
           ? { targetCommentId: targetId }
           : { targetUserId: targetId }),
     },
-    data: { status: input.decision === "confirm" ? "RESOLVED" : "DISMISSED", handledBy: admin.id, handledAt: new Date() },
+    data: {
+      status: input.decision === "confirm" ? "RESOLVED" : "DISMISSED",
+      handledBy: admin.id,
+      handledAt: new Date(),
+    },
   });
   if (closed.count === 0) return { ok: false, error: "没有待处理举报" };
-  await audit(admin.id, input.decision === "confirm" ? "REPORT_RESOLVE" : "REPORT_DISMISS", input.type, targetId);
+  await audit(
+    admin.id,
+    input.decision === "confirm" ? "REPORT_RESOLVE" : "REPORT_DISMISS",
+    input.type,
+    targetId,
+  );
 
   if (input.type === "RESOURCE" && input.resourceId) {
     const res = await prisma.resource.findUnique({
@@ -155,7 +182,12 @@ export async function handleReportBatchAction(input: {
           }),
         ]);
         await audit(admin.id, "REMOVE_RESOURCE", "RESOURCE", res.id, res.title);
-        await notifyByEmail(res.authorId, "你的内容因举报被下架", `《${res.title}》：经核查确认违规，已下架。如有疑问请联系管理员`, `/resources/${res.slug}`).catch(() => undefined);
+        await notifyByEmail(
+          res.authorId,
+          "你的内容因举报被下架",
+          `《${res.title}》：经核查确认违规，已下架。如有疑问请联系管理员`,
+          `/resources/${res.slug}`,
+        ).catch(() => undefined);
         revalidatePath(`/resources/${res.slug}`);
       } else if (res.status === "PENDING") {
         await prisma.$transaction([
@@ -187,7 +219,10 @@ export async function handleReportBatchAction(input: {
 }
 
 // ---------- 用户管理（仅 ADMIN） ----------
-export async function setUserTrusted(userId: string, trusted: boolean): Promise<{ ok: boolean; error?: string }> {
+export async function setUserTrusted(
+  userId: string,
+  trusted: boolean,
+): Promise<{ ok: boolean; error?: string }> {
   const admin = await adminOnly();
   if (!admin) return { ok: false, error: "仅管理员可操作" };
   // updateMany + count 预检：目标不存在时不抛 P2025 500，给友好错误
@@ -201,7 +236,7 @@ export async function setUserTrusted(userId: string, trusted: boolean): Promise<
 
 export async function setUserRole(
   userId: string,
-  role: "USER" | "MODERATOR" | "ADMIN"
+  role: "USER" | "MODERATOR" | "ADMIN",
 ): Promise<{ ok: boolean; error?: string }> {
   const admin = await adminOnly();
   if (!admin) return { ok: false, error: "仅管理员可操作" };
@@ -216,17 +251,25 @@ export async function setUserRole(
 export async function setUserBanned(
   userId: string,
   banned: boolean,
-  reason?: string
+  reason?: string,
 ): Promise<{ ok: boolean; error?: string }> {
   const admin = await adminOnly();
   if (!admin) return { ok: false, error: "仅管理员可操作" };
   if (userId === admin.id) return { ok: false, error: "不能封禁自己" };
   const r = await prisma.user.updateMany({
     where: { id: userId },
-    data: banned ? { bannedAt: new Date(), bannedReason: reason?.slice(0, 200) || null, trusted: false } : { bannedAt: null, bannedReason: null },
+    data: banned
+      ? { bannedAt: new Date(), bannedReason: reason?.slice(0, 200) || null, trusted: false }
+      : { bannedAt: null, bannedReason: null },
   });
   if (r.count === 0) return { ok: false, error: "用户不存在" };
-  await audit(admin.id, banned ? "BAN" : "UNBAN", "USER", userId, banned ? reason || undefined : undefined);
+  await audit(
+    admin.id,
+    banned ? "BAN" : "UNBAN",
+    "USER",
+    userId,
+    banned ? reason || undefined : undefined,
+  );
   revalidatePath("/admin/users");
   return { ok: true };
 }

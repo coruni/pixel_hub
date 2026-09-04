@@ -11,10 +11,20 @@ export function fieldErr(msg?: string[]): ReactNode {
 }
 
 /** 分节标题：序号方块 + 文案（+ 可选尾部说明） */
-export function SectionTitle({ n, children, tail }: { n: number; children: ReactNode; tail?: ReactNode }) {
+export function SectionTitle({
+  n,
+  children,
+  tail,
+}: {
+  n: number;
+  children: ReactNode;
+  tail?: ReactNode;
+}) {
   return (
     <h2 className="flex items-center gap-2 text-sm font-semibold text-neutral-800">
-      <span className="grid h-6 w-6 place-items-center rounded-none border border-brand-600 bg-brand-500 text-[11px] text-white">{n}</span>
+      <span className="grid h-6 w-6 place-items-center rounded-none border border-brand-600 bg-brand-500 text-[11px] text-white">
+        {n}
+      </span>
       {children}
       {tail}
     </h2>

@@ -74,14 +74,10 @@ export function FavoriteButton({
 }) {
   const [fav, setFav] = useState(initialFavorited);
   const [n, setN] = useState(count);
-  const [colId, setColId] = useState<string | null>(
-    initialCollectionId ?? null,
-  );
+  const [colId, setColId] = useState<string | null>(initialCollectionId ?? null);
   const [prevFav, setPrevFav] = useState(initialFavorited);
   const [prevCount, setPrevCount] = useState(count);
-  const [prevColId, setPrevColId] = useState<string | null>(
-    initialCollectionId ?? null,
-  );
+  const [prevColId, setPrevColId] = useState<string | null>(initialCollectionId ?? null);
   // 服务端 refresh 后以最新 props 为准（渲染期派生 state，避免 effect 内 setState）
   if (
     prevFav !== initialFavorited ||

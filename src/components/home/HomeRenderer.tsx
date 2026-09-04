@@ -30,7 +30,13 @@ export default async function HomeRenderer({
         const cfg = s.config as Record<string, unknown>;
         switch (s.kind) {
           case "hero":
-            return <HeroBlock key={s.id} title={s.title} cfg={{ featuredIds: (cfg.featuredIds as string[]) ?? [] }} />;
+            return (
+              <HeroBlock
+                key={s.id}
+                title={s.title}
+                cfg={{ featuredIds: (cfg.featuredIds as string[]) ?? [] }}
+              />
+            );
           case "categories":
             return (
               <CategoriesBlock
@@ -84,7 +90,13 @@ export default async function HomeRenderer({
           case "stats":
             return <StatsBlock key={s.id} title={s.title} />;
           case "creators":
-            return <CreatorsBlock key={s.id} title={s.title} count={typeof cfg.count === "number" ? cfg.count : 6} />;
+            return (
+              <CreatorsBlock
+                key={s.id}
+                title={s.title}
+                count={typeof cfg.count === "number" ? cfg.count : 6}
+              />
+            );
           case "tags":
             return (
               <TagsBlock

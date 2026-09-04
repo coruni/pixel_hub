@@ -57,19 +57,19 @@ export default async function ListBlock({
   }
 
   return (
-<BlockShell title={title}>
-        <ResourceGrid items={items} display={showAs} ratio={uniformRatio} />
-        {cfg.paged && (
-          <ListMore
-            type={cfg.type}
-            sort={cfg.sort}
-            categorySlugs={cfg.categorySlugs}
-            tagSlugs={cfg.tagSlugs}
-            pageSize={cfg.count}
-            display={showAs}
-            ratio={uniformRatio}
-          />
-        )}
+    <BlockShell title={title}>
+      <ResourceGrid items={items} display={showAs} ratio={uniformRatio} />
+      {cfg.paged && (
+        <ListMore
+          type={cfg.type}
+          sort={cfg.sort}
+          categorySlugs={cfg.categorySlugs}
+          tagSlugs={cfg.tagSlugs}
+          pageSize={cfg.count}
+          display={showAs}
+          ratio={uniformRatio}
+        />
+      )}
     </BlockShell>
   );
 }

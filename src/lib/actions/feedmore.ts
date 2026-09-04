@@ -24,7 +24,7 @@ const listPageSchema = z.object({
 
 /** 首页「内容板块」翻页：按与首屏一致的筛选取第 page 页（page ≥ 2），返回可序列化卡片 */
 export async function loadListPageAction(
-  p: ListPageParams
+  p: ListPageParams,
 ): Promise<{ ok: boolean; items: FeedCard[]; hasMore: boolean; error?: string }> {
   const parsed = listPageSchema.safeParse(p);
   if (!parsed.success) return { ok: false, items: [], hasMore: false, error: "参数不合法" };

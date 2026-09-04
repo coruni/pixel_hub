@@ -13,7 +13,8 @@ export async function GET(req: NextRequest) {
   if (!resourceId) return NextResponse.json({ error: "bad request" }, { status: 400 });
 
   const since = sinceRaw ? new Date(sinceRaw) : null;
-  if (since && Number.isNaN(since.getTime())) return NextResponse.json({ error: "bad request" }, { status: 400 });
+  if (since && Number.isNaN(since.getTime()))
+    return NextResponse.json({ error: "bad request" }, { status: 400 });
 
   const comments = await prisma.comment.findMany({
     where: {
@@ -24,7 +25,18 @@ export async function GET(req: NextRequest) {
     },
     orderBy: { createdAt: "asc" },
     include: {
-      author: { select: { id: true, username: true, name: true, avatarKey: true, bio: true, role: true, trusted: true, createdAt: true } },
+      author: {
+        select: {
+          id: true,
+          username: true,
+          name: true,
+          avatarKey: true,
+          bio: true,
+          role: true,
+          trusted: true,
+          createdAt: true,
+        },
+      },
       media: { orderBy: { sort: "asc" }, select: { storageKey: true, width: true, height: true } },
     },
   });
@@ -33,7 +45,11 @@ export async function GET(req: NextRequest) {
   const authorStats = authorIds.length
     ? await prisma.user.findMany({
         where: { id: { in: authorIds } },
-        select: { id: true, lastSeenAt: true, _count: { select: { resources: true, followers: true } } },
+        select: {
+          id: true,
+          lastSeenAt: true,
+          _count: { select: { resources: true, followers: true } },
+        },
       })
     : [];
   const statsMap = new Map(authorStats.map((u) => [u.id, u]));
@@ -41,12 +57,17 @@ export async function GET(req: NextRequest) {
   // 深层回复的被回复评论（引用卡需要原文）：父楼层可能早于 since，不在上面结果集里，单独补查
   const fetchedIds = new Set(comments.map((c) => c.id));
   const parentIds = [...new Set(comments.filter((c) => c.parentId).map((c) => c.parentId!))].filter(
-    (id) => !fetchedIds.has(id)
+    (id) => !fetchedIds.has(id),
   );
   const parents = parentIds.length
     ? await prisma.comment.findMany({
         where: { id: { in: parentIds }, status: "PUBLIC" },
-        select: { id: true, parentId: true, content: true, author: { select: { username: true, name: true } } },
+        select: {
+          id: true,
+          parentId: true,
+          content: true,
+          author: { select: { username: true, name: true } },
+        },
       })
     : [];
   const parentMap = new Map(parents.map((p) => [p.id, p]));
@@ -66,7 +87,11 @@ export async function GET(req: NextRequest) {
       // 与 SSR 展平逻辑一致：二级回复为 null；深层回复指向被回复评论
       replyTo:
         parent && parent.parentId
-          ? { id: parent.id, name: parent.author.name ?? parent.author.username, content: parent.content }
+          ? {
+              id: parent.id,
+              name: parent.author.name ?? parent.author.username,
+              content: parent.content,
+            }
           : null,
       author: {
         username: c.author.username,
@@ -80,7 +105,11 @@ export async function GET(req: NextRequest) {
         followerCount: s?._count.followers,
         online: isOnline(s?.lastSeenAt),
       },
-      images: c.media.map((m) => ({ url: publicUrl(m.storageKey), width: m.width, height: m.height })),
+      images: c.media.map((m) => ({
+        url: publicUrl(m.storageKey),
+        width: m.width,
+        height: m.height,
+      })),
     };
   });
 
@@ -91,5 +120,9 @@ export async function GET(req: NextRequest) {
     select: { id: true },
   });
 
-  return NextResponse.json({ items, serverTime: now.toISOString(), liveIds: liveIds.map((x) => x.id) });
+  return NextResponse.json({
+    items,
+    serverTime: now.toISOString(),
+    liveIds: liveIds.map((x) => x.id),
+  });
 }

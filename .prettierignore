@@ -1,0 +1,9 @@
+node_modules
+.next
+package-lock.json
+dev.db
+AGENTS.md
+DESIGN.md
+README.md
+CLAUDE.md
+.claude

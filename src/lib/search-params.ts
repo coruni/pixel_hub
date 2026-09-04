@@ -20,7 +20,7 @@ export function enumParam<T extends readonly string[]>(
   sp: SP,
   key: string,
   allowed: T,
-  fallback: T[number]
+  fallback: T[number],
 ): T[number] {
   const raw = str(sp, key);
   return (allowed as readonly string[]).includes(raw ?? "") ? (raw as T[number]) : fallback;

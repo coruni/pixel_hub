@@ -109,7 +109,9 @@ export default function Comments({
     <section id="comments" className="mt-10 scroll-mt-24 border-t border-neutral-200 pt-8">
       <h2 className="text-lg font-semibold text-neutral-900">评论（{total}）</h2>
 
-      {error && <p className="mt-3 rounded-none bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+      {error && (
+        <p className="mt-3 rounded-none bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+      )}
 
       {canPost ? (
         <div className="mt-4">
@@ -138,7 +140,11 @@ export default function Comments({
             {previews.map((src, i) => (
               <span key={src} className="relative">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={src} alt="" className="h-14 w-14 rounded-none border border-brand-200 object-cover" />
+                <img
+                  src={src}
+                  alt=""
+                  className="h-14 w-14 rounded-none border border-brand-200 object-cover"
+                />
                 <button
                   type="button"
                   onClick={() => removeImage(i)}
@@ -188,7 +194,9 @@ export default function Comments({
             onViewImages={(images, index) => setViewer({ images, index })}
           />
         ))}
-        {merged.length === 0 && <li className="text-sm text-neutral-400">还没有评论，来说两句？</li>}
+        {merged.length === 0 && (
+          <li className="text-sm text-neutral-400">还没有评论，来说两句？</li>
+        )}
       </ul>
 
       {viewer && (

@@ -127,11 +127,12 @@ function findWidget(theme: Theme, id: string): { area: WidgetAreaKey; idx: numbe
 /** 追加一个 widget（默认配置，追加到指定区域的末尾） */
 export async function addSidebarWidgetAction(
   kind: SidebarWidgetKind,
-  area: WidgetAreaKey
+  area: WidgetAreaKey,
 ): Promise<{ ok: boolean; error?: string }> {
   const admin = await adminOnly();
   if (!admin) return { ok: false, error: "仅管理员可操作" };
-  if (!(SIDEBAR_WIDGET_KINDS as string[]).includes(kind)) return { ok: false, error: "未知组件类型" };
+  if (!(SIDEBAR_WIDGET_KINDS as string[]).includes(kind))
+    return { ok: false, error: "未知组件类型" };
   if (!validArea(area)) return { ok: false, error: "区域不合法" };
 
   const doc = await readThemeDoc();
@@ -147,12 +148,20 @@ export async function addSidebarWidgetAction(
   };
   doc.theme = withAreaWidgets(theme, area, [...getAreaWidgets(theme, area), widget]);
   if (!(await writeThemeDoc(doc))) return CONFLICT;
-  await audit(admin.id, "ADD_THEME_WIDGET", "THEME", undefined, `${area}/${SIDEBAR_KIND_META[kind].label}`);
+  await audit(
+    admin.id,
+    "ADD_THEME_WIDGET",
+    "THEME",
+    undefined,
+    `${area}/${SIDEBAR_KIND_META[kind].label}`,
+  );
   themeRevalidate();
   return { ok: true };
 }
 
-export async function removeSidebarWidgetAction(id: string): Promise<{ ok: boolean; error?: string }> {
+export async function removeSidebarWidgetAction(
+  id: string,
+): Promise<{ ok: boolean; error?: string }> {
   const admin = await adminOnly();
   if (!admin) return { ok: false, error: "仅管理员可操作" };
   const doc = await readThemeDoc();
@@ -160,16 +169,27 @@ export async function removeSidebarWidgetAction(id: string): Promise<{ ok: boole
   const at = findWidget(theme, id);
   if (!at) return { ok: false, error: "组件不存在" };
   const w = getAreaWidgets(theme, at.area)[at.idx];
-  doc.theme = withAreaWidgets(theme, at.area, getAreaWidgets(theme, at.area).filter((x) => x.id !== id));
+  doc.theme = withAreaWidgets(
+    theme,
+    at.area,
+    getAreaWidgets(theme, at.area).filter((x) => x.id !== id),
+  );
   if (!(await writeThemeDoc(doc))) return CONFLICT;
   await audit(admin.id, "REMOVE_THEME_WIDGET", "THEME", id, `${at.area}/${w.kind}`);
   themeRevalidate();
   return { ok: true };
 }
 
-export type SidebarWidgetPatch = { id: string; title?: string | null; enabled?: boolean; config?: unknown };
+export type SidebarWidgetPatch = {
+  id: string;
+  title?: string | null;
+  enabled?: boolean;
+  config?: unknown;
+};
 
-export async function updateSidebarWidgetAction(patch: SidebarWidgetPatch): Promise<{ ok: boolean; error?: string }> {
+export async function updateSidebarWidgetAction(
+  patch: SidebarWidgetPatch,
+): Promise<{ ok: boolean; error?: string }> {
   const admin = await adminOnly();
   if (!admin) return { ok: false, error: "仅管理员可操作" };
   const doc = await readThemeDoc();
@@ -197,7 +217,7 @@ export async function updateSidebarWidgetAction(patch: SidebarWidgetPatch): Prom
 /** 保存指定区域的 widget 顺序（ids 为该区域最终顺序） */
 export async function reorderSidebarWidgetsAction(
   area: WidgetAreaKey,
-  ids: string[]
+  ids: string[],
 ): Promise<{ ok: boolean; error?: string }> {
   const admin = await adminOnly();
   if (!admin) return { ok: false, error: "仅管理员可操作" };
@@ -227,7 +247,12 @@ export async function setDetailTemplateAction(patch: {
 }): Promise<{ ok: boolean; error?: string }> {
   const admin = await adminOnly();
   if (!admin) return { ok: false, error: "仅管理员可操作" };
-  if (patch.scope !== "default" && patch.scope !== "IMAGE" && patch.scope !== "GAME" && patch.scope !== "ARTICLE")
+  if (
+    patch.scope !== "default" &&
+    patch.scope !== "IMAGE" &&
+    patch.scope !== "GAME" &&
+    patch.scope !== "ARTICLE"
+  )
     return { ok: false, error: "作用域不合法" };
   if (patch.value !== "" && !(DETAIL_TEMPLATE_IDS as readonly string[]).includes(patch.value))
     return { ok: false, error: "模板不合法" };
@@ -244,7 +269,13 @@ export async function setDetailTemplateAction(patch: {
     theme.detailTemplate.byType[patch.scope] = patch.value;
   }
   if (!(await writeThemeDoc(doc))) return CONFLICT;
-  await audit(admin.id, "EDIT_THEME_DETAIL_TPL", "THEME", undefined, `${patch.scope}:${patch.value}`);
+  await audit(
+    admin.id,
+    "EDIT_THEME_DETAIL_TPL",
+    "THEME",
+    undefined,
+    `${patch.scope}:${patch.value}`,
+  );
   themeRevalidate();
   return { ok: true };
 }
@@ -279,7 +310,13 @@ export async function updateCategoriesMenuAction(cfg: {
   const doc = await readThemeDoc();
   doc.theme.navbar.categoriesMenu = { enabled: cfg.enabled === true, label };
   if (!(await writeThemeDoc(doc))) return CONFLICT;
-  await audit(admin.id, "EDIT_THEME_NAV", "THEME", undefined, `分类菜单 ${cfg.enabled ? "开" : "关"}(${label})`);
+  await audit(
+    admin.id,
+    "EDIT_THEME_NAV",
+    "THEME",
+    undefined,
+    `分类菜单 ${cfg.enabled ? "开" : "关"}(${label})`,
+  );
   themeRevalidate();
   return { ok: true };
 }

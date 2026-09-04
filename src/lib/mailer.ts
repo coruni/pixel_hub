@@ -14,11 +14,19 @@ export function mailFrom(): string {
   return process.env.MAIL_FROM ?? `noreply@${new URL(siteUrl()).host}`;
 }
 
-export async function sendMail(to: string, subject: string, text: string, html?: string): Promise<MailResult> {
+export async function sendMail(
+  to: string,
+  subject: string,
+  text: string,
+  html?: string,
+): Promise<MailResult> {
   if (!smtpConfigured()) {
     // 未配置 SMTP：开发环境把正文（含重置链接）返回给调用方展示；生产环境只记日志
     console.warn(`[mailer] SMTP 未配置，邮件未发送 → ${to}：${subject}`);
-    return { delivered: false, previewLink: process.env.NODE_ENV === "development" ? text : undefined };
+    return {
+      delivered: false,
+      previewLink: process.env.NODE_ENV === "development" ? text : undefined,
+    };
   }
   try {
     const transport = nodemailer.createTransport({

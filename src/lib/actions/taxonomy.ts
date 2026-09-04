@@ -9,17 +9,15 @@ import { adminOnly, audit } from "@/lib/actions/_guards";
 type Result = { ok: true } | { ok: false; error: string };
 
 function revalidateAll() {
-  for (const p of ["/", "/browse", "/search", "/admin/categories", "/admin/tags"]) revalidatePath(p);
+  for (const p of ["/", "/browse", "/search", "/admin/categories", "/admin/tags"])
+    revalidatePath(p);
 }
 
 const cleanName = (v: unknown) => (typeof v === "string" ? v.trim().slice(0, 40) : "");
 
 // ---------- 分类 ----------
 
-export async function createCategoryAction(input: {
-  name: string;
-  slug: string;
-}): Promise<Result> {
+export async function createCategoryAction(input: { name: string; slug: string }): Promise<Result> {
   const admin = await adminOnly();
   if (!admin) return { ok: false, error: "仅管理员可操作" };
   const name = cleanName(input.name);
@@ -47,7 +45,8 @@ export async function updateCategoryAction(input: {
     if (!name) return { ok: false, error: "名称不能为空" };
     data.name = name;
   }
-  if (typeof input.sort === "number" && Number.isFinite(input.sort)) data.sort = Math.trunc(input.sort);
+  if (typeof input.sort === "number" && Number.isFinite(input.sort))
+    data.sort = Math.trunc(input.sort);
   if (Object.keys(data).length === 0) return { ok: true };
   // updateMany + count：目标不存在时给友好错误而非 P2025 500
   const r = await prisma.category.updateMany({ where: { id: input.id }, data });
@@ -67,7 +66,10 @@ export async function deleteCategoryAction(input: { id: string }): Promise<Resul
   if (!c) return { ok: false, error: "分类不存在" };
   if (c._count.children > 0) return { ok: false, error: "该分类下有子分类，先处理子分类" };
   if (c._count.resources > 0) {
-    return { ok: false, error: `仍有 ${c._count.resources} 个内容挂在该分类下，先移走或改挂其他分类` };
+    return {
+      ok: false,
+      error: `仍有 ${c._count.resources} 个内容挂在该分类下，先移走或改挂其他分类`,
+    };
   }
   await prisma.category.delete({ where: { id: input.id } });
   await audit(admin.id, "EDIT_CATEGORY", "CATEGORY", input.id, `删除分类 ${c.name}(${c.slug})`);
@@ -89,7 +91,10 @@ export async function renameTagAction(input: { id: string; name: string }): Prom
   if (byName) {
     // 同名合并：把旧标签的资源关联转挂到目标标签（已存在的跳过），计数只加净增，然后删旧
     await prisma.$transaction(async (tx) => {
-      const links = await tx.tagOnResource.findMany({ where: { tagId: t.id }, select: { resourceId: true } });
+      const links = await tx.tagOnResource.findMany({
+        where: { tagId: t.id },
+        select: { resourceId: true },
+      });
       const ids = links.map((l) => l.resourceId);
       const existing = await tx.tagOnResource.findMany({
         where: { tagId: byName.id, resourceId: { in: ids } },

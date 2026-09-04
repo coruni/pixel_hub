@@ -11,9 +11,5 @@ export default async function UploadPage() {
   if (!session?.user) redirect("/login?callbackUrl=/upload");
 
   const categories = await getCategories();
-  return (
-    <UploadWizard
-      categories={categories.map((c) => ({ id: c.id, name: c.name }))}
-    />
-  );
+  return <UploadWizard categories={categories.map((c) => ({ id: c.id, name: c.name }))} />;
 }

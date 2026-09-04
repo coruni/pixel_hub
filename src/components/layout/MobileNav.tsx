@@ -2,18 +2,28 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import {
-  LayoutGrid,
-  Menu,
-  X,
-} from "lucide-react";
+import { LayoutGrid, Menu, X } from "lucide-react";
 import { NAV_ICON_MAP } from "@/lib/nav-icons";
 import type { NavCategory } from "./NavCategoriesMenu";
 
-export type MobileNavItem = { id: string; label: string; href: string; newTab: boolean; icon: string };
+export type MobileNavItem = {
+  id: string;
+  label: string;
+  href: string;
+  newTab: boolean;
+  icon: string;
+};
 
 /** 小屏导航抽屉（<sm 显示）：汉堡按钮 + 全屏下滑面板，含导航项与分类直达 */
-export default function MobileNav({ items, catLabel, categories }: { items: MobileNavItem[]; catLabel: string; categories: NavCategory[] }) {
+export default function MobileNav({
+  items,
+  catLabel,
+  categories,
+}: {
+  items: MobileNavItem[];
+  catLabel: string;
+  categories: NavCategory[];
+}) {
   const [open, setOpen] = useState(false);
 
   // 打开时锁滚动 + Esc 关闭

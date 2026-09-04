@@ -6,7 +6,10 @@ export default function Loading() {
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
         {Array.from({ length: 8 }).map((_, i) => (
           <div key={i} className="animate-pulse">
-            <div className="rounded-none border border-brand-200 bg-brand-50/40" style={{ height: `${120 + (i % 4) * 60}px` }} />
+            <div
+              className="rounded-none border border-brand-200 bg-brand-50/40"
+              style={{ height: `${120 + (i % 4) * 60}px` }}
+            />
             <div className="mt-2 h-3.5 w-3/4 rounded-none bg-neutral-100" />
             <div className="mt-1.5 h-3 w-1/2 rounded-none bg-neutral-100" />
           </div>

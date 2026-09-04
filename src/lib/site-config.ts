@@ -17,14 +17,17 @@ export type DetailTemplateId = "post" | "banner" | "twocol" | "article";
 
 export const DETAIL_TEMPLATE_IDS: DetailTemplateId[] = ["post", "banner", "twocol", "article"];
 
-export const DETAIL_TEMPLATE_META: Record<
-  DetailTemplateId,
-  { label: string; desc: string }
-> = {
-  post: { label: "居中图帖式", desc: "主图/画廊居中，标题摘要在上、长描述与评论随后，适合图片作品阅读" },
+export const DETAIL_TEMPLATE_META: Record<DetailTemplateId, { label: string; desc: string }> = {
+  post: {
+    label: "居中图帖式",
+    desc: "主图/画廊居中，标题摘要在上、长描述与评论随后，适合图片作品阅读",
+  },
   banner: { label: "顶栏横幅式", desc: "顶部封面 + 关键信息横幅，下方接内容图集与描述，适合游戏" },
   twocol: { label: "左右两栏式", desc: "左画廊右信息（近似早期版本），信息紧凑" },
-  article: { label: "杂志阅读式", desc: "编辑部排版：左对齐大标题 + 作者行 + 阅读列正文，适合文章" },
+  article: {
+    label: "杂志阅读式",
+    desc: "编辑部排版：左对齐大标题 + 作者行 + 阅读列正文，适合文章",
+  },
 };
 
 // ---------- 侧边栏 widget 类型 ----------
@@ -68,22 +71,50 @@ export const SIDEBAR_KIND_META: Record<
   { label: string; desc: string; defaultTitle: string | null }
 > = {
   hot: { label: "内容排行", desc: "最新 / 最热 / 最多下载 的短列表", defaultTitle: "热门内容" },
-  categories: { label: "分类入口", desc: "按大类或手动挑选的分类直达链接", defaultTitle: "分类直达" },
+  categories: {
+    label: "分类入口",
+    desc: "按大类或手动挑选的分类直达链接",
+    defaultTitle: "分类直达",
+  },
   tags: { label: "标签云", desc: "热门标签，或手动挑选的标签", defaultTitle: "热门标签" },
   creators: { label: "人气创作者", desc: "按粉丝数展示创作者", defaultTitle: "人气创作者" },
   stats: { label: "站点数据", desc: "社区规模数字小览", defaultTitle: "社区数据" },
   about: { label: "站点说明", desc: "一段自定义文字（简介/公告/指引）", defaultTitle: "关于本站" },
-  comments: { label: "最新评论", desc: "全站最新评论流（头像+摘要+来源资源），透出社区活跃度", defaultTitle: "最新评论" },
-  random: { label: "随机推荐", desc: "每次刷新随机抽几张已上架内容，「手气不错」探索位", defaultTitle: "手气不错" },
-  notice: { label: "公告栏", desc: "醒目公告卡：多条公告，每条可选 普通/重要/活动 风格", defaultTitle: "公告" },
+  comments: {
+    label: "最新评论",
+    desc: "全站最新评论流（头像+摘要+来源资源），透出社区活跃度",
+    defaultTitle: "最新评论",
+  },
+  random: {
+    label: "随机推荐",
+    desc: "每次刷新随机抽几张已上架内容，「手气不错」探索位",
+    defaultTitle: "手气不错",
+  },
+  notice: {
+    label: "公告栏",
+    desc: "醒目公告卡：多条公告，每条可选 普通/重要/活动 风格",
+    defaultTitle: "公告",
+  },
   custom: {
     label: "自定义内容",
     desc: "自由内容卡片：Markdown 富文本 + 可选链接列表，可展示公告/指引/任意信息",
     defaultTitle: null,
   },
-  authorWorks: { label: "作者其它作品", desc: "仅详情页生效：当前资源作者的其它作品（按热度）", defaultTitle: "作者其它作品" },
-  sameCategory: { label: "同分类推荐", desc: "仅详情页生效：同分类其它内容，不足补同类型热门", defaultTitle: "同分类推荐" },
-  ad: { label: "广告位", desc: "图片+链接 或 HTML/JS 代码片段（可接联盟广告），可放侧边栏或详情页槽位", defaultTitle: null },
+  authorWorks: {
+    label: "作者其它作品",
+    desc: "仅详情页生效：当前资源作者的其它作品（按热度）",
+    defaultTitle: "作者其它作品",
+  },
+  sameCategory: {
+    label: "同分类推荐",
+    desc: "仅详情页生效：同分类其它内容，不足补同类型热门",
+    defaultTitle: "同分类推荐",
+  },
+  ad: {
+    label: "广告位",
+    desc: "图片+链接 或 HTML/JS 代码片段（可接联盟广告），可放侧边栏或详情页槽位",
+    defaultTitle: null,
+  },
 };
 
 // ---------- 各类 widget 的 config ----------
@@ -131,7 +162,7 @@ const noticeCfg = z.object({
       z.object({
         level: z.enum(NOTICE_LEVELS).default("info"),
         text: z.string().trim().min(1).max(200),
-      })
+      }),
     )
     .max(10)
     .default([]), // 空数组 = 不渲染
@@ -143,7 +174,7 @@ const customCfg = z.object({
       z.object({
         label: z.string().trim().min(1).max(60),
         href: safeUrlSchema(300).refine((v) => !!v, "链接不能为空"),
-      })
+      }),
     )
     .max(20)
     .default([]), // 结构化链接行（http(s):// 自动新窗口）
@@ -180,7 +211,12 @@ export const sidebarConfigSchemas: Record<SidebarWidgetKind, z.ZodTypeAny> = {
 };
 
 export type SidebarWidgetConfig =
-  | { type: "ALL" | ContentType; sort: "latest" | "popular" | "downloads"; count: number; display: ContentDisplay } // hot
+  | {
+      type: "ALL" | ContentType;
+      sort: "latest" | "popular" | "downloads";
+      count: number;
+      display: ContentDisplay;
+    } // hot
   | { slugs: string[] } // categories
   | { count: number; slugs: string[] } // tags
   | { count: number } // creators
@@ -191,7 +227,14 @@ export type SidebarWidgetConfig =
   | { items: { level: NoticeLevel; text: string }[] } // notice
   | { content: string; links: { label: string; href: string }[] } // custom
   | { count: number } // authorWorks / sameCategory
-  | { mode: "image" | "html"; image: string; link: string; alt: string; html: string; badge: boolean }; // ad
+  | {
+      mode: "image" | "html";
+      image: string;
+      link: string;
+      alt: string;
+      html: string;
+      badge: boolean;
+    }; // ad
 
 export type SidebarWidget = {
   id: string;
@@ -212,7 +255,7 @@ export function parseSidebarConfig(kind: SidebarWidgetKind, value: unknown): Sid
 /** 保存前校验 widget 提交的 config */
 export function safeSidebarConfig(
   kind: SidebarWidgetKind,
-  value: unknown
+  value: unknown,
 ): { ok: true; data: SidebarWidgetConfig } | { ok: false; error: string } {
   const schema = sidebarConfigSchemas[kind];
   const r = schema.safeParse(value);
@@ -225,7 +268,8 @@ function parseWidget(raw: unknown): SidebarWidget | null {
   const o = raw as Record<string, unknown>;
   const kind = o.kind as SidebarWidgetKind;
   if (typeof kind !== "string" || !(SIDEBAR_WIDGET_KINDS as string[]).includes(kind)) return null;
-  const id = typeof o.id === "string" && o.id ? (o.id as string) : `sw-${kind}-${(o._i as string) ?? ""}`;
+  const id =
+    typeof o.id === "string" && o.id ? (o.id as string) : `sw-${kind}-${(o._i as string) ?? ""}`;
   const title = typeof o.title === "string" && o.title.trim() ? o.title.trim().slice(0, 80) : null;
   const enabled = typeof o.enabled === "boolean" ? o.enabled : true;
   return { id, kind, title, enabled, config: parseSidebarConfig(kind, o.config) };
@@ -234,14 +278,21 @@ function parseWidget(raw: unknown): SidebarWidget | null {
 export function parseNavItem(raw: unknown): NavItem | null {
   if (!raw || typeof raw !== "object") return null;
   const o = raw as Record<string, unknown>;
-  const id = typeof o.id === "string" && o.id ? (o.id as string) : `nav-${(o.label as string) ?? ""}-${(o.href as string) ?? ""}`;
+  const id =
+    typeof o.id === "string" && o.id
+      ? (o.id as string)
+      : `nav-${(o.label as string) ?? ""}-${(o.href as string) ?? ""}`;
   const label = typeof o.label === "string" ? o.label.trim().slice(0, 24) : "";
   const href = typeof o.href === "string" ? o.href.trim().slice(0, 300) : "";
   const internal = href.startsWith("/");
   const external = /^https?:\/\//i.test(href);
   if (!label || (!internal && !external)) return null;
-  const icon = typeof o.icon === "string" && (NAV_ICONS as readonly string[]).includes(o.icon) ? o.icon : null;
-  const showTo = typeof o.showTo === "string" && (NAV_VISIBILITY_KEYS as string[]).includes(o.showTo) ? (o.showTo as NavVisibility) : "all";
+  const icon =
+    typeof o.icon === "string" && (NAV_ICONS as readonly string[]).includes(o.icon) ? o.icon : null;
+  const showTo =
+    typeof o.showTo === "string" && (NAV_VISIBILITY_KEYS as string[]).includes(o.showTo)
+      ? (o.showTo as NavVisibility)
+      : "all";
   return {
     id,
     label,
@@ -267,7 +318,17 @@ export const NAV_VISIBILITY_LABELS: Record<NavVisibility, string> = {
 };
 
 /** 可配置的导航图标（白名单，未知值渲染为纯文本） */
-export const NAV_ICONS = ["home", "compass", "upload", "bell", "shield", "tag", "bookmark", "external", "info"] as const;
+export const NAV_ICONS = [
+  "home",
+  "compass",
+  "upload",
+  "bell",
+  "shield",
+  "tag",
+  "bookmark",
+  "external",
+  "info",
+] as const;
 
 export type NavItem = {
   id: string;
@@ -280,11 +341,51 @@ export type NavItem = {
 };
 
 export const DEFAULT_NAV_ITEMS: NavItem[] = [
-  { id: "nav-home", label: "首页", href: "/", icon: "home", newTab: false, showTo: "all", enabled: true },
-  { id: "nav-browse", label: "浏览", href: "/browse", icon: "compass", newTab: false, showTo: "all", enabled: true },
-  { id: "nav-upload", label: "发布", href: "/upload", icon: "upload", newTab: false, showTo: "user", enabled: true },
-  { id: "nav-notify", label: "通知", href: "/notifications", icon: "bell", newTab: false, showTo: "user", enabled: true },
-  { id: "nav-admin", label: "管理", href: "/admin", icon: "shield", newTab: false, showTo: "staff", enabled: true },
+  {
+    id: "nav-home",
+    label: "首页",
+    href: "/",
+    icon: "home",
+    newTab: false,
+    showTo: "all",
+    enabled: true,
+  },
+  {
+    id: "nav-browse",
+    label: "浏览",
+    href: "/browse",
+    icon: "compass",
+    newTab: false,
+    showTo: "all",
+    enabled: true,
+  },
+  {
+    id: "nav-upload",
+    label: "发布",
+    href: "/upload",
+    icon: "upload",
+    newTab: false,
+    showTo: "user",
+    enabled: true,
+  },
+  {
+    id: "nav-notify",
+    label: "通知",
+    href: "/notifications",
+    icon: "bell",
+    newTab: false,
+    showTo: "user",
+    enabled: true,
+  },
+  {
+    id: "nav-admin",
+    label: "管理",
+    href: "/admin",
+    icon: "shield",
+    newTab: false,
+    showTo: "staff",
+    enabled: true,
+  },
 ];
 
 // ---------- 主题文档（Theme） ----------
@@ -354,7 +455,10 @@ export function withAreaWidgets(theme: Theme, area: WidgetAreaKey, list: Sidebar
     return { ...theme, slots: { ...theme.slots, [area]: list } };
   }
   const page = area as SidebarPageKey;
-  return { ...theme, sidebar: { ...theme.sidebar, widgetsByPage: { ...theme.sidebar.widgetsByPage, [page]: list } } };
+  return {
+    ...theme,
+    sidebar: { ...theme.sidebar, widgetsByPage: { ...theme.sidebar.widgetsByPage, [page]: list } },
+  };
 }
 
 export function widgetTitle(w: SidebarWidget): string {
@@ -464,14 +568,21 @@ const VALID_TEMPLATES = DETAIL_TEMPLATE_IDS as string[];
 /** 从 SiteSetting 的 JSON 文本解析为完整 Theme（null/坏数据兜底为默认），绝不抛错 */
 export function parseTheme(raw: unknown): Theme {
   const o = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
-  const sb = (o.sidebar && typeof o.sidebar === "object" ? o.sidebar : {}) as Record<string, unknown>;
-  const so = (sb.showOn && typeof sb.showOn === "object" ? sb.showOn : {}) as Record<string, unknown>;
-  const dt = (o.detailTemplate && typeof o.detailTemplate === "object" ? o.detailTemplate : {}) as Record<string, unknown>;
-
-  const wbpRaw = (sb.widgetsByPage && typeof sb.widgetsByPage === "object" ? sb.widgetsByPage : null) as Record<
+  const sb = (o.sidebar && typeof o.sidebar === "object" ? o.sidebar : {}) as Record<
     string,
     unknown
-  > | null;
+  >;
+  const so = (sb.showOn && typeof sb.showOn === "object" ? sb.showOn : {}) as Record<
+    string,
+    unknown
+  >;
+  const dt = (
+    o.detailTemplate && typeof o.detailTemplate === "object" ? o.detailTemplate : {}
+  ) as Record<string, unknown>;
+
+  const wbpRaw = (
+    sb.widgetsByPage && typeof sb.widgetsByPage === "object" ? sb.widgetsByPage : null
+  ) as Record<string, unknown> | null;
 
   const parseList = (raw: unknown): SidebarWidget[] | null =>
     Array.isArray(raw) ? raw.map(parseWidget).filter((w): w is SidebarWidget => w !== null) : null;
@@ -483,20 +594,30 @@ export function parseTheme(raw: unknown): Theme {
 
   // 内容槽位（详情上/中/下 + 首页/归档上/下），缺省空（不配置不显示）
   // 旧文档字段名 detailSlots（仅详情三槽）迁入 slots
-  const slotsRaw = (o.slots && typeof o.slots === "object" ? o.slots : o.detailSlots ?? {}) as Record<string, unknown>;
+  const slotsRaw = (
+    o.slots && typeof o.slots === "object" ? o.slots : (o.detailSlots ?? {})
+  ) as Record<string, unknown>;
   const slotWidgets = (key: ContentSlotKey): SidebarWidget[] => parseList(slotsRaw[key]) ?? [];
 
   const pickTemplate = (v: unknown, fallback: DetailTemplateId): DetailTemplateId =>
-    typeof v === "string" && (VALID_TEMPLATES as string[]).includes(v) ? (v as DetailTemplateId) : fallback;
+    typeof v === "string" && (VALID_TEMPLATES as string[]).includes(v)
+      ? (v as DetailTemplateId)
+      : fallback;
 
-  const byTypeRaw = (dt.byType && typeof dt.byType === "object" ? dt.byType : {}) as Record<string, unknown>;
+  const byTypeRaw = (dt.byType && typeof dt.byType === "object" ? dt.byType : {}) as Record<
+    string,
+    unknown
+  >;
   const defaultTpl = pickTemplate(dt.default, DEFAULT_THEME.detailTemplate.default);
   // 文档里显式有 detailTemplate → 未覆盖的类型走「全局默认」（该选项真正生效）；
   // 完全没配过（新站/旧文档）才整体沿用内置按类型默认（GAME→banner 等差异版式）。
   const templateConfigured = o.detailTemplate !== undefined && typeof o.detailTemplate === "object";
 
   // 导航：坏数据/空列表回退内置默认
-  const navRaw = (o.navbar && typeof o.navbar === "object" ? o.navbar : {}) as Record<string, unknown>;
+  const navRaw = (o.navbar && typeof o.navbar === "object" ? o.navbar : {}) as Record<
+    string,
+    unknown
+  >;
   let navItems: NavItem[];
   if (Array.isArray(navRaw.items)) {
     const parsed = navRaw.items.map(parseNavItem).filter((x): x is NavItem => x !== null);
@@ -505,10 +626,15 @@ export function parseTheme(raw: unknown): Theme {
     navItems = DEFAULT_NAV_ITEMS.map((x) => ({ ...x }));
   }
   // 导航「分类」下拉菜单（旧文档缺省 = 关闭）
-  const cmRaw = (navRaw.categoriesMenu && typeof navRaw.categoriesMenu === "object" ? navRaw.categoriesMenu : {}) as Record<string, unknown>;
+  const cmRaw = (
+    navRaw.categoriesMenu && typeof navRaw.categoriesMenu === "object" ? navRaw.categoriesMenu : {}
+  ) as Record<string, unknown>;
   const categoriesMenu: CategoriesMenuCfg = {
     enabled: cmRaw.enabled === true,
-    label: typeof cmRaw.label === "string" && cmRaw.label.trim() ? cmRaw.label.trim().slice(0, 12) : "分类",
+    label:
+      typeof cmRaw.label === "string" && cmRaw.label.trim()
+        ? cmRaw.label.trim().slice(0, 12)
+        : "分类",
   };
 
   return {
@@ -540,9 +666,15 @@ export function parseTheme(raw: unknown): Theme {
       // 完全没配过 detailTemplate 的文档整体沿用内置按类型默认
       byType: templateConfigured
         ? {
-            ...(typeof byTypeRaw.IMAGE === "string" ? { IMAGE: pickTemplate(byTypeRaw.IMAGE, defaultTpl) } : {}),
-            ...(typeof byTypeRaw.GAME === "string" ? { GAME: pickTemplate(byTypeRaw.GAME, defaultTpl) } : {}),
-            ...(typeof byTypeRaw.ARTICLE === "string" ? { ARTICLE: pickTemplate(byTypeRaw.ARTICLE, defaultTpl) } : {}),
+            ...(typeof byTypeRaw.IMAGE === "string"
+              ? { IMAGE: pickTemplate(byTypeRaw.IMAGE, defaultTpl) }
+              : {}),
+            ...(typeof byTypeRaw.GAME === "string"
+              ? { GAME: pickTemplate(byTypeRaw.GAME, defaultTpl) }
+              : {}),
+            ...(typeof byTypeRaw.ARTICLE === "string"
+              ? { ARTICLE: pickTemplate(byTypeRaw.ARTICLE, defaultTpl) }
+              : {}),
           }
         : { ...DEFAULT_THEME.detailTemplate.byType },
     },

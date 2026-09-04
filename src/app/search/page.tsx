@@ -22,7 +22,10 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
               placeholder="搜索资源、作者或标签…"
               className="w-full rounded-none border border-brand-200 bg-surface px-4 py-2.5 text-sm outline-none focus:border-brand-500"
             />
-            <button type="submit" className="rounded-none border border-brand-600 bg-brand-500 px-5 text-sm font-medium text-white hover:bg-brand-600">
+            <button
+              type="submit"
+              className="rounded-none border border-brand-600 bg-brand-500 px-5 text-sm font-medium text-white hover:bg-brand-600"
+            >
               搜索
             </button>
           </form>
@@ -31,7 +34,9 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
               「<span className="font-medium text-neutral-900">{q}</span>」的结果
             </p>
           ) : (
-            <p className="mt-4 text-sm text-neutral-400">输入关键词开始搜索，支持按资源标题与简介匹配</p>
+            <p className="mt-4 text-sm text-neutral-400">
+              输入关键词开始搜索，支持按资源标题与简介匹配
+            </p>
           )}
         </div>
       }

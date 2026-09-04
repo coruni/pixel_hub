@@ -8,7 +8,10 @@ import { siteName, siteUrl } from "@/lib/site-url";
 // 只在「值得打扰」的场景调用：评论回复、审核结果；点赞/关注仅站内通知。
 
 export function emailNotifyEnabled(): boolean {
-  return process.env.MAIL_NOTIFY === "1" && !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+  return (
+    process.env.MAIL_NOTIFY === "1" &&
+    !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS)
+  );
 }
 
 export async function notifyByEmail(

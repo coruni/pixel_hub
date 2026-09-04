@@ -6,7 +6,14 @@ import { useActionState, useRef, useState } from "react";
 import { createResourceAction, type ResourceActionState } from "@/lib/actions/resource";
 import MediaPicker from "./media-picker";
 import { AttachmentUpload, GameSection, ImageSection } from "./wizard-sections";
-import { SectionTitle, fieldErr, wizInput, wizLabel, type Cat, type Uploaded } from "./wizard-shared";
+import {
+  SectionTitle,
+  fieldErr,
+  wizInput,
+  wizLabel,
+  type Cat,
+  type Uploaded,
+} from "./wizard-shared";
 
 const TYPES = [
   { k: "IMAGE", label: "图片", desc: "原创 / AI / 壁纸 / 截图", Icon: ImageIcon },
@@ -50,7 +57,7 @@ export default function UploadWizard({ categories }: { categories: Cat[] }) {
 
   const [state, formAction, pending] = useActionState<ResourceActionState, FormData>(
     createResourceAction,
-    {}
+    {},
   );
 
   const ids = files.filter((f) => f.ok).map((f) => f.id);
@@ -81,7 +88,10 @@ export default function UploadWizard({ categories }: { categories: Cat[] }) {
         setFiles(next);
         if (!coverId && next.length > 0) setCoverId(next[0].id);
       }
-      if (bad.length > 0) setUploadMsg(`${bad.map((b) => b.name).join("、")} 上传失败：${bad[0]?.error ?? "未知原因"}`);
+      if (bad.length > 0)
+        setUploadMsg(
+          `${bad.map((b) => b.name).join("、")} 上传失败：${bad[0]?.error ?? "未知原因"}`,
+        );
     } catch {
       setUploadMsg("上传失败，请检查网络后重试");
     } finally {
@@ -117,7 +127,9 @@ export default function UploadWizard({ categories }: { categories: Cat[] }) {
             onClick={() => applyType(t.k)}
             aria-pressed={type === t.k}
             className={`flex items-center gap-3 rounded-none border p-3 text-left transition ${
-              type === t.k ? "border-brand-600 bg-brand-500 text-white" : "border-brand-200 bg-surface text-neutral-500 hover:border-brand-400 hover:text-neutral-800"
+              type === t.k
+                ? "border-brand-600 bg-brand-500 text-white"
+                : "border-brand-200 bg-surface text-neutral-500 hover:border-brand-400 hover:text-neutral-800"
             }`}
           >
             <t.Icon size={20} className="shrink-0" aria-hidden />
@@ -133,33 +145,63 @@ export default function UploadWizard({ categories }: { categories: Cat[] }) {
       <section className="mt-6 space-y-4 rounded-none border border-brand-200 bg-surface p-5">
         <SectionTitle n={1}>基础信息</SectionTitle>
         <div>
-          <label className={wizLabel} htmlFor="title">标题</label>
-          <input id="title" name="title" required maxLength={80} placeholder="给内容起一个清晰的名字" className={wizInput} />
+          <label className={wizLabel} htmlFor="title">
+            标题
+          </label>
+          <input
+            id="title"
+            name="title"
+            required
+            maxLength={80}
+            placeholder="给内容起一个清晰的名字"
+            className={wizInput}
+          />
           {fieldErr(state.fieldErrors?.title)}
         </div>
         <div>
-          <label className={wizLabel} htmlFor="summary">一句话简介（可选）</label>
-          <input id="summary" name="summary" maxLength={160} placeholder="出现在卡片与详情页的副标题" className={wizInput} />
+          <label className={wizLabel} htmlFor="summary">
+            一句话简介（可选）
+          </label>
+          <input
+            id="summary"
+            name="summary"
+            maxLength={160}
+            placeholder="出现在卡片与详情页的副标题"
+            className={wizInput}
+          />
         </div>
         <div>
-          <label className={wizLabel} htmlFor="description">{type === "ARTICLE" ? "正文" : "详细描述"}</label>
+          <label className={wizLabel} htmlFor="description">
+            {type === "ARTICLE" ? "正文" : "详细描述"}
+          </label>
           <textarea
             id="description"
             name="description"
             required
             rows={type === "ARTICLE" ? 12 : 5}
             maxLength={20000}
-            placeholder={type === "ARTICLE" ? "文章正文（Markdown）……\n（至少 10 个字）" : "介绍内容、玩法/用途、使用方法、注意事项……\n（至少 10 个字）"}
+            placeholder={
+              type === "ARTICLE"
+                ? "文章正文（Markdown）……\n（至少 10 个字）"
+                : "介绍内容、玩法/用途、使用方法、注意事项……\n（至少 10 个字）"
+            }
             className={wizInput}
           />
           {fieldErr(state.fieldErrors?.description)}
           <p className="mt-1 text-xs leading-5 text-neutral-400">
-            支持 Markdown 排版：空行分段；<code className="rounded-none bg-neutral-100 px-1">#</code> 标题、<code className="rounded-none bg-neutral-100 px-1">-</code> 列表、<code className="rounded-none bg-neutral-100 px-1">**加粗**</code>、<code className="rounded-none bg-neutral-100 px-1">`代码`</code>、<code className="rounded-none bg-neutral-100 px-1">[链接](地址)</code>。
+            支持 Markdown 排版：空行分段；
+            <code className="rounded-none bg-neutral-100 px-1">#</code> 标题、
+            <code className="rounded-none bg-neutral-100 px-1">-</code> 列表、
+            <code className="rounded-none bg-neutral-100 px-1">**加粗**</code>、
+            <code className="rounded-none bg-neutral-100 px-1">`代码`</code>、
+            <code className="rounded-none bg-neutral-100 px-1">[链接](地址)</code>。
           </p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className={wizLabel} htmlFor="categoryId">分类</label>
+            <label className={wizLabel} htmlFor="categoryId">
+              分类
+            </label>
             <select
               id="categoryId"
               name="categoryId"
@@ -169,14 +211,24 @@ export default function UploadWizard({ categories }: { categories: Cat[] }) {
             >
               <option value="">选择分类…</option>
               {categories.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
               ))}
             </select>
             {fieldErr(state.fieldErrors?.categoryId)}
           </div>
           <div>
-            <label className={wizLabel} htmlFor="tags">标签</label>
-            <input id="tags" name="tags" maxLength={400} placeholder="用空格/逗号分隔，如：像素风 开放世界" className={wizInput} />
+            <label className={wizLabel} htmlFor="tags">
+              标签
+            </label>
+            <input
+              id="tags"
+              name="tags"
+              maxLength={400}
+              placeholder="用空格/逗号分隔，如：像素风 开放世界"
+              className={wizInput}
+            />
           </div>
         </div>
       </section>
@@ -188,7 +240,13 @@ export default function UploadWizard({ categories }: { categories: Cat[] }) {
           extUrl={extUrl}
           setExtUrl={setExtUrl}
           fieldErrors={state.fieldErrors}
-          attachment={<AttachmentUpload uploading={attUploading} onUpload={onAttachment} filled={extUrl.startsWith("/")} />}
+          attachment={
+            <AttachmentUpload
+              uploading={attUploading}
+              onUpload={onAttachment}
+              filled={extUrl.startsWith("/")}
+            />
+          }
         />
       )}
 
@@ -214,7 +272,12 @@ export default function UploadWizard({ categories }: { categories: Cat[] }) {
           下载需登录
         </label>
         <label className="flex items-center gap-2">
-          <input type="checkbox" name="allowComments" defaultChecked className="h-4 w-4 accent-brand-500" />
+          <input
+            type="checkbox"
+            name="allowComments"
+            defaultChecked
+            className="h-4 w-4 accent-brand-500"
+          />
           允许评论
         </label>
       </section>
@@ -226,12 +289,18 @@ export default function UploadWizard({ categories }: { categories: Cat[] }) {
           disabled={pending || uploading}
           className="rounded-none border border-brand-600 bg-brand-500 px-8 py-3 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-50"
         >
-          {pending ? "提交中…" : type !== "ARTICLE" && files.length === 0 ? "先上传图片" : "提交发布"}
+          {pending
+            ? "提交中…"
+            : type !== "ARTICLE" && files.length === 0
+              ? "先上传图片"
+              : "提交发布"}
         </button>
         {state.ok && state.pending && (
           <span className="flex items-center gap-2 text-sm text-emerald-600">
             ✓ 已提交审核，通过后将自动上架
-            <Link href="/" className="underline">返回首页</Link>
+            <Link href="/" className="underline">
+              返回首页
+            </Link>
           </span>
         )}
         {state.error && <span className="text-sm text-red-500">{state.error}</span>}

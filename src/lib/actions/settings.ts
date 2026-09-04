@@ -9,7 +9,11 @@ import { prisma } from "@/lib/db/prisma";
 import { rateLimit } from "@/lib/rate-limit";
 import { makeKey, saveFile, delFile } from "@/lib/storage";
 
-export type SettingsActionState = { ok?: boolean; error?: string; fieldErrors?: Record<string, string[]> };
+export type SettingsActionState = {
+  ok?: boolean;
+  error?: string;
+  fieldErrors?: Record<string, string[]>;
+};
 
 const profileSchema = z.object({
   name: z.string().trim().min(0).max(30, "昵称最长 30 字"),
@@ -18,7 +22,7 @@ const profileSchema = z.object({
 
 export async function updateProfileAction(
   _prev: SettingsActionState,
-  fd: FormData
+  fd: FormData,
 ): Promise<SettingsActionState> {
   const user = (await auth())?.user;
   if (!user) return { error: "请先登录" };
@@ -45,9 +49,11 @@ const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
 
 function sniffImage(buf: Buffer): boolean {
   if (buf.length < 12) return false;
-  if (buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return true;
+  if (buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])))
+    return true;
   if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return true;
-  const s = (str: string, off: number) => buf.subarray(off, off + str.length).toString("latin1") === str;
+  const s = (str: string, off: number) =>
+    buf.subarray(off, off + str.length).toString("latin1") === str;
   if (s("RIFF", 0) && s("WEBP", 8)) return true;
   if (s("GIF8", 0)) return true;
   return false;
@@ -55,7 +61,7 @@ function sniffImage(buf: Buffer): boolean {
 
 export async function uploadAvatarAction(
   _prev: SettingsActionState,
-  fd: FormData
+  fd: FormData,
 ): Promise<SettingsActionState> {
   const user = (await auth())?.user;
   if (!user) return { error: "请先登录" };
@@ -73,15 +79,20 @@ export async function uploadAvatarAction(
   try {
     const key = makeKey("avatars", isGif ? ".gif" : ".webp");
     // GIF：保留动图原样落盘（不过 sharp，避免动图被压成静帧）；其余：方形居中裁切 256px webp
-    const out = isGif ? buf : await sharp(buf, { failOn: "none" })
-      .rotate()
-      .resize(256, 256, { fit: "cover", position: "attention" })
-      .webp({ quality: 85 })
-      .toBuffer();
+    const out = isGif
+      ? buf
+      : await sharp(buf, { failOn: "none" })
+          .rotate()
+          .resize(256, 256, { fit: "cover", position: "attention" })
+          .webp({ quality: 85 })
+          .toBuffer();
     const url = await saveFile(key, out);
 
     // 换头像后清理旧文件（本站存储的 key；chevereto 远端 URL 也尽力删）
-    const row = await prisma.user.findUnique({ where: { id: user.id }, select: { avatarKey: true } });
+    const row = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { avatarKey: true },
+    });
     const old = row?.avatarKey;
     await prisma.user.update({ where: { id: user.id }, data: { avatarKey: url } });
     if (old && old !== url) await delFile(old).catch(() => {});
@@ -121,7 +132,7 @@ const passwordSchema = z
 
 export async function changePasswordAction(
   _prev: SettingsActionState,
-  fd: FormData
+  fd: FormData,
 ): Promise<SettingsActionState> {
   const user = (await auth())?.user;
   if (!user) return { error: "请先登录" };
@@ -133,13 +144,17 @@ export async function changePasswordAction(
   });
   if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
 
-  const row = await prisma.user.findUnique({ where: { id: user.id }, select: { passwordHash: true } });
+  const row = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { passwordHash: true },
+  });
   if (row?.passwordHash) {
     const ok = await bcrypt.compare(parsed.data.current, row.passwordHash);
     if (!ok) return { fieldErrors: { current: ["当前密码不正确"] } };
   }
   // OAuth 账号（未设密码）跳过当前密码校验即可设首个密码，因此加限流防会话被盗后恶意改密
-  if (!rateLimit(`pwchange:${user.id}`, 5, 10 * 60_000)) return { error: "操作过于频繁，请稍后再试" };
+  if (!rateLimit(`pwchange:${user.id}`, 5, 10 * 60_000))
+    return { error: "操作过于频繁，请稍后再试" };
   const passwordHash = await bcrypt.hash(parsed.data.next, 10);
   await prisma.user.update({
     where: { id: user.id },
@@ -155,7 +170,7 @@ const emailSchema = z.object({
 
 export async function changeEmailAction(
   _prev: SettingsActionState,
-  fd: FormData
+  fd: FormData,
 ): Promise<SettingsActionState> {
   const user = (await auth())?.user;
   if (!user) return { error: "请先登录" };
@@ -166,7 +181,10 @@ export async function changeEmailAction(
   });
   if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
 
-  const row = await prisma.user.findUnique({ where: { id: user.id }, select: { email: true, passwordHash: true } });
+  const row = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { email: true, passwordHash: true },
+  });
   if (!row) return { error: "账号不存在" };
   if (parsed.data.email === row.email) return { fieldErrors: { email: ["新邮箱与当前邮箱相同"] } };
 

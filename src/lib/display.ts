@@ -10,12 +10,18 @@ export const DISPLAY_META: Record<ContentDisplay, { label: string; hint: string 
   masonry: { label: "瀑布流", hint: "CSS 多列错落排布，保留图片原始比例" },
 };
 
-export const DISPLAY_OPTIONS: { value: ContentDisplay; label: string }[] = DISPLAY_ORDER.map((d) => ({
-  value: d,
-  label: DISPLAY_META[d].label,
-}));
+export const DISPLAY_OPTIONS: { value: ContentDisplay; label: string }[] = DISPLAY_ORDER.map(
+  (d) => ({
+    value: d,
+    label: DISPLAY_META[d].label,
+  }),
+);
 
-export const TYPE_LABEL: Record<string, string> = { GAME: "游戏", IMAGE: "图片作品", ARTICLE: "文章" };
+export const TYPE_LABEL: Record<string, string> = {
+  GAME: "游戏",
+  IMAGE: "图片作品",
+  ARTICLE: "文章",
+};
 
 export type ContentTypeFilter = ContentType | "ALL";
 
@@ -40,4 +46,3 @@ export const CARD_RATIOS: Record<CardRatio, { label: string; aspect?: string }> 
 export function clampedAspect(w: number, h: number): number {
   return Math.min(Math.max(w / h, 3 / 4), 4 / 3);
 }
-

@@ -56,7 +56,9 @@ export default function RulesPage() {
       <div className="mt-8 space-y-8">
         {SECTIONS.map((s) => (
           <section key={s.title}>
-            <h2 className="border-l-2 border-brand-500 pl-3 text-base font-semibold text-neutral-900">{s.title}</h2>
+            <h2 className="border-l-2 border-brand-500 pl-3 text-base font-semibold text-neutral-900">
+              {s.title}
+            </h2>
             <ul className="mt-3 grid gap-2">
               {s.items.map((it) => (
                 <li key={it} className="flex gap-2 text-sm leading-6 text-neutral-700">

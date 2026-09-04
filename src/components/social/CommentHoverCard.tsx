@@ -83,7 +83,9 @@ export default function CommentHoverCard({
           }}
         >
           <span className="block text-xs font-medium text-neutral-800">{data.author}</span>
-          <span className="mt-1 block line-clamp-3 text-xs leading-5 text-neutral-600">{data.content}</span>
+          <span className="mt-1 block line-clamp-3 text-xs leading-5 text-neutral-600">
+            {data.content}
+          </span>
         </span>
       )}
     </span>

@@ -4,11 +4,7 @@ import { useState, useTransition } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import type { ContentType } from "@/lib/display";
 import { INPUT, INPUT_SM, LABEL_STRONG } from "@/lib/ui/cls";
-import {
-  SIDEBAR_KIND_META,
-  type SidebarWidget,
-  type SidebarWidgetConfig,
-} from "@/lib/site-config";
+import { SIDEBAR_KIND_META, type SidebarWidget, type SidebarWidgetConfig } from "@/lib/site-config";
 import { updateSidebarWidgetAction } from "@/lib/actions/site";
 import AdConfigFields, { initAdConfig } from "@/components/admin-shared/ad-config-fields";
 import ChipPicker from "@/components/ui/ChipPicker";
@@ -34,34 +30,42 @@ export default function WidgetEditor({
   const cfg = widget.config as Record<string, unknown>;
   const id = (k: string) => `${k}-${widget.id}`;
   const [title, setTitle] = useState(widget.title ?? "");
-  const [type, setType] = useState<"ALL" | ContentType>(cfg.type === "IMAGE" || cfg.type === "GAME" || cfg.type === "ARTICLE" ? cfg.type : "ALL");
+  const [type, setType] = useState<"ALL" | ContentType>(
+    cfg.type === "IMAGE" || cfg.type === "GAME" || cfg.type === "ARTICLE" ? cfg.type : "ALL",
+  );
   const [sort, setSort] = useState<"latest" | "popular" | "downloads">(
-    cfg.sort === "latest" || cfg.sort === "downloads" ? cfg.sort : "popular"
+    cfg.sort === "latest" || cfg.sort === "downloads" ? cfg.sort : "popular",
   );
   const [count, setCount] = useState<number>(
     typeof cfg.count === "number"
       ? cfg.count
       : kind === "creators"
-      ? 3
-      : kind === "comments"
-      ? 5
-      : kind === "random" || kind === "authorWorks" || kind === "sameCategory"
-      ? 4
-      : 6
+        ? 3
+        : kind === "comments"
+          ? 5
+          : kind === "random" || kind === "authorWorks" || kind === "sameCategory"
+            ? 4
+            : 6,
   );
   const [display, setDisplay] = useState<"card" | "list" | "masonry">(
-    cfg.display === "card" || cfg.display === "masonry" ? cfg.display : "list"
+    cfg.display === "card" || cfg.display === "masonry" ? cfg.display : "list",
   );
   const [cats, setCats] = useState<string[]>((cfg.slugs as string[]) ?? []);
   const [text, setText] = useState<string>(typeof cfg.text === "string" ? cfg.text : "");
-  const [content, setContent] = useState<string>(typeof cfg.content === "string" ? cfg.content : "");
+  const [content, setContent] = useState<string>(
+    typeof cfg.content === "string" ? cfg.content : "",
+  );
   const [links, setLinks] = useState<{ key: string; label: string; href: string }[]>(
     Array.isArray(cfg.links)
       ? (cfg.links as unknown[]).map((l) => {
           const o = (l && typeof l === "object" ? l : {}) as Record<string, unknown>;
-          return { key: nextRowKey(), label: typeof o.label === "string" ? o.label : "", href: typeof o.href === "string" ? o.href : "" };
+          return {
+            key: nextRowKey(),
+            label: typeof o.label === "string" ? o.label : "",
+            href: typeof o.href === "string" ? o.href : "",
+          };
         })
-      : []
+      : [],
   );
   const [notices, setNotices] = useState<{ key: string; level: string; text: string }[]>(
     Array.isArray(cfg.items)
@@ -69,11 +73,14 @@ export default function WidgetEditor({
           const o = (l && typeof l === "object" ? l : {}) as Record<string, unknown>;
           return {
             key: nextRowKey(),
-            level: typeof o.level === "string" && ["info", "warn", "event"].includes(o.level) ? o.level : "info",
+            level:
+              typeof o.level === "string" && ["info", "warn", "event"].includes(o.level)
+                ? o.level
+                : "info",
             text: typeof o.text === "string" ? o.text : "",
           };
         })
-      : []
+      : [],
   );
   const [msg, setMsg] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -154,7 +161,14 @@ export default function WidgetEditor({
           <label className={LABEL_STRONG} htmlFor={id("title")}>
             组件标题（留空用默认）
           </label>
-          <input id={id("title")} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={80} placeholder={SIDEBAR_KIND_META[kind].defaultTitle ?? "标题…"} className={INPUT} />
+          <input
+            id={id("title")}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            maxLength={80}
+            placeholder={SIDEBAR_KIND_META[kind].defaultTitle ?? "标题…"}
+            className={INPUT}
+          />
         </div>
 
         {kind === "hot" && (
@@ -163,7 +177,12 @@ export default function WidgetEditor({
               <label className={LABEL_STRONG} htmlFor={id("type")}>
                 内容类型
               </label>
-              <select id={id("type")} value={type} onChange={(e) => setType(e.target.value as "ALL" | ContentType)} className={INPUT}>
+              <select
+                id={id("type")}
+                value={type}
+                onChange={(e) => setType(e.target.value as "ALL" | ContentType)}
+                className={INPUT}
+              >
                 <option value="ALL">全部</option>
                 <option value="IMAGE">图片作品</option>
                 <option value="GAME">游戏</option>
@@ -174,7 +193,12 @@ export default function WidgetEditor({
               <label className={LABEL_STRONG} htmlFor={id("sort")}>
                 排序
               </label>
-              <select id={id("sort")} value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} className={INPUT}>
+              <select
+                id={id("sort")}
+                value={sort}
+                onChange={(e) => setSort(e.target.value as typeof sort)}
+                className={INPUT}
+              >
                 <option value="popular">最热</option>
                 <option value="latest">最新</option>
                 <option value="downloads">最多下载</option>
@@ -184,13 +208,26 @@ export default function WidgetEditor({
               <label className={LABEL_STRONG} htmlFor={id("count")}>
                 数量（3–12）
               </label>
-              <input id={id("count")} type="number" min={3} max={12} value={count} onChange={(e) => setCount(Math.max(3, Math.min(12, Number(e.target.value) || 3)))} className={INPUT} />
+              <input
+                id={id("count")}
+                type="number"
+                min={3}
+                max={12}
+                value={count}
+                onChange={(e) => setCount(Math.max(3, Math.min(12, Number(e.target.value) || 3)))}
+                className={INPUT}
+              />
             </div>
             <div>
               <label className={LABEL_STRONG} htmlFor={id("display")}>
                 显示形态
               </label>
-              <select id={id("display")} value={display} onChange={(e) => setDisplay(e.target.value as typeof display)} className={INPUT}>
+              <select
+                id={id("display")}
+                value={display}
+                onChange={(e) => setDisplay(e.target.value as typeof display)}
+                className={INPUT}
+              >
                 <option value="list">列表行</option>
                 <option value="card">小卡片</option>
                 <option value="masonry">小瀑布</option>
@@ -225,7 +262,15 @@ export default function WidgetEditor({
                 <label className={LABEL_STRONG} htmlFor={id("count")}>
                   未挑选时按热度的数量（4–24）
                 </label>
-                <input id={id("count")} type="number" min={4} max={24} value={count} onChange={(e) => setCount(Math.max(4, Math.min(24, Number(e.target.value) || 4)))} className={INPUT} />
+                <input
+                  id={id("count")}
+                  type="number"
+                  min={4}
+                  max={24}
+                  value={count}
+                  onChange={(e) => setCount(Math.max(4, Math.min(24, Number(e.target.value) || 4)))}
+                  className={INPUT}
+                />
               </div>
             )}
           </>
@@ -236,7 +281,15 @@ export default function WidgetEditor({
             <label className={LABEL_STRONG} htmlFor={id("count")}>
               数量（1–6）
             </label>
-            <input id={id("count")} type="number" min={1} max={6} value={count} onChange={(e) => setCount(Math.max(1, Math.min(6, Number(e.target.value) || 1)))} className={INPUT} />
+            <input
+              id={id("count")}
+              type="number"
+              min={1}
+              max={6}
+              value={count}
+              onChange={(e) => setCount(Math.max(1, Math.min(6, Number(e.target.value) || 1)))}
+              className={INPUT}
+            />
           </div>
         )}
 
@@ -245,7 +298,15 @@ export default function WidgetEditor({
             <label className={LABEL_STRONG} htmlFor={id("text")}>
               说明文字（支持换行；空则不显示）
             </label>
-            <textarea id={id("text")} value={text} onChange={(e) => setText(e.target.value)} rows={4} maxLength={600} className={`${INPUT} resize-y`} placeholder="一句话介绍站点/公告…" />
+            <textarea
+              id={id("text")}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              rows={4}
+              maxLength={600}
+              className={`${INPUT} resize-y`}
+              placeholder="一句话介绍站点/公告…"
+            />
           </div>
         )}
 
@@ -254,7 +315,15 @@ export default function WidgetEditor({
             <label className={LABEL_STRONG} htmlFor={id("count")}>
               展示条数（3–10）
             </label>
-            <input id={id("count")} type="number" min={3} max={10} value={count} onChange={(e) => setCount(Math.max(3, Math.min(10, Number(e.target.value) || 3)))} className={INPUT} />
+            <input
+              id={id("count")}
+              type="number"
+              min={3}
+              max={10}
+              value={count}
+              onChange={(e) => setCount(Math.max(3, Math.min(10, Number(e.target.value) || 3)))}
+              className={INPUT}
+            />
           </div>
         )}
 
@@ -263,7 +332,15 @@ export default function WidgetEditor({
             <label className={LABEL_STRONG} htmlFor={id("count")}>
               抽取数量（2–8）
             </label>
-            <input id={id("count")} type="number" min={2} max={8} value={count} onChange={(e) => setCount(Math.max(2, Math.min(8, Number(e.target.value) || 2)))} className={INPUT} />
+            <input
+              id={id("count")}
+              type="number"
+              min={2}
+              max={8}
+              value={count}
+              onChange={(e) => setCount(Math.max(2, Math.min(8, Number(e.target.value) || 2)))}
+              className={INPUT}
+            />
           </div>
         )}
 
@@ -272,9 +349,21 @@ export default function WidgetEditor({
             <label className={LABEL_STRONG} htmlFor={id("count")}>
               展示数量（2–8）
             </label>
-            <input id={id("count")} type="number" min={2} max={8} value={count} onChange={(e) => setCount(Math.max(2, Math.min(8, Number(e.target.value) || 2)))} className={INPUT} />
+            <input
+              id={id("count")}
+              type="number"
+              min={2}
+              max={8}
+              value={count}
+              onChange={(e) => setCount(Math.max(2, Math.min(8, Number(e.target.value) || 2)))}
+              className={INPUT}
+            />
             <p className="mt-1 text-[11px] text-neutral-400">
-              仅详情页侧边栏生效（{kind === "authorWorks" ? "按热度展示当前作者的其它作品，自动排除本资源" : "同分类其它内容优先，不足补同类型热门，自动排除本资源"}）。
+              仅详情页侧边栏生效（
+              {kind === "authorWorks"
+                ? "按热度展示当前作者的其它作品，自动排除本资源"
+                : "同分类其它内容优先，不足补同类型热门，自动排除本资源"}
+              ）。
             </p>
           </div>
         )}
@@ -316,7 +405,9 @@ export default function WidgetEditor({
             {notices.length < 10 && (
               <button
                 type="button"
-                onClick={() => setNotices((arr) => [...arr, { key: nextRowKey(), level: "info", text: "" }])}
+                onClick={() =>
+                  setNotices((arr) => [...arr, { key: nextRowKey(), level: "info", text: "" }])
+                }
                 className="mt-1.5 inline-flex items-center gap-1 rounded-none border border-brand-200 px-2.5 py-1 text-xs text-neutral-500 transition hover:border-brand-400 hover:text-brand-700"
               >
                 <Plus size={12} /> 添加公告
@@ -374,7 +465,9 @@ export default function WidgetEditor({
               {links.length < 20 && (
                 <button
                   type="button"
-                  onClick={() => setLinks((arr) => [...arr, { key: nextRowKey(), label: "", href: "" }])}
+                  onClick={() =>
+                    setLinks((arr) => [...arr, { key: nextRowKey(), label: "", href: "" }])
+                  }
                   className="mt-1.5 inline-flex items-center gap-1 rounded-none border border-brand-200 px-2.5 py-1 text-xs text-neutral-500 transition hover:border-brand-400 hover:text-brand-700"
                 >
                   <Plus size={12} /> 添加链接
@@ -386,15 +479,28 @@ export default function WidgetEditor({
 
         {kind === "ad" && <AdConfigFields idPrefix={id("ad")} value={ad} onChange={setAd} />}
 
-        {kind === "stats" && <p className="text-xs text-neutral-400">自动读取：上架内容 / 注册用户 / 累计下载 / 累计浏览，无需配置。</p>}
+        {kind === "stats" && (
+          <p className="text-xs text-neutral-400">
+            自动读取：上架内容 / 注册用户 / 累计下载 / 累计浏览，无需配置。
+          </p>
+        )}
       </div>
 
       {msg && <p className="mt-2 text-xs text-red-500">{msg}</p>}
       <div className="mt-4 flex justify-end gap-2">
-        <button type="button" onClick={onDone} className="rounded-none px-3 py-1.5 text-xs text-neutral-500 hover:bg-neutral-200">
+        <button
+          type="button"
+          onClick={onDone}
+          className="rounded-none px-3 py-1.5 text-xs text-neutral-500 hover:bg-neutral-200"
+        >
           取消
         </button>
-        <button type="button" disabled={pending} onClick={save} className="rounded-none border border-brand-600 bg-brand-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-brand-600 disabled:opacity-50">
+        <button
+          type="button"
+          disabled={pending}
+          onClick={save}
+          className="rounded-none border border-brand-600 bg-brand-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-brand-600 disabled:opacity-50"
+        >
           {pending ? "保存中…" : "保存组件"}
         </button>
       </div>

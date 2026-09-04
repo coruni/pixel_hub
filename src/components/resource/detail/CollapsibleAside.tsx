@@ -14,7 +14,9 @@ export default function CollapsibleAside({ main, aside }: { main: ReactNode; asi
   return (
     <div
       className={`relative mt-6 grid grid-cols-1 transition-[grid-template-columns,gap] duration-300 ease-in-out ${
-        open ? "lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-6" : "lg:grid-cols-[minmax(0,1fr)_0px] lg:gap-0"
+        open
+          ? "lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-6"
+          : "lg:grid-cols-[minmax(0,1fr)_0px] lg:gap-0"
       }`}
     >
       <div className="min-w-0 space-y-5">{main}</div>
