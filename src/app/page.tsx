@@ -1,21 +1,21 @@
+import type { Metadata } from "next";
 import { auth } from "@/lib/auth";
 import { getHomeSections } from "@/lib/home";
-import { getTheme } from "@/lib/site";
-import { sidebarVisible } from "@/lib/site-config";
 import HomeRenderer from "@/components/home/HomeRenderer";
 import SiteSidebar from "@/components/sidebar/SiteSidebar";
 import SidebarLayout from "@/components/layout/SidebarLayout";
+import { getTheme } from "@/lib/site";
+import { sidebarVisible } from "@/lib/site-config";
+import type { SP } from "@/lib/search-params";
 
 import { siteName } from "@/lib/site-url";
 
 // root layout 的 title.template 不作用于与其同段的首页，需自行拼接站点名
-export const metadata = { title: `发现 · ${siteName()}` };
+export const metadata: Metadata = { title: `发现 · ${siteName()}` };
 
-type SP = Record<string, string | string[] | undefined>;
 export default async function HomePage({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = await searchParams;
-  const session = await auth();
-  const u = session?.user;
+  const u = (await auth())?.user;
 
   const [sections, theme] = await Promise.all([getHomeSections(), getTheme()]);
   const showSidebar = sidebarVisible(theme, "home");

@@ -1,9 +1,9 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { getCategories, getFeed, getTopTags } from "@/lib/queries";
+import { enumParam, intParam, str, type SP } from "@/lib/search-params";
 import MasonryGrid from "@/components/resource/MasonryGrid";
 
-type SP = Record<string, string | string[] | undefined>;
 type Props = {
  base: string; // 当前页路径
  searchParams: SP;
@@ -15,20 +15,14 @@ type Props = {
 
 export default async function FeedBrowser({ base, searchParams, authed, userId, heading, showTags }: Props) {
  const sp = searchParams;
- const str = (k: string) => (typeof sp[k] === "string" ? (sp[k] as string) : undefined);
-
- const typeRaw = str("type");
- const type = typeRaw === "GAME" || typeRaw === "IMAGE" || typeRaw === "ARTICLE" ? typeRaw : "ALL";
- const cat = str("cat");
- const tag = str("tag");
- const sortRaw = str("sort");
- const sort = sortRaw === "popular" || sortRaw === "downloads" ? sortRaw : "latest";
- const periodRaw = str("period");
- const period = periodRaw === "day" || periodRaw === "week" || periodRaw === "month" ? periodRaw : "all";
- const q = str("q")?.trim();
- const follow = str("follow") === "1" && !!authed && !!userId;
- const pageRaw = parseInt(str("page") ?? "1", 10);
- const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
+ const type = enumParam(sp, "type", ["ALL", "GAME", "IMAGE", "ARTICLE"] as const, "ALL");
+ const cat = str(sp, "cat");
+ const tag = str(sp, "tag");
+ const sort = enumParam(sp, "sort", ["latest", "popular", "downloads"] as const, "latest");
+ const period = enumParam(sp, "period", ["all", "day", "week", "month"] as const, "all");
+ const q = str(sp, "q")?.trim();
+ const follow = str(sp, "follow") === "1" && !!authed && !!userId;
+ const page = intParam(sp, "page", 1);
 
  const categories = await getCategories();
  const { items, hasMore } = await getFeed({

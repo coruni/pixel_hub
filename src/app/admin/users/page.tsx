@@ -4,8 +4,9 @@ import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/lib/auth";
 import { formatCount, timeAgo } from "@/lib/format";
 import { UserActions } from "@/components/admin/buttons";
+import type { Metadata } from "next";
 
-export const metadata = { title: "用户管理" };
+export const metadata: Metadata = { title: "用户管理" };
 
 const roleLabel: Record<string, string> = { USER: "用户", MODERATOR: "版主", ADMIN: "管理员" };
 

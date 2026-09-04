@@ -1,7 +1,6 @@
+import type { SP } from "@/lib/search-params";
 import FeedBrowser from "@/components/feed/FeedBrowser";
 import SectionTitle from "@/components/home/SectionTitle";
-
-type SP = Record<string, string | string[] | undefined>;
 
 export default async function FeedBlock({
   title,

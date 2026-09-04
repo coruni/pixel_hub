@@ -5,8 +5,9 @@ import { prisma } from "@/lib/db/prisma";
 import { ensureHomeSections } from "@/lib/home";
 import { HOME_SECTION_KINDS, parseSectionConfig, type HomeSectionKind } from "@/lib/home-config";
 import HomeManager from "@/components/home-admin/HomeManager";
+import type { Metadata } from "next";
 
-export const metadata = { title: "首页布局" };
+export const metadata: Metadata = { title: "首页布局" };
 
 export default async function AdminHomePage() {
  const session = await auth();

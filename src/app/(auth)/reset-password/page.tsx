@@ -1,13 +1,13 @@
 import Link from "next/link";
+import type { Metadata } from "next";
+import { str, type SP } from "@/lib/search-params";
 import ResetPasswordForm from "@/components/auth/reset-password-form";
 
-export const metadata = { title: "重置密码" };
-
-type SP = Record<string, string | string[] | undefined>;
+export const metadata: Metadata = { title: "重置密码" };
 
 export default async function ResetPasswordPage({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = await searchParams;
-  const token = typeof sp.token === "string" ? sp.token : "";
+  const token = str(sp, "token") ?? "";
 
   return (
     <div className="flex min-h-[70vh] items-center justify-center px-4 py-16">

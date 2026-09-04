@@ -1,27 +1,29 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { prisma } from "@/lib/db/prisma";
 import { publicUrl } from "@/lib/storage";
 import { timeAgo } from "@/lib/format";
+import { TYPE_LABEL } from "@/lib/display";
+import { str, type SP } from "@/lib/search-params";
 import { QueueActions } from "@/components/admin/buttons";
 import SpotActions from "@/components/admin/spot-actions";
 
-export const metadata = { title: "审核队列" };
-
-const typeLabel: Record<string, string> = { GAME: "游戏", IMAGE: "图片", ARTICLE: "文章" };
-
-type SP = Record<string, string | string[] | undefined>;
+export const metadata: Metadata = { title: "审核队列" };
 
 export default async function QueuePage({ searchParams }: { searchParams: Promise<SP> }) {
  const sp = await searchParams;
  // view=spot：trusted 用户直发（PUBLISHED）内容的事后抽查视图（DESIGN §6.4）
- const spot = sp.view === "spot";
+ const spot = str(sp, "view") === "spot";
+ // 近 7 日窗口（new Date() 无参不触发纯函数校验，等价 Date.now() - 7d）
+ const spotSince = new Date();
+ spotSince.setDate(spotSince.getDate() - 7);
 
  const rows = spot
  ? await prisma.resource.findMany({
  where: {
  status: "PUBLISHED",
  author: { trusted: true },
- publishedAt: { gte: new Date(Date.now() - 7 * 24 * 3600 * 1000) },
+ publishedAt: { gte: spotSince },
  },
  orderBy: { publishedAt: "desc" },
  take: 50,
@@ -89,7 +91,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
  {r.title}
  </Link>
  <span className="rounded-none bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500">
- {typeLabel[r.type]}
+ {TYPE_LABEL[r.type]}
  </span>
  {r.category && <span className="text-xs text-neutral-400">{r.category.name}</span>}
  {spot && (

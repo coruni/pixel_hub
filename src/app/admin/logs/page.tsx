@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/db/prisma";
 import { timeAgo } from "@/lib/format";
+import type { Metadata } from "next";
 
-export const metadata = { title: "操作日志" };
+export const metadata: Metadata = { title: "操作日志" };
 
 const actionLabel: Record<string, string> = {
  APPROVE: "通过审核",

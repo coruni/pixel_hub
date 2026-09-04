@@ -18,8 +18,10 @@ export function timeAgo(date: Date | string | null | undefined): string {
   if (h < 24) return `${h} 小时前`;
   const days = Math.floor(h / 24);
   if (days < 7) return `${days} 天前`;
-  const y = d.getFullYear();
-  const mo = String(d.getMonth() + 1).padStart(2, "0");
-  const da = String(d.getDate()).padStart(2, "0");
-  return `${y}-${mo}-${da}`;
+  return dayKey(d);
+}
+
+/** 本地日期 key（YYYY-MM-DD）：Visit.day 落库、按天聚合与 timeAgo 的日期显示共用 */
+export function dayKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }

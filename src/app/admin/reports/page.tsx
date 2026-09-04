@@ -1,9 +1,11 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { prisma } from "@/lib/db/prisma";
 import { timeAgo } from "@/lib/format";
+import { enumParam, type SP } from "@/lib/search-params";
 import { ReportActions } from "@/components/admin/buttons";
 
-export const metadata = { title: "举报处理" };
+export const metadata: Metadata = { title: "举报处理" };
 
 const stLabel: Record<string, { text: string; cls: string }> = {
  OPEN: { text: "待处理", cls: "bg-red-50 text-red-600" },
@@ -12,13 +14,11 @@ const stLabel: Record<string, { text: string; cls: string }> = {
 };
 const typeText: Record<string, string> = { RESOURCE: "资源", COMMENT: "评论", USER: "用户" };
 
-type SP = Record<string, string | string[] | undefined>;
+const REPORT_STATUSES = ["OPEN", "RESOLVED", "DISMISSED"] as const;
+
 export default async function ReportsPage({ searchParams }: { searchParams: Promise<SP> }) {
  const sp = await searchParams;
- const statusRaw = typeof sp.status === "string" ? sp.status : "OPEN";
- const status = (["OPEN", "RESOLVED", "DISMISSED"] as const).includes(statusRaw as never)
- ? (statusRaw as "OPEN" | "RESOLVED" | "DISMISSED")
- : "OPEN";
+ const status = enumParam(sp, "status", REPORT_STATUSES, "OPEN");
 
  const rows = await prisma.report.findMany({
  where: { status },
@@ -93,7 +93,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
  return (
  <div>
  <div className="mb-4 flex flex-wrap gap-2">
- {(["OPEN", "RESOLVED", "DISMISSED"] as const).map((s) => (
+ {REPORT_STATUSES.map((s) => (
  <Link key={s} href={`/admin/reports?status=${s}`} className={chip(s)}>
  {stLabel[s].text}
  </Link>

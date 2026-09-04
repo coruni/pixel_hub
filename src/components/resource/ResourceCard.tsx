@@ -2,9 +2,7 @@ import Link from "next/link";
 import { Download, Gamepad2, Heart, Image as ImageIcon, MessageSquare, Newspaper, Star } from "lucide-react";
 import type { FeedCard } from "@/lib/queries";
 import { formatCount } from "@/lib/format";
-import { CARD_RATIOS, clampedAspect, type CardRatio } from "@/lib/display";
-
-const typeLabel: Record<string, string> = { GAME: "游戏", IMAGE: "图片", ARTICLE: "文章" };
+import { CARD_RATIOS, TYPE_LABEL, clampedAspect, type CardRatio } from "@/lib/display";
 
 /**
  * 统一资源卡（信息全覆盖图，无图下白条）：
@@ -25,7 +23,7 @@ export default function ResourceCard({
  const h = item.cover?.height && item.cover.height > 0 ? item.cover.height : 2;
  const cover = item.cover;
  const author = item.author.name ?? item.author.username;
- const meta = item.category?.name ?? typeLabel[item.type] ?? item.type;
+ const meta = item.category?.name ?? TYPE_LABEL[item.type] ?? item.type;
 
  // uniform 且显式给了比例 → 按选择裁切；uniform 未给比例 → 沿用 4:3 网格默认
  // 瀑布流（非 uniform）：保留原图比例但限幅 [3/4, 4/3] ——

@@ -53,7 +53,8 @@ function KindIcon({ kind, size = 15 }: { kind: HomeSectionKind; size?: number })
 
 const dispLabel: Record<string, string> = { card: "卡片", list: "列表", masonry: "瀑布流" };
 const sortLabel: Record<string, string> = { latest: "最新", popular: "最热", downloads: "最多下载" };
-const typeLabel: Record<string, string> = { ALL: "全部", IMAGE: "图片", GAME: "游戏" };
+// 板块配置摘要用短标签（TYPE_LABEL 的 IMAGE 是全称「图片作品」，这里空间紧凑取「图片」）
+const typeLabel: Record<string, string> = { ALL: "全部", IMAGE: "图片", GAME: "游戏", ARTICLE: "文章" };
 
 function cfgSummary(row: ManagerRow): string {
  const c = row.config as Record<string, unknown>;

@@ -9,7 +9,7 @@ import { markAllNotificationsReadAction } from "@/lib/actions/notify";
 import { NotificationDelete, NotificationsClearAll } from "@/components/social/notify-actions";
 import NotificationCardLink from "@/components/social/notification-card-link";
 
-export const metadata: Metadata = { title: "通知" };
+export const metadata: Metadata = { title: "通知", robots: { index: false } };
 
 const FILTERS = [
  { key: "", label: "全部", icon: Bell },

@@ -1,6 +1,13 @@
 import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 import { auth } from "@/lib/auth";
 import AdminTabs from "@/components/admin/AdminTabs";
+
+// 后台整段不收录；子页 title 走「页面 · 管理后台」模板（absolute 为本段兜底标题）
+export const metadata: Metadata = {
+  title: { absolute: "管理后台", template: "%s · 管理后台" },
+  robots: { index: false },
+};
 
 const tabs: { href: string; label: string; adminOnly?: boolean }[] = [
   { href: "/admin", label: "概览" },

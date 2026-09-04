@@ -1,13 +1,15 @@
 import Link from "next/link";
 import { Download, Heart, MessageSquare } from "lucide-react";
+import type { Metadata } from "next";
 import { prisma } from "@/lib/db/prisma";
 import { publicUrl } from "@/lib/storage";
 import { formatCount, timeAgo } from "@/lib/format";
+import { TYPE_LABEL } from "@/lib/display";
+import { enumParam, type SP } from "@/lib/search-params";
 import { ContentActions } from "@/components/admin/buttons";
 
-export const metadata = { title: "内容库" };
+export const metadata: Metadata = { title: "内容库" };
 
-const typeLabel: Record<string, string> = { GAME: "游戏", IMAGE: "图片作品", ARTICLE: "文章" };
 const statusLabel: Record<string, { text: string; cls: string }> = {
     PUBLISHED: { text: "已上架", cls: "bg-emerald-50 text-emerald-600" },
     PENDING: { text: "待审核", cls: "bg-amber-50 text-amber-600" },
@@ -16,13 +18,11 @@ const statusLabel: Record<string, { text: string; cls: string }> = {
     DRAFT: { text: "草稿", cls: "bg-neutral-100 text-neutral-500" },
 };
 
-type SP = Record<string, string | string[] | undefined>;
+const STATUSES = ["PUBLISHED", "PENDING", "REJECTED", "REMOVED", "DRAFT"] as const;
+
 export default async function ContentPage({ searchParams }: { searchParams: Promise<SP> }) {
     const sp = await searchParams;
-    const statusRaw = typeof sp.status === "string" ? sp.status : "PUBLISHED";
-    const status = (["PUBLISHED", "PENDING", "REJECTED", "REMOVED", "DRAFT"] as const).includes(statusRaw as never)
-        ? (statusRaw as "PUBLISHED" | "PENDING" | "REJECTED" | "REMOVED" | "DRAFT")
-        : "PUBLISHED";
+    const status = enumParam(sp, "status", STATUSES, "PUBLISHED");
 
     const rows = await prisma.resource.findMany({
         where: { status },
@@ -47,7 +47,7 @@ export default async function ContentPage({ searchParams }: { searchParams: Prom
     return (
         <div>
             <div className="mb-4 flex flex-wrap gap-2">
-                {(["PUBLISHED", "PENDING", "REJECTED", "REMOVED", "DRAFT"] as const).map((s) => (
+                {STATUSES.map((s) => (
                     <Link key={s} href={`/admin/content?status=${s}`} className={chip(s)}>
                         {statusLabel[s]?.text ?? s}
                     </Link>
@@ -78,7 +78,7 @@ export default async function ContentPage({ searchParams }: { searchParams: Prom
                                         <Link href={`/resources/${r.slug}`} className="truncate text-sm font-medium text-neutral-900 hover:underline">
                                             {r.title}
                                         </Link>
-                                        <span className="rounded-none bg-neutral-100 px-1.5 py-0.5 text-[10px] text-neutral-500">{typeLabel[r.type]}</span>
+                                        <span className="rounded-none bg-neutral-100 px-1.5 py-0.5 text-[10px] text-neutral-500">{TYPE_LABEL[r.type]}</span>
                                         {st && <span className={`rounded-none px-1.5 py-0.5 text-[10px] font-medium ${st.cls}`}>{st.text}</span>}
                                     </div>
                                     <p className="mt-0.5 truncate text-xs text-neutral-400">

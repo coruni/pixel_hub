@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db/prisma";
+import { dayKey } from "@/lib/format";
+import type { Metadata } from "next";
 
-export const metadata = { title: "管理概览" };
+export const metadata: Metadata = { title: "管理概览" };
 
 function formatSize(bytes: number | null | undefined): string {
  if (!bytes) return "0 B";
@@ -13,11 +15,6 @@ function formatSize(bytes: number | null | undefined): string {
  i++;
  }
  return `${v >= 100 ? Math.round(v) : v.toFixed(1)} ${units[i]}`;
-}
-
-// 本地日期 key（YYYY-MM-DD，与 Visit.day 一致）
-function dkey(d: Date): string {
- return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 export default async function AdminIndex() {
@@ -85,7 +82,7 @@ export default async function AdminIndex() {
  d.setHours(0, 0, 0, 0);
  d.setDate(d.getDate() - i);
  days.push({
- key: dkey(d),
+ key: dayKey(d),
  label: `${d.getMonth() + 1}/${d.getDate()}`,
  resources: 0,
  users: 0,
@@ -95,20 +92,20 @@ export default async function AdminIndex() {
  }
  const dayByKey = new Map(days.map((d) => [d.key, d]));
  for (const r of recentResources) {
- const day = dayByKey.get(dkey(r.createdAt));
+ const day = dayByKey.get(dayKey(r.createdAt));
  if (day) day.resources++;
  }
  for (const u of recentUsers) {
- const day = dayByKey.get(dkey(u.createdAt));
+ const day = dayByKey.get(dayKey(u.createdAt));
  if (day) day.users++;
  }
  const trendMax = Math.max(1, ...days.map((d) => Math.max(d.resources, d.users)));
 
  // ---- PV / IP 统计（Visit 表） ----
- const today = dkey(new Date());
+ const today = dayKey(new Date());
  const yesterdayD = new Date();
  yesterdayD.setDate(yesterdayD.getDate() - 1);
- const yesterday = dkey(yesterdayD);
+ const yesterday = dayKey(yesterdayD);
  const weekStart = days[0].key;
 
  const [todayPv, yesterdayPv, totalPv, weekRows, totalIpRow] = await Promise.all([

@@ -2,8 +2,9 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/lib/auth";
 import { CategoryManager } from "@/components/admin/TaxonomyManager";
+import type { Metadata } from "next";
 
-export const metadata = { title: "分类管理" };
+export const metadata: Metadata = { title: "分类管理" };
 
 export default async function CategoriesAdminPage() {
   const session = await auth();

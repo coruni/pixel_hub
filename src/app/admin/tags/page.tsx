@@ -2,8 +2,9 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/lib/auth";
 import { TagManager } from "@/components/admin/TaxonomyManager";
+import type { Metadata } from "next";
 
-export const metadata = { title: "标签管理" };
+export const metadata: Metadata = { title: "标签管理" };
 
 export default async function TagsAdminPage() {
   const session = await auth();

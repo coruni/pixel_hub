@@ -5,8 +5,9 @@ import { publicUrl } from "@/lib/storage";
 import { formatCount, timeAgo } from "@/lib/format";
 import { MediaDeleteButton, MediaUploadForm } from "@/components/admin/media";
 import { MediaThumb } from "@/components/admin/MediaThumb";
+import type { Metadata } from "next";
 
-export const metadata = { title: "媒体库" };
+export const metadata: Metadata = { title: "媒体库" };
 
 const PAGE_SIZE = 30;
 

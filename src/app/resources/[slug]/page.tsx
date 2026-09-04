@@ -13,10 +13,10 @@ import DetailBanner from "@/components/resource/detail/DetailBanner";
 import DetailTwocol from "@/components/resource/detail/DetailTwocol";
 import DetailArticle from "@/components/resource/detail/DetailArticle";
 import { PendingBanner, type DetailCtx } from "@/components/resource/detail/parts";
+import { TYPE_LABEL } from "@/lib/display";
+import { siteName } from "@/lib/site-url";
 
 type PageProps = { params: Promise<{ slug: string }> };
-
-const typeLabel: Record<string, string> = { GAME: "游戏", IMAGE: "图集", ARTICLE: "文章" };
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
@@ -30,13 +30,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const r = await getResourceDetail(slug, meId);
   if (!r || r.status !== "PUBLISHED") return { title: r?.title ?? "未发布内容", robots: { index: false } };
 
-  const description = r.summary ?? `${r.author.name ?? "@" + r.author.username} 分享的${typeLabel[r.type] ?? "资源"}`;
+  const description = r.summary ?? `${r.author.name ?? "@" + r.author.username} 分享的${TYPE_LABEL[r.type] ?? "资源"}`;
   const ogImages = r.gallery[0] ? [r.gallery[0].bigUrl] : [];
   return {
     title: r.title,
     description,
     alternates: { canonical: `/resources/${r.slug}` },
     openGraph: {
+      // 页级 openGraph 不与根布局合并，siteName 需自带
+      siteName: siteName(),
       title: r.title,
       description,
       type: "article",

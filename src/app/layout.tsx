@@ -4,7 +4,6 @@ import "./globals.css";
 import Navbar from "@/components/layout/Navbar";
 import PageTracker from "@/components/layout/PageTracker";
 import PresencePing from "@/components/layout/PresencePing";
-import ThemeToggle from "@/components/layout/ThemeToggle";
 import { auth } from "@/lib/auth";
 import { siteUrl, siteName } from "@/lib/site-url";
 

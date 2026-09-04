@@ -1,6 +1,7 @@
 import ForgotPasswordForm from "@/components/auth/forgot-password-form";
+import type { Metadata } from "next";
 
-export const metadata = { title: "找回密码" };
+export const metadata: Metadata = { title: "找回密码" };
 
 export default function ForgotPasswordPage() {
   return (

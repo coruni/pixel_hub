@@ -1,5 +1,6 @@
 import type { HomeSectionView } from "@/lib/home";
 import type { CardRatio } from "@/lib/display";
+import type { SP } from "@/lib/search-params";
 import HeroBlock from "./blocks/hero";
 import CategoriesBlock from "./blocks/categories";
 import ListBlock from "./blocks/list";
@@ -9,8 +10,6 @@ import StatsBlock from "./blocks/stats";
 import CreatorsBlock from "./blocks/creators";
 import TagsBlock from "./blocks/tags";
 import AdSectionBlock from "./blocks/ad";
-
-type SP = Record<string, string | string[] | undefined>;
 
 export default async function HomeRenderer({
   sections,

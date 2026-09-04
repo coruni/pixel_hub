@@ -1,12 +1,12 @@
+import type { Metadata } from "next";
+import { safeCallbackUrl, type SP } from "@/lib/search-params";
 import LoginForm from "@/components/auth/login-form";
 
-export const metadata = { title: "登录" };
+export const metadata: Metadata = { title: "登录" };
 
-type SP = Record<string, string | string[] | undefined>;
 export default async function LoginPage({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = await searchParams;
-  const raw = typeof sp.callbackUrl === "string" ? sp.callbackUrl : "/";
-  const callbackUrl = raw.startsWith("/") && !raw.startsWith("//") ? raw : "/";
+  const callbackUrl = safeCallbackUrl(sp);
   const githubEnabled = Boolean(process.env.GITHUB_ID && process.env.GITHUB_SECRET);
   const resetDone = sp.reset === "1";
   return (

@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { rateLimit } from "@/lib/rate-limit";
 import { sameOrigin } from "@/lib/origin";
+import { dayKey } from "@/lib/format";
 
 // PV/IP 采集端：PageTracker 发 beacon，失败静默（统计不能影响页面）
 export async function POST(req: NextRequest) {
@@ -26,20 +27,14 @@ export async function POST(req: NextRequest) {
  .digest("hex")
  .slice(0, 16);
 
- const now = new Date();
- const day = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
- now.getDate(),
- ).padStart(2, "0")}`;
+ const day = dayKey(new Date());
 
  await prisma.visit.create({ data: { day, ipHash, path } });
 
  // 访问明细保留 180 天：约 1% 的请求顺带清理过期行（机会式保留，免去定时任务；
  // 按 day 前缀比较可命中索引，YYYY-MM-DD 字典序即时间序）
  if (Math.random() < 0.01) {
- const cutoff = new Date(Date.now() - 180 * 24 * 3600 * 1000);
- const cutoffDay = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, "0")}-${String(
- cutoff.getDate(),
- ).padStart(2, "0")}`;
+ const cutoffDay = dayKey(new Date(Date.now() - 180 * 24 * 3600 * 1000));
  void prisma.visit.deleteMany({ where: { day: { lt: cutoffDay } } }).catch(() => {});
  }
 

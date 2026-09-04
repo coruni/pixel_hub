@@ -10,7 +10,7 @@ import AvatarForm from "@/components/auth/avatar-form";
 import { EmailForm, PasswordForm } from "@/components/auth/security-forms";
 import { startGitHubBindAction, unbindGitHubAction } from "@/lib/actions/connections";
 
-export const metadata: Metadata = { title: "账户设置" };
+export const metadata: Metadata = { title: "账户设置", robots: { index: false } };
 
 const BIND_MESSAGES: Record<string, string> = {
   ok: "GitHub 账号绑定成功",

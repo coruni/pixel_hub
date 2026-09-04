@@ -4,8 +4,9 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { getTheme, ensureSiteTheme } from "@/lib/site";
 import SiteLayoutManager from "@/components/site-admin/SiteLayoutManager";
+import type { Metadata } from "next";
 
-export const metadata = { title: "站点布局" };
+export const metadata: Metadata = { title: "站点布局" };
 
 export default async function AdminSitePage() {
  const session = await auth();
