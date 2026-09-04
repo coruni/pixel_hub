@@ -251,6 +251,7 @@ model Collection {
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 
+  @@unique([ownerId, name]) // 同一用户夹子名唯一：默认夹 upsert 与重命名防重的依据
   @@index([ownerId])
 }
 

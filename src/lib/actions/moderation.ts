@@ -1,28 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { auth } from "@/lib/auth";
+import { after } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { notifyByEmail } from "@/lib/mail-notify";
-
-type StaffUser = { id: string; role: "ADMIN" | "MODERATOR" | "USER" };
-
-async function staff(): Promise<StaffUser | null> {
-  const s = await auth();
-  const role = s?.user?.role;
-  return role === "ADMIN" || role === "MODERATOR" ? { id: s!.user!.id, role } : null;
-}
-
-async function adminOnly(): Promise<StaffUser | null> {
-  const s = await auth();
-  return s?.user?.role === "ADMIN" ? { id: s.user.id, role: "ADMIN" as const } : null;
-}
-
-async function audit(adminId: string, action: string, targetType?: string, targetId?: string, note?: string) {
-  await prisma.auditLog
-    .create({ data: { adminId, action, targetType, targetId: targetId ?? null, note: note ?? null } })
-    .catch(() => undefined);
-}
+import { adminOnly, audit, staff } from "@/lib/actions/_guards";
 
 async function notifyMod(userId: string, actorId: string, resourceId: string, message: string) {
   if (!userId || userId === actorId) return;
@@ -30,14 +12,14 @@ async function notifyMod(userId: string, actorId: string, resourceId: string, me
     .create({ data: { userId, actorId, type: "MODERATION", resourceId, message } })
     .catch(() => undefined);
 
-  // 审核结果邮件提醒：查资源标题组装文案
-  void (async () => {
+  // 审核结果邮件提醒：after() 在响应后继续执行（不丢任务，也不拖慢 action）
+  after(async () => {
     const resource = await prisma.resource
       .findUnique({ where: { id: resourceId }, select: { slug: true, title: true } })
       .catch(() => null);
     if (!resource) return;
     await notifyByEmail(userId, "你的投稿有审核结果", `《${resource.title}》：${message}`, `/resources/${resource.slug}`);
-  })();
+  });
 }
 
 // ---------- 审核队列 ----------
@@ -85,12 +67,17 @@ export async function rejectResourceAction(
 export async function setResourceRemoved(resourceId: string): Promise<{ ok: boolean; error?: string }> {
   const admin = await staff();
   if (!admin) return { ok: false, error: "无权限" };
-  const r = await prisma.resource.update({
+  const r = await prisma.resource.updateMany({
     where: { id: resourceId },
     data: { status: "REMOVED" },
   });
-  await audit(admin.id, "REMOVE_RESOURCE", "RESOURCE", resourceId, r.title);
-  await notifyMod(r.authorId, admin.id, resourceId, "你的内容已被下架，如有疑问请联系管理员");
+  if (r.count === 0) return { ok: false, error: "资源不存在" };
+  const res = await prisma.resource.findUnique({
+    where: { id: resourceId },
+    select: { title: true, authorId: true },
+  });
+  await audit(admin.id, "REMOVE_RESOURCE", "RESOURCE", resourceId, res?.title);
+  if (res) await notifyMod(res.authorId, admin.id, resourceId, "你的内容已被下架，如有疑问请联系管理员");
   revalidatePath("/admin");
   revalidatePath("/admin/content");
   revalidatePath("/", "layout");
@@ -100,10 +87,11 @@ export async function setResourceRemoved(resourceId: string): Promise<{ ok: bool
 export async function restoreResource(resourceId: string): Promise<{ ok: boolean; error?: string }> {
   const admin = await staff();
   if (!admin) return { ok: false, error: "无权限" };
-  await prisma.resource.update({
+  const r = await prisma.resource.updateMany({
     where: { id: resourceId },
     data: { status: "PUBLISHED", publishedAt: new Date(), rejectReason: null },
   });
+  if (r.count === 0) return { ok: false, error: "资源不存在" };
   await audit(admin.id, "RESTORE", "RESOURCE", resourceId);
   revalidatePath("/admin");
   revalidatePath("/admin/content");
@@ -153,17 +141,39 @@ export async function handleReportBatchAction(input: {
     // 已下架内容不重复动作，只关闭举报
     if (res && res.status !== "REMOVED") {
       if (input.decision === "confirm") {
-        await prisma.resource.update({ where: { id: res.id }, data: { status: "REMOVED" } });
+        // 下架 + 通知同事务：状态与提醒不会出现一边成功一边失败
+        await prisma.$transaction([
+          prisma.resource.update({ where: { id: res.id }, data: { status: "REMOVED" } }),
+          prisma.notification.create({
+            data: {
+              userId: res.authorId,
+              actorId: admin.id,
+              type: "MODERATION",
+              resourceId: res.id,
+              message: `你的内容「${res.title}」因举报被确认违规，已下架。如有疑问请联系管理员`,
+            },
+          }),
+        ]);
         await audit(admin.id, "REMOVE_RESOURCE", "RESOURCE", res.id, res.title);
-        await notifyMod(res.authorId, admin.id, res.id, `你的内容「${res.title}」因举报被确认违规，已下架。如有疑问请联系管理员`);
+        await notifyByEmail(res.authorId, "你的内容因举报被下架", `《${res.title}》：经核查确认违规，已下架。如有疑问请联系管理员`, `/resources/${res.slug}`).catch(() => undefined);
         revalidatePath(`/resources/${res.slug}`);
       } else if (res.status === "PENDING") {
-        await prisma.resource.update({
-          where: { id: res.id },
-          data: { status: "PUBLISHED", publishedAt: new Date(), rejectReason: null },
-        });
+        await prisma.$transaction([
+          prisma.resource.update({
+            where: { id: res.id },
+            data: { status: "PUBLISHED", publishedAt: new Date(), rejectReason: null },
+          }),
+          prisma.notification.create({
+            data: {
+              userId: res.authorId,
+              actorId: admin.id,
+              type: "MODERATION",
+              resourceId: res.id,
+              message: `你的内容「${res.title}」经核查无违规，已恢复上架`,
+            },
+          }),
+        ]);
         await audit(admin.id, "RESTORE", "RESOURCE", res.id);
-        await notifyMod(res.authorId, admin.id, res.id, `你的内容「${res.title}」经核查无违规，已恢复上架`);
         revalidatePath(`/resources/${res.slug}`);
       }
     }
@@ -180,7 +190,9 @@ export async function handleReportBatchAction(input: {
 export async function setUserTrusted(userId: string, trusted: boolean): Promise<{ ok: boolean; error?: string }> {
   const admin = await adminOnly();
   if (!admin) return { ok: false, error: "仅管理员可操作" };
-  await prisma.user.update({ where: { id: userId }, data: { trusted } });
+  // updateMany + count 预检：目标不存在时不抛 P2025 500，给友好错误
+  const r = await prisma.user.updateMany({ where: { id: userId }, data: { trusted } });
+  if (r.count === 0) return { ok: false, error: "用户不存在" };
   await audit(admin.id, trusted ? "TRUST" : "UNTRUST", "USER", userId);
   revalidatePath("/admin/users");
   revalidatePath("/", "layout");
@@ -194,7 +206,8 @@ export async function setUserRole(
   const admin = await adminOnly();
   if (!admin) return { ok: false, error: "仅管理员可操作" };
   if (userId === admin.id && role !== "ADMIN") return { ok: false, error: "不能修改自己的角色" };
-  await prisma.user.update({ where: { id: userId }, data: { role } });
+  const r = await prisma.user.updateMany({ where: { id: userId }, data: { role } });
+  if (r.count === 0) return { ok: false, error: "用户不存在" };
   await audit(admin.id, "SET_ROLE", "USER", userId, role);
   revalidatePath("/admin/users");
   return { ok: true };
@@ -208,10 +221,11 @@ export async function setUserBanned(
   const admin = await adminOnly();
   if (!admin) return { ok: false, error: "仅管理员可操作" };
   if (userId === admin.id) return { ok: false, error: "不能封禁自己" };
-  await prisma.user.update({
+  const r = await prisma.user.updateMany({
     where: { id: userId },
     data: banned ? { bannedAt: new Date(), bannedReason: reason?.slice(0, 200) || null, trusted: false } : { bannedAt: null, bannedReason: null },
   });
+  if (r.count === 0) return { ok: false, error: "用户不存在" };
   await audit(admin.id, banned ? "BAN" : "UNBAN", "USER", userId, banned ? reason || undefined : undefined);
   revalidatePath("/admin/users");
   return { ok: true };

@@ -49,18 +49,21 @@ export async function reportResourceAction(
     where: { targetResourceId: resourceId, status: "OPEN" },
   });
   if (resource.status === "PUBLISHED" && openCount >= REPORT_AUTO_HIDE_AT) {
-    await prisma.resource.update({
-      where: { id: resourceId },
-      data: { status: "PENDING", rejectReason: null },
-    });
-    await prisma.notification.create({
-      data: {
-        userId: resource.authorId,
-        type: "MODERATION",
-        resourceId,
-        message: `你的内容「${resource.title}」因收到 ${openCount} 条举报已转为待人工复查，核查通过后将自动恢复上架。`,
-      },
-    });
+    // 暂挂 + 通知作者同事务
+    await prisma.$transaction([
+      prisma.resource.update({
+        where: { id: resourceId },
+        data: { status: "PENDING", rejectReason: null },
+      }),
+      prisma.notification.create({
+        data: {
+          userId: resource.authorId,
+          type: "MODERATION",
+          resourceId,
+          message: `你的内容「${resource.title}」因收到 ${openCount} 条举报已转为待人工复查，核查通过后将自动恢复上架。`,
+        },
+      }),
+    ]);
     revalidatePath("/", "layout");
     revalidatePath(`/resources/${resource.slug}`);
     revalidatePath("/admin/reports");

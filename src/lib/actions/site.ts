@@ -1,8 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
+import { adminOnly, audit } from "@/lib/actions/_guards";
 import {
   DETAIL_TEMPLATE_IDS,
   SIDEBAR_KIND_META,
@@ -24,19 +24,6 @@ import {
   type WidgetAreaKey,
 } from "@/lib/site-config";
 import type { ContentType } from "@/lib/display";
-
-type Admin = { id: string };
-
-async function adminOnly(): Promise<Admin | null> {
-  const s = await auth();
-  return s?.user?.role === "ADMIN" ? { id: s.user.id } : null;
-}
-
-async function audit(adminId: string, action: string, note?: string) {
-  await prisma.auditLog
-    .create({ data: { adminId, action, targetType: "THEME", note: note ?? null } })
-    .catch(() => undefined);
-}
 
 function themeRevalidate() {
   // 前台动态页每次请求现读 DB；这里刷新路由缓存与后台自身
@@ -116,7 +103,7 @@ export async function updateSidebarFlagsAction(patch: {
   }
 
   if (!(await writeThemeDoc(doc))) return CONFLICT;
-  await audit(admin.id, "EDIT_THEME_SIDEBAR", JSON.stringify(patch));
+  await audit(admin.id, "EDIT_THEME_SIDEBAR", "THEME", undefined, JSON.stringify(patch));
   themeRevalidate();
   return { ok: true };
 }
@@ -160,7 +147,7 @@ export async function addSidebarWidgetAction(
   };
   doc.theme = withAreaWidgets(theme, area, [...getAreaWidgets(theme, area), widget]);
   if (!(await writeThemeDoc(doc))) return CONFLICT;
-  await audit(admin.id, "ADD_THEME_WIDGET", `${area}/${SIDEBAR_KIND_META[kind].label}`);
+  await audit(admin.id, "ADD_THEME_WIDGET", "THEME", undefined, `${area}/${SIDEBAR_KIND_META[kind].label}`);
   themeRevalidate();
   return { ok: true };
 }
@@ -175,7 +162,7 @@ export async function removeSidebarWidgetAction(id: string): Promise<{ ok: boole
   const w = getAreaWidgets(theme, at.area)[at.idx];
   doc.theme = withAreaWidgets(theme, at.area, getAreaWidgets(theme, at.area).filter((x) => x.id !== id));
   if (!(await writeThemeDoc(doc))) return CONFLICT;
-  await audit(admin.id, "REMOVE_THEME_WIDGET", `${at.area}/${w.kind}`);
+  await audit(admin.id, "REMOVE_THEME_WIDGET", "THEME", id, `${at.area}/${w.kind}`);
   themeRevalidate();
   return { ok: true };
 }
@@ -202,7 +189,7 @@ export async function updateSidebarWidgetAction(patch: SidebarWidgetPatch): Prom
   list[at.idx] = widget;
   doc.theme = withAreaWidgets(theme, at.area, list);
   if (!(await writeThemeDoc(doc))) return CONFLICT;
-  await audit(admin.id, "EDIT_THEME_WIDGET", `${at.area}/${widget.kind}`);
+  await audit(admin.id, "EDIT_THEME_WIDGET", "THEME", patch.id, `${at.area}/${widget.kind}`);
   themeRevalidate();
   return { ok: true };
 }
@@ -227,7 +214,7 @@ export async function reorderSidebarWidgetsAction(
   for (const w of list) if (!next.includes(w)) next.push(w);
   doc.theme = withAreaWidgets(theme, area, next);
   if (!(await writeThemeDoc(doc))) return CONFLICT;
-  await audit(admin.id, "REORDER_THEME_WIDGET", `${area}:${ids.join(",")}`);
+  await audit(admin.id, "REORDER_THEME_WIDGET", "THEME", undefined, `${area}:${ids.join(",")}`);
   themeRevalidate();
   return { ok: true };
 }
@@ -257,7 +244,7 @@ export async function setDetailTemplateAction(patch: {
     theme.detailTemplate.byType[patch.scope] = patch.value;
   }
   if (!(await writeThemeDoc(doc))) return CONFLICT;
-  await audit(admin.id, "EDIT_THEME_DETAIL_TPL", `${patch.scope}:${patch.value}`);
+  await audit(admin.id, "EDIT_THEME_DETAIL_TPL", "THEME", undefined, `${patch.scope}:${patch.value}`);
   themeRevalidate();
   return { ok: true };
 }
@@ -275,7 +262,7 @@ export async function updateNavbarAction(items: unknown): Promise<{ ok: boolean;
   const doc = await readThemeDoc();
   doc.theme.navbar.items = clean;
   if (!(await writeThemeDoc(doc))) return CONFLICT;
-  await audit(admin.id, "EDIT_THEME_NAV", clean.map((i) => i.label).join(","));
+  await audit(admin.id, "EDIT_THEME_NAV", "THEME", undefined, clean.map((i) => i.label).join(","));
   themeRevalidate();
   return { ok: true };
 }
@@ -292,7 +279,7 @@ export async function updateCategoriesMenuAction(cfg: {
   const doc = await readThemeDoc();
   doc.theme.navbar.categoriesMenu = { enabled: cfg.enabled === true, label };
   if (!(await writeThemeDoc(doc))) return CONFLICT;
-  await audit(admin.id, "EDIT_THEME_NAV", `分类菜单 ${cfg.enabled ? "开" : "关"}(${label})`);
+  await audit(admin.id, "EDIT_THEME_NAV", "THEME", undefined, `分类菜单 ${cfg.enabled ? "开" : "关"}(${label})`);
   themeRevalidate();
   return { ok: true };
 }

@@ -2,18 +2,9 @@
 
 // 管理后台媒体库：全站媒体（Media 表）列表的删除 + 管理员直传，走统一存储层。
 import { revalidatePath } from "next/cache";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
+import { audit, staff } from "@/lib/actions/_guards";
 import { makeKey, saveFile, delFile, isStorageUrl } from "@/lib/storage";
-
-type Staff = { id: string; role: "ADMIN" | "MODERATOR" };
-
-async function staff(): Promise<Staff | null> {
-  const s = await auth();
-  const role = s?.user?.role;
-  if (role !== "ADMIN" && role !== "MODERATOR") return null;
-  return { id: s!.user!.id, role };
-}
 
 /** 删除媒体：被资源（封面/图集/评论图）或头像引用时拒绝，需先解除引用 */
 export async function deleteMediaAction(mediaId: string): Promise<{ ok: boolean; error?: string }> {
@@ -38,6 +29,7 @@ export async function deleteMediaAction(mediaId: string): Promise<{ ok: boolean;
   if (avatarUser) return { ok: false, error: "该图片正被用户用作头像" };
 
   await prisma.media.delete({ where: { id: mediaId } });
+  await audit(me.id, "DELETE_MEDIA", "MEDIA", mediaId, m.fileName ?? undefined);
   // local 驱动的 del 不接受带前导斜杠的路径（越界校验），相对 key 先剥掉
   for (const k of keys) await delFile(isStorageUrl(k) ? k : k.replace(/^\/+/, "")).catch(() => {});
   revalidatePath("/admin/media");

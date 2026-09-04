@@ -1,8 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
+import { adminOnly, audit } from "@/lib/actions/_guards";
 import { publicUrl } from "@/lib/storage";
 import {
   HOME_KIND_META,
@@ -10,19 +10,6 @@ import {
   safeHomeConfig,
   type HomeSectionKind,
 } from "@/lib/home-config";
-
-type Admin = { id: string };
-
-async function adminOnly(): Promise<Admin | null> {
-  const s = await auth();
-  return s?.user?.role === "ADMIN" ? { id: s.user.id } : null;
-}
-
-async function audit(adminId: string, action: string, note?: string, targetId?: string) {
-  await prisma.auditLog
-    .create({ data: { adminId, action, targetType: "HOMESECTION", targetId: targetId ?? null, note: note ?? null } })
-    .catch(() => undefined);
-}
 
 function homeRevalidate() {
   revalidatePath("/admin/home");
@@ -65,7 +52,7 @@ export async function updateHomeSectionAction(patch: HomePatch): Promise<{ ok: b
   }
 
   await prisma.homeSection.update({ where: { id: patch.id }, data });
-  await audit(admin.id, "EDIT_HOME", `${HOME_KIND_META[kind].label}${data.title ? ` · ${data.title}` : ""}`, patch.id);
+  await audit(admin.id, "EDIT_HOME", "HOMESECTION", patch.id, `${HOME_KIND_META[kind].label}${data.title ? ` · ${data.title}` : ""}`);
   homeRevalidate();
   return { ok: true };
 }
@@ -89,7 +76,7 @@ export async function addHomeSectionAction(kind: HomeSectionKind): Promise<{ ok:
       config: JSON.stringify(cfg.data),
     },
   });
-  await audit(admin.id, "ADD_HOME", HOME_KIND_META[kind].label);
+  await audit(admin.id, "ADD_HOME", "HOMESECTION", undefined, HOME_KIND_META[kind].label);
   homeRevalidate();
   return { ok: true };
 }
@@ -102,21 +89,29 @@ export async function removeHomeSectionAction(id: string): Promise<{ ok: boolean
   if (!row) return { ok: false, error: "板块不存在" };
 
   await prisma.homeSection.delete({ where: { id } });
-  await audit(admin.id, "REMOVE_HOME", row.kind, id);
+  await audit(admin.id, "REMOVE_HOME", "HOMESECTION", id, row.kind);
   homeRevalidate();
   return { ok: true };
 }
 
-/** 整页保存排序（ids 为板块 id 列表，即最终顺序） */
+/** 整页保存排序（ids 为板块 id 列表，即最终顺序；已不存在的板块 id 自动过滤） */
 export async function reorderHomeSectionsAction(ids: string[]): Promise<{ ok: boolean; error?: string }> {
   const admin = await adminOnly();
   if (!admin) return { ok: false, error: "仅管理员可操作" };
-  const clean = ids.filter((x) => typeof x === "string").slice(0, 40);
+  // 先过滤到实际存在的板块：脏 id 会让 update 抛 P2025 导致整个事务 500
+  const rows = await prisma.homeSection.findMany({ select: { id: true } });
+  const existing = new Set(rows.map((r) => r.id));
+  const clean = ids.filter((x) => typeof x === "string" && existing.has(x)).slice(0, 40);
+  if (clean.length === 0) return { ok: true };
 
-  await prisma.$transaction(
-    clean.map((id, i) => prisma.homeSection.update({ where: { id }, data: { order: (i + 1) * 10 } }))
-  );
-  await audit(admin.id, "REORDER_HOME", clean.join(","));
+  try {
+    await prisma.$transaction(
+      clean.map((id, i) => prisma.homeSection.update({ where: { id }, data: { order: (i + 1) * 10 } }))
+    );
+  } catch {
+    return { ok: false, error: "排序保存失败，请刷新后重试" };
+  }
+  await audit(admin.id, "REORDER_HOME", "HOMESECTION", undefined, clean.join(","));
   homeRevalidate();
   return { ok: true };
 }

@@ -1,23 +1,12 @@
 "use server";
 
-// 分类/标签管理（后台 taxonomy）：全部 ADMIN 守卫 + AuditLog。
+// 分类/标签管理（后台 taxonomy）：全部 ADMIN 守卫 + AuditLog（共享 _guards）。
 import { revalidatePath } from "next/cache";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { slugify } from "@/lib/slug";
+import { adminOnly, audit } from "@/lib/actions/_guards";
 
 type Result = { ok: true } | { ok: false; error: string };
-
-async function adminOnly(): Promise<{ id: string } | null> {
-  const s = await auth();
-  return s?.user?.role === "ADMIN" ? { id: s.user.id } : null;
-}
-
-async function audit(adminId: string, action: string, note?: string) {
-  await prisma.auditLog
-    .create({ data: { adminId, action, targetType: "CATEGORY", note: note ?? null } })
-    .catch(() => undefined);
-}
 
 function revalidateAll() {
   for (const p of ["/", "/browse", "/search", "/admin/categories", "/admin/tags"]) revalidatePath(p);
@@ -40,7 +29,7 @@ export async function createCategoryAction(input: {
   const hit = await prisma.category.findUnique({ where: { slug } });
   if (hit) return { ok: false, error: `slug「${slug}」已被占用` };
   await prisma.category.create({ data: { name, slug } });
-  await audit(admin.id, "EDIT_CATEGORY", `新建分类 ${name}(${slug})`);
+  await audit(admin.id, "EDIT_CATEGORY", "CATEGORY", undefined, `新建分类 ${name}(${slug})`);
   revalidateAll();
   return { ok: true };
 }
@@ -60,12 +49,10 @@ export async function updateCategoryAction(input: {
   }
   if (typeof input.sort === "number" && Number.isFinite(input.sort)) data.sort = Math.trunc(input.sort);
   if (Object.keys(data).length === 0) return { ok: true };
-  try {
-    await prisma.category.update({ where: { id: input.id }, data });
-  } catch {
-    return { ok: false, error: "分类不存在" };
-  }
-  await audit(admin.id, "EDIT_CATEGORY", `更新分类 ${data.name ?? input.id}`);
+  // updateMany + count：目标不存在时给友好错误而非 P2025 500
+  const r = await prisma.category.updateMany({ where: { id: input.id }, data });
+  if (r.count === 0) return { ok: false, error: "分类不存在" };
+  await audit(admin.id, "EDIT_CATEGORY", "CATEGORY", input.id, `更新分类 ${data.name ?? input.id}`);
   revalidateAll();
   return { ok: true };
 }
@@ -83,7 +70,7 @@ export async function deleteCategoryAction(input: { id: string }): Promise<Resul
     return { ok: false, error: `仍有 ${c._count.resources} 个内容挂在该分类下，先移走或改挂其他分类` };
   }
   await prisma.category.delete({ where: { id: input.id } });
-  await audit(admin.id, "EDIT_CATEGORY", `删除分类 ${c.name}(${c.slug})`);
+  await audit(admin.id, "EDIT_CATEGORY", "CATEGORY", input.id, `删除分类 ${c.name}(${c.slug})`);
   revalidateAll();
   return { ok: true };
 }
@@ -119,7 +106,7 @@ export async function renameTagAction(input: { id: string; name: string }): Prom
       });
       await tx.tag.delete({ where: { id: t.id } });
     });
-    await audit(admin.id, "EDIT_TAG", `合并标签 ${t.name} → ${name}`);
+    await audit(admin.id, "EDIT_TAG", "TAG", t.id, `合并标签 ${t.name} → ${name}`);
     revalidateAll();
     return { ok: true };
   }
@@ -127,7 +114,7 @@ export async function renameTagAction(input: { id: string; name: string }): Prom
   const bySlug = await prisma.tag.findFirst({ where: { slug, id: { not: t.id } } });
   if (bySlug) return { ok: false, error: `slug「${slug}」已被标签「${bySlug.name}」占用` };
   await prisma.tag.update({ where: { id: t.id }, data: { name, slug } });
-  await audit(admin.id, "EDIT_TAG", `重命名标签 ${t.name} → ${name}`);
+  await audit(admin.id, "EDIT_TAG", "TAG", t.id, `重命名标签 ${t.name} → ${name}`);
   revalidateAll();
   return { ok: true };
 }
@@ -138,7 +125,7 @@ export async function deleteTagAction(input: { id: string }): Promise<Result> {
   const t = await prisma.tag.findUnique({ where: { id: input.id } });
   if (!t) return { ok: false, error: "标签不存在" };
   await prisma.tag.delete({ where: { id: input.id } }); // TagOnResource 级联删除
-  await audit(admin.id, "EDIT_TAG", `删除标签 ${t.name}(${t.count})`);
+  await audit(admin.id, "EDIT_TAG", "TAG", input.id, `删除标签 ${t.name}(${t.count})`);
   revalidateAll();
   return { ok: true };
 }

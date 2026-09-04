@@ -2,6 +2,8 @@
 
 import { cookies, headers } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { Prisma } from "@prisma/client";
 import sharp from "sharp";
 import { makeKey, saveFile } from "@/lib/storage";
 import { z } from "zod";
@@ -9,6 +11,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
 import { notifyByEmail } from "@/lib/mail-notify";
+import { audit } from "@/lib/actions/_guards";
 
 async function requiredUser() {
   const s = await auth();
@@ -35,9 +38,9 @@ async function notify(userId: string, actorId: string, type: "LIKE" | "COMMENT" 
     })
     .catch(() => undefined);
 
-  // 评论邮件提醒（点赞/关注仅站内，避免骚扰）；fire-and-forget，不拖慢 action
+  // 评论邮件提醒（点赞/关注仅站内，避免骚扰）；after() 在响应后执行，不丢任务也不拖慢 action
   if (type === "COMMENT" && resourceId) {
-    void (async () => {
+    after(async () => {
       const [resource, actor] = await Promise.all([
         prisma.resource.findUnique({ where: { id: resourceId }, select: { slug: true, title: true } }),
         prisma.user.findUnique({ where: { id: actorId }, select: { name: true, username: true } }),
@@ -49,7 +52,7 @@ async function notify(userId: string, actorId: string, type: "LIKE" | "COMMENT" 
         `${actor.name ?? actor.username} 在《${resource.title}》下发表了新评论，快去看看吧。`,
         `/resources/${resource.slug}#comment-${commentId ?? "comments"}`,
       );
-    })();
+    });
   }
 }
 
@@ -63,53 +66,73 @@ export async function toggleLikeAction(resourceId: string): Promise<{ liked: boo
   });
   if (!resource) return { liked: false };
 
-  const existing = await prisma.like.findUnique({
-    where: { userId_resourceId: { userId: user.id, resourceId } },
-  });
-  if (existing) {
-    await prisma.like.delete({ where: { id: existing.id } });
-    await prisma.resource.update({ where: { id: resourceId }, data: { likeCount: { decrement: 1 } } });
-    return { liked: false };
+  // 切换 + 计数同事务：不会出现点赞记录与 likeCount 脱节
+  try {
+    const liked = await prisma.$transaction(async (tx) => {
+      const existing = await tx.like.findUnique({
+        where: { userId_resourceId: { userId: user.id, resourceId } },
+        select: { id: true },
+      });
+      if (existing) {
+        await tx.like.delete({ where: { id: existing.id } });
+        await tx.resource.update({ where: { id: resourceId }, data: { likeCount: { decrement: 1 } } });
+        return false;
+      }
+      await tx.like.create({ data: { userId: user.id, resourceId } });
+      await tx.resource.update({ where: { id: resourceId }, data: { likeCount: { increment: 1 } } });
+      return true;
+    });
+    if (liked) await notify(resource.authorId, user.id, "LIKE", resourceId);
+    return { liked };
+  } catch (e) {
+    // 并发双击：唯一键冲突 → 已是点赞态，幂等返回
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") return { liked: true };
+    throw e;
   }
-  await prisma.like.create({ data: { userId: user.id, resourceId } });
-  await prisma.resource.update({ where: { id: resourceId }, data: { likeCount: { increment: 1 } } });
-  await notify(resource.authorId, user.id, "LIKE", resourceId);
-  return { liked: true };
 }
 
 // ---------- 收藏 ----------
 // 收藏时若用户还没有「默认收藏」夹子则自动创建，新收藏一律落入其中
 async function ensureDefaultCollection(userId: string): Promise<string> {
-  const existing = await prisma.collection.findFirst({
-    where: { ownerId: userId, name: "默认收藏" },
-    select: { id: true },
+  // upsert 依赖 Collection @@unique([ownerId, name])：并发首次收藏不会创建出两个默认夹
+  const col = await prisma.collection.upsert({
+    where: { ownerId_name: { ownerId: userId, name: "默认收藏" } },
+    update: {},
+    create: { ownerId: userId, name: "默认收藏" },
   });
-  if (existing) return existing.id;
-  const created = await prisma.collection.create({ data: { ownerId: userId, name: "默认收藏" } });
-  return created.id;
+  return col.id;
 }
 
 export async function toggleFavoriteAction(resourceId: string): Promise<{ favorited: boolean }> {
   const user = await requiredUser();
   if (!user) return { favorited: false };
-  const existing = await prisma.favorite.findUnique({
-    where: { userId_resourceId: { userId: user.id, resourceId } },
-  });
-  if (existing) {
-    await prisma.favorite.delete({ where: { id: existing.id } });
-    await prisma.resource.update({ where: { id: resourceId }, data: { favoriteCount: { decrement: 1 } } });
-    return { favorited: false };
-  }
   // 与 toggleLikeAction 一致：只能收藏已上架资源（防操纵未发布/已下架内容计数）
   const target = await prisma.resource.findFirst({
     where: { id: resourceId, status: "PUBLISHED" },
     select: { id: true },
   });
   if (!target) return { favorited: false };
-  const collectionId = await ensureDefaultCollection(user.id);
-  await prisma.favorite.create({ data: { userId: user.id, resourceId, collectionId } });
-  await prisma.resource.update({ where: { id: resourceId }, data: { favoriteCount: { increment: 1 } } });
-  return { favorited: true };
+  try {
+    const favorited = await prisma.$transaction(async (tx) => {
+      const existing = await tx.favorite.findUnique({
+        where: { userId_resourceId: { userId: user.id, resourceId } },
+        select: { id: true },
+      });
+      if (existing) {
+        await tx.favorite.delete({ where: { id: existing.id } });
+        await tx.resource.update({ where: { id: resourceId }, data: { favoriteCount: { decrement: 1 } } });
+        return false;
+      }
+      const collectionId = await ensureDefaultCollection(user.id);
+      await tx.favorite.create({ data: { userId: user.id, resourceId, collectionId } });
+      await tx.resource.update({ where: { id: resourceId }, data: { favoriteCount: { increment: 1 } } });
+      return true;
+    });
+    return { favorited };
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") return { favorited: true };
+    throw e;
+  }
 }
 
 /** 把已收藏的资源移动到指定夹子（collectionId 为空 = 未分组） */
@@ -168,6 +191,7 @@ export async function toggleFollowAction(targetUserId: string): Promise<{ follow
   if (!rateLimit(`follow:${user.id}`, 20, 60_000)) return { following: false };
   const existing = await prisma.follow.findUnique({
     where: { followerId_followingId: { followerId: user.id, followingId: targetUserId } },
+    select: { followerId: true },
   });
   if (existing) {
     await prisma.follow.delete({
@@ -175,7 +199,13 @@ export async function toggleFollowAction(targetUserId: string): Promise<{ follow
     });
     return { following: false };
   }
-  await prisma.follow.create({ data: { followerId: user.id, followingId: targetUserId } });
+  try {
+    await prisma.follow.create({ data: { followerId: user.id, followingId: targetUserId } });
+  } catch (e) {
+    // 并发双击：唯一键冲突 → 已是关注态，幂等返回
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") return { following: true };
+    throw e;
+  }
   await notify(targetUserId, user.id, "FOLLOW");
   return { following: true };
 }
@@ -241,45 +271,51 @@ export async function addCommentAction(_prev: CommentActionState, fd: FormData):
     if (!parent) return { error: "回复的楼层不存在" };
   }
 
-  // 附图（仅主楼，回复不带图）
+  // 附图（仅主楼，回复不带图）：先落盘，成功与否不阻断文字评论
   const images = fd.getAll("images").filter((f): f is File => f instanceof File && f.size > 0);
   if (images.length > COMMENT_IMG_MAX_COUNT) return { error: `附图最多 ${COMMENT_IMG_MAX_COUNT} 张` };
-
-  const comment = await prisma.comment.create({
-    data: {
-      resourceId: resource.id,
-      authorId: user.id,
-      parentId: parsed.data.parentId,
-      content: parsed.data.content,
-    },
-  });
-
+  let saved: { key: string; width: number; height: number; size: number }[] = [];
   if (images.length > 0) {
     try {
-      const saved = await Promise.all(images.slice(0, COMMENT_IMG_MAX_COUNT).map(saveCommentImage));
-      await prisma.media.createMany({
-        data: saved
-          .filter((x): x is { key: string; width: number; height: number; size: number } => !!x)
-          .map((m, i) => ({
-            kind: "ATTACHMENT" as const,
-            commentId: comment.id,
-            uploaderId: user.id,
-            storageKey: m.key,
-            width: m.width,
-            height: m.height,
-            size: m.size,
-            mime: "image/webp",
-            status: "READY" as const,
-            sort: i,
-          })),
-      });
+      saved = (await Promise.all(images.slice(0, COMMENT_IMG_MAX_COUNT).map(saveCommentImage))).filter(
+        (x): x is { key: string; width: number; height: number; size: number } => !!x
+      );
     } catch (e) {
       // 图片失败不阻断文字评论
       console.error("[comment-image]", e);
     }
   }
 
-  await prisma.resource.update({ where: { id: resource.id }, data: { commentCount: { increment: 1 } } });
+  // 评论 + 附图记录 + 计数同事务
+  const comment = await prisma.$transaction(async (tx) => {
+    const c = await tx.comment.create({
+      data: {
+        resourceId: resource.id,
+        authorId: user.id,
+        parentId: parsed.data.parentId,
+        content: parsed.data.content,
+      },
+    });
+    if (saved.length > 0) {
+      await tx.media.createMany({
+        data: saved.map((m, i) => ({
+          kind: "ATTACHMENT" as const,
+          commentId: c.id,
+          uploaderId: user.id,
+          storageKey: m.key,
+          width: m.width,
+          height: m.height,
+          size: m.size,
+          mime: "image/webp",
+          status: "READY" as const,
+          sort: i,
+        })),
+      });
+    }
+    await tx.resource.update({ where: { id: resource.id }, data: { commentCount: { increment: 1 } } });
+    return c;
+  });
+
   await notify(resource.authorId, user.id, "COMMENT", resource.id, comment.id);
   return { ok: true };
 }
@@ -291,13 +327,21 @@ export async function deleteCommentAction(commentId: string): Promise<{ ok: bool
   if (!comment) return { ok: false };
   const isStaff = user.role === "ADMIN" || user.role === "MODERATOR";
   if (comment.authorId !== user.id && !isStaff && comment.resource.authorId !== user.id) return { ok: false };
-  // 条件更新：只有原本公开的评论被删除才扣计数；重复删除/非公开评论不重复扣
-  const upd = await prisma.comment.updateMany({
-    where: { id: commentId, status: "PUBLIC" },
-    data: { status: "DELETED", content: "" },
+  // 条件更新 + 计数扣减同事务：只有原本公开的评论被删除才扣；重复删除/非公开评论不重复扣
+  const deleted = await prisma.$transaction(async (tx) => {
+    const upd = await tx.comment.updateMany({
+      where: { id: commentId, status: "PUBLIC" },
+      data: { status: "DELETED", content: "" },
+    });
+    if (upd.count > 0) {
+      await tx.resource.update({ where: { id: comment.resourceId }, data: { commentCount: { decrement: 1 } } });
+      return true;
+    }
+    return false;
   });
-  if (upd.count > 0) {
-    await prisma.resource.update({ where: { id: comment.resourceId }, data: { commentCount: { decrement: 1 } } });
+  // 非作者删除（版主/资源作者介入治理）落审计
+  if (deleted && comment.authorId !== user.id) {
+    await audit(user.id, "DELETE_COMMENT", "COMMENT", commentId, `by ${user.role}`);
   }
   return { ok: true };
 }
