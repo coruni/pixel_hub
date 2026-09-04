@@ -1,12 +1,10 @@
-"use client";
-
 import Link from "next/link";
 import ReactMarkdown, { type Components } from "react-markdown";
 
 const EXTERNAL = /^https?:\/\//i;
 
 /**
- * 全站统一的 Markdown 渲染（client 边界，服务端组件不能直接跑 react-markdown 时的入口）。
+ * 全站统一的 Markdown 渲染（可在服务端或客户端组件中使用；react-markdown 为纯渲染、无 hooks）。
  * 安全：react-markdown 默认不渲染原始 HTML；javascript: 等危险协议会被其默认 transform 剥离。
  *
  * 用法：外层用 <div className="md-body …"> 包裹以套用 globals.css 排版。

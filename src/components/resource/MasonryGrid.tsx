@@ -1,5 +1,6 @@
 "use client";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { clampedAspect } from "@/lib/display";
 import type { FeedCard } from "@/lib/queries";
 import ResourceCard from "./ResourceCard";
 
@@ -8,8 +9,8 @@ const BODY_PX = 2; // 卡片边框近似高（信息全覆盖图后无图下统�
 function aspectOf(it: FeedCard) {
   const cw = it.cover?.width && it.cover.width > 0 ? it.cover.width : 3;
   const ch = it.cover?.height && it.cover.height > 0 ? it.cover.height : 2;
-  // 与 ResourceCard 一致：封面比例限幅 [4/3, 3/4]（竖图不拉长、横图不超矮）
-  return { cw, ch: Math.min(Math.max(ch, (cw * 3) / 4), (cw * 4) / 3) };
+  // 与 ResourceCard 同一限幅（lib/display 的 clampedAspect），列高估算才不偏
+  return { cw, ch: cw * clampedAspect(cw, ch) };
 }
 function colsForWidth(w: number, maxCols: number) {
   // w 是容器 clientWidth（max-w-7xl 页面在 xl 视口下只有 1232px，达不到 1280），

@@ -126,17 +126,22 @@ export async function handleReportBatchAction(input: {
   const admin = await staff();
   if (!admin) return { ok: false, error: "无权限" };
 
-  const where =
-    input.type === "RESOURCE"
-      ? { targetResourceId: input.resourceId ?? null }
-      : input.type === "COMMENT"
-        ? { targetCommentId: input.commentId ?? null }
-        : { targetUserId: input.userId ?? null };
+  // 目标 id 必须与 type 匹配且非空，否则 where 落到「该列为 null 的全部举报」误关别类举报
+  const targetId = input.resourceId ?? input.commentId ?? input.userId ?? "";
+  if (!targetId || targetId === "?") return { ok: false, error: "缺少举报目标" };
+
   const closed = await prisma.report.updateMany({
-    where: { ...where, status: "OPEN" },
+    where: {
+      type: input.type,
+      status: "OPEN",
+      ...(input.type === "RESOURCE"
+        ? { targetResourceId: targetId }
+        : input.type === "COMMENT"
+          ? { targetCommentId: targetId }
+          : { targetUserId: targetId }),
+    },
     data: { status: input.decision === "confirm" ? "RESOLVED" : "DISMISSED", handledBy: admin.id, handledAt: new Date() },
   });
-  const targetId = input.resourceId ?? input.commentId ?? input.userId ?? "?";
   if (closed.count === 0) return { ok: false, error: "没有待处理举报" };
   await audit(admin.id, input.decision === "confirm" ? "REPORT_RESOLVE" : "REPORT_DISMISS", input.type, targetId);
 

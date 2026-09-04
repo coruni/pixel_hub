@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Download, Gamepad2, Heart, Image as ImageIcon, MessageSquare, Newspaper, Star } from "lucide-react";
 import type { FeedCard } from "@/lib/queries";
 import { formatCount } from "@/lib/format";
-import { CARD_RATIOS, type CardRatio } from "@/lib/display";
+import { CARD_RATIOS, clampedAspect, type CardRatio } from "@/lib/display";
 
 const typeLabel: Record<string, string> = { GAME: "游戏", IMAGE: "图片", ARTICLE: "文章" };
 
@@ -28,11 +28,11 @@ export default function ResourceCard({
  const meta = item.category?.name ?? typeLabel[item.type] ?? item.type;
 
  // uniform 且显式给了比例 → 按选择裁切；uniform 未给比例 → 沿用 4:3 网格默认
- // 瀑布流（非 uniform）：保留原图比例但限幅 [4/3, 3/4] ——
+ // 瀑布流（非 uniform）：保留原图比例但限幅 [3/4, 4/3] ——
  // 竖图封顶 3/4 不拉长卡片；横图最扁 4/3，避免超矮卡上信息层盖满整图
  const boxAspect = uniform
  ? (ratio && ratio !== "auto" ? CARD_RATIOS[ratio].aspect : undefined) ?? "4 / 3"
- : String(Math.min(Math.max(w / h, 4 / 3), 3 / 4));
+ : String(clampedAspect(w, h));
 
  return (
  <Link

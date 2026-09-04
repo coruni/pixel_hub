@@ -38,17 +38,36 @@ export async function GET(req: NextRequest) {
     : [];
   const statsMap = new Map(authorStats.map((u) => [u.id, u]));
 
+  // 深层回复的被回复评论（引用卡需要原文）：父楼层可能早于 since，不在上面结果集里，单独补查
+  const fetchedIds = new Set(comments.map((c) => c.id));
+  const parentIds = [...new Set(comments.filter((c) => c.parentId).map((c) => c.parentId!))].filter(
+    (id) => !fetchedIds.has(id)
+  );
+  const parents = parentIds.length
+    ? await prisma.comment.findMany({
+        where: { id: { in: parentIds }, status: "PUBLIC" },
+        select: { id: true, parentId: true, content: true, author: { select: { username: true, name: true } } },
+      })
+    : [];
+  const parentMap = new Map(parents.map((p) => [p.id, p]));
+
   // 服务端时钟给客户端做下一轮 since 基准，避免客户端时钟偏差
   const now = new Date();
 
   const items = comments.map((c) => {
     const s = statsMap.get(c.authorId);
+    const parent = c.parentId ? parentMap.get(c.parentId) : undefined;
     return {
       id: c.id,
       parentId: c.parentId,
       authorId: c.authorId,
       content: c.content,
       createdAt: c.createdAt,
+      // 与 SSR 展平逻辑一致：二级回复为 null；深层回复指向被回复评论
+      replyTo:
+        parent && parent.parentId
+          ? { id: parent.id, name: parent.author.name ?? parent.author.username, content: parent.content }
+          : null,
       author: {
         username: c.author.username,
         name: c.author.name,

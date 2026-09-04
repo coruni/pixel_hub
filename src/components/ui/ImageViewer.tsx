@@ -137,7 +137,12 @@ export default function ImageViewer({
       onClick={onClose}
       onWheel={onWheel}
     >
-      <button className="absolute right-5 top-5 z-30 p-1 text-white/70 transition hover:text-white" aria-label="关闭">
+      <button
+        type="button"
+        onClick={onClose}
+        className="absolute right-5 top-5 z-30 p-1 text-white/70 transition hover:text-white"
+        aria-label="关闭"
+      >
         <X size={24} />
       </button>
 

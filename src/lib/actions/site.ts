@@ -214,7 +214,7 @@ export async function reorderSidebarWidgetsAction(
 
 export async function setDetailTemplateAction(patch: {
   scope: "default" | ContentType;
-  value: DetailTemplateId;
+  value: DetailTemplateId | "";
 }): Promise<{ ok: boolean; error?: string }> {
   const admin = await adminOnly();
   if (!admin) return { ok: false, error: "仅管理员可操作" };
@@ -222,8 +222,15 @@ export async function setDetailTemplateAction(patch: {
     return { ok: false, error: "作用域不合法" };
 
   const theme = await readThemeDoc();
-  if (patch.scope === "default") theme.detailTemplate.default = patch.value;
-  else theme.detailTemplate.byType[patch.scope] = patch.value;
+  if (patch.scope === "default") {
+    if (!patch.value) return { ok: false, error: "模板不合法" };
+    theme.detailTemplate.default = patch.value;
+  } else if (patch.value === "") {
+    // 空值 = 清除类型覆盖，跟随全局默认
+    delete theme.detailTemplate.byType[patch.scope];
+  } else {
+    theme.detailTemplate.byType[patch.scope] = patch.value;
+  }
   await writeThemeDoc(theme);
   await audit(admin.id, "EDIT_THEME_DETAIL_TPL", `${patch.scope}:${patch.value}`);
   themeRevalidate();

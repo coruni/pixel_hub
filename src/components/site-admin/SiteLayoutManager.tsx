@@ -619,31 +619,43 @@ function DetailTemplateCard({
  { scope: "GAME", label: "游戏覆盖" },
  { scope: "ARTICLE", label: "文章覆盖" },
  ];
- const val = (scope: string): DetailTemplateId =>
- scope === "default" ? theme.detailTemplate.default : theme.detailTemplate.byType[scope as ContentType] ?? theme.detailTemplate.default;
+ const val = (scope: string): DetailTemplateId | "" =>
+ scope === "default"
+ ? theme.detailTemplate.default
+ : theme.detailTemplate.byType[scope as ContentType] ?? "";
 
  return (
  <section className="rounded-none border border-brand-200 bg-surface p-5">
  <h2 className="text-base font-semibold text-neutral-900">详情页模板</h2>
- <p className="mt-0.5 text-xs text-neutral-500">选择资源详情页的版式。单资源按「类型覆盖 &gt; 全局默认」生效；选择后立即保存。</p>
+ <p className="mt-0.5 text-xs text-neutral-500">
+ 选择资源详情页的版式。单资源按「类型覆盖 &gt; 全局默认」生效；类型覆盖选「跟随全局」即清除，选择后立即保存。
+ </p>
  <div className="mt-3 grid gap-3 sm:grid-cols-3">
- {rows.map((r) => (
+ {rows.map((r) => {
+ const v = val(r.scope);
+ return (
  <label key={r.scope} className="block">
  <span className="mb-1.5 block text-xs font-medium text-neutral-500">{r.label}</span>
  <select
- value={val(r.scope)}
- onChange={(e) => run(() => setDetailTemplateAction({ scope: r.scope, value: e.target.value as DetailTemplateId }))}
+ value={v}
+ onChange={(e) => run(() => setDetailTemplateAction({ scope: r.scope, value: e.target.value as DetailTemplateId | "" }))}
  className="w-full rounded-none border border-brand-200 bg-surface px-3 py-2 text-sm outline-none focus:border-brand-500"
  >
+ {r.scope !== "default" && (
+ <option value="">跟随全局默认</option>
+ )}
  {DETAIL_TEMPLATE_IDS.map((id) => (
  <option key={id} value={id}>
  {DETAIL_TEMPLATE_META[id].label}
  </option>
  ))}
  </select>
- <span className="mt-1 block text-[11px] text-neutral-400">{DETAIL_TEMPLATE_META[val(r.scope)].desc}</span>
+ <span className="mt-1 block text-[11px] text-neutral-400">
+ {DETAIL_TEMPLATE_META[v || theme.detailTemplate.default].desc}
+ </span>
  </label>
- ))}
+ );
+ })}
  </div>
  </section>
  );

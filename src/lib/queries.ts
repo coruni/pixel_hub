@@ -292,20 +292,30 @@ export async function getResourceDetail(slug: string, viewerId?: string) {
   const commentMap = new Map(allComments.map((c) => [c.id, c]));
   const rootIdOf = (c: (typeof allComments)[number]): string => {
     let cur = c;
-    while (cur.parentId) cur = commentMap.get(cur.parentId)!;
+    while (cur.parentId) {
+      const p = commentMap.get(cur.parentId);
+      // 祖先楼层已被删除（不在 PUBLIC 集合）→ 上溯链断裂，当前可达的最早祖先视为根
+      if (!p) break;
+      cur = p;
+    }
     return cur.id;
   };
   const replyName = (a: { username: string; name: string | null }) => a.name ?? a.username;
-  const repliesByRoot = new Map<string, { c: (typeof allComments)[number]; replyTo: { id: string; name: string } | null }[]>();
+  const repliesByRoot = new Map<
+    string,
+    { c: (typeof allComments)[number]; replyTo: { id: string; name: string; content: string } | null }[]
+  >();
   for (const c of allComments) {
     if (!c.parentId) continue;
     const rootId = rootIdOf(c);
     const list = repliesByRoot.get(rootId) ?? [];
-    const parent = commentMap.get(c.parentId)!;
-    // 二级回复 replyTo 为 null；深层回复指向被回复评论（供 UI hover 卡片定位）
+    const parent = commentMap.get(c.parentId);
+    // 二级回复 replyTo 为 null；深层回复指向被回复评论（供 UI hover 卡片定位、引用卡显示原文）
     list.push({
       c,
-      replyTo: parent.parentId ? { id: parent.id, name: replyName(parent.author) } : null,
+      replyTo: parent?.parentId
+        ? { id: parent.id, name: replyName(parent.author), content: parent.content }
+        : null,
     });
     repliesByRoot.set(rootId, list);
   }

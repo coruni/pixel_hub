@@ -40,3 +40,11 @@ export const CARD_RATIOS: Record<CardRatio, { label: string; aspect?: string }> 
   "3:4": { label: "3:4 竖图", aspect: "3 / 4" },
 };
 
+/**
+ * 瀑布流封面比例限幅：宽高比 clamp 到 [3/4, 4/3]（竖图不拉长卡片、横图不超矮）。
+ * 卡片渲染（ResourceCard）与列高估算（MasonryGrid）共用，保证两边一致。
+ */
+export function clampedAspect(w: number, h: number): number {
+  return Math.min(Math.max(w / h, 3 / 4), 4 / 3);
+}
+

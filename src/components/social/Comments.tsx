@@ -32,8 +32,8 @@ export type CommentShape = {
  content: string;
  createdAt: string | Date;
  author: CommentAuthor;
- // 展平后深层回复的被回复人（二级回复为 null）
- replyTo?: { id: string; name: string } | null;
+ // 展平后深层回复的被回复人（二级回复为 null；content 供引用卡显示被回复原文）
+ replyTo?: { id: string; name: string; content: string } | null;
  }[];
 };
 
@@ -77,7 +77,7 @@ export default function Comments({
   createdAt: string | Date;
   author: CommentAuthor;
   images?: CommentImage[];
-  replyTo?: { id: string; name: string } | null;
+  replyTo?: { id: string; name: string; content: string } | null;
  };
 
  // liveComments 初值直接用 props：SSR/hydration 首轮就要渲染评论，
@@ -432,7 +432,7 @@ export default function Comments({
  <span className="text-[11px] text-neutral-400">
  回复{" "}
  <CommentHoverCard
- data={{ id: rp.replyTo.id, content: rp.content, author: rp.replyTo.name }}
+ data={{ id: rp.replyTo.id, content: rp.replyTo.content, author: rp.replyTo.name }}
  rootId={c.id}
  onNavigate={navigateToComment}
  />

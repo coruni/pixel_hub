@@ -291,8 +291,14 @@ export async function deleteCommentAction(commentId: string): Promise<{ ok: bool
   if (!comment) return { ok: false };
   const isStaff = user.role === "ADMIN" || user.role === "MODERATOR";
   if (comment.authorId !== user.id && !isStaff && comment.resource.authorId !== user.id) return { ok: false };
-  await prisma.comment.update({ where: { id: commentId }, data: { status: "DELETED", content: "" } });
-  await prisma.resource.update({ where: { id: comment.resourceId }, data: { commentCount: { decrement: 1 } } });
+  // 条件更新：只有原本公开的评论被删除才扣计数；重复删除/非公开评论不重复扣
+  const upd = await prisma.comment.updateMany({
+    where: { id: commentId, status: "PUBLIC" },
+    data: { status: "DELETED", content: "" },
+  });
+  if (upd.count > 0) {
+    await prisma.resource.update({ where: { id: comment.resourceId }, data: { commentCount: { decrement: 1 } } });
+  }
   return { ok: true };
 }
 

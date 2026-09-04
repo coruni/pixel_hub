@@ -24,7 +24,6 @@ export default async function UsersPage() {
  <div>
  <div className="mb-4 flex items-center justify-between">
  <h2 className="text-lg font-medium text-neutral-900">用户（{rows.length}）</h2>
- {!isAdmin && <span className="text-xs text-neutral-400">仅管理员可修改用户状态</span>}
  </div>
 
  <div className="overflow-x-auto rounded-none border border-brand-200 bg-surface">

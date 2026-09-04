@@ -483,10 +483,9 @@ export function parseTheme(raw: unknown): Theme {
 
   const byTypeRaw = (dt.byType && typeof dt.byType === "object" ? dt.byType : {}) as Record<string, unknown>;
   const defaultTpl = pickTemplate(dt.default, DEFAULT_THEME.detailTemplate.default);
-  // byType 缺省时并入内置默认（GAME→banner 等），保证未显式覆盖也能按类型差异出版式
-  const byImage = DEFAULT_THEME.detailTemplate.byType.IMAGE ?? defaultTpl;
-  const byGame = DEFAULT_THEME.detailTemplate.byType.GAME ?? defaultTpl;
-  const byArticle = DEFAULT_THEME.detailTemplate.byType.ARTICLE ?? defaultTpl;
+  // 文档里显式有 detailTemplate → 未覆盖的类型走「全局默认」（该选项真正生效）；
+  // 完全没配过（新站/旧文档）才整体沿用内置按类型默认（GAME→banner 等差异版式）。
+  const templateConfigured = o.detailTemplate !== undefined && typeof o.detailTemplate === "object";
 
   // 导航：坏数据/空列表回退内置默认
   const navRaw = (o.navbar && typeof o.navbar === "object" ? o.navbar : {}) as Record<string, unknown>;
@@ -529,11 +528,15 @@ export function parseTheme(raw: unknown): Theme {
     },
     detailTemplate: {
       default: defaultTpl,
-      byType: {
-        IMAGE: byTypeRaw.IMAGE !== undefined ? pickTemplate(byTypeRaw.IMAGE, byImage) : byImage,
-        GAME: byTypeRaw.GAME !== undefined ? pickTemplate(byTypeRaw.GAME, byGame) : byGame,
-        ARTICLE: byTypeRaw.ARTICLE !== undefined ? pickTemplate(byTypeRaw.ARTICLE, byArticle) : byArticle,
-      },
+      // 只保留显式覆盖过的类型（清除覆盖=跟随全局后不会被读取-回写复活，resolveDetailTemplate 兜底默认）；
+      // 完全没配过 detailTemplate 的文档整体沿用内置按类型默认
+      byType: templateConfigured
+        ? {
+            ...(typeof byTypeRaw.IMAGE === "string" ? { IMAGE: pickTemplate(byTypeRaw.IMAGE, defaultTpl) } : {}),
+            ...(typeof byTypeRaw.GAME === "string" ? { GAME: pickTemplate(byTypeRaw.GAME, defaultTpl) } : {}),
+            ...(typeof byTypeRaw.ARTICLE === "string" ? { ARTICLE: pickTemplate(byTypeRaw.ARTICLE, defaultTpl) } : {}),
+          }
+        : { ...DEFAULT_THEME.detailTemplate.byType },
     },
   };
 }

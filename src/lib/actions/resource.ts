@@ -6,7 +6,7 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { imageMetaSchema, gameMetaSchema, articleMetaSchema } from "@/lib/meta";
-import { uniqueSlug, slugify } from "@/lib/slug";
+import { randomTail, uniqueSlug, slugify } from "@/lib/slug";
 import { revalidatePath } from "next/cache";
 
 export type ResourceActionState = {
@@ -150,12 +150,14 @@ export async function createResourceAction(
         ),
       ].slice(0, 12);
       for (const name of names) {
-        const slugName = slugify(name) || (await uniqueSlug(`tag-${name}`));
+        // 标签 slug：直接取名称 slugify；纯符号名 slugify 为空时用随机串兜底（不走 uniqueSlug——它查的是 resource 表）
+        const slugName = slugify(name) || `tag-${randomTail()}`;
         const tag = await tx.tag.upsert({ where: { slug: slugName }, update: {}, create: { slug: slugName, name } });
-        await tx.tagOnResource
+        const link = await tx.tagOnResource
           .create({ data: { resourceId: r.id, tagId: tag.id } })
-          .catch(() => undefined); // 并发去重
-        await tx.tag.update({ where: { id: tag.id }, data: { count: { increment: 1 } } });
+          .catch(() => null); // 并发去重
+        // 只有真正建立了关联才计数，重复关联不重复加
+        if (link) await tx.tag.update({ where: { id: tag.id }, data: { count: { increment: 1 } } });
       }
 
       // 认领已上传的媒体并排序（只认领本人上传、未被占用的孤儿媒体；防把他人素材挂进自己资源）
