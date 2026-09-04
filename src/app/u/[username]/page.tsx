@@ -14,7 +14,10 @@ import { FollowButton } from "@/components/social/interactions";
 
 export async function generateMetadata({ params }: { params: Promise<{ username: string }> }): Promise<Metadata> {
  const { username } = await params;
- const p = await getProfile(username);
+ // 与 page 同参（含 viewerId）：cache() 同请求去重
+ const session = await auth();
+ const meId = typeof session?.user?.id === "string" && session.user.id ? session.user.id : undefined;
+ const p = await getProfile(username, meId);
  return { title: p ? `${p.name ?? p.username} · 个人主页` : "用户不存在" };
 }
 

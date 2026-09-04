@@ -121,6 +121,27 @@ type FeedRow = {
   } | null;
 };
 
+// Feed 列表实际用到的字段（显式 select：不取 description/meta 等大字段）
+const feedSelect = {
+  id: true,
+  slug: true,
+  title: true,
+  summary: true,
+  type: true,
+  publishedAt: true,
+  createdAt: true,
+  likeCount: true,
+  viewCount: true,
+  favoriteCount: true,
+  commentCount: true,
+  downloadCount: true,
+  loginRequired: true,
+  coverMedia: { select: coverSelect },
+  author: { select: { username: true, name: true } },
+  category: { select: { slug: true, name: true } },
+  tags: { select: { tag: { select: { slug: true, name: true } } } },
+} satisfies Prisma.ResourceSelect;
+
 function toFeedItem(r: FeedRow): FeedItem {
   return {
     id: r.id,
@@ -168,9 +189,11 @@ export async function getFeed(params: FeedParams): Promise<{ items: FeedItem[]; 
   } else if (params.tagSlug) {
     where.tags = { some: { tag: { slug: params.tagSlug } } };
   }
-  if (params.authorUsername) where.author = { username: params.authorUsername };
-  if (params.followOnlyOf)
-    where.authorId = { in: (await prisma.follow.findMany({ where: { followerId: params.followOnlyOf }, select: { followingId: true } })).map((f) => f.followingId) };
+  // 作者过滤合并进嵌套关系（followOnlyOf 不再预查全量关注列表）
+  const authorFilter: Prisma.UserWhereInput = {};
+  if (params.authorUsername) authorFilter.username = params.authorUsername;
+  if (params.followOnlyOf) authorFilter.followers = { some: { followerId: params.followOnlyOf } };
+  if (Object.keys(authorFilter).length > 0) where.author = { is: authorFilter };
   if (params.ids && params.ids.length > 0) where.id = { in: params.ids };
   if (params.q) {
     where.OR = [
@@ -188,24 +211,20 @@ export async function getFeed(params: FeedParams): Promise<{ items: FeedItem[]; 
     where.publishedAt = { gte: new Date(Date.now() - days * 24 * 3600 * 1000) };
   }
 
+  // 排序带 id 决胜：同值时结果稳定（分页翻页不跳动）
   const orderBy: Prisma.ResourceOrderByWithRelationInput[] =
     params.sort === "popular"
-      ? [{ likeCount: "desc" }, { publishedAt: "desc" }]
+      ? [{ likeCount: "desc" }, { publishedAt: "desc" }, { id: "desc" }]
       : params.sort === "downloads"
-        ? [{ downloadCount: "desc" }, { publishedAt: "desc" }]
-        : [{ publishedAt: "desc" }];
+        ? [{ downloadCount: "desc" }, { publishedAt: "desc" }, { id: "desc" }]
+        : [{ publishedAt: "desc" }, { createdAt: "desc" }, { id: "desc" }];
 
   const rows = await prisma.resource.findMany({
     where,
     orderBy,
     take: pageSize + 1,
     skip: (page - 1) * pageSize,
-    include: {
-      coverMedia: { select: coverSelect },
-      author: { select: { username: true, name: true } },
-      category: { select: { slug: true, name: true } },
-      tags: { select: { tag: { select: { slug: true, name: true } } }, orderBy: { resourceId: "asc" } },
-    },
+    select: feedSelect,
   });
   const hasMore = rows.length > pageSize;
   return { items: rows.slice(0, pageSize).map(toFeedItem), page, hasMore };
@@ -222,7 +241,8 @@ export const getTopTags = cache(async (limit = 24) => {
 
 export type ResourceDetail = Awaited<ReturnType<typeof getResourceDetail>>;
 
-export async function getResourceDetail(slug: string, viewerId?: string) {
+// cache()：同请求内 metadata 与 page 各调一次时只查一遍库（两处须传相同 viewerId）
+export const getResourceDetail = cache(async (slug: string, viewerId?: string) => {
   const where: Prisma.ResourceWhereInput = { slug };
   if (!viewerId) where.status = "PUBLISHED";
 
@@ -237,7 +257,7 @@ export async function getResourceDetail(slug: string, viewerId?: string) {
         orderBy: { sort: "asc" },
         select: { id: true, thumbKey: true, bigKey: true, storageKey: true, width: true, height: true, placeholder: true },
       },
-      versions: { orderBy: { createdAt: "desc" } },
+      versions: { orderBy: { createdAt: "desc" }, take: 20 },
       _count: { select: { likes: true } },
     },
   });
@@ -255,13 +275,17 @@ export async function getResourceDetail(slug: string, viewerId?: string) {
   let viewerStates = { liked: false, favorited: false, favoriteCollectionId: null as string | null, followingAuthor: false };
   if (viewerId) {
     const [lk, fv, fl] = await Promise.all([
-      prisma.like.findUnique({ where: { userId_resourceId: { userId: viewerId, resourceId: resource.id } } }),
+      prisma.like.findUnique({
+        where: { userId_resourceId: { userId: viewerId, resourceId: resource.id } },
+        select: { id: true },
+      }),
       prisma.favorite.findUnique({
         where: { userId_resourceId: { userId: viewerId, resourceId: resource.id } },
         select: { collectionId: true },
       }),
       prisma.follow.findUnique({
         where: { followerId_followingId: { followerId: viewerId, followingId: resource.authorId } },
+        select: { followerId: true },
       }),
     ]);
     viewerStates = {
@@ -272,16 +296,19 @@ export async function getResourceDetail(slug: string, viewerId?: string) {
     };
   }
 
-  // 一次取全部评论，在内存里展平：二级以下的回复全部挂到根楼层下（按时间序），
+  // 一次取评论（软上限：取最新 200 条再正序），在内存里展平：二级以下的回复全部挂到根楼层下（按时间序），
   // 避免嵌套多层；深层回复带上 replyTo（被回复人）供 UI 显示 "回复 @xx"
-  const allComments = await prisma.comment.findMany({
-    where: { resourceId: resource.id, status: "PUBLIC" },
-    orderBy: { createdAt: "asc" },
-    include: {
-      author: { select: { username: true, name: true, avatarKey: true, bio: true, role: true, trusted: true, createdAt: true } },
-      media: { orderBy: { sort: "asc" }, select: { storageKey: true, width: true, height: true } },
-    },
-  });
+  const allComments = (
+    await prisma.comment.findMany({
+      where: { resourceId: resource.id, status: "PUBLIC" },
+      orderBy: { createdAt: "desc" },
+      take: 200,
+      include: {
+        author: { select: { username: true, name: true, avatarKey: true, bio: true, role: true, trusted: true, createdAt: true } },
+        media: { orderBy: { sort: "asc" }, select: { storageKey: true, width: true, height: true } },
+      },
+    })
+  ).reverse();
   // 用户 hover 卡片统计（作品数/关注者数）+ 在线状态，authorId 批量查一次
   const authorIds = [...new Set(allComments.map((c) => c.authorId))];
   const authorStats = await prisma.user.findMany({
@@ -350,8 +377,11 @@ export async function getResourceDetail(slug: string, viewerId?: string) {
   const toCommentImages = (ms: { storageKey: string; width: number | null; height: number | null }[]) =>
     ms.map((m) => ({ url: publicUrl(m.storageKey), width: m.width, height: m.height }));
 
+  // media 已映射为 gallery，不再随返回值重复序列化（原对象含多个 storage key 字段）
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { media: _media, ...resourceRest } = resource;
   return {
-    ...resource,
+    ...resourceRest,
     gallery,
     author: {
       id: resource.author.id,
@@ -386,7 +416,7 @@ export async function getResourceDetail(slug: string, viewerId?: string) {
       })),
     viewer: viewerStates,
   };
-}
+});
 
 // ---------- 相关推荐 ----------
 // 同分类热门优先，不足补同类型热门（排除自身与已取条目），复用 getFeed 的取数逻辑
@@ -438,7 +468,8 @@ export type UserProfile = {
   online: boolean;
 };
 
-export async function getProfile(username: string, viewerId?: string): Promise<UserProfile | null> {
+// cache()：同请求内 metadata 与 page 各调一次时只查一遍库（两处须传相同 viewerId）
+export const getProfile = cache(async (username: string, viewerId?: string): Promise<UserProfile | null> => {
   const user = await prisma.user.findUnique({
     where: { username },
     select: {
@@ -460,6 +491,7 @@ export async function getProfile(username: string, viewerId?: string): Promise<U
   if (viewerId && !isViewer) {
     following = !!(await prisma.follow.findUnique({
       where: { followerId_followingId: { followerId: viewerId, followingId: user.id } },
+      select: { followerId: true },
     }));
   }
   return {
@@ -478,7 +510,7 @@ export async function getProfile(username: string, viewerId?: string): Promise<U
     following,
     online: isOnline(user.lastSeenAt),
   };
-}
+});
 
 // ---------- 收藏夹 ----------
 export type CollectionRow = { id: string; name: string; count: number };
@@ -493,7 +525,8 @@ export async function getCollections(userId: string): Promise<CollectionRow[]> {
 }
 
 // 收藏夹详情：owner 本人或 isPublic 才可见；条目按收藏时间倒序（FeedCard 形状喂 MasonryGrid）
-export async function getCollectionDetail(id: string, viewerId?: string) {
+// cache()：同请求内 metadata 与 page 各调一次时只查一遍库（两处须传相同 viewerId）
+export const getCollectionDetail = cache(async (id: string, viewerId?: string) => {
   const col = await prisma.collection.findUnique({
     where: { id },
     include: {
@@ -504,14 +537,7 @@ export async function getCollectionDetail(id: string, viewerId?: string) {
         // 只展示已上架资源：未发布/被下架内容不能经公开夹子绕过 detail 页守卫
         where: { resource: { status: "PUBLISHED" } },
         include: {
-          resource: {
-            include: {
-              coverMedia: { select: coverSelect },
-              author: { select: { username: true, name: true } },
-              category: { select: { slug: true, name: true } },
-              tags: { select: { tag: { select: { slug: true, name: true } } } },
-            },
-          },
+          resource: { select: feedSelect },
         },
       },
     },
@@ -526,9 +552,9 @@ export async function getCollectionDetail(id: string, viewerId?: string) {
     isOwner: col.ownerId === viewerId,
     owner: col.owner,
     createdAt: col.createdAt,
-    items: col.items.map((f) => toFeedCard(toFeedItem({ ...f.resource, publishedAt: f.resource.publishedAt } as FeedRow))),
+    items: col.items.map((f) => toFeedCard(toFeedItem(f.resource as FeedRow))),
   };
-}
+});
 
 // ---------- 通知 ----------
 export type NotificationRow = {

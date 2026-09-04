@@ -24,7 +24,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   // 注意不能按 status 判断——草稿/待审的作者预览也走这里
   const exists = await prisma.resource.findUnique({ where: { slug }, select: { id: true } });
   if (!exists) notFound();
-  const r = await getResourceDetail(slug);
+  // 与 page 同参（含 viewerId）：cache() 同请求去重，草稿预览也能拿到真实标题
+  const session = await auth();
+  const meId = typeof session?.user?.id === "string" && session.user.id ? session.user.id : undefined;
+  const r = await getResourceDetail(slug, meId);
   if (!r || r.status !== "PUBLISHED") return { title: r?.title ?? "未发布内容", robots: { index: false } };
 
   const description = r.summary ?? `${r.author.name ?? "@" + r.author.username} 分享的${typeLabel[r.type] ?? "资源"}`;

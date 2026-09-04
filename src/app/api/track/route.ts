@@ -33,6 +33,16 @@ export async function POST(req: NextRequest) {
 
  await prisma.visit.create({ data: { day, ipHash, path } });
 
+ // 访问明细保留 180 天：约 1% 的请求顺带清理过期行（机会式保留，免去定时任务；
+ // 按 day 前缀比较可命中索引，YYYY-MM-DD 字典序即时间序）
+ if (Math.random() < 0.01) {
+ const cutoff = new Date(Date.now() - 180 * 24 * 3600 * 1000);
+ const cutoffDay = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, "0")}-${String(
+ cutoff.getDate(),
+ ).padStart(2, "0")}`;
+ void prisma.visit.deleteMany({ where: { day: { lt: cutoffDay } } }).catch(() => {});
+ }
+
  // 资源详情页浏览量与 PV 同链路采集（bumpView 无调用方，viewCount 从不增长的旧 bug）
  // updateMany：slug 不存在/未发布时静默不计数；同 IP 限流天然防刷
  const slug = path.match(/^\/resources\/([^/?#]+)/)?.[1];
