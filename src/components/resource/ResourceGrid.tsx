@@ -29,11 +29,9 @@ export default function ResourceGrid({
   }
 
   if (display === "card") {
-    // 列数按容器宽（非视口）：带侧栏的主列 ~888px 给 3 列，全宽 1232px 给 4 列，避免窄主列里卡片过挤
+    // 列数用标准视口断点：移动 2 / md(iPad) 3 / lg(PC) 4
     return (
-      <div
-        className={`@container grid grid-cols-2 gap-4 @[700px]:grid-cols-3 @[1200px]:grid-cols-4 ${className}`}
-      >
+      <div className={`grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 ${className}`}>
         {items.map((item) => (
           <ResourceCard key={item.id} item={item} uniform ratio={ratio} />
         ))}

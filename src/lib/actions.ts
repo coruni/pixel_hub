@@ -92,16 +92,23 @@ export async function registerAction(_prev: RegisterState, fd: FormData): Promis
 
   try {
     const passwordHash = await bcrypt.hash(password, 10);
-    await prisma.user.create({
-      data: {
-        email,
-        username,
-        name: name || username,
-        passwordHash,
-        role: "USER",
-        trusted: false,
+    // 部署即开站：库中尚无任何 ADMIN 时，首个注册者自动成为管理员（可事务串行化防并发双管理员）
+    await prisma.$transaction(
+      async (tx) => {
+        const hasAdmin = (await tx.user.count({ where: { role: "ADMIN" } })) > 0;
+        await tx.user.create({
+          data: {
+            email,
+            username,
+            name: name || username,
+            passwordHash,
+            role: hasAdmin ? "USER" : "ADMIN",
+            trusted: !hasAdmin, // 首任管理员直发免审
+          },
+        });
       },
-    });
+      { isolationLevel: "Serializable" },
+    );
     // 注册成功自动登录
     await signIn("credentials", { identifier: email, password, redirectTo: "/" });
     return {};

@@ -5,8 +5,11 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite" // 生产切 postgresql
-  url      = env("DATABASE_URL")
+  // 2026-09-06 部署 Vercel 切 PG：本地=本机 PG18 cms，生产=Vercel env（Supabase avgrfktnmrnzxzkfqvpp）
+  // url（runtime）= DATABASE_URL：生产走 transaction pooler 6543?pgbouncer=true（避免 serverless 打爆 session 连接池）
+  // directUrl（migration/db push/seed）= DIRECT_URL：生产走 session pooler 5432；回滚 sqlite 需连改 provider 与两处 env
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
 }
 
 // ---------- 认证（Auth.js v5 + prisma adapter） ----------
@@ -146,6 +149,7 @@ model Resource {
 
   isDownloadable Boolean @default(true)
   loginRequired  Boolean @default(false) // D3：外链下载是否需登录
+  nsfw           Boolean @default(false) // D9：NSFW 隔离 —— 未登录访客/搜索引擎不可见（列表不出现、详情 404、sitemap 不含）；登录后可见
   allowComments  Boolean @default(true)
   externalUrl    String? // D1：游戏/整包外链（网盘/直链）
 

@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { loadBrowseFeedAction, type BrowseFeedParams } from "@/lib/actions/feedmore";
 import type { FeedCard } from "@/lib/queries";
-import MasonryGrid from "@/components/resource/MasonryGrid";
+import Loader from "@/components/Loader";
+import ResourceGrid from "@/components/resource/ResourceGrid";
 
 const PAGE_SIZE = 30;
 
@@ -11,7 +12,7 @@ type FeedFilters = Omit<BrowseFeedParams, "page" | "pageSize">;
 
 /**
  * /browse 的无限滚动流：首屏 initial 由 SSR 注入，滚近底部（提前约一屏高）时自动取下一页并
- * append 进同一条 MasonryGrid —— 网格会把新卡补进当前最短列，视觉上是一整条连续瀑布。
+ * append 进同一条卡片网格（统一 3:4 竖版卡，追页只是网格自然加长）。
  * 筛选条仍是服务端 Link（换筛选 = 换 URL = 本组件以新首屏重挂），因此「返回顶部/重来」天然成立。
  */
 export default function FeedInfinite({
@@ -84,7 +85,8 @@ export default function FeedInfinite({
 
   return (
     <div>
-      <MasonryGrid className="mt-4" items={items} maxCols={5} gap={12} />
+      {/* 统一 3:4 竖版卡：PC 4 列 / 平板 3 列 / 移动 2 列（与 ResourceGrid card 断点一致） */}
+      <ResourceGrid className="mt-4" items={items} display="card" ratio="3:4" />
 
       {err && (
         <div className="mt-5 flex flex-col items-center gap-2 text-center">
@@ -109,7 +111,7 @@ export default function FeedInfinite({
       ) : (
         <div ref={sentinelRef} className="mt-6 flex items-center justify-center" aria-live="polite">
           {pending ? (
-            <span className="text-xs text-neutral-400">加载中…</span>
+            <Loader label="加载中…" />
           ) : (
             <span className="text-xs text-neutral-300">向下滚动加载更多</span>
           )}

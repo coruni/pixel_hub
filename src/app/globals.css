@@ -144,6 +144,13 @@ body {
   font-family: "Fusion Pixel", "Microsoft YaHei", Arial, sans-serif;
 }
 
+/* 无封面占位（CoverPlaceholder）：同款点阵纹理 + 暖底，暗色跟随色板变量自动翻转 */
+.placeholder-dots {
+  background-color: var(--color-brand-50);
+  background-image: radial-gradient(var(--dot-color) 1px, transparent 1px);
+  background-size: 8px 8px;
+}
+
 /* 像素风图标：lucide 线条图标去掉圆头圆角、锐利渲染，与位图字体同一语言 */
 svg.lucide {
   stroke-linecap: butt;
@@ -274,6 +281,38 @@ summary {
   }
   50% {
     background-color: var(--color-brand-100);
+  }
+}
+
+/* 三方块跳动加载（oO0 0Oo）：方块依次弹起放大、落回缩小，相位错开 0.15s */
+.loader-bounce {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 22px; /* 弹起放大后不裁切 */
+}
+.loader-bounce > span {
+  width: 10px;
+  height: 10px;
+  background: var(--color-brand-500);
+  animation: loader-bounce 0.9s ease-in-out infinite;
+}
+.loader-bounce > span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.loader-bounce > span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes loader-bounce {
+  0%,
+  70%,
+  100% {
+    transform: translateY(0) scale(0.65);
+    opacity: 0.5;
+  }
+  35% {
+    transform: translateY(-8px) scale(1.4);
+    opacity: 1;
   }
 }
 

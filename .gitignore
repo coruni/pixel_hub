@@ -49,3 +49,10 @@ next-env.d.ts
 # local temp scripts & dev log
 _tmp_*
 _dev.log
+
+# CosHub 备份导出（含用户邮箱/密码哈希等敏感数据，仅保留本机）
+/prisma/coshub-data/
+
+
+.vercel
+.env*

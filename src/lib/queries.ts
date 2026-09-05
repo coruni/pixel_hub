@@ -1,6 +1,7 @@
 import { publicUrl } from "@/lib/storage";
 import { prisma } from "@/lib/db/prisma";
 import { isOnline } from "@/lib/online";
+import { auth } from "@/lib/auth";
 import { cache } from "react";
 import type { Prisma, ResourceType } from "@prisma/client";
 
@@ -18,6 +19,7 @@ export type FeedItem = {
   commentCount: number;
   downloadCount: number;
   loginRequired: boolean;
+  nsfw: boolean;
   category: { slug: string; name: string } | null;
   tags: { slug: string; name: string }[];
   author: { username: string; name: string | null };
@@ -42,6 +44,7 @@ export type FeedCard = {
   commentCount: number;
   downloadCount: number;
   loginRequired: boolean;
+  nsfw: boolean;
   category: { slug: string; name: string } | null;
   author: { username: string; name: string | null };
   cover: {
@@ -65,6 +68,7 @@ export function toFeedCard(i: FeedItem): FeedCard {
     commentCount: i.commentCount,
     downloadCount: i.downloadCount,
     loginRequired: i.loginRequired,
+    nsfw: i.nsfw,
     category: i.category,
     author: i.author,
     cover: i.cover,
@@ -87,6 +91,8 @@ export type FeedParams = {
   ids?: string[]; // 指定 id 集合（首页主推等），顺序需调用方自行按 id 重排
   page?: number;
   pageSize?: number;
+  /** D9：显式覆盖 NSFW 可见性；缺省按当前登录态（登录可见全站，游客只见 SFW） */
+  includeNsfw?: boolean;
 };
 
 const coverSelect = {
@@ -122,6 +128,7 @@ type FeedRow = {
   commentCount: number;
   downloadCount: number;
   loginRequired: boolean;
+  nsfw: boolean;
   category: { slug: string; name: string } | null;
   tags: { tag: { slug: string; name: string } }[];
   author: { username: string; name: string | null };
@@ -150,6 +157,7 @@ const feedSelect = {
   commentCount: true,
   downloadCount: true,
   loginRequired: true,
+  nsfw: true,
   coverMedia: { select: coverSelect },
   author: { select: { username: true, name: true } },
   category: { select: { slug: true, name: true } },
@@ -171,6 +179,7 @@ function toFeedItem(r: FeedRow): FeedItem {
     commentCount: r.commentCount,
     downloadCount: r.downloadCount,
     loginRequired: r.loginRequired,
+    nsfw: r.nsfw,
     category: r.category ? { slug: r.category.slug, name: r.category.name } : null,
     tags: r.tags?.map((t) => ({ slug: t.tag.slug, name: t.tag.name })) ?? [],
     author: { username: r.author.username, name: r.author.name },
@@ -185,15 +194,32 @@ function toFeedItem(r: FeedRow): FeedItem {
   };
 }
 
+/**
+ * D9 NSFW 隔离判定：当前请求是否已登录。getFeed / getRandomResourceIds / getCollectionDetail
+ * 是全部「游客可见」的资源取数出口，登录态在此统一判定比调用点逐个传参更不易漏网
+ * （首页板块、浏览/搜索/标签/作者主页、相关推荐、侧栏组件、无限追加 action 都汇到这里）。
+ * 非请求上下文一律按游客处理（最安全）；显式 includeNsfw 参数可覆盖。
+ */
+async function viewerAuthed(): Promise<boolean> {
+  try {
+    return !!(await auth())?.user;
+  } catch {
+    return false;
+  }
+}
+
 export async function getFeed(
   params: FeedParams,
 ): Promise<{ items: FeedItem[]; page: number; hasMore: boolean }> {
   const page = Math.max(1, params.page ?? 1);
+  // D9：游客（含搜索引擎）只见 SFW；登录后全站可见
+  const allowNsfw = params.includeNsfw ?? (await viewerAuthed());
   const pageSize = Math.max(1, Math.min(48, params.pageSize ?? 24));
 
   const where: Prisma.ResourceWhereInput = {
     status: params.includeStatuses ? { in: params.includeStatuses } : "PUBLISHED",
   };
+  if (!allowNsfw) where.nsfw = false; // D9：未登录列表一律不含 NSFW
   if (params.type && params.type !== "ALL") where.type = params.type;
   if (params.categorySlugs && params.categorySlugs.length > 0) {
     where.category = { slug: { in: params.categorySlugs } };
@@ -609,8 +635,14 @@ export const getCollectionDetail = cache(async (id: string, viewerId?: string) =
       items: {
         orderBy: { createdAt: "desc" },
         take: 100,
-        // 只展示已上架资源：未发布/被下架内容不能经公开夹子绕过 detail 页守卫
-        where: { resource: { status: "PUBLISHED" } },
+        // 只展示已上架资源：未发布/被下架内容不能经公开夹子绕过 detail 页守卫；
+        // D9：公开夹子对未登录访客同样不暴露 NSFW 项
+        where: {
+          resource: {
+            status: "PUBLISHED",
+            ...(viewerId ? {} : { nsfw: false }),
+          },
+        },
         include: {
           resource: { select: feedSelect },
         },
@@ -739,9 +771,11 @@ export function getRecentComments(limit: number) {
 }
 
 /** 随机「手气不错」id 池：轻量 id 池洗牌后精取（SQLite 无原生 random 排序；池子封顶 500） */
-export async function getRandomResourceIds(count: number) {
+export async function getRandomResourceIds(count: number, includeNsfw?: boolean) {
+  // D9：随机池对游客同样不含 NSFW（getFeed 二次精取还有兜底，池内提前滤更省）
+  const allowNsfw = includeNsfw ?? (await viewerAuthed());
   const pool = await prisma.resource.findMany({
-    where: { status: "PUBLISHED" },
+    where: { status: "PUBLISHED", ...(allowNsfw ? {} : { nsfw: false }) },
     select: { id: true },
     take: 500,
     orderBy: { createdAt: "desc" },

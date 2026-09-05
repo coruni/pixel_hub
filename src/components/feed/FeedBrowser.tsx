@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { getCategories, getFeed, getTopTags, toFeedCard } from "@/lib/queries";
 import { enumParam, intParam, str, type SP } from "@/lib/search-params";
-import MasonryGrid from "@/components/resource/MasonryGrid";
+import ResourceGrid from "@/components/resource/ResourceGrid";
 import FeedPager from "@/components/feed/FeedPager";
 import FeedInfinite from "@/components/feed/FeedInfinite";
 
@@ -111,9 +111,17 @@ export default async function FeedBrowser({
         : "border-brand-200 bg-surface text-neutral-600 hover:border-brand-500"
     }`;
 
+  // 换筛选 = 换 URL，server 端按新 searchParams 取回首屏；但客户端软导航不会卸载本组件，
+  // FeedInfinite 内部 useState(initial) 只在挂载时生效 —— 用 key 把筛选组合钉进组件身份，
+  // 筛选项一变即强制以新首屏重挂（追加态/滚动观察器一并清空）。
+  const feedKey = `${type}|${sort}|${period}|${cat ?? ""}|${tag ?? ""}|${q ?? ""}|${
+    follow ? "1" : "0"
+  }`;
+
   // 无限滚动：首屏注入客户端流，后续页由 IntersectionObserver 自动追加；否则数字分页
   const feedArea = infinite ? (
     <FeedInfinite
+      key={feedKey}
       initial={items.map(toFeedCard)}
       initialHasMore={hasMore}
       params={{
@@ -129,7 +137,12 @@ export default async function FeedBrowser({
     />
   ) : (
     <>
-      <MasonryGrid className="mt-4" items={items} maxCols={5} gap={12} />
+      <ResourceGrid
+        className="mt-4"
+        items={items.map(toFeedCard)}
+        display="card"
+        ratio="3:4"
+      />
       {items.length === 0 && (
         <div className="mt-20 text-center text-sm text-neutral-400">{emptyText}</div>
       )}
@@ -297,7 +310,7 @@ export default async function FeedBrowser({
         </div>
       )}
 
-      {/* 瀑布流：无限滚动(客户端流)或数字分页（见 feedArea） */}
+      {/* 内容区：统一 3:4 竖版卡片网格 —— 无限滚动(客户端流)或数字分页（见 feedArea） */}
       {feedArea}
     </div>
   );

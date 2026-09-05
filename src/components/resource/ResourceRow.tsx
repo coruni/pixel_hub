@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Download, Heart } from "lucide-react";
 import type { FeedCard } from "@/lib/queries";
 import { formatCount } from "@/lib/format";
+import CoverPlaceholder from "./CoverPlaceholder";
 
 // 横向「缩略图 + 标题/作者/分类」行卡：用于列表显示形态（首页 list 板块、归档列表、侧栏排行）。
 export default function ResourceRow({ item }: { item: FeedCard }) {
@@ -25,7 +26,7 @@ export default function ResourceRow({ item }: { item: FeedCard }) {
             className="h-full w-full object-cover"
           />
         ) : (
-          <span className="absolute inset-0 bg-neutral-200" />
+          <CoverPlaceholder iconSize={16} />
         )}
       </span>
       <span className="min-w-0 flex-1">

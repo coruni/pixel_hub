@@ -1,0 +1,5 @@
+# 本地 env 文件：Vercel 环境变量在 dashboard/CLI 配置，不随源码上传
+.env
+.env.*
+!.env.example
+node_modules

@@ -16,7 +16,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // 已发布资源详情；未发布/下架的详情页不可收录
   const [resources, categories, tags] = await Promise.all([
     prisma.resource.findMany({
-      where: { status: "PUBLISHED" },
+      // D9：sitemap 只列 SFW；NSFW 详情另有 noindex + 未登录 404，不进入收录面
+      where: { status: "PUBLISHED", nsfw: false },
       select: { slug: true, updatedAt: true },
       orderBy: { publishedAt: "desc" },
       take: 2000,

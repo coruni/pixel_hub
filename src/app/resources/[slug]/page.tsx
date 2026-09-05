@@ -32,6 +32,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   if (!r || r.status !== "PUBLISHED")
     return { title: r?.title ?? "未发布内容", robots: { index: false } };
 
+  // D9：NSFW 详情永不收录 —— 未登录访问在 page 层直接 404，登录后可见但同样拒绝索引
+  if (r.nsfw) return { title: r.title, robots: { index: false, follow: false } };
+
   const description =
     r.summary ??
     `${r.author.name ?? "@" + r.author.username} 分享的${TYPE_LABEL[r.type] ?? "资源"}`;
@@ -69,6 +72,8 @@ export default async function ResourcePage({ params }: PageProps) {
     const isStaff = me?.role === "ADMIN" || me?.role === "MODERATOR";
     if (!isOwner && !isStaff) notFound();
   }
+  // D9：NSFW 详情登录门 —— 已发布成人内容仅登录后可见，未登录一律 404（不进索引/不泄露图）
+  if (detail.status === "PUBLISHED" && detail.nsfw && !meId) notFound();
 
   // 相关推荐只对已发布内容计算（草稿/待审不需要）
   const related = detail.status === "PUBLISHED" ? await getRelated(detail) : [];

@@ -11,6 +11,7 @@ import {
 import type { FeedCard } from "@/lib/queries";
 import { formatCount } from "@/lib/format";
 import { CARD_RATIOS, TYPE_LABEL, clampedAspect, type CardRatio } from "@/lib/display";
+import CoverPlaceholder from "./CoverPlaceholder";
 
 /**
  * 统一资源卡（信息全覆盖图，无图下白条）：
@@ -59,9 +60,7 @@ export default function ResourceCard({
             className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
           />
         ) : (
-          <div className="absolute inset-0 grid place-items-center bg-neutral-200 text-2xl font-semibold text-neutral-400">
-            {(item.title ?? "?").slice(0, 1).toUpperCase()}
-          </div>
+          <CoverPlaceholder />
         )}
       </div>
 
@@ -76,8 +75,9 @@ export default function ResourceCard({
         )}
       </span>
 
-      {/* 底部渐变 + 全覆盖信息 */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-[linear-gradient(to_top,rgba(0,0,0,.92)_0%,rgba(0,0,0,.92)_58%,rgba(0,0,0,.55)_58%,rgba(0,0,0,.55)_78%,transparent_78.5%)] px-3 pb-2 pt-10">
+      {/* 底部渐变 + 全覆盖信息。遮罩用固定 px 高度（非 %）：瀑布流卡片高低不一，
+          百分比会让竖图卡黑掉大半、横图卡信息挤成一团；px 版所有卡信息带等高、错落只留给图片 */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-[linear-gradient(to_top,rgba(0,0,0,.92)_0px,rgba(0,0,0,.92)_68px,rgba(0,0,0,.55)_68px,rgba(0,0,0,.55)_96px,transparent_96px)] px-3 pb-2 pt-9">
         <p className="truncate text-sm font-medium leading-snug text-white drop-shadow">
           {item.title}
         </p>

@@ -120,10 +120,16 @@ export default async function UserPage({
   ).key;
   const page = Math.max(1, Number(pageRaw) || 1);
 
+  // D9：作者页统计对齐游客可见范围（NSFW 不计入）；登录访客全站口径
+  const pubWhere = {
+    authorId: profile.id,
+    status: "PUBLISHED" as const,
+    ...(meId ? {} : { nsfw: false }),
+  };
   const [pubCount, agg, commentCount] = await Promise.all([
-    prisma.resource.count({ where: { authorId: profile.id, status: "PUBLISHED" } }),
+    prisma.resource.count({ where: pubWhere }),
     prisma.resource.aggregate({
-      where: { authorId: profile.id, status: "PUBLISHED" },
+      where: pubWhere,
       _sum: { viewCount: true, downloadCount: true, likeCount: true },
     }),
     prisma.comment.count({ where: { authorId: profile.id, status: "PUBLIC" } }),

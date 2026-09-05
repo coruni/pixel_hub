@@ -21,12 +21,12 @@ function colsForWidth(w: number, maxCols: number) {
   return 2;
 }
 
-/** SSR/无 JS 占位的响应式列数（容器查询，断点与 colsForWidth 一致；外层须声明 @container） */
+/** SSR/无 JS 占位的响应式列数（标准视口断点：移动 2 / md 3 / lg 4） */
 function placeholderCols(maxCols: number): string {
   if (maxCols <= 2) return "columns-2";
-  if (maxCols === 3) return "columns-2 @[700px]:columns-3";
-  if (maxCols === 4) return "columns-2 @[700px]:columns-3 @[820px]:columns-4";
-  return "columns-2 @[700px]:columns-3 @[820px]:columns-4 @[1200px]:columns-5";
+  if (maxCols === 3) return "columns-2 md:columns-3";
+  if (maxCols === 4) return "columns-2 md:columns-3 lg:columns-4";
+  return "columns-2 md:columns-3 lg:columns-4 xl:columns-5";
 }
 
 export default function MasonryGrid({
@@ -73,10 +73,10 @@ export default function MasonryGrid({
   if (items.length === 0) return null;
 
   if (!colItems) {
-    // 服务端 / 首帧占位:CSS 多列。列数用容器查询断点（与 JS colsForWidth 同一套阈值），
-    // 有无侧边栏、任意容器宽都与 JS 接管后的列数一致；break-inside:avoid 防卡片被拦腰分列
+    // 服务端 / 首帧占位:CSS 多列。列数用标准视口断点（移动 2 / md 3 / lg 4），
+    // break-inside:avoid 防卡片被拦腰分列；JS 接管后按实测容器宽重排列
     return (
-      <div ref={ref} className={`@container ${className}`}>
+      <div ref={ref} className={className}>
         <div style={{ gap }} className={placeholderCols(maxCols)}>
           {items.map((it) => (
             <div key={it.id} style={{ marginBottom: gap, breakInside: "avoid" }}>
