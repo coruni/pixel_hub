@@ -4,12 +4,19 @@
 // 纯客户端表单，保存走 saveUploadLimitsAction；数值服务端 clamp、后缀 normalizeExts 权威校验，
 // 前端只是组织入参并在服务端 refresh 后把最新配置同步回本地草稿（渲染期派生，见下方 prev 对比）。
 import { useState } from "react";
-import { RotateCcw, Save } from "lucide-react";
+import {
+  FileUp,
+  Image as ImageIcon,
+  MessageCircle,
+  RotateCcw,
+  Save,
+  ShieldCheck,
+  UserRound,
+} from "lucide-react";
 import { DEFAULT_ATTACH_EXTS, type UploadLimits } from "@/lib/upload-config";
 import { useAction } from "@/lib/hooks";
 import { resetUploadLimitsAction, saveUploadLimitsAction } from "@/lib/actions/uploads";
-import { BTN_DANGER_SM, BTN_PRIMARY_SM, INPUT_SM, LABEL_STRONG } from "@/lib/ui/cls";
-import MiniBadge from "@/components/ui/MiniBadge";
+import { BTN_DANGER_SM, BTN_PRIMARY_SM, INPUT_SM } from "@/lib/ui/cls";
 
 /** 数值字段规约：key / label / 范围（提交时服务端还会 clamp，这里仅辅助输入） */
 const NUM_FIELDS: {
@@ -48,6 +55,15 @@ const NUM_FIELDS: {
     hint: "设置页上传头像的单张上限（裁剪产物通常远小于此）。",
   },
 ];
+
+const OVERVIEW_FIELDS = [
+  { key: "attachmentMaxMb", label: "附件", note: "单文件上限", Icon: FileUp },
+  { key: "galleryImageMaxMb", label: "图集 / 原图", note: "单张上限", Icon: ImageIcon },
+  { key: "commentImageMaxMb", label: "评论附图", note: "单张上限", Icon: MessageCircle },
+  { key: "avatarMaxMb", label: "头像", note: "单张上限", Icon: UserRound },
+] as const;
+
+const IMAGE_FIELDS = NUM_FIELDS.filter((field) => field.key !== "attachmentMaxMb");
 
 type Draft = {
   attachmentMaxMb: string;
@@ -107,86 +123,154 @@ export default function UploadLimitsManager({ limits }: { limits: UploadLimits }
     .filter(Boolean);
 
   return (
-    <div className="space-y-5">
-      <section className="overflow-hidden rounded-none border border-brand-200 bg-surface">
-        <div className="border-b border-brand-100 bg-brand-50/50 px-4 py-4 sm:px-5 sm:py-5">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-base font-semibold text-neutral-900">附件与图片上传限制</h2>
-            <MiniBadge strong>后台配置</MiniBadge>
+    <div className="space-y-6">
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        {OVERVIEW_FIELDS.map(({ key, label, note, Icon }) => (
+          <div
+            key={key}
+            className="flex min-w-0 items-center gap-3 border border-brand-200 bg-surface px-3.5 py-3"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center bg-brand-50 text-brand-600">
+              <Icon size={17} strokeWidth={1.8} aria-hidden />
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-xs text-neutral-500">{label}</p>
+              <p className="mt-0.5 text-base font-semibold tabular-nums text-neutral-900">
+                {draft[key]} <span className="text-xs font-normal text-neutral-400">MB</span>
+              </p>
+              <p className="text-[10px] text-neutral-400">{note}</p>
+            </div>
           </div>
-          <p className="mt-2 max-w-4xl text-xs leading-5 text-neutral-500">
-            所有上传入口（发布向导、追加版本、评论区、头像、媒体库直传）以这里的值为准，改动即生效，
-            无需重启。图片<b>允许格式</b>由服务端字节嗅探决定（png/jpg/webp/gif/avif
-            等），不在此配置。 危险后缀（可执行/脚本型文件）已全局禁用，即使添加也会被拒。
-          </p>
-        </div>
+        ))}
+      </div>
 
-        {/* 数值档位 */}
-        <div className="grid gap-3 p-4 sm:grid-cols-2 sm:gap-4 sm:p-5">
-          {NUM_FIELDS.map((f) => (
-            <div key={f.key} className="min-w-0 border border-brand-100 bg-brand-50/30 p-3 sm:p-4">
-              <div className="flex items-center justify-between gap-2">
-                <label className={LABEL_STRONG} htmlFor={`ul-${f.key}`}>
-                  {f.label}
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(18rem,0.9fr)]">
+        <section className="overflow-hidden border border-brand-200 bg-surface">
+          <div className="border-b border-brand-100 px-4 py-4 sm:px-5">
+            <div className="flex items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center bg-brand-50 text-brand-600">
+                <ImageIcon size={18} strokeWidth={1.8} aria-hidden />
+              </span>
+              <div>
+                <h2 className="text-sm font-semibold text-neutral-900">图片上传限制</h2>
+                <p className="mt-1 text-xs leading-5 text-neutral-500">
+                  控制图集、评论附图和头像的单张原图大小，服务端会在上传时统一校验。
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="divide-y divide-brand-100">
+            {IMAGE_FIELDS.map((f) => (
+              <div
+                key={f.key}
+                className="grid gap-3 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_10rem] sm:items-start sm:px-5"
+              >
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <label className="text-xs font-medium text-neutral-700" htmlFor={`ul-${f.key}`}>
+                      {f.label}
+                    </label>
+                    <span className="rounded-none bg-neutral-100 px-1.5 py-0.5 text-[10px] text-neutral-400">
+                      {f.min}–{f.max} MB
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[11px] leading-4 text-neutral-400">{f.hint}</p>
+                </div>
+                <input
+                  id={`ul-${f.key}`}
+                  type="number"
+                  inputMode="numeric"
+                  min={f.min}
+                  max={f.max}
+                  step={1}
+                  value={draft[f.key]}
+                  onChange={(e) => set(f.key, e.target.value)}
+                  className={`${INPUT_SM} w-full text-right tabular-nums sm:text-left`}
+                />
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="overflow-hidden border border-brand-200 bg-surface">
+          <div className="border-b border-brand-100 px-4 py-4 sm:px-5">
+            <div className="flex items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center bg-brand-50 text-brand-600">
+                <FileUp size={18} strokeWidth={1.8} aria-hidden />
+              </span>
+              <div>
+                <h2 className="text-sm font-semibold text-neutral-900">附件格式限制</h2>
+                <p className="mt-1 text-xs leading-5 text-neutral-500">
+                  附件支持的容量与后缀，应用到发布、版本追加和云盘上传。
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="space-y-5 p-4 sm:p-5">
+            <div>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label
+                  className="text-xs font-medium text-neutral-700"
+                  htmlFor="ul-attachmentMaxMb"
+                >
+                  附件单文件上限（MB）
                 </label>
-                <span className="shrink-0 rounded-none bg-neutral-100 px-1.5 py-0.5 text-[10px] text-neutral-400">
-                  {f.min}–{f.max} MB
-                </span>
+                <span className="text-[10px] text-neutral-400">1–250 MB</span>
               </div>
               <input
-                id={`ul-${f.key}`}
+                id="ul-attachmentMaxMb"
                 type="number"
                 inputMode="numeric"
-                min={f.min}
-                max={f.max}
+                min={1}
+                max={250}
                 step={1}
-                value={draft[f.key]}
-                onChange={(e) => set(f.key, e.target.value)}
-                className={`${INPUT_SM} mt-1 w-full max-w-none sm:max-w-40`}
+                value={draft.attachmentMaxMb}
+                onChange={(e) => set("attachmentMaxMb", e.target.value)}
+                className={`${INPUT_SM} mt-2 w-full text-right tabular-nums sm:text-left`}
               />
-              <p className="mt-1 text-[11px] leading-4 text-neutral-400">{f.hint}</p>
+              <p className="mt-1 text-[11px] leading-4 text-neutral-400">{NUM_FIELDS[0].hint}</p>
             </div>
-          ))}
-        </div>
 
-        {/* 附件后缀 */}
-        <div className="border-t border-brand-100 px-4 py-4 sm:px-5 sm:py-5">
-          <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
-            <label className={LABEL_STRONG} htmlFor="ul-attachmentExts">
-              附件允许后缀（每行 / 空格 / 逗号分隔一项）
-            </label>
-            <span className="shrink-0 text-[11px] text-neutral-400">
-              小写、不带点 · 已识别 {extTokens.length} 项
-            </span>
-          </div>
-          <textarea
-            id="ul-attachmentExts"
-            rows={6}
-            spellCheck={false}
-            value={draft.attachmentExts}
-            onChange={(e) => set("attachmentExts", e.target.value)}
-            className="mt-1 w-full rounded-none border border-brand-200 bg-surface px-2.5 py-1.5 font-mono text-xs leading-5 outline-none transition focus:border-brand-500"
-            placeholder={DEFAULT_ATTACH_EXTS.join(" ")}
-          />
-          <div className="mt-2 grid gap-1.5 text-[11px] leading-4 text-neutral-400 sm:grid-cols-[auto_1fr] sm:gap-x-4">
-            <span className="min-w-0">
-              默认 {DEFAULT_ATTACH_EXTS.length} 项：
-              <span className="font-mono text-neutral-500">{DEFAULT_ATTACH_EXTS.join("/")}</span>
-            </span>
-            <span className="min-w-0 text-red-500/80">
-              危险后缀（html/svg/js/exe/msi 等脚本可执行型）硬拒，防存储型 XSS / 下载执行。
-            </span>
-          </div>
-        </div>
-      </section>
+            <div className="border-t border-brand-100 pt-5">
+              <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+                <label className="text-xs font-medium text-neutral-700" htmlFor="ul-attachmentExts">
+                  允许的附件后缀
+                </label>
+                <span className="text-[11px] text-neutral-400">
+                  已识别 {extTokens.length} 项 · 空格或逗号分隔
+                </span>
+              </div>
+              <textarea
+                id="ul-attachmentExts"
+                rows={7}
+                spellCheck={false}
+                value={draft.attachmentExts}
+                onChange={(e) => set("attachmentExts", e.target.value)}
+                className="mt-2 w-full resize-y rounded-none border border-brand-200 bg-surface px-2.5 py-2 font-mono text-xs leading-5 outline-none transition focus:border-brand-500"
+                placeholder={DEFAULT_ATTACH_EXTS.join(" ")}
+              />
+              <p className="mt-2 break-words text-[11px] leading-4 text-neutral-400">
+                默认 {DEFAULT_ATTACH_EXTS.length} 项：
+                <span className="font-mono text-neutral-500">{DEFAULT_ATTACH_EXTS.join("/")}</span>
+              </p>
+            </div>
 
-      {/* 操作栏 */}
-      <div className="flex flex-wrap items-center gap-2.5 border-t border-brand-100 pt-4 sm:gap-3">
+            <div className="flex gap-2 border border-red-200 bg-red-50/60 p-3 text-[11px] leading-4 text-red-600/90">
+              <ShieldCheck size={14} className="mt-0.5 shrink-0" aria-hidden />
+              <span>
+                危险后缀（html/svg/js/exe/msi 等脚本可执行型）硬拒，防存储型 XSS / 下载执行。
+              </span>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div className="flex flex-col gap-2.5 border-t border-brand-100 pt-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
         <button
           type="button"
           disabled={pending}
           onClick={save}
-          className={`${BTN_PRIMARY_SM} min-h-9 px-4`}
+          className={`${BTN_PRIMARY_SM} min-h-10 w-full justify-center px-4 sm:w-auto`}
         >
           <Save size={13} aria-hidden /> 保存
         </button>
@@ -194,11 +278,11 @@ export default function UploadLimitsManager({ limits }: { limits: UploadLimits }
           type="button"
           disabled={pending}
           onClick={reset}
-          className={`${BTN_DANGER_SM} min-h-9 px-4`}
+          className={`${BTN_DANGER_SM} min-h-10 w-full justify-center px-4 sm:w-auto`}
         >
           <RotateCcw size={13} aria-hidden /> 恢复默认
         </button>
-        <span className="basis-full text-xs leading-5 text-neutral-400 sm:basis-auto">
+        <span className="text-xs leading-5 text-neutral-400 sm:ml-1">
           保存后上传向导 / 版本 / 头像等入口的提示与校验同步更新。
         </span>
       </div>
