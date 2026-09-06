@@ -9,6 +9,9 @@ export const INPUT_SM =
   "rounded-none border border-brand-200 bg-surface px-2.5 py-1.5 text-sm outline-none transition focus:border-brand-500";
 /** 表单 label（编辑器内强调样式） */
 export const LABEL_STRONG = "mb-1 block text-xs font-medium text-neutral-500";
+/** 下拉选择框（紧凑，后台筛选/合并等） */
+export const SELECT_SM =
+  "rounded-none border border-brand-200 bg-surface px-2 py-1.5 text-sm outline-none transition focus:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-400";
 
 /** 主按钮（小尺寸，后台操作） */
 export const BTN_PRIMARY_SM =

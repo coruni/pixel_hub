@@ -1,7 +1,7 @@
 // 详情页共享部件 —— 纯服务端展示片段，三种模板（post/banner/twocol）复用同一套数据。
 // 组件均为 server component；内部按钮（关注/点赞/下载/评论）为客户端交互组件。
 import Link from "next/link";
-import { CalendarDays, Download, Eye, Heart, Star } from "lucide-react";
+import { CalendarDays, Download, Eye, Heart, Pencil, Star } from "lucide-react";
 import type { ResourceDetail } from "@/lib/queries";
 import type { parseMeta } from "@/lib/meta";
 import { formatCount, timeAgo } from "@/lib/format";
@@ -165,6 +165,14 @@ export function ActionBar({ ctx }: { ctx: DetailCtx }) {
           </>
         )}
         {meId && !isAuthor && <ReportButton resourceId={detail.id} resourceTitle={detail.title} />}
+        {isAuthor && (
+          <Link
+            href={`/resources/${detail.slug}/edit`}
+            className="inline-flex items-center gap-1.5 rounded-none border border-brand-200 bg-surface px-3.5 py-2 text-sm text-neutral-700 hover:border-brand-500"
+          >
+            <Pencil size={15} aria-hidden /> 编辑
+          </Link>
+        )}
       </div>
       {detail.loginRequired && !authed && (
         <p className="mt-1.5 text-xs text-neutral-400">该资源需登录后获取下载地址。</p>

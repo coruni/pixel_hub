@@ -21,6 +21,7 @@ import {
   Tags as TagsIcon,
   Trash2,
   Users,
+  Wand2,
 } from "lucide-react";
 import {
   HOME_KIND_META,
@@ -52,6 +53,7 @@ function KindIcon({ kind, size = 15 }: { kind: HomeSectionKind; size?: number })
     creators: Users,
     tags: TagsIcon,
     ad: RectangleHorizontal,
+    recommend: Wand2,
   };
   const Icon = map[kind] ?? Sparkles;
   return <Icon size={size} aria-hidden />;
@@ -99,6 +101,13 @@ function cfgSummary(row: ManagerRow): string {
       return c.showTags ? "全站浏览 + 顶部热门标签" : "全站浏览（纯净）";
     case "creators":
       return `按粉丝数展示 ${c.count ?? 6} 位创作者`;
+    case "recommend": {
+      const scope = c.scope === "all" ? "全站热门" : "个性化推荐";
+      const cnt = Number(c.count ?? 12);
+      const er = Number(c.explorationRatio ?? 0.3);
+      const cats = n(c.categorySlugs);
+      return `${scope} · 展示 ${cnt} 个${cats ? ` · ${cats} 个分类` : ""} · 探索 ${er.toFixed(2)}`;
+    }
     case "tags":
       return n(c.slugs) ? `展示所选 ${n(c.slugs)} 个标签` : `展示 ${c.count ?? 12} 个热门标签`;
     case "ad": {
@@ -180,17 +189,15 @@ export default function HomeManager({
 
   return (
     <div>
-      {/* 工具栏 */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-neutral-500">
-          拖拽排序或使用上下按钮调整首页板块顺序；改动实时生效。
+          拖拽或上下按钮调整板块顺序，改动实时生效。
         </p>
         <Link href="/" className="text-sm text-neutral-600 hover:text-neutral-900 hover:underline">
           预览首页 →
         </Link>
       </div>
 
-      {/* 板块列表 */}
       {rows.length === 0 ? (
         <p className="rounded-none border border-brand-200 bg-surface px-5 py-10 text-center text-sm text-neutral-400">
           暂无板块，从下方添加一个开始搭建首页。
@@ -314,7 +321,6 @@ export default function HomeManager({
                 </div>
               </div>
 
-              {/* 展开编辑器 */}
               {editingId === row.id && (
                 <div className="border-t border-neutral-100 px-3 py-3">
                   <SectionEditor
@@ -331,7 +337,6 @@ export default function HomeManager({
         </ul>
       )}
 
-      {/* 添加板块 */}
       <div className="mt-6 rounded-none border-2 border-dashed border-brand-300 p-4">
         <p className="mb-2.5 text-xs font-medium uppercase tracking-wide text-neutral-400">
           添加板块
@@ -351,7 +356,7 @@ export default function HomeManager({
           ))}
         </div>
         <p className="mt-2 text-[11px] text-neutral-400">
-          同一种板块可以重复添加（例如放两个不同分类入口），但首页会按此顺序渲染，请注意信息密度。
+          同一板块可重复添加（如两个不同分类入口）；首页按此顺序渲染，注意信息密度。
         </p>
       </div>
     </div>

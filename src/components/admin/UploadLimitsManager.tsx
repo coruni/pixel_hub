@@ -13,7 +13,13 @@ import {
   ShieldCheck,
   UserRound,
 } from "lucide-react";
-import { DEFAULT_ATTACH_EXTS, MB_RANGE, type UploadLimits } from "@/lib/upload-config";
+import {
+  COMMENT_COUNT_RANGE,
+  COUNT_RANGE,
+  DEFAULT_ATTACH_EXTS,
+  MB_RANGE,
+  type UploadLimits,
+} from "@/lib/upload-config";
 import { useAction } from "@/lib/hooks";
 import { resetUploadLimitsAction, saveUploadLimitsAction } from "@/lib/actions/uploads";
 import { BTN_DANGER_SM, BTN_PRIMARY_SM, INPUT_SM } from "@/lib/ui/cls";
@@ -56,6 +62,37 @@ const NUM_FIELDS: {
   },
 ];
 
+/** 图片数量限制字段：key / label / 范围（张） */
+const COUNT_FIELDS: {
+  key: "galleryImageMaxCount" | "articleImageMaxCount" | "commentImageMaxCount";
+  label: string;
+  min: number;
+  max: number;
+  hint: string;
+}[] = [
+  {
+    key: "galleryImageMaxCount",
+    label: "图集 / 原图 张数上限",
+    min: COUNT_RANGE.min,
+    max: COUNT_RANGE.max,
+    hint: "单个【图片】资源可上传的预览图张数（含首图）。超出后上传入口禁用。",
+  },
+  {
+    key: "articleImageMaxCount",
+    label: "文章插图 张数上限",
+    min: COUNT_RANGE.min,
+    max: COUNT_RANGE.max,
+    hint: "单个【文章】资源可上传的插图张数。设为与图集不同的值可分别管控两类内容。",
+  },
+  {
+    key: "commentImageMaxCount",
+    label: "评论附图 张数上限",
+    min: COMMENT_COUNT_RANGE.min,
+    max: COMMENT_COUNT_RANGE.max,
+    hint: "单条评论可附带的图片张数。设为 0 即禁止评论附图。",
+  },
+];
+
 const OVERVIEW_FIELDS = [
   { key: "attachmentMaxMb", label: "附件", note: "单文件上限", Icon: FileUp },
   { key: "galleryImageMaxMb", label: "图集 / 原图", note: "单张上限", Icon: ImageIcon },
@@ -76,6 +113,9 @@ type Draft = {
   galleryImageMaxMb: string;
   commentImageMaxMb: string;
   avatarMaxMb: string;
+  galleryImageMaxCount: string;
+  articleImageMaxCount: string;
+  commentImageMaxCount: string;
 };
 
 const toDraft = (l: UploadLimits): Draft => ({
@@ -84,6 +124,9 @@ const toDraft = (l: UploadLimits): Draft => ({
   galleryImageMaxMb: String(l.galleryImageMaxMb),
   commentImageMaxMb: String(l.commentImageMaxMb),
   avatarMaxMb: String(l.avatarMaxMb),
+  galleryImageMaxCount: String(l.galleryImageMaxCount),
+  articleImageMaxCount: String(l.articleImageMaxCount),
+  commentImageMaxCount: String(l.commentImageMaxCount),
 });
 
 export default function UploadLimitsManager({ limits }: { limits: UploadLimits }) {
@@ -107,6 +150,9 @@ export default function UploadLimitsManager({ limits }: { limits: UploadLimits }
         galleryImageMaxMb: Number(draft.galleryImageMaxMb),
         commentImageMaxMb: Number(draft.commentImageMaxMb),
         avatarMaxMb: Number(draft.avatarMaxMb),
+        galleryImageMaxCount: Number(draft.galleryImageMaxCount),
+        articleImageMaxCount: Number(draft.articleImageMaxCount),
+        commentImageMaxCount: Number(draft.commentImageMaxCount),
       }),
     );
   }
@@ -121,7 +167,7 @@ export default function UploadLimitsManager({ limits }: { limits: UploadLimits }
     void run(() => resetUploadLimitsAction());
   }
 
-  // 文本区实时预览：多少项、样例、（客户端不去逐字校验，服务端 save 时兜底）
+  // 解析输入的后缀 token（空格/逗号分隔；客户端不逐字校验，服务端 save 时兜底）
   const extTokens = draft.attachmentExts
     .split(/[\s,，;、]+/)
     .map((t) => t.trim().toLowerCase().replace(/^\.+/, ""))
@@ -197,6 +243,52 @@ export default function UploadLimitsManager({ limits }: { limits: UploadLimits }
           </div>
         </section>
 
+        <section className="overflow-hidden border border-brand-200 bg-surface xl:col-span-2">
+          <div className="border-b border-brand-100 px-4 py-4 sm:px-5">
+            <div className="flex items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center bg-brand-50 text-brand-600">
+                <ImageIcon size={18} strokeWidth={1.8} aria-hidden />
+              </span>
+              <div>
+                <h2 className="text-sm font-semibold text-neutral-900">图片数量限制</h2>
+                <p className="mt-1 text-xs leading-5 text-neutral-500">
+                  分别管控图集、文章插图与评论附图的张数上限，服务端在上传与发布时统一校验。
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="divide-y divide-brand-100">
+            {COUNT_FIELDS.map((f) => (
+              <div
+                key={f.key}
+                className="grid gap-3 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_10rem] sm:items-start sm:px-5"
+              >
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <label className="text-xs font-medium text-neutral-700" htmlFor={`ul-${f.key}`}>
+                      {f.label}
+                    </label>
+                    <span className="rounded-none bg-neutral-100 px-1.5 py-0.5 text-[10px] text-neutral-400">
+                      {f.min}–{f.max} 张
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[11px] leading-4 text-neutral-400">{f.hint}</p>
+                </div>
+                <input
+                  id={`ul-${f.key}`}
+                  type="number"
+                  inputMode="numeric"
+                  min={f.min}
+                  max={f.max}
+                  step={1}
+                  value={draft[f.key]}
+                  onChange={(e) => set(f.key, e.target.value)}
+                  className={`${INPUT_SM} w-full text-right tabular-nums sm:text-left`}
+                />
+              </div>
+            ))}
+          </div>
+        </section>
         <section className="overflow-hidden border border-brand-200 bg-surface">
           <div className="border-b border-brand-100 px-4 py-4 sm:px-5">
             <div className="flex items-start gap-3">

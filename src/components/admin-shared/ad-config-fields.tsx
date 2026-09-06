@@ -1,6 +1,7 @@
 "use client";
 
 import { INPUT, LABEL_STRONG } from "@/lib/ui/cls";
+import { SquareCheckbox } from "../admin/SquareCheckbox";
 
 /** 广告位草稿配置：图片模式或 HTML 模式 + 角标开关（首页广告板块与侧栏 ad 组件共用） */
 export type AdConfigDraft = {
@@ -118,12 +119,7 @@ export default function AdConfigFields({
       {emptyNote && <p className="text-xs text-neutral-400 sm:col-span-2">{emptyNote}</p>}
       <div className="sm:col-span-2">
         <label className={`${LABEL_STRONG} flex items-center gap-2`}>
-          <input
-            type="checkbox"
-            checked={value.badge}
-            onChange={(e) => patch({ badge: e.target.checked })}
-            className="h-4 w-4 accent-brand-500"
-          />
+          <SquareCheckbox checked={value.badge} onChange={(next) => patch({ badge: next })} ariaLabel="显示广告角标" />
           显示「广告」角标（右上角标识）
         </label>
         <p className="mt-1 text-[11px] text-neutral-400">

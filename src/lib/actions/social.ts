@@ -253,8 +253,8 @@ const commentSchema = z.object({
 });
 export type CommentActionState = { error?: string; ok?: boolean };
 
-// 评论附图：压缩为单张 webp（最长边 ≤1200），≤3 张、各 ≤后台配置上限
-const COMMENT_IMG_MAX_COUNT = 3;
+// 评论附图：压缩为单张 webp（最长边 ≤1200）；张数上限与单张字节上限均取后台 /admin/uploads 配置
+const DEFAULT_COMMENT_IMG_MAX_COUNT = 3;
 
 function sniffImage(buf: Buffer): boolean {
   if (buf.length < 12) return false;
@@ -316,16 +316,18 @@ export async function addCommentAction(
 
   // 附图（仅主楼，回复不带图）：先落盘，成功与否不阻断文字评论
   const images = fd.getAll("images").filter((f): f is File => f instanceof File && f.size > 0);
-  if (images.length > COMMENT_IMG_MAX_COUNT)
-    return { error: `附图最多 ${COMMENT_IMG_MAX_COUNT} 张` };
+  // 后台配置优先：张数上限（缺省 3）与单张字节上限
   const L = await getUploadLimits();
+  const commentMaxCount = L.commentImageMaxCount || DEFAULT_COMMENT_IMG_MAX_COUNT;
+  if (images.length > commentMaxCount)
+    return { error: `附图最多 ${commentMaxCount} 张` };
   const commentMaxBytes = L.commentImageMaxMb * MIB;
   let saved: { key: string; width: number; height: number; size: number }[] = [];
   if (images.length > 0) {
     try {
       saved = (
         await Promise.all(
-          images.slice(0, COMMENT_IMG_MAX_COUNT).map((f) => saveCommentImage(f, commentMaxBytes)),
+          images.slice(0, commentMaxCount).map((f) => saveCommentImage(f, commentMaxBytes)),
         )
       ).filter((x): x is { key: string; width: number; height: number; size: number } => !!x);
     } catch (e) {

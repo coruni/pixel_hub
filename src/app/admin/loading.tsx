@@ -1,23 +1,10 @@
-// 后台各页多为表格/卡片，统一一个简单骨架（统计卡 + 列表行）
+// 后台加载统一复用前台 Loader（三方块跳动动画），不再使用 animate-pulse 骨架屏
+import Loader from "@/components/Loader";
+
 export default function Loading() {
   return (
-    <div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div
-            key={i}
-            className="h-20 animate-pulse rounded-none border border-neutral-200 bg-surface"
-          />
-        ))}
-      </div>
-      <div className="mt-6 space-y-2">
-        {Array.from({ length: 8 }).map((_, i) => (
-          <div
-            key={i}
-            className="h-14 animate-pulse rounded-none border border-neutral-200 bg-surface"
-          />
-        ))}
-      </div>
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+      <Loader label="后台加载中…" className="mt-24" />
     </div>
   );
 }

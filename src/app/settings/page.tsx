@@ -87,7 +87,6 @@ export default async function SettingsPage({
         </Link>
       </div>
 
-      {/* 头像 */}
       <section className="mt-6 rounded-none border border-brand-200 bg-surface p-6">
         <h2 className="text-sm font-semibold text-neutral-800">头像</h2>
         <p className="mb-4 mt-1 text-xs text-neutral-400">展示在个人主页、评论区与作者信息</p>
@@ -100,14 +99,12 @@ export default async function SettingsPage({
         />
       </section>
 
-      {/* 个人资料 */}
       <section className="mt-6 rounded-none border border-brand-200 bg-surface p-6">
         <h2 className="text-sm font-semibold text-neutral-800">个人资料</h2>
         <p className="mb-4 mt-1 text-xs text-neutral-400">昵称与简介会展示在你的公开主页</p>
         <SettingsForm name={profile?.name ?? null} bio={profile?.bio ?? null} />
       </section>
 
-      {/* 账号信息（只读） */}
       <section className="mt-4 rounded-none border border-brand-200 bg-surface p-6">
         <h2 className="text-sm font-semibold text-neutral-800">账号信息</h2>
         <dl className="mt-4 space-y-2.5">
@@ -120,21 +117,18 @@ export default async function SettingsPage({
         </dl>
       </section>
 
-      {/* 账号安全：改密码 */}
       <section className="mt-4 rounded-none border border-brand-200 bg-surface p-6">
         <h2 className="text-sm font-semibold text-neutral-800">修改密码</h2>
         <p className="mb-4 mt-1 text-xs text-neutral-400">修改后其他设备需用新密码重新登录</p>
         <PasswordForm />
       </section>
 
-      {/* 账号安全：换邮箱 */}
       <section className="mt-4 rounded-none border border-brand-200 bg-surface p-6">
         <h2 className="text-sm font-semibold text-neutral-800">登录邮箱</h2>
         <p className="mb-4 mt-1 text-xs text-neutral-400">修改需验证当前密码</p>
         <EmailForm currentEmail={me.email ?? null} />
       </section>
 
-      {/* 第三方账号绑定 */}
       <section className="mt-4 rounded-none border border-brand-200 bg-surface p-6">
         <h2 className="text-sm font-semibold text-neutral-800">第三方账号</h2>
         <div className="mt-4 flex items-center justify-between gap-4">

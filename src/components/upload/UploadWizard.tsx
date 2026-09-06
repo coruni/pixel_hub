@@ -5,9 +5,9 @@ import { Gamepad2, Image as ImageIcon, Newspaper } from "lucide-react";
 import { useActionState, useRef, useState } from "react";
 import { createResourceAction, type ResourceActionState } from "@/lib/actions/resource";
 import type { UploadLimits } from "@/lib/upload-config";
-import { uploadAttachment } from "@/lib/upload-attachment-client";
 import MediaPicker from "./media-picker";
-import { ArticleSection, AttachmentUpload, GameSection, ImageSection } from "./wizard-sections";
+import { ArticleSection, GameSection, ImageSection } from "./wizard-sections";
+import { SquareCheckbox } from "../admin/SquareCheckbox";
 import {
   SectionTitle,
   fieldErr,
@@ -23,8 +23,7 @@ const TYPES = [
   { k: "ARTICLE", label: "文章", desc: "图文教程 / 心得 / 资讯", Icon: Newspaper },
 ] as const;
 
-/** 发布资源向导：类型选择 + 基础信息 + 类型化信息 + 预览图上传 + 发布选项。
- *  limits 由服务端宿主读取后台配置后传入（见 app/upload/page.tsx），驱动各体积/后缀提示动态化 */
+/** 发布资源向导。limits 由宿主读取后台配置后传入，驱动体积/后缀提示动态化 */
 export default function UploadWizard({
   categories,
   limits,
@@ -39,26 +38,6 @@ export default function UploadWizard({
   const [uploadMsg, setUploadMsg] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [catId, setCatId] = useState("");
-  // GAME：下载外链（受控，附件直传成功后回填站内路径）
-  const [extUrl, setExtUrl] = useState("");
-  const [attUploading, setAttUploading] = useState(false);
-  const [attProgress, setAttProgress] = useState<number | null>(null);
-
-  async function onAttachment(file: File | null) {
-    if (!file) return;
-    setAttUploading(true);
-    setAttProgress(0);
-    setUploadMsg(null);
-    try {
-      const data = await uploadAttachment(file, setAttProgress);
-      setExtUrl(data.url);
-    } catch {
-      setUploadMsg("附件上传失败，请重试");
-    } finally {
-      setAttUploading(false);
-      setAttProgress(null);
-    }
-  }
 
   const [state, formAction, pending] = useActionState<ResourceActionState, FormData>(
     createResourceAction,
@@ -76,10 +55,12 @@ export default function UploadWizard({
     if (!fl || fl.length === 0) return;
     setUploading(true);
     setUploadMsg(null);
+    const maxCount =
+      type === "ARTICLE" ? limits.articleImageMaxCount : limits.galleryImageMaxCount;
     const fd = new FormData();
     for (const f of Array.from(fl)) fd.append("files", f);
     try {
-      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      const res = await fetch(`/api/upload?max=${maxCount}`, { method: "POST", body: fd });
       const data = await res.json();
       if (!data.ok) {
         setUploadMsg(data.error ?? "上传失败");
@@ -89,7 +70,7 @@ export default function UploadWizard({
       const good = list.filter((f) => f.ok);
       const bad = list.filter((f) => !f.ok);
       if (good.length > 0) {
-        const next = [...files, ...good].slice(0, 12);
+        const next = [...files, ...good].slice(0, maxCount);
         setFiles(next);
         if (!coverId && next.length > 0) setCoverId(next[0].id);
       }
@@ -115,10 +96,9 @@ export default function UploadWizard({
     <form action={formAction} className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
       <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">发布资源</h1>
       <p className="mt-2 rounded-none border border-brand-200 bg-brand-50/60 px-3 py-2 text-xs leading-5 text-brand-800">
-        支持图片、游戏（外链）与文章发布。可信用户免审直发，普通用户提交后进入审核队列。
+        支持图片、游戏外链与文章发布；可信用户免审直发，其余提交后进入审核队列。
       </p>
 
-      {/* 隐藏字段 */}
       <input type="hidden" name="type" value={type} />
       <input type="hidden" name="mediaIds" value={JSON.stringify(ids)} />
       <input type="hidden" name="coverId" value={coverId} />
@@ -146,7 +126,6 @@ export default function UploadWizard({
         ))}
       </div>
 
-      {/* 基础信息 */}
       <section className="mt-6 space-y-4 rounded-none border border-brand-200 bg-surface p-5">
         <SectionTitle n={1}>基础信息</SectionTitle>
         <div>
@@ -158,7 +137,7 @@ export default function UploadWizard({
             name="title"
             required
             maxLength={80}
-            placeholder="给内容起一个清晰的名字"
+            placeholder="输入标题"
             className={wizInput}
           />
           {fieldErr(state.fieldErrors?.title)}
@@ -171,7 +150,7 @@ export default function UploadWizard({
             id="summary"
             name="summary"
             maxLength={160}
-            placeholder="出现在卡片与详情页的副标题"
+            placeholder="卡片/详情页副标题"
             className={wizInput}
           />
         </div>
@@ -187,14 +166,14 @@ export default function UploadWizard({
             maxLength={20000}
             placeholder={
               type === "ARTICLE"
-                ? "文章正文（Markdown）……\n（至少 10 个字）"
-                : "介绍内容、玩法/用途、使用方法、注意事项……\n（至少 10 个字）"
+                ? "正文（Markdown），至少 10 字"
+                : "玩法/用途/方法/注意事项……至少 10 字"
             }
             className={wizInput}
           />
           {fieldErr(state.fieldErrors?.description)}
           <p className="mt-1 text-xs leading-5 text-neutral-400">
-            支持 Markdown 排版：空行分段；
+            支持 Markdown：空行分段；
             <code className="rounded-none bg-neutral-100 px-1">#</code> 标题、
             <code className="rounded-none bg-neutral-100 px-1">-</code> 列表、
             <code className="rounded-none bg-neutral-100 px-1">**加粗**</code>、
@@ -231,31 +210,18 @@ export default function UploadWizard({
               id="tags"
               name="tags"
               maxLength={400}
-              placeholder="用空格/逗号分隔，如：像素风 开放世界"
+              placeholder="空格或逗号分隔，如：像素风 开放世界"
               className={wizInput}
             />
           </div>
         </div>
       </section>
 
-      {/* 类型化信息：图片 D2 声明+整包下载 / 游戏外链+版本 / 文章正文即内容+附件清单 */}
+      {/* 按类型渲染对应分节 */}
       {type === "IMAGE" && <ImageSection fieldErrors={state.fieldErrors} limits={limits} />}
       {type === "ARTICLE" && <ArticleSection fieldErrors={state.fieldErrors} limits={limits} />}
       {type === "GAME" && (
-        <GameSection
-          extUrl={extUrl}
-          setExtUrl={setExtUrl}
-          fieldErrors={state.fieldErrors}
-          attachment={
-            <AttachmentUpload
-              uploading={attUploading}
-              progress={attProgress}
-              onUpload={onAttachment}
-              filled={extUrl.startsWith("/")}
-              limits={limits}
-            />
-          }
-        />
+        <GameSection fieldErrors={state.fieldErrors} limits={limits} showChangelog />
       )}
 
       {/* 图片上传（文章为可选插图） */}
@@ -265,6 +231,9 @@ export default function UploadWizard({
         uploading={uploading}
         isArticle={type === "ARTICLE"}
         maxMb={limits.galleryImageMaxMb}
+        maxCount={
+          type === "ARTICLE" ? limits.articleImageMaxCount : limits.galleryImageMaxCount
+        }
         uploadMsg={uploadMsg}
         fieldError={state.fieldErrors?.mediaIds}
         onPick={onFiles}
@@ -273,21 +242,23 @@ export default function UploadWizard({
         fileRef={fileRef}
       />
 
-      {/* 发布选项 */}
       <section className="mt-4 flex flex-wrap gap-x-6 gap-y-2 rounded-none border border-brand-200 bg-surface p-5 text-sm text-neutral-700">
         <SectionTitle n={4}>发布选项</SectionTitle>
         <label className="flex items-center gap-2">
-          <input type="checkbox" name="loginRequired" className="h-4 w-4 accent-brand-500" />
+          <SquareCheckbox name="nsfw" ariaLabel="NSFW" />
+          NSFW（未登录与搜索引擎不可见）
+        </label>
+        <label className="flex items-center gap-2">
+          <SquareCheckbox name="loginRequired" ariaLabel="下载需登录" />
           下载需登录
         </label>
         <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            name="allowComments"
-            defaultChecked
-            className="h-4 w-4 accent-brand-500"
-          />
+          <SquareCheckbox name="allowComments" defaultChecked ariaLabel="允许评论" />
           允许评论
+        </label>
+        <label className="flex items-center gap-2">
+          <SquareCheckbox name="isDownloadable" ariaLabel="提供下载" />
+          提供下载
         </label>
       </section>
 

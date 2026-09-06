@@ -48,12 +48,53 @@ function ImageDownloadCard({
         <MetaDownloadButton
           resourceId={detail.id}
           url={dl.url}
+          name={dl.fileName}
+          kind={dl.mode === "file" ? "file" : "link"}
           label={dl.mode === "file" ? "下载" : "前往下载（外链）"}
           loginRequired={detail.loginRequired}
           authed={authed}
           callbackPath={`/resources/${detail.slug}`}
         />
       </div>
+    </section>
+  );
+}
+
+/** IMAGE：多附件图包/整套下载清单（新），逐行下载；区别于 GAME 版本表 */
+function ImageDownloadsCard({
+  ctx,
+  list,
+}: {
+  ctx: DetailCtx;
+  list: Extract<DetailCtx["meta"], { kind: "IMAGE" }>["downloads"];
+}) {
+  const { detail, authed } = ctx;
+  return (
+    <section className="mt-6 rounded-none border border-brand-200 bg-surface p-5">
+      <h2 className="text-sm font-semibold text-neutral-400">图包 / 整套下载（{list.length}）</h2>
+      <ul className="mt-3 divide-y divide-neutral-100">
+        {list.map((a, i) => (
+          <li
+            key={i}
+            className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3 first:pt-0 last:pb-0"
+          >
+            <DlBadge kind={a.kind} />
+            <span className="min-w-0 flex-1 truncate text-sm text-neutral-800">{a.name}</span>
+            {a.size && <span className="shrink-0 text-xs text-neutral-400">{a.size}</span>}
+            <MetaDownloadButton
+              resourceId={detail.id}
+              url={a.url}
+              name={a.name}
+              kind={a.kind}
+              label="下载"
+              small
+              loginRequired={detail.loginRequired}
+              authed={authed}
+              callbackPath={`/resources/${detail.slug}`}
+            />
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
@@ -76,6 +117,8 @@ function ArticleAttachmentsCard({ ctx }: { ctx: DetailCtx }) {
             <MetaDownloadButton
               resourceId={detail.id}
               url={a.url}
+              name={a.name}
+              kind={a.kind}
               label="下载"
               small
               loginRequired={detail.loginRequired}
@@ -91,10 +134,12 @@ function ArticleAttachmentsCard({ ctx }: { ctx: DetailCtx }) {
 
 export function DownloadPanel({ ctx }: { ctx: DetailCtx }) {
   const { meta } = ctx;
-  // IMAGE 单条主下载
+  // IMAGE：多附件图包/整套优先（新）；旧单 download 回退兼容
   if (meta.kind === "IMAGE") {
-    if (meta.download.mode === "none" || !meta.download.url) return null;
-    return <ImageDownloadCard ctx={ctx} dl={meta.download} />;
+    if (meta.downloads.length > 0) return <ImageDownloadsCard ctx={ctx} list={meta.downloads} />;
+    if (meta.download.mode !== "none" && meta.download.url)
+      return <ImageDownloadCard ctx={ctx} dl={meta.download} />;
+    return null;
   }
   // ARTICLE 附件清单
   if (meta.kind === "ARTICLE") return <ArticleAttachmentsCard ctx={ctx} />;

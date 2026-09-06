@@ -3,8 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, RotateCcw, X, ZoomIn, ZoomOut } from "lucide-react";
 
-// 头像裁剪器：方形视口 + 拖动平移 + 滚轮/滑杆缩放，确认后导出 256×256 方图（blob）。
-// 像素风：直角、brand 色板，与全站一致。
+// 头像裁剪器：方形视口，拖动平移 + 滚轮/滑杆缩放，导出 256×256。
 
 const VIEW = 288; // 裁剪视口边长（显示像素）
 const OUT = 256; // 导出边长
@@ -32,7 +31,6 @@ export default function AvatarCropper({
   const dw = img ? img.naturalWidth * scale : 0;
   const dh = img ? img.naturalHeight * scale : 0;
 
-  // 载入选中的文件
   useEffect(() => {
     const url = URL.createObjectURL(file);
     const el = new Image();

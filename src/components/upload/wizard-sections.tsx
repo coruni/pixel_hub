@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import type { ReactNode } from "react";
+import { useState, type Dispatch, type SetStateAction } from "react";
 import { FileText, Link as LinkIcon, Plus, Trash2, UploadCloud } from "lucide-react";
 import {
   attachmentAcceptAttr,
@@ -11,24 +10,50 @@ import {
 } from "@/lib/upload-config";
 import { uploadAttachment } from "@/lib/upload-attachment-client";
 import { fieldErr, wizInput, wizLabel, SectionTitle } from "./wizard-shared";
+import { SquareCheckbox } from "../admin/SquareCheckbox";
 
 /** 附件分节只关心附件体积+后缀两个字段 */
 type AttachLimits = Pick<UploadLimits, "attachmentMaxMb" | "attachmentExts">;
 
-/** 发布向导的类型化分节：游戏信息（外链 + 版本/平台等元数据）、图片 D2 声明、图片整包下载、文章附件清单 */
-
 export function GameSection({
-  extUrl,
-  setExtUrl,
+  initial,
   fieldErrors,
-  attachment,
+  limits,
+  showChangelog = false,
 }: {
-  extUrl: string;
-  setExtUrl: (v: string) => void;
+  initial?: {
+    externalUrl?: string;
+    version?: string;
+    size?: string;
+    platforms?: string;
+    lang?: string;
+    license?: string;
+    note?: string;
+  };
   fieldErrors?: Record<string, string[]>;
-  /** 外链输入框下方的附件直传区（由父组件渲染，保持 extUrl 受控在向导层） */
-  attachment?: ReactNode;
+  limits: UploadLimits;
+  /** 仅发布时创建版本记录需要更新日志；改稿不复用版本，故默认隐藏 */
+  showChangelog?: boolean;
 }) {
+  const [extUrl, setExtUrl] = useState(initial?.externalUrl ?? "");
+  const [attUploading, setAttUploading] = useState(false);
+  const [attProgress, setAttProgress] = useState<number | null>(null);
+
+  async function onAttachment(file: File | null) {
+    if (!file) return;
+    setAttUploading(true);
+    setAttProgress(0);
+    try {
+      const data = await uploadAttachment(file, setAttProgress);
+      setExtUrl(data.url);
+    } catch {
+      // 静默失败：用户仍可手动粘贴外链
+    } finally {
+      setAttUploading(false);
+      setAttProgress(null);
+    }
+  }
+
   return (
     <section className="mt-4 space-y-4 rounded-none border border-brand-200 bg-surface p-5">
       <SectionTitle n={2}>游戏信息</SectionTitle>
@@ -46,9 +71,15 @@ export function GameSection({
           className={wizInput}
         />
         {fieldErr(fieldErrors?.externalUrl)}
-        {attachment}
+        <AttachmentUpload
+          uploading={attUploading}
+          progress={attProgress}
+          onUpload={onAttachment}
+          filled={extUrl.startsWith("/")}
+          limits={limits}
+        />
         <p className="mt-1 text-xs text-neutral-400">
-          仅允许发布<b>有权分发</b>的内容（原创/已获授权/免费资源）。严禁盗版与侵权资源。
+          仅发布<b>有权分发</b>的内容（原创/已授权/免费），严禁盗版与侵权。
         </p>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
@@ -71,19 +102,21 @@ export function GameSection({
           <input id="size" name="size" maxLength={40} placeholder="1.2 GB" className={wizInput} />
         </div>
       </div>
-      <div>
-        <label className={wizLabel} htmlFor="changelog">
-          更新日志
-        </label>
-        <textarea
-          id="changelog"
-          name="changelog"
-          rows={3}
-          maxLength={2000}
-          placeholder="这个版本包含什么内容…"
-          className={wizInput}
-        />
-      </div>
+      {showChangelog && (
+        <div>
+          <label className={wizLabel} htmlFor="changelog">
+            更新日志
+          </label>
+          <textarea
+            id="changelog"
+            name="changelog"
+            rows={3}
+            maxLength={2000}
+            placeholder="这个版本包含什么内容…"
+            className={wizInput}
+          />
+        </div>
+      )}
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label className={wizLabel} htmlFor="platforms">
@@ -140,7 +173,7 @@ export function GameSection({
   );
 }
 
-/** 附件直传：成功后回填站内路径到外链输入框（受控由父组件持有 extUrl）；上限/后缀提示来自后台配置 */
+/** 附件直传：成功后回填站内路径（extUrl 受控于父组件）；上限/后缀提示来自后台配置 */
 export function AttachmentUpload({
   uploading,
   progress,
@@ -185,7 +218,7 @@ function formatBytes(n: number): string {
   return `${(mb / 1024).toFixed(1)} GB`;
 }
 
-/** 附件直传：OneDrive 使用浏览器分片直传，其他存储回退既有 API。 */
+/** 附件直传：OneDrive 走浏览器分片直传，其他存储回退既有 API */
 async function postAttachment(
   file: File,
 ): Promise<{ url: string; name: string; size: number } | null> {
@@ -194,256 +227,6 @@ async function postAttachment(
   } catch {
     return null;
   }
-}
-
-const segBase =
-  "rounded-none border px-3.5 py-2 text-sm transition disabled:opacity-60 aria-pressed:border-brand-600 aria-pressed:bg-brand-500 aria-pressed:text-white";
-const segIdle = "border-brand-200 bg-surface text-neutral-600 hover:border-brand-400";
-
-/** IMAGE 整包/图包下载（可选）：站内附件(zip) 或 网盘外链，单条主下载，区别于 GAME 版本表 */
-export function ImageSection({
-  fieldErrors,
-  limits,
-}: {
-  fieldErrors?: Record<string, string[]>;
-  limits: AttachLimits;
-}) {
-  const [dlMode, setDlMode] = useState<"none" | "file" | "link">("none");
-  const [dlUrl, setDlUrl] = useState("");
-  const [dlName, setDlName] = useState("");
-  const [dlSize, setDlSize] = useState("");
-  const [dlUploading, setDlUploading] = useState(false);
-  const [dlKey, setDlKey] = useState(0);
-  const [dlMsg, setDlMsg] = useState<string | null>(null);
-
-  function pickMode(k: "none" | "file" | "link") {
-    setDlMode(k);
-    if (k === "none") {
-      setDlUrl("");
-      setDlName("");
-      setDlSize("");
-    }
-  }
-
-  async function onDlFile(file: File | null) {
-    if (!file) return;
-    setDlUploading(true);
-    setDlMsg(null);
-    try {
-      const r = await postAttachment(file);
-      if (!r) {
-        setDlMsg("附件上传失败，请重试");
-        return;
-      }
-      setDlMode("file");
-      setDlUrl(r.url);
-      setDlName(r.name);
-      setDlSize(formatBytes(r.size));
-    } finally {
-      setDlUploading(false);
-      setDlKey((k) => k + 1); // 重挂载内部 file input，同一文件可再次选择
-    }
-  }
-
-  const dlSegs: { k: "none" | "file" | "link"; label: string }[] = [
-    { k: "none", label: "不提供下载" },
-    { k: "file", label: "站内附件（zip 等）" },
-    { k: "link", label: "网盘外链" },
-  ];
-
-  return (
-    <section className="mt-4 space-y-4 rounded-none border border-brand-200 bg-surface p-5">
-      <SectionTitle n={2} tail={<span className="font-normal text-neutral-400">D2 声明</span>}>
-        图片信息
-      </SectionTitle>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="flex items-center gap-2 rounded-none border border-brand-200 px-3 py-2.5 text-sm text-neutral-700">
-          <input type="checkbox" name="isAiGenerated" className="h-4 w-4 accent-brand-500" />由 AI
-          生成
-        </label>
-        <label className="flex items-center gap-2 rounded-none border border-brand-200 px-3 py-2.5 text-sm text-neutral-700">
-          <input type="checkbox" name="original" className="h-4 w-4 accent-brand-500" />
-          本人原创
-        </label>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label className={wizLabel} htmlFor="aiTool">
-            生成工具（如选 AI）
-          </label>
-          <input
-            id="aiTool"
-            name="aiTool"
-            maxLength={60}
-            placeholder="Midjourney / Stable Diffusion…"
-            className={wizInput}
-          />
-        </div>
-        <div>
-          <label className={wizLabel} htmlFor="aiModel">
-            模型/参数（可选）
-          </label>
-          <input
-            id="aiModel"
-            name="aiModel"
-            maxLength={60}
-            placeholder="v6.1 / SDXL…"
-            className={wizInput}
-          />
-        </div>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label className={wizLabel} htmlFor="license">
-            授权/许可（可选）
-          </label>
-          <input
-            id="license"
-            name="license"
-            maxLength={40}
-            placeholder="仅自用 / CC BY / 可商用…"
-            className={wizInput}
-          />
-        </div>
-        <div>
-          <label className={wizLabel} htmlFor="sourceNote">
-            素材来源（转素材请填）
-          </label>
-          <input
-            id="sourceNote"
-            name="sourceNote"
-            maxLength={200}
-            placeholder="作者/原址，避免侵权纠纷"
-            className={wizInput}
-          />
-        </div>
-      </div>
-
-      {/* 整包 / 图包下载（可选）—— 单条整套下载，区别于 GAME 的版本/平台表 */}
-      <div className="rounded-none border border-brand-200 p-4">
-        <p className="text-sm font-medium text-neutral-700">整包 / 图包下载（可选）</p>
-        <p className="mt-0.5 text-xs text-neutral-400">
-          提供原画集 / 多图整套 zip 或网盘链接；不提供可跳过。
-        </p>
-        <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label="下载方式">
-          {dlSegs.map((s) => (
-            <button
-              key={s.k}
-              type="button"
-              aria-pressed={dlMode === s.k}
-              onClick={() => pickMode(s.k)}
-              className={`${segBase} ${dlMode === s.k ? "" : segIdle}`}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
-
-        {dlMode === "file" && (
-          <div className="mt-3">
-            <AttachmentUpload
-              key={dlKey}
-              uploading={dlUploading}
-              onUpload={onDlFile}
-              filled={!!dlUrl}
-              limits={limits}
-            />
-            {dlMsg && <p className="mt-1 text-xs text-amber-600">{dlMsg}</p>}
-            {dlUrl && (
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className={wizLabel} htmlFor="dlName">
-                    文件名（展示）
-                  </label>
-                  <input
-                    id="dlName"
-                    value={dlName}
-                    onChange={(e) => setDlName(e.target.value)}
-                    maxLength={120}
-                    placeholder="图包.zip"
-                    className={wizInput}
-                  />
-                </div>
-                <div>
-                  <label className={wizLabel} htmlFor="dlSize">
-                    大小（展示）
-                  </label>
-                  <input
-                    id="dlSize"
-                    value={dlSize}
-                    onChange={(e) => setDlSize(e.target.value)}
-                    maxLength={40}
-                    placeholder="128 MB"
-                    className={wizInput}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-        {dlMode === "link" && (
-          <div className="mt-3 space-y-3">
-            <div>
-              <label className={wizLabel} htmlFor="dlLinkUrl">
-                网盘 / 下载地址 *
-              </label>
-              <input
-                id="dlLinkUrl"
-                required
-                value={dlUrl}
-                onChange={(e) => setDlUrl(e.target.value)}
-                placeholder="https://pan.xxx / 官网直链…"
-                className={wizInput}
-              />
-              {fieldErr(fieldErrors?.downloadUrl)}
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label className={wizLabel} htmlFor="dlLinkName">
-                  文件名（展示，可选）
-                </label>
-                <input
-                  id="dlLinkName"
-                  value={dlName}
-                  onChange={(e) => setDlName(e.target.value)}
-                  maxLength={120}
-                  placeholder="整套素材"
-                  className={wizInput}
-                />
-              </div>
-              <div>
-                <label className={wizLabel} htmlFor="dlLinkSize">
-                  大小（展示，可选）
-                </label>
-                <input
-                  id="dlLinkSize"
-                  value={dlSize}
-                  onChange={(e) => setDlSize(e.target.value)}
-                  maxLength={40}
-                  placeholder="128 MB"
-                  className={wizInput}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* 下载配置隐藏字段（仅 IMAGE 挂载时进入 FormData；受控 state 为唯一来源） */}
-      <input type="hidden" name="dlMode" value={dlMode} />
-      <input type="hidden" name="dlUrl" value={dlUrl} />
-      {dlMode !== "none" && (
-        <>
-          <input type="hidden" name="dlName" value={dlName} />
-          <input type="hidden" name="dlSize" value={dlSize} />
-        </>
-      )}
-
-      <p className="text-xs text-neutral-400">
-        上传图片需尊重版权：转载须注明来源，AI 生成建议如实标注。
-      </p>
-    </section>
-  );
 }
 
 export type AttachRow = {
@@ -457,15 +240,24 @@ export type AttachRow = {
 let uidSeed = 0;
 const uid = () => `att-${++uidSeed}-${Math.random().toString(36).slice(2, 8)}`;
 
-/** ARTICLE 文末附件清单（可选）：站内附件 / 网盘外链多行，逐行展示于详情页底部 */
-export function ArticleSection({
-  fieldErrors,
+/**
+ * 多附件清单编辑器：IMAGE「整包/图包」与 ARTICLE「文末清单」共用。
+ * 站内附件上传 + 网盘外链逐行增删；每行独立 kind，切换/增删互相隔离，不会串数据。
+ * 隐藏字段 downloads 由本组件受控序列化（客户端唯一来源）。
+ */
+export function AttachmentListEditor({
+  rows,
+  setRows,
   limits,
+  errors,
+  addLinkLabel = "添加网盘外链",
 }: {
-  fieldErrors?: Record<string, string[]>;
-  limits: AttachLimits;
+  rows: AttachRow[];
+  setRows: Dispatch<SetStateAction<AttachRow[]>>;
+  limits: UploadLimits;
+  errors?: string[];
+  addLinkLabel?: string;
 }) {
-  const [rows, setRows] = useState<AttachRow[]>([]);
   const [uploading, setUploading] = useState(false);
   const [fileKey, setFileKey] = useState(0);
   const [msg, setMsg] = useState<string | null>(null);
@@ -519,21 +311,18 @@ export function ArticleSection({
     "inline-flex items-center gap-1.5 rounded-none border border-brand-200 bg-surface px-3 py-1.5 text-xs text-neutral-600 transition hover:border-brand-400 hover:text-neutral-900 disabled:opacity-50";
 
   return (
-    <section className="mt-4 space-y-4 rounded-none border border-brand-200 bg-surface p-5">
-      <SectionTitle
-        n={2}
-        tail={<span className="font-normal text-neutral-400">文末清单 · 可选</span>}
-      >
-        附件下载
-      </SectionTitle>
-      <p className="-mt-2 text-xs text-neutral-400">
-        附件将以清单形式展示在文章底部，访客逐行下载。
-      </p>
-
-      {fieldErr(fieldErrors?.downloads)}
-
+    <>
+      {errors && errors.length > 0 && (
+        <ul className="mt-2 space-y-0.5">
+          {errors.map((e, i) => (
+            <li key={i} className="text-xs text-red-600">
+              {e}
+            </li>
+          ))}
+        </ul>
+      )}
       {rows.length > 0 && (
-        <ul className="space-y-2">
+        <ul className="mt-3 space-y-2">
           {rows.map((r, i) => (
             <li
               key={r.key}
@@ -597,8 +386,7 @@ export function ArticleSection({
           ))}
         </ul>
       )}
-
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         <AttachmentUpload
           key={fileKey}
           uploading={uploading}
@@ -607,7 +395,7 @@ export function ArticleSection({
           limits={limits}
         />
         <button type="button" onClick={addLink} disabled={rows.length >= 20} className={addBtn}>
-          <Plus size={13} aria-hidden /> 添加网盘外链
+          <Plus size={13} aria-hidden /> {addLinkLabel}
         </button>
         <span className="text-xs tabular-nums text-neutral-400">{rows.length}/20</span>
         {msg && <span className="text-xs text-amber-600">{msg}</span>}
@@ -615,6 +403,168 @@ export function ArticleSection({
 
       {/* 附件清单隐藏字段（单 JSON，客户端受控 state 序列化，规避多兄弟 key 顺序脆弱） */}
       <input type="hidden" name="downloads" value={JSON.stringify(payload)} />
+    </>
+  );
+}
+
+/** IMAGE 整包/图包下载（可选）：站内附件(zip) 或 网盘外链，多附件清单；区别于 GAME 版本表 */
+export function ImageSection({
+  initial,
+  fieldErrors,
+  limits,
+}: {
+  initial?: {
+    isAiGenerated?: boolean;
+    original?: boolean;
+    aiTool?: string;
+    aiModel?: string;
+    license?: string;
+    sourceNote?: string;
+    downloads?: { name: string; kind: "file" | "link"; url: string; size?: string }[];
+  };
+  fieldErrors?: Record<string, string[]>;
+  limits: UploadLimits;
+}) {
+  const [rows, setRows] = useState<AttachRow[]>(
+    (initial?.downloads ?? []).map((d) => ({
+      key: uid(),
+      name: d.name,
+      kind: d.kind,
+      url: d.url,
+      size: d.size ?? "",
+    })),
+  );
+
+  return (
+    <section className="mt-4 space-y-4 rounded-none border border-brand-200 bg-surface p-5">
+      <SectionTitle n={2} tail={<span className="font-normal text-neutral-400">D2 声明</span>}>
+        图片信息
+      </SectionTitle>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="flex items-center gap-2 rounded-none border border-brand-200 px-3 py-2.5 text-sm text-neutral-700">
+          <SquareCheckbox name="isAiGenerated" defaultChecked={initial?.isAiGenerated} ariaLabel="由 AI 生成" />
+          由 AI 生成
+        </label>
+        <label className="flex items-center gap-2 rounded-none border border-brand-200 px-3 py-2.5 text-sm text-neutral-700">
+          <SquareCheckbox name="original" defaultChecked={initial?.original} ariaLabel="本人原创" />
+          本人原创
+        </label>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className={wizLabel} htmlFor="aiTool">
+            生成工具（如选 AI）
+          </label>
+          <input
+            id="aiTool"
+            name="aiTool"
+            maxLength={60}
+            defaultValue={initial?.aiTool ?? ""}
+            placeholder="Midjourney / Stable Diffusion…"
+            className={wizInput}
+          />
+        </div>
+        <div>
+          <label className={wizLabel} htmlFor="aiModel">
+            模型/参数（可选）
+          </label>
+          <input
+            id="aiModel"
+            name="aiModel"
+            maxLength={60}
+            defaultValue={initial?.aiModel ?? ""}
+            placeholder="v6.1 / SDXL…"
+            className={wizInput}
+          />
+        </div>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className={wizLabel} htmlFor="license">
+            授权/许可（可选）
+          </label>
+          <input
+            id="license"
+            name="license"
+            maxLength={40}
+            defaultValue={initial?.license ?? ""}
+            placeholder="仅自用 / CC BY / 可商用…"
+            className={wizInput}
+          />
+        </div>
+        <div>
+          <label className={wizLabel} htmlFor="sourceNote">
+            素材来源（转素材请填）
+          </label>
+          <input
+            id="sourceNote"
+            name="sourceNote"
+            maxLength={200}
+            defaultValue={initial?.sourceNote ?? ""}
+            placeholder="作者/原址，避免侵权纠纷"
+            className={wizInput}
+          />
+        </div>
+      </div>
+
+      <div className="rounded-none border border-brand-200 p-4">
+        <p className="text-sm font-medium text-neutral-700">整包 / 图包下载（可选）</p>
+        <p className="mt-0.5 text-xs text-neutral-400">
+          提供原画集/整套 zip 或网盘链接，可添加多个；不提供可跳过。
+        </p>
+        <AttachmentListEditor
+          rows={rows}
+          setRows={setRows}
+          limits={limits}
+          errors={fieldErrors?.downloads}
+        />
+      </div>
+
+      <p className="text-xs text-neutral-400">
+        请尊重版权：转载注明来源，AI 生成如实标注。
+      </p>
+    </section>
+  );
+}
+
+/** ARTICLE 文末附件清单（可选）：站内附件 / 网盘外链多行，逐行展示于详情页底部 */
+export function ArticleSection({
+  initial,
+  fieldErrors,
+  limits,
+}: {
+  initial?: { downloads?: { name: string; kind: "file" | "link"; url: string; size?: string }[] };
+  fieldErrors?: Record<string, string[]>;
+  limits: UploadLimits;
+}) {
+  const [rows, setRows] = useState<AttachRow[]>(
+    (initial?.downloads ?? []).map((d) => ({
+      key: uid(),
+      name: d.name,
+      kind: d.kind,
+      url: d.url,
+      size: d.size ?? "",
+    })),
+  );
+
+  return (
+    <section className="mt-4 space-y-4 rounded-none border border-brand-200 bg-surface p-5">
+      <SectionTitle
+        n={2}
+        tail={<span className="font-normal text-neutral-400">文末清单 · 可选</span>}
+      >
+        附件下载
+      </SectionTitle>
+      <p className="-mt-2 text-xs text-neutral-400">
+        附件以清单展示于文章底部，访客逐行下载。
+      </p>
+
+      <AttachmentListEditor
+        rows={rows}
+        setRows={setRows}
+        limits={limits}
+        errors={fieldErrors?.downloads}
+      />
     </section>
   );
 }

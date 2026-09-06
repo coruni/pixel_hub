@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ChevronDown, ChevronUp, Eye, EyeOff, Menu, Plus, Trash2 } from "lucide-react";
 import { NAV_ICON_MAP } from "@/lib/nav-icons";
 import { INPUT_SM } from "@/lib/ui/cls";
+import { SquareCheckbox } from "../admin/SquareCheckbox";
 import {
   NAV_ICONS,
   NAV_VISIBILITY_KEYS,
@@ -14,7 +15,6 @@ import {
 import { updateCategoriesMenuAction, updateNavbarAction } from "@/lib/actions/site";
 import type { RunFn } from "./shared";
 
-/** 顶部导航栏编辑：导航项增删改排序 + 分类下拉菜单开关 */
 export default function NavbarCard({
   items: initialItems,
   menu: initialMenu,
@@ -205,16 +205,10 @@ export default function NavbarCard({
         <span className="self-center text-[11px] text-neutral-400">外链需以 http(s):// 开头</span>
       </div>
 
-      {/* 分类下拉菜单 */}
       <div className="mt-4 rounded-none border border-brand-200 bg-brand-50/40 p-3">
         <div className="flex flex-wrap items-center gap-2.5">
           <label className="flex cursor-pointer items-center gap-2 text-sm text-neutral-800">
-            <input
-              type="checkbox"
-              checked={menu.enabled}
-              onChange={(e) => setMenu({ ...menu, enabled: e.target.checked })}
-              className="h-4 w-4 accent-brand-500"
-            />
+            <SquareCheckbox checked={menu.enabled} onChange={(next) => setMenu({ ...menu, enabled: next })} ariaLabel="启用分类菜单" />
             启用「分类」下拉菜单
           </label>
           <input
@@ -224,7 +218,7 @@ export default function NavbarCard({
             className={`${INPUT_SM} w-28`}
             aria-label="菜单文字"
           />
-          <span className="text-[11px] text-neutral-400">在导航链接后渲染分类直达下拉</span>
+          <span className="text-[11px] text-neutral-400">导航链接后显示分类直达下拉</span>
         </div>
       </div>
     </section>

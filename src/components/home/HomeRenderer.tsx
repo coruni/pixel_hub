@@ -10,6 +10,7 @@ import StatsBlock from "./blocks/stats";
 import CreatorsBlock from "./blocks/creators";
 import TagsBlock from "./blocks/tags";
 import AdSectionBlock from "./blocks/ad";
+import RecommendBlock from "./blocks/recommend";
 
 export default async function HomeRenderer({
   sections,
@@ -118,6 +119,24 @@ export default async function HomeRenderer({
                   alt: typeof cfg.alt === "string" ? cfg.alt : "",
                   html: typeof cfg.html === "string" ? cfg.html : "",
                   badge: cfg.badge !== false,
+                }}
+              />
+            );
+          case "recommend":
+            return (
+              <RecommendBlock
+                key={s.id}
+                title={s.title}
+                userId={userId}
+                authed={authed}
+                cfg={{
+                  scope: (cfg.scope as "personal" | "all") ?? "personal",
+                  type: (cfg.type as "ALL" | "IMAGE" | "GAME" | "ARTICLE") ?? "ALL",
+                  count: typeof cfg.count === "number" ? cfg.count : 12,
+                  categorySlugs: (cfg.categorySlugs as string[]) ?? [],
+                  explorationRatio:
+                    typeof cfg.explorationRatio === "number" ? cfg.explorationRatio : 0.3,
+                  minCategories: typeof cfg.minCategories === "number" ? cfg.minCategories : 0,
                 }}
               />
             );

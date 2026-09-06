@@ -12,6 +12,7 @@ import {
   getAreaWidgets,
   widgetTitle,
   withAreaWidgets,
+  type SidebarWidget,
   type Theme,
   type WidgetAreaKey,
 } from "@/lib/site-config";
@@ -28,7 +29,6 @@ import NavbarCard from "./NavbarCard";
 import WidgetEditor from "./WidgetEditor";
 import { AREA_TABS, KindIcon, type RunFn, type SiteCategories, type SiteTags } from "./shared";
 
-/** 站点外观管理：导航栏 / 详情模板 / 侧边栏范围 / 各区域组件（按页签） */
 export default function SiteLayoutManager({
   theme: initial,
   categories,
@@ -44,6 +44,8 @@ export default function SiteLayoutManager({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [activeArea, setActiveArea] = useState<WidgetAreaKey>("home");
   const [pending, start] = useTransition();
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
 
   // 服务端 refresh 后以最新 props 为准（渲染期派生 state，避免 effect 内 setState）
   if (prev !== initial) {
@@ -64,24 +66,34 @@ export default function SiteLayoutManager({
     activeArea === "home" || activeArea === "archive" || activeArea === "detail";
   const areaOn = !isSidebarArea || theme.sidebar.showOn[activeArea];
 
+  // 拖拽/上下按钮共用：本地先重排以即时反馈，再持久化顺序
+  function persistOrder(next: SidebarWidget[]) {
+    setTheme(withAreaWidgets(theme, activeArea, next));
+    run(() => reorderSidebarWidgetsAction(activeArea, next.map((w) => w.id)));
+  }
+
   function moveBy(index: number, delta: number) {
     const target = index + delta;
     if (target < 0 || target >= widgets.length) return;
     const next = [...widgets];
     const [m] = next.splice(index, 1);
     next.splice(target, 0, m);
-    setTheme(withAreaWidgets(theme, activeArea, next));
-    run(() =>
-      reorderSidebarWidgetsAction(
-        activeArea,
-        next.map((w) => w.id),
-      ),
-    );
+    persistOrder(next);
+  }
+
+  function onDrop(index: number) {
+    const from = dragId ? widgets.findIndex((w) => w.id === dragId) : -1;
+    setDragId(null);
+    setOverId(null);
+    if (from < 0 || from === index) return;
+    const next = [...widgets];
+    const [m] = next.splice(from, 1);
+    next.splice(index, 0, m);
+    persistOrder(next);
   }
 
   return (
     <div className="space-y-6">
-      {/* 顶部导航栏 */}
       <NavbarCard
         items={theme.navbar.items}
         menu={theme.navbar.categoriesMenu}
@@ -89,25 +101,21 @@ export default function SiteLayoutManager({
         pending={pending}
       />
 
-      {/* 详情模板 */}
       <DetailTemplateCard theme={theme} run={run} />
 
-      {/* 侧边栏范围与外观 */}
       <FlagsCard theme={theme} pending={pending} run={run} />
 
-      {/* 组件区域（侧边栏页面 + 详情页正文槽位，按区域页签配置） */}
       <section className="rounded-none border border-brand-200 bg-surface p-5">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-base font-semibold text-neutral-900">页面组件</h2>
             <p className="mt-0.5 text-xs text-neutral-500">
-              按区域分别配置：侧边栏三类页面 +
-              归档页上/下、详情页上/中/下正文槽位，各自独立一套组件，可排序、开关与删除。
-              首页板块流布局在
+              按区域分别配置：侧边栏三类页面，以及归档页、详情页的各正文槽位；组件各自独立，可排序、开关、删除。
+              首页板块流在
               <Link href="/admin/home" className="mx-0.5 text-brand-600 hover:underline">
                 首页布局
               </Link>
-              页专门管理。
+              页管理。
             </p>
           </div>
           <Link
@@ -118,7 +126,6 @@ export default function SiteLayoutManager({
           </Link>
         </div>
 
-        {/* 区域页签 */}
         <div className="mt-4 flex flex-wrap gap-1 border-b border-neutral-200" role="tablist">
           {AREA_TABS.map((t) => {
             const on = activeArea === t.key;
@@ -153,7 +160,6 @@ export default function SiteLayoutManager({
           })}
         </div>
 
-        {/* 当前区域的配置面板 */}
         <div
           role="tabpanel"
           id="widget-panel"
@@ -184,7 +190,28 @@ export default function SiteLayoutManager({
             <ul className="mt-4 space-y-2">
               {widgets.map((w, index) => (
                 <li key={w.id} className="rounded-none border border-brand-200">
-                  <div className="flex items-center gap-3 px-3 py-2.5">
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      setDragId(w.id);
+                      e.dataTransfer.effectAllowed = "move";
+                    }}
+                    onDragEnd={() => {
+                      setDragId(null);
+                      setOverId(null);
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      if (overId !== w.id) setOverId(w.id);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      onDrop(index);
+                    }}
+                    className={`flex items-center gap-3 px-3 py-2.5 transition ${
+                      overId === w.id ? "ring-2 ring-neutral-900/20" : ""
+                    }`}
+                  >
                     <span
                       className="cursor-grab text-neutral-300 active:cursor-grabbing"
                       aria-hidden

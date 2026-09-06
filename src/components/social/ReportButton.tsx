@@ -26,7 +26,7 @@ export default function ReportButton({
     if (r.ok) {
       setOpen(false);
       setDetail("");
-      setMsg("✓ 举报已提交，感谢你帮助维护社区");
+      setMsg("✓ 举报已提交，感谢维护社区");
     } else {
       setMsg(r.error ?? "提交失败");
     }
@@ -65,7 +65,7 @@ export default function ReportButton({
               onChange={(e) => setDetail(e.target.value)}
               rows={3}
               maxLength={500}
-              placeholder="补充说明（可选）"
+              placeholder="补充说明（选填）"
               className="w-full rounded-none border border-brand-200 px-2.5 py-1.5 text-sm outline-none focus:border-brand-500"
             />
           </div>

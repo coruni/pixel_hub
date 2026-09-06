@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import Gallery from "@/components/resource/Gallery";
-import { DownloadButton } from "@/components/social/interactions";
 import CollapsibleAside from "./CollapsibleAside";
 import { DownloadPanel } from "./download-panel";
 import {
@@ -44,7 +43,7 @@ export default function DetailBanner({
             {detail.title.slice(0, 1).toUpperCase()}
           </div>
         )}
-        <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,.88)_0%,rgba(0,0,0,.88)_55%,rgba(0,0,0,.4)_55%,rgba(0,0,0,.4)_75%,transparent_75.5%)]" />
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,.6)_0%,rgba(0,0,0,.92)_55%, transparent_100%)]" />
         <div className="absolute inset-x-0 bottom-0 p-5 sm:p-6">
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-none border border-brand-600 bg-stone-900/85 px-2.5 py-0.5 text-[11px] font-medium text-white">
@@ -63,16 +62,7 @@ export default function DetailBanner({
             {detail.title}
           </h1>
           {detail.summary && (
-            <p className="mt-1.5 max-w-2xl text-sm leading-6 text-white/80">{detail.summary}</p>
-          )}
-          {detail.externalUrl && (
-            <DownloadButton
-              resourceId={detail.id}
-              externalUrl={detail.externalUrl}
-              loginRequired={detail.loginRequired}
-              authed={ctx.authed}
-              callbackPath={`/resources/${detail.slug}`}
-            />
+            <p className="mt-1.5 line-clamp-2 max-w-2xl text-sm leading-6 text-white/80">{detail.summary}</p>
           )}
         </div>
       </div>

@@ -7,6 +7,7 @@ import { updateHomeSectionAction } from "@/lib/actions/home";
 import { CARD_RATIO_KEYS, CARD_RATIOS, DISPLAY_META, DISPLAY_OPTIONS } from "@/lib/display";
 import type { CardRatio, ContentType } from "@/lib/display";
 import { INPUT, LABEL_STRONG } from "@/lib/ui/cls";
+import { SquareCheckbox } from "../admin/SquareCheckbox";
 import type { HomeSectionConfig, HomeSectionKind } from "@/lib/home-config";
 import AdConfigFields, { initAdConfig } from "@/components/admin-shared/ad-config-fields";
 import ChipPicker from "@/components/ui/ChipPicker";
@@ -79,12 +80,23 @@ export default function SectionEditor({
     (CARD_RATIO_KEYS as string[]).includes(String(cfg.ratio)) ? (cfg.ratio as CardRatio) : "auto",
   );
   const [paged, setPaged] = useState(kind === "list" && cfg.paged === true);
+  // 为你推荐：个性化 / 全站热门
+  const [scope, setScope] = useState<"personal" | "all">(
+    cfg.scope === "all" ? "all" : "personal",
+  );
+  // 为你推荐：探索占比（打破信息茧房）
+  const [explorationRatio, setExplorationRatio] = useState(
+    typeof cfg.explorationRatio === "number" ? cfg.explorationRatio : 0.3,
+  );
+  // 为你推荐：最少覆盖分类数（0 = 自动）
+  const [minCategories, setMinCategories] = useState(
+    typeof cfg.minCategories === "number" ? cfg.minCategories : 0,
+  );
   // 广告位（共享编辑字段，草稿见 admin-shared/ad-config-fields）
   const [ad, setAd] = useState(() => initAdConfig(cfg));
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
 
-  // 大类变化时剔除不属于该类的已选分类，避免保存「看不见」的配置
   function setTypeWithFilter(v: TypeFilter) {
     setType(v);
   }
@@ -107,6 +119,8 @@ export default function SectionEditor({
         return { count, slugs: tagSel };
       case "stats":
         return {};
+      case "recommend":
+        return { scope, type, count, categorySlugs: cats, explorationRatio, minCategories };
       case "ad":
         return { ...ad, image: ad.image.trim(), link: ad.link.trim(), alt: ad.alt.trim() };
     }
@@ -144,7 +158,6 @@ export default function SectionEditor({
       </div>
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
-        {/* 标题（通用） */}
         <div className="sm:col-span-2">
           <label className={field} htmlFor={`t-${row.id}`}>
             {kind === "hero"
@@ -163,8 +176,7 @@ export default function SectionEditor({
           />
         </div>
 
-        {/* 通用：大类 / 排序 / 数量 / 显示形态 */}
-        {kind === "list" && (
+        {(kind === "list" || kind === "recommend") && (
           <div>
             <label className={field} htmlFor={`ty-${row.id}`}>
               内容大类
@@ -214,7 +226,7 @@ export default function SectionEditor({
                 className={input}
               />
               <p className="mt-1 text-[11px] text-neutral-400">
-                首屏展示数；开启下方翻页后即每页条数
+                首屏数量；开启翻页后即每页条数
               </p>
             </div>
           </>
@@ -223,16 +235,11 @@ export default function SectionEditor({
         {kind === "list" && (
           <div className="sm:col-span-2">
             <label className={`${field} flex items-center gap-2`}>
-              <input
-                type="checkbox"
-                checked={paged}
-                onChange={(e) => setPaged(e.target.checked)}
-                className="h-4 w-4 accent-brand-500"
-              />
+              <SquareCheckbox checked={paged} onChange={(next) => setPaged(next)} ariaLabel="允许翻页" />
               允许「下一页」翻页（点按钮按相同条件加载后续页）
             </label>
             <p className="text-[11px] text-neutral-400">
-              关闭时板块只显示首屏静态内容；内容很多时建议开启。
+              关闭时仅显示首屏；内容多建议开启。
             </p>
           </div>
         )}
@@ -258,7 +265,6 @@ export default function SectionEditor({
           </div>
         )}
 
-        {/* list/featured：卡片比例（列表行不适用；auto=默认 3:4 竖版） */}
         {(kind === "list" || kind === "featured") && display !== "list" && (
           <div>
             <label className={field} htmlFor={`r-${row.id}`}>
@@ -284,12 +290,92 @@ export default function SectionEditor({
           </div>
         )}
 
-        {/* list：分类/标签多选 */}
-        {kind === "list" && (
+        {kind === "recommend" && (
+          <>
+            <div>
+              <label className={field} htmlFor={`sc-${row.id}`}>
+                推荐范围
+              </label>
+              <select
+                id={`sc-${row.id}`}
+                value={scope}
+                onChange={(e) => setScope(e.target.value as "personal" | "all")}
+                className={input}
+              >
+                <option value="personal">个性化（按登录用户偏好）</option>
+                <option value="all">全站热门（游客也适用）</option>
+              </select>
+              <p className="mt-1 text-[11px] text-neutral-400">
+                登录用户走个性化；游客或无偏好信号时自动回退热门。
+              </p>
+            </div>
+            <div>
+              <label className={field} htmlFor={`n-${row.id}`}>
+                展示数量（1–48）
+              </label>
+              <input
+                id={`n-${row.id}`}
+                type="number"
+                min={1}
+                max={48}
+                value={count}
+                onChange={(e) => setCount(Math.max(1, Math.min(48, Number(e.target.value) || 1)))}
+                className={input}
+              />
+            </div>
+            <div>
+              <label className={field} htmlFor={`er-${row.id}`}>
+                探索占比（打破信息茧房，0–0.6）
+              </label>
+              <input
+                id={`er-${row.id}`}
+                type="number"
+                min={0}
+                max={0.6}
+                step={0.05}
+                value={explorationRatio}
+                onChange={(e) =>
+                  setExplorationRatio(
+                    Math.max(0, Math.min(0.6, Number(e.target.value) || 0)),
+                  )
+                }
+                className={input}
+              />
+              <p className="mt-1 text-[11px] text-neutral-400">
+                将部分槽位留给「你很少接触」的优质/新内容，避免越推越窄。冷启动会自动调高。
+              </p>
+            </div>
+            <div>
+              <label className={field} htmlFor={`mc-${row.id}`}>
+                最少分类覆盖（0 = 自动）
+              </label>
+              <input
+                id={`mc-${row.id}`}
+                type="number"
+                min={0}
+                max={12}
+                value={minCategories}
+                onChange={(e) =>
+                  setMinCategories(Math.max(0, Math.min(12, Number(e.target.value) || 0)))
+                }
+                className={input}
+              />
+              <p className="mt-1 text-[11px] text-neutral-400">
+                最终列表至少覆盖的不同分类数，进一步防止整页同质。
+              </p>
+            </div>
+          </>
+        )}
+
+        {(kind === "list" || kind === "recommend") && (
           <>
             <div className="sm:col-span-2">
               <ChipPicker
-                label="挑分类（可多选；不选 = 不限）"
+                label={
+                  kind === "recommend"
+                    ? "限定分类（可多选；不选 = 不限）"
+                    : "挑分类（可多选；不选 = 不限）"
+                }
                 options={categories.map((c) => ({ key: c.slug, label: c.name }))}
                 selected={cats}
                 onChange={setCats}
@@ -308,7 +394,6 @@ export default function SectionEditor({
           </>
         )}
 
-        {/* categories：手动挑选分类（可选） */}
         {kind === "categories" && (
           <div className="sm:col-span-2">
             <ChipPicker
@@ -321,7 +406,6 @@ export default function SectionEditor({
           </div>
         )}
 
-        {/* tags：手动挑选标签（可选） */}
         {kind === "tags" && (
           <>
             <div>
@@ -350,25 +434,18 @@ export default function SectionEditor({
           </>
         )}
 
-        {/* 内容流（全站浏览）：顶部热门标签 */}
         {kind === "feed" && (
           <div>
             <label className={`${field} flex items-center gap-2`}>
-              <input
-                type="checkbox"
-                checked={showTags}
-                onChange={(e) => setShowTags(e.target.checked)}
-                className="h-4 w-4 accent-brand-500"
-              />
+              <SquareCheckbox checked={showTags} onChange={(next) => setShowTags(next)} ariaLabel="显示热门标签行" />
               顶部显示热门标签行
             </label>
             <p className="text-xs text-neutral-400">
-              与「浏览」页一致；也可单独加一个“热门标签”板块置于下方
+              与「浏览」页一致；也可单独加「热门标签」板块。
             </p>
           </div>
         )}
 
-        {/* 人气创作者：数量 */}
         {kind === "creators" ? (
           <div>
             <label className={field} htmlFor={`n-${row.id}`}>
@@ -386,7 +463,6 @@ export default function SectionEditor({
           </div>
         ) : null}
 
-        {/* 主推 / 专题：手动挑选资源 */}
         {(kind === "hero" || kind === "featured") && (
           <div className="sm:col-span-2">
             <HeroPick
@@ -397,20 +473,18 @@ export default function SectionEditor({
             />
             <p className="mt-1 text-xs text-neutral-400">
               {kind === "hero"
-                ? "可挑选 1–8 个已上架资源；不挑选时自动展示近期最热内容。挑选后第一张作为大图主推，其余作副推。"
-                : "可挑选最多 24 个资源组成专题；不挑选时自动兜底近期最热内容。"}
+                ? "挑选 1–8 个资源；不挑则自动展示近期最热，首图作主推、其余作副推。"
+                : "最多 24 个资源组成专题；不挑则自动兜底近期最热。"}
             </p>
           </div>
         )}
 
-        {/* 数据一览：无需配置 */}
         {kind === "stats" && (
           <p className="text-xs text-neutral-400">
             自动读取：已上架内容 / 注册用户 / 累计下载 / 累计浏览。
           </p>
         )}
 
-        {/* 广告位：图片+链接 或 HTML/联盟代码（共享字段） */}
         {kind === "ad" && (
           <AdConfigFields
             idPrefix={`ad-${row.id}`}

@@ -10,9 +10,8 @@ import {
   type SettingsActionState,
 } from "@/lib/actions/settings";
 
-// 设置页头像卡：选图 → 裁剪器（方形视口/缩放/拖动）→ 预览 → 保存。
-// GIF 免裁剪直接上传（仅受信用户可选 GIF）；其余格式裁剪成 256×256。
-// blob: 预览 URL 在 publicUrl 中原样放行，避免被拼成 /uploads/blob:... 404。
+// 头像卡：选图 → 裁剪 256×256 → 预览 → 保存。
+// GIF 免裁剪直传（仅受信用户）；blob: 预览 URL 原样放行，避免拼成 /uploads/blob:... 404。
 export default function AvatarForm({
   name,
   username,
@@ -83,7 +82,7 @@ export default function AvatarForm({
       <Avatar name={name} username={username} avatarKey={preview ?? avatarKey} size="lg" />
       <form action={formAction} className="min-w-0 flex-1">
         <p className="text-xs leading-5 text-neutral-400">
-          支持 png / jpg / webp，最大 {avatarMaxMb}MB；选图后可拖动/缩放调整裁剪区域
+          支持 png / jpg / webp，最大 {avatarMaxMb}MB，选图后拖动或缩放调整
           {trusted && "；GIF 动图免裁剪直接上传"}
         </p>
         {state.ok && <p className="mt-1 text-sm text-emerald-600">✓ 已更新</p>}

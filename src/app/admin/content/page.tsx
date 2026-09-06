@@ -1,13 +1,16 @@
 import Link from "next/link";
 import MiniBadge from "@/components/ui/MiniBadge";
-import { Download, Heart, MessageSquare } from "lucide-react";
+import { Download, Heart, MessageSquare, Pencil } from "lucide-react";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db/prisma";
 import { publicUrl } from "@/lib/storage";
 import { formatCount, timeAgo } from "@/lib/format";
 import { TYPE_LABEL } from "@/lib/display";
-import { enumParam, type SP } from "@/lib/search-params";
+import { enumParam, intParam, str, type SP } from "@/lib/search-params";
+import { ADMIN_PAGE_SIZE, STABLE_NEWEST, adminQuery } from "@/lib/admin/paging";
+import { TableFooter } from "@/components/admin/DataTable";
 import { ContentActions } from "@/components/admin/buttons";
+import type { Prisma, ResourceType } from "@prisma/client";
 
 export const metadata: Metadata = { title: "内容库" };
 
@@ -20,43 +23,154 @@ const statusLabel: Record<string, { text: string; cls: string }> = {
 };
 
 const STATUSES = ["PUBLISHED", "PENDING", "REJECTED", "REMOVED", "DRAFT"] as const;
+const TYPES = ["GAME", "IMAGE", "ARTICLE"] as const;
+
+const input =
+  "rounded-none border border-brand-200 bg-surface px-3 py-1.5 text-sm outline-none transition focus:border-brand-500";
 
 export default async function ContentPage({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = await searchParams;
+  const q = (str(sp, "q") ?? "").trim().slice(0, 80);
+  const type = str(sp, "type") ?? "";
+  const author = (str(sp, "author") ?? "").trim().slice(0, 60);
+  const cat = str(sp, "cat") ?? "";
   const status = enumParam(sp, "status", STATUSES, "PUBLISHED");
+  const page = intParam(sp, "page", 1);
+  const pageSize = Math.min(100, intParam(sp, "size", ADMIN_PAGE_SIZE));
 
-  const rows = await prisma.resource.findMany({
-    where: { status },
-    orderBy: { createdAt: "desc" },
-    take: 200,
-    include: {
-      author: { select: { username: true, name: true } },
-      coverMedia: { select: { storageKey: true, bigKey: true, thumbKey: true } },
-      media: {
-        where: { resourceId: { not: null } },
-        orderBy: { sort: "asc" },
-        take: 1,
-        select: { storageKey: true, bigKey: true, thumbKey: true },
+  // 关键词命中标题/简介/正文；作者命中用户名或昵称
+  const where: Prisma.ResourceWhereInput = {
+    status,
+    ...((TYPES as readonly string[]).includes(type) ? { type: type as ResourceType } : {}),
+    ...(cat ? { categoryId: cat } : {}),
+    ...(author
+      ? {
+          author: {
+            OR: [
+              { username: { contains: author, mode: "insensitive" as const } },
+              { name: { contains: author, mode: "insensitive" as const } },
+            ],
+          },
+        }
+      : {}),
+    ...(q
+      ? {
+          OR: [
+            { title: { contains: q, mode: "insensitive" as const } },
+            { summary: { contains: q, mode: "insensitive" as const } },
+            { description: { contains: q, mode: "insensitive" as const } },
+          ],
+        }
+      : {}),
+  };
+
+  const [rows, total, categories] = await Promise.all([
+    prisma.resource.findMany({
+      where,
+      orderBy: [...STABLE_NEWEST],
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: {
+        author: { select: { username: true, name: true } },
+        category: { select: { name: true } },
+        coverMedia: { select: { storageKey: true, bigKey: true, thumbKey: true } },
+        media: {
+          where: { resourceId: { not: null } },
+          orderBy: { sort: "asc" },
+          take: 1,
+          select: { storageKey: true, bigKey: true, thumbKey: true },
+        },
       },
-    },
-  });
+    }),
+    prisma.resource.count({ where }),
+    prisma.category.findMany({ orderBy: [{ sort: "asc" }, { name: "asc" }], select: { id: true, name: true } }),
+  ]);
 
+  const base = {
+    q: q || undefined,
+    type: type || undefined,
+    author: author || undefined,
+    cat: cat || undefined,
+    ...(pageSize !== ADMIN_PAGE_SIZE ? { size: String(pageSize) } : {}),
+  };
+  const href = (p: number) => `/admin/content${adminQuery(base, { status, page: String(p) })}`;
   const chip = (s: string) =>
     `rounded-none px-3 py-1 text-xs transition ${
       status === s
         ? "bg-brand-500 text-white"
-        : "bg-surface text-neutral-500 border border-brand-200 hover:border-brand-500"
+        : "border border-brand-200 bg-surface text-neutral-500 hover:border-brand-500"
     }`;
 
   return (
     <div>
-      <div className="mb-4 flex flex-wrap gap-2">
+      {/* 状态 chips：切状态保留其余筛选，回到第 1 页 */}
+      <div className="mb-3 flex flex-wrap gap-2">
         {STATUSES.map((s) => (
-          <Link key={s} href={`/admin/content?status=${s}`} className={chip(s)}>
+          <Link key={s} href={`/admin/content${adminQuery(base, { status: s })}`} className={chip(s)}>
             {statusLabel[s]?.text ?? s}
           </Link>
         ))}
       </div>
+
+      <form method="get" className="mb-4 flex flex-wrap items-center gap-2">
+        <input type="hidden" name="status" value={status} />
+        <label className="sr-only" htmlFor="content-q">
+          关键词
+        </label>
+        <input
+          id="content-q"
+          name="q"
+          defaultValue={q}
+          placeholder="标题 / 简介 / 正文"
+          className={`${input} w-44 text-xs`}
+        />
+        <label className="sr-only" htmlFor="content-author">
+          作者
+        </label>
+        <input
+          id="content-author"
+          name="author"
+          defaultValue={author}
+          placeholder="作者用户名 / 昵称"
+          className={`${input} w-40 text-xs`}
+        />
+        <label className="sr-only" htmlFor="content-type">
+          类型
+        </label>
+        <select id="content-type" name="type" defaultValue={type} className={`${input} text-xs`}>
+          <option value="">全部类型</option>
+          {TYPES.map((t) => (
+            <option key={t} value={t}>
+              {TYPE_LABEL[t]}
+            </option>
+          ))}
+        </select>
+        <label className="sr-only" htmlFor="content-cat">
+          分类
+        </label>
+        <select id="content-cat" name="cat" defaultValue={cat} className={`${input} text-xs`}>
+          <option value="">全部分类</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+        <button
+          type="submit"
+          className="rounded-none border border-brand-200 bg-surface px-3 py-1.5 text-xs text-neutral-700 transition hover:border-brand-500"
+        >
+          筛选
+        </button>
+        {(q || author || type || cat) && (
+          <Link
+            href={`/admin/content?status=${status}`}
+            className="text-xs text-neutral-400 underline-offset-2 hover:text-brand-700 hover:underline"
+          >
+            清空筛选
+          </Link>
+        )}
+      </form>
 
       {rows.length === 0 ? (
         <p className="rounded-none border border-brand-200 bg-surface px-5 py-10 text-center text-sm text-neutral-400">
@@ -105,6 +219,7 @@ export default async function ContentPage({ searchParams }: { searchParams: Prom
                     )}
                   </div>
                   <p className="mt-0.5 truncate text-xs text-neutral-400">
+                    {r.category?.name ? `${r.category.name} · ` : ""}
                     {r.author.name ?? r.author.username} · {timeAgo(r.createdAt)} ·{" "}
                     <Heart size={11} className="mb-0.5 inline" /> {formatCount(r.likeCount)} ·{" "}
                     <MessageSquare size={11} className="mb-0.5 inline" />{" "}
@@ -115,12 +230,27 @@ export default async function ContentPage({ searchParams }: { searchParams: Prom
                     )}
                   </p>
                 </div>
+                <Link
+                  href={`/admin/content/${r.id}/edit`}
+                  className="inline-flex items-center gap-1 rounded-none border border-brand-200 bg-surface px-2.5 py-1.5 text-xs text-neutral-600 transition hover:border-brand-500 hover:text-brand-700"
+                >
+                  <Pencil size={12} aria-hidden />
+                  编辑
+                </Link>
                 <ContentActions resourceId={r.id} status={r.status} />
               </li>
             );
           })}
         </ul>
       )}
+
+      <TableFooter
+        page={page}
+        hasMore={(page - 1) * pageSize + rows.length < total}
+        total={total}
+        pageSize={pageSize}
+        href={href}
+      />
     </div>
   );
 }

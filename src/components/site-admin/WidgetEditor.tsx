@@ -14,7 +14,6 @@ import type { SiteCategories, SiteTags } from "./shared";
 let rowKeySeq = 0;
 const nextRowKey = () => `row-${++rowKeySeq}`;
 
-/** 侧栏组件内联编辑：按 kind 渲染对应配置字段，保存调用 updateSidebarWidgetAction */
 export default function WidgetEditor({
   widget,
   categories,
@@ -240,7 +239,7 @@ export default function WidgetEditor({
             <div className="sm:col-span-2">
               {kind === "categories" ? (
                 <ChipPicker
-                  label="挑选要展示的分类（可多选；不选则全部）"
+                  label="挑选展示分类（可多选，不选则全部）"
                   options={categories.map((c) => ({ key: c.slug, label: c.name }))}
                   selected={cats}
                   onChange={setCats}
@@ -248,7 +247,7 @@ export default function WidgetEditor({
                 />
               ) : (
                 <ChipPicker
-                  label="挑选要展示的标签（可多选；不选则按热度）"
+                  label="挑选展示标签（可多选，不选则按热度）"
                   options={tags.map((t) => ({ key: t.slug, label: t.name }))}
                   selected={cats}
                   onChange={setCats}

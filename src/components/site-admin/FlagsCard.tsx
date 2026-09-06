@@ -4,8 +4,8 @@ import { useState } from "react";
 import type { Theme } from "@/lib/site-config";
 import { updateSidebarFlagsAction } from "@/lib/actions/site";
 import { PAGE_LABELS, type RunFn } from "./shared";
+import { SquareCheckbox } from "../admin/SquareCheckbox";
 
-/** 侧边栏在哪些页面显示（showOn）+ sticky / 栏宽外观 */
 export default function FlagsCard({
   theme,
   pending,
@@ -58,17 +58,16 @@ export default function FlagsCard({
 
       <div className="mt-4 flex flex-wrap items-end gap-5 border-t border-neutral-100 pt-4">
         <label className="flex items-center gap-2 text-sm text-neutral-700">
-          <input
-            type="checkbox"
+          <SquareCheckbox
             checked={sticky}
             disabled={pending}
-            onChange={(e) => {
-              setSticky(e.target.checked);
-              commit({ sticky: e.target.checked });
+            onChange={(next) => {
+              setSticky(next);
+              commit({ sticky: next });
             }}
-            className="h-4 w-4 accent-brand-500"
+            ariaLabel="侧边栏固定"
           />
-          侧边栏工具固定（sticky，随滚动吸附）
+          侧边栏固定（sticky）
         </label>
         <label className="flex items-center gap-2 text-sm text-neutral-700">
           栏宽

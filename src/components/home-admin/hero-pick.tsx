@@ -61,7 +61,6 @@ export default function HeroPick({
 
   return (
     <div>
-      {/* 已选 */}
       {value.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-1.5">
           {value.map((p) => (

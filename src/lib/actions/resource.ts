@@ -9,6 +9,9 @@ import { imageMetaSchema, gameMetaSchema, articleMetaSchema } from "@/lib/meta";
 import { randomTail, uniqueSlug, slugify } from "@/lib/slug";
 import { translateToEnglish } from "@/lib/edge-translate";
 import { revalidatePath } from "next/cache";
+import { resourceTextFields } from "@/lib/resource-fields";
+import { applyResourceEdit, type ResourceEditState } from "@/lib/actions/_resource-edit";
+import { getUploadLimits } from "@/lib/upload-limits";
 
 export type ResourceActionState = {
   error?: string;
@@ -27,23 +30,8 @@ async function activeUser() {
   return u;
 }
 
-const commonFields = z.object({
+const commonFields = resourceTextFields.extend({
   type: z.enum(["GAME", "IMAGE", "ARTICLE"]),
-  title: z.string().trim().min(3, "标题至少 3 个字").max(80, "标题过长"),
-  summary: z.string().trim().max(160, "简介过长").optional().default(""),
-  description: z.string().trim().min(10, "描述至少 10 个字").max(20000, "描述过长"),
-  categoryId: z.string().min(1, "请选择分类"),
-  tags: z.string().trim().max(400, "标签过长").optional().default(""),
-  externalUrl: z
-    .string()
-    .trim()
-    // 站内附件路径（/uploads/...）或 http(s) 外链
-    .refine(
-      (v) => !v || /^https?:\/\/.+/i.test(v) || /^\/[^/].*$/i.test(v),
-      "外链需以 http(s):// 开头",
-    )
-    .optional()
-    .default(""),
 });
 
 export async function createResourceAction(
@@ -71,23 +59,7 @@ export async function createResourceAction(
   // —— 类型化 meta ——
   const license = String(fd.get("license") ?? "").trim();
 
-  // IMAGE 整包下载（dlMode none/file/link）；非 none 时 url 必为 http(s) 或站内 /uploads 路径
-  const dlModeRaw = fd.get("dlMode");
-  const dlMode = dlModeRaw === "file" || dlModeRaw === "link" ? dlModeRaw : "none";
-  let download: { mode: "file" | "link"; url: string; fileName?: string; size?: string } | undefined;
-  if (dlMode !== "none") {
-    const url = String(fd.get("dlUrl") ?? "").trim();
-    if (!/^https?:\/\/.+/i.test(url) && !/^\/[^/].*$/i.test(url))
-      return { fieldErrors: { downloadUrl: ["选择文件/外链后需填写 http(s):// 或站内附件路径"] } };
-    download = {
-      mode: dlMode,
-      url,
-      fileName: String(fd.get("dlName") ?? "").trim() || undefined,
-      size: String(fd.get("dlSize") ?? "").trim() || undefined,
-    };
-  }
-
-  // ARTICLE 附件清单：单个 downloads JSON（客户端受控序列化）
+  // 附件清单：IMAGE 多附件图包 / ARTICLE 文末清单，同源 downloads JSON（各分节受控序列化）
   let downloads: unknown = [];
   try {
     downloads = JSON.parse(String(fd.get("downloads") ?? "[]"));
@@ -105,7 +77,7 @@ export async function createResourceAction(
       original: fd.get("original") === "on",
       license,
       sourceNote: String(fd.get("sourceNote") ?? "").trim() || undefined,
-      download,
+      downloads,
     });
     if (!im.success) return { fieldErrors: im.error.flatten().fieldErrors };
     metaStr = JSON.stringify(im.data);
@@ -150,6 +122,13 @@ export async function createResourceAction(
   if (type !== "ARTICLE" && mediaIds.length === 0)
     return { fieldErrors: { mediaIds: ["请至少上传一张图片"] } };
 
+  // 图片数量上限：以 /admin/uploads 配置为准，发布入口（向导/API）与这里双重强制。
+  const L = await getUploadLimits();
+  if (type === "IMAGE" && mediaIds.length > L.galleryImageMaxCount)
+    return { fieldErrors: { mediaIds: [`图片不能超过 ${L.galleryImageMaxCount} 张`] } };
+  if (type === "ARTICLE" && mediaIds.length > L.articleImageMaxCount)
+    return { fieldErrors: { mediaIds: [`文章插图不能超过 ${L.articleImageMaxCount} 张`] } };
+
   // D6：可信/管理员免审直发，否则进审核队列
   const directPublish = user.trusted || user.role === "ADMIN" || user.role === "MODERATOR";
   const status = directPublish ? "PUBLISHED" : "PENDING";
@@ -193,6 +172,8 @@ export async function createResourceAction(
           externalUrl: effectiveUrl || null,
           loginRequired: fd.get("loginRequired") === "on",
           allowComments: fd.get("allowComments") !== "off",
+          nsfw: fd.get("nsfw") === "on",
+          isDownloadable: fd.get("isDownloadable") === "on",
           publishedAt: status === "PUBLISHED" ? new Date() : null,
         },
       });
@@ -332,6 +313,40 @@ export async function addVersionAction(
     }),
   ]);
   revalidatePath(`/resources/${resource.slug}`);
+  return { ok: true };
+}
+
+// ---------- 作者改稿：仅允许编辑自己发布的资源 ----------
+
+export async function updateResourceOwnerAction(
+  _prev: ResourceEditState,
+  fd: FormData,
+): Promise<ResourceEditState> {
+  const user = await activeUser();
+  if (!user) return { error: "账号不可用或已被封禁" };
+
+  const id = String(fd.get("id") ?? "");
+  if (!id) return { error: "缺少资源" };
+
+  const resource = await prisma.resource.findUnique({
+    where: { id },
+    select: { id: true, type: true, slug: true, authorId: true },
+  });
+  if (!resource) return { error: "资源不存在" };
+  if (resource.authorId !== user.id) return { error: "只能编辑自己发布的资源" };
+
+  try {
+    const res = await prisma.$transaction(async (tx) =>
+      applyResourceEdit(tx, id, resource.type, fd, user.id),
+    );
+    if (res.fieldErrors) return { fieldErrors: res.fieldErrors };
+  } catch (e) {
+    console.error("[updateResourceOwner]", e);
+    return { error: "保存失败，请稍后重试" };
+  }
+
+  revalidatePath(`/resources/${resource.slug}`);
+  revalidatePath("/", "layout");
   return { ok: true };
 }
 

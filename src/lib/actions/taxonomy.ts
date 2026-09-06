@@ -18,11 +18,26 @@ const cleanName = (v: unknown) => (typeof v === "string" ? v.trim().slice(0, 40)
 
 // ---------- 分类 ----------
 
-export async function createCategoryAction(input: { name: string; slug: string }): Promise<Result> {
+export async function createCategoryAction(input: {
+  name: string;
+  slug: string;
+  parentId?: string | null;
+}): Promise<Result> {
   const admin = await adminOnly();
   if (!admin) return { ok: false, error: "仅管理员可操作" };
   const name = cleanName(input.name);
   if (!name) return { ok: false, error: "名称必填" };
+  // 子分类：父级必须存在；限制两级（不允许给子分类再建子分类），避免深层循环与 UI 复杂度爆炸
+  let parentId: string | null | undefined;
+  if (input.parentId) {
+    const parent = await prisma.category.findUnique({
+      where: { id: input.parentId },
+      select: { id: true, parentId: true },
+    });
+    if (!parent) return { ok: false, error: "父分类不存在" };
+    if (parent.parentId) return { ok: false, error: "子分类不能再包含子分类" };
+    parentId = parent.id;
+  }
   // slug 自动翻译：显式填写的 slug 原样采用；留空则把（含中文的）名称经 Edge 微软翻译成英文再 slugify，利于 SEO
   const explicit = typeof input.slug === "string" ? input.slug.trim() : "";
   const slug = explicit
@@ -31,8 +46,14 @@ export async function createCategoryAction(input: { name: string; slug: string }
   if (!slug) return { ok: false, error: "slug 必填（字母/数字/中文）" };
   const hit = await prisma.category.findUnique({ where: { slug } });
   if (hit) return { ok: false, error: `slug「${slug}」已被占用` };
-  await prisma.category.create({ data: { name, slug } });
-  await audit(admin.id, "EDIT_CATEGORY", "CATEGORY", undefined, `新建分类 ${name}(${slug})`);
+  await prisma.category.create({ data: { name, slug, parentId } });
+  await audit(
+    admin.id,
+    "EDIT_CATEGORY",
+    "CATEGORY",
+    undefined,
+    `新建分类 ${name}(${slug})${parentId ? " [子分类]" : ""}`,
+  );
   revalidateAll();
   return { ok: true };
 }
@@ -40,6 +61,7 @@ export async function createCategoryAction(input: { name: string; slug: string }
 export async function updateCategoryAction(input: {
   id: string;
   name?: string;
+  slug?: string;
   sort?: number;
 }): Promise<Result> {
   const admin = await adminOnly();
@@ -48,26 +70,52 @@ export async function updateCategoryAction(input: {
   if (!existing) return { ok: false, error: "分类不存在" };
 
   const data: { name?: string; slug?: string; sort?: number } = {};
+
+  // 名称：仅当与现状不同才更新；改名不动 slug（slug 由下方显式填写逻辑单独控制）
   if (input.name !== undefined) {
     const name = cleanName(input.name);
     if (!name) return { ok: false, error: "名称不能为空" };
-    data.name = name;
-    // 改名时同步 slug：与标签一致，把新名（含中文）经 Edge 翻译成英文 slug；撞 slug 报错不静默改
-    if (name !== existing.name) {
-      const slug = slugify((await translateToEnglish(name)) ?? name);
-      if (slug && slug !== existing.slug) {
+    if (name !== existing.name) data.name = name;
+  }
+
+  // slug 仅当改动过该字段时才处理：
+  // - 传入空字符串 = 用户清空 slug，按（新）名称自动翻译重新生成；
+  // - 传入非空 = 原样采用并校验全局唯一；
+  // - 未传（只改了名称、没碰 slug 字段）= 保留现有 slug，不重新生成。
+  if (input.slug !== undefined) {
+    const raw = input.slug.trim();
+    if (!raw) {
+      const base = data.name ?? existing.name;
+      const slug = slugify((await translateToEnglish(base)) ?? base) || base;
+      if (slug !== existing.slug) {
+        const clash = await prisma.category.findUnique({ where: { slug } });
+        if (clash) return { ok: false, error: `自动生成的 slug「${slug}」已被分类「${clash.name}」占用` };
+        data.slug = slug;
+      }
+    } else {
+      const slug = slugify(raw);
+      if (!slug) return { ok: false, error: "slug 仅含字母/数字/中文" };
+      if (slug !== existing.slug) {
         const clash = await prisma.category.findUnique({ where: { slug } });
         if (clash) return { ok: false, error: `slug「${slug}」已被分类「${clash.name}」占用` };
         data.slug = slug;
       }
     }
   }
+
   if (typeof input.sort === "number" && Number.isFinite(input.sort))
     data.sort = Math.trunc(input.sort);
+
   if (Object.keys(data).length === 0) return { ok: true };
 
   await prisma.category.update({ where: { id: input.id }, data });
-  await audit(admin.id, "EDIT_CATEGORY", "CATEGORY", input.id, `更新分类 ${data.name ?? ""}(${data.slug ?? input.id})`);
+  await audit(
+    admin.id,
+    "EDIT_CATEGORY",
+    "CATEGORY",
+    input.id,
+    `更新分类 ${data.name ?? existing.name}(${data.slug ?? existing.slug})`,
+  );
   revalidateAll();
   return { ok: true };
 }
@@ -95,48 +143,79 @@ export async function deleteCategoryAction(input: { id: string }): Promise<Resul
 
 // ---------- 标签 ----------
 
-export async function renameTagAction(input: { id: string; name: string }): Promise<Result> {
+export async function renameTagAction(input: {
+  id: string;
+  name?: string;
+  slug?: string;
+}): Promise<Result> {
   const admin = await adminOnly();
   if (!admin) return { ok: false, error: "仅管理员可操作" };
-  const name = cleanName(input.name);
-  if (!name) return { ok: false, error: "标签名不能为空" };
   const t = await prisma.tag.findUnique({ where: { id: input.id } });
   if (!t) return { ok: false, error: "标签不存在" };
-  if (t.name === name) return { ok: true };
-  const byName = await prisma.tag.findUnique({ where: { name } });
-  if (byName) {
-    // 同名合并：把旧标签的资源关联转挂到目标标签（已存在的跳过），计数只加净增，然后删旧
-    await prisma.$transaction(async (tx) => {
-      const links = await tx.tagOnResource.findMany({
-        where: { tagId: t.id },
-        select: { resourceId: true },
+
+  const rawName = input.name !== undefined ? cleanName(input.name) : t.name;
+  if (!rawName) return { ok: false, error: "标签名不能为空" };
+  const nameChanged = rawName !== t.name;
+
+  // 改名为已存在的标签名 → 合并（资源关联转挂目标，计数加净增，删旧）
+  if (nameChanged) {
+    const byName = await prisma.tag.findUnique({ where: { name: rawName } });
+    if (byName) {
+      await prisma.$transaction(async (tx) => {
+        const links = await tx.tagOnResource.findMany({
+          where: { tagId: t.id },
+          select: { resourceId: true },
+        });
+        const ids = links.map((l) => l.resourceId);
+        const existing = await tx.tagOnResource.findMany({
+          where: { tagId: byName.id, resourceId: { in: ids } },
+          select: { resourceId: true },
+        });
+        const fresh = ids.filter((id) => !existing.some((e) => e.resourceId === id));
+        for (const id of fresh) {
+          await tx.tagOnResource.create({ data: { resourceId: id, tagId: byName.id } });
+        }
+        await tx.tagOnResource.deleteMany({ where: { tagId: t.id } });
+        await tx.tag.update({
+          where: { id: byName.id },
+          data: { count: { increment: fresh.length } },
+        });
+        await tx.tag.delete({ where: { id: t.id } });
       });
-      const ids = links.map((l) => l.resourceId);
-      const existing = await tx.tagOnResource.findMany({
-        where: { tagId: byName.id, resourceId: { in: ids } },
-        select: { resourceId: true },
-      });
-      const fresh = ids.filter((id) => !existing.some((e) => e.resourceId === id));
-      for (const id of fresh) {
-        await tx.tagOnResource.create({ data: { resourceId: id, tagId: byName.id } });
-      }
-      await tx.tagOnResource.deleteMany({ where: { tagId: t.id } });
-      await tx.tag.update({
-        where: { id: byName.id },
-        data: { count: { increment: fresh.length } },
-      });
-      await tx.tag.delete({ where: { id: t.id } });
-    });
-    await audit(admin.id, "EDIT_TAG", "TAG", t.id, `合并标签 ${t.name} → ${name}`);
-    revalidateAll();
-    return { ok: true };
+      await audit(admin.id, "EDIT_TAG", "TAG", t.id, `合并标签 ${t.name} → ${rawName}`);
+      revalidateAll();
+      return { ok: true };
+    }
   }
-  // 重命名时同步 slug：含中文的名称同样先经 Edge 微软翻译成英文再 slugify（SEO 友好稳定外链）
-  const slug = slugify((await translateToEnglish(name)) ?? name) || t.slug;
-  const bySlug = await prisma.tag.findFirst({ where: { slug, id: { not: t.id } } });
-  if (bySlug) return { ok: false, error: `slug「${slug}」已被标签「${bySlug.name}」占用` };
-  await prisma.tag.update({ where: { id: t.id }, data: { name, slug } });
-  await audit(admin.id, "EDIT_TAG", "TAG", t.id, `重命名标签 ${t.name} → ${name}`);
+
+  // slug 仅当改动过该字段时才处理：
+  // - 显式清空（空串）= 按（新）名称自动翻译重新生成；
+  // - 非空 = 原样采用并校验全局唯一；
+  // - 未传（只改了名称、没碰 slug 字段）= 保留现有 slug，不重新生成。
+  let nextSlug = t.slug;
+  const rawSlug = input.slug?.trim();
+  if (rawSlug !== undefined) {
+    if (rawSlug === "") {
+      nextSlug = slugify((await translateToEnglish(rawName)) ?? rawName) || t.slug;
+      if (nextSlug !== t.slug) {
+        const bySlug = await prisma.tag.findFirst({ where: { slug: nextSlug, id: { not: t.id } } });
+        if (bySlug) return { ok: false, error: `自动生成的 slug「${nextSlug}」已被标签「${bySlug.name}」占用` };
+      }
+    } else {
+      const s = slugify(rawSlug);
+      if (!s) return { ok: false, error: "slug 仅含字母/数字/中文" };
+      if (s !== t.slug) {
+        const clash = await prisma.tag.findFirst({ where: { slug: s, id: { not: t.id } } });
+        if (clash) return { ok: false, error: `slug「${s}」已被标签「${clash.name}」占用` };
+        nextSlug = s;
+      }
+    }
+  }
+
+  if (!nameChanged && nextSlug === t.slug) return { ok: true };
+
+  await prisma.tag.update({ where: { id: t.id }, data: { name: rawName, slug: nextSlug } });
+  await audit(admin.id, "EDIT_TAG", "TAG", t.id, `重命名标签 ${t.name} → ${rawName}`);
   revalidateAll();
   return { ok: true };
 }

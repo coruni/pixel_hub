@@ -457,7 +457,8 @@ export async function activeCloudDrive(): Promise<CloudDrive | null> {
 /** 引用计数：Media.storageKey / Resource.externalUrl / ResourceVersion.url 以 /od/{id}/ 开头合计 */
 export async function countDriveRefs(driveId: string): Promise<number> {
   const prefix = `/od/${driveId}/`;
-  const [media, resources, versions] = await Promise.all([
+  // 合并到单次事务（单连接）执行 3 个 count，降低并发连接占用，避免打爆 Supabase 15 连接池
+  const [media, resources, versions] = await prisma.$transaction([
     prisma.media.count({ where: { storageKey: { startsWith: prefix } } }),
     prisma.resource.count({ where: { externalUrl: { startsWith: prefix } } }),
     prisma.resourceVersion.count({ where: { url: { startsWith: prefix } } }),

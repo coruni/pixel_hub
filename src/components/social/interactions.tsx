@@ -231,6 +231,8 @@ export function MetaDownloadButton({
   callbackPath,
   count,
   small,
+  name,
+  kind = "file",
 }: {
   resourceId: string;
   url: string;
@@ -242,6 +244,10 @@ export function MetaDownloadButton({
   count?: number;
   /** ARTICLE 清单行内紧凑样式 */
   small?: boolean;
+  /** 原始文件名：file 类型经 /api/dl 代理下载时作为保存名（修复“文件名不是原名”） */
+  name?: string;
+  /** file = 本站托管附件（走代理强制原名）；link = 作者外链（原样打开） */
+  kind?: "file" | "link";
 }) {
   const [n, setN] = useState(count ?? 0);
   const [prevCount, setPrevCount] = useState(count);
@@ -253,6 +259,11 @@ export function MetaDownloadButton({
   const [pending, start] = useTransition();
   const path = callbackPath ?? `/resources/${resourceId}`;
   const showCount = count !== undefined;
+  // file 类型走本站 /api/dl 代理，强制以原始文件名保存；link 类型（作者外链）原样打开
+  const dlHref =
+    kind === "file"
+      ? `/api/dl?u=${encodeURIComponent(url)}&n=${encodeURIComponent(name ?? "")}`
+      : url;
   if (loginRequired && !authed) {
     return (
       <a
@@ -273,7 +284,7 @@ export function MetaDownloadButton({
         start(async () => {
           await incrementDownloadAction(resourceId);
           if (showCount) setN((x) => x + 1);
-          window.open(url, "_blank", "noopener");
+          window.open(dlHref, "_blank", "noopener");
         })
       }
       className={`inline-flex items-center gap-1.5 rounded-none border border-emerald-600 bg-emerald-600 font-medium text-white transition hover:bg-emerald-500 disabled:opacity-60 ${

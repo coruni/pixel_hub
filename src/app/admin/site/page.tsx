@@ -36,9 +36,7 @@ export default async function AdminSitePage() {
         </Link>
       </div>
       <p className="mb-4 rounded-none border border-brand-200 bg-surface px-4 py-3 text-xs leading-5 text-neutral-500">
-        全局外观配置，作用于首页 / 归档页（浏览·搜索·标签）/
-        资源详情页：侧边栏在哪些页面启用、是否固定、栏宽与所含组件；
-        以及详情页版式（按类型可覆盖）。改动实时保存并应用到前台。此页仅管理员可见。
+        侧边栏与详情页版式配置；改动实时应用到前台。仅管理员可见。
       </p>
       <SiteLayoutManager
         theme={theme}

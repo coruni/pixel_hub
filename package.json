@@ -9,6 +9,7 @@
     "lint": "eslint",
     "format": "prettier --write src prisma _test *.ts *.mjs",
     "test:smoke": "node _test/smoke.mjs",
+    "test:admin-data": "node _test/admin-data.mjs",
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
     "db:seed:extra": "tsx prisma/seed-extra.ts",

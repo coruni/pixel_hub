@@ -5,7 +5,16 @@ import type { CardRatio } from "./display";
 import { safeUrlSchema } from "./site-config";
 
 export type HomeSectionKind =
-  "hero" | "categories" | "list" | "featured" | "feed" | "stats" | "creators" | "tags" | "ad";
+  | "hero"
+  | "categories"
+  | "list"
+  | "featured"
+  | "feed"
+  | "stats"
+  | "creators"
+  | "tags"
+  | "ad"
+  | "recommend";
 
 export const HOME_SECTION_KINDS: HomeSectionKind[] = [
   "hero",
@@ -17,6 +26,7 @@ export const HOME_SECTION_KINDS: HomeSectionKind[] = [
   "creators",
   "tags",
   "ad",
+  "recommend",
 ];
 
 export const HOME_KIND_META: Record<
@@ -55,6 +65,11 @@ export const HOME_KIND_META: Record<
     label: "广告位",
     desc: "图片+链接 或 HTML/联盟广告代码，带「广告」角标；可插在板块流任意位置",
     defaultTitle: null,
+  },
+  recommend: {
+    label: "为你推荐",
+    desc: "登录用户按点赞/收藏/评论/关注构建画像精准推荐，并保留探索槽位打破信息茧房；游客回退全站热门",
+    defaultTitle: "为你推荐",
   },
 };
 
@@ -105,6 +120,16 @@ const adCfg = z.object({
   html: z.string().max(8000).default(""), // 联盟广告代码片段（html 模式）
   badge: z.boolean().default(true), // 是否显示「广告」角标
 });
+const recommendCfg = z.object({
+  scope: z.enum(["personal", "all"]).default("personal"), // personal=按登录用户偏好；all=全站热门
+  type: z.enum(["ALL", "IMAGE", "GAME", "ARTICLE"]).default("ALL"),
+  count: z.number().int().min(1).max(48).default(12),
+  categorySlugs: z.array(z.string()).max(30).default([]), // 空 = 不限
+  // 探索占比：用于打破信息茧房，将一部分槽位留给用户「没怎么接触过」的优质/新内容（0–0.6，默认 0.3）
+  explorationRatio: z.number().min(0).max(0.6).default(0.3),
+  // 最终列表最少覆盖的不同分类数；0 = 自动（min(3, count)），防止整页同质
+  minCategories: z.number().int().min(0).max(12).default(0),
+});
 
 export const homeConfigSchemas: Record<HomeSectionKind, z.ZodTypeAny> = {
   hero: heroCfg,
@@ -116,6 +141,7 @@ export const homeConfigSchemas: Record<HomeSectionKind, z.ZodTypeAny> = {
   creators: creatorsCfg,
   tags: tagsCfg,
   ad: adCfg,
+  recommend: recommendCfg,
 };
 
 export type HomeSectionConfig =
@@ -143,7 +169,8 @@ export type HomeSectionConfig =
       alt: string;
       html: string;
       badge: boolean;
-    }; // ad
+    } // ad
+  | { scope: "personal" | "all"; type: "ALL" | "IMAGE" | "GAME" | "ARTICLE"; count: number; categorySlugs: string[]; explorationRatio: number; minCategories: number }; // recommend
 
 // 后端传给编辑器的类型化 config
 export type EditableConfig<T extends HomeSectionKind> = z.infer<(typeof homeConfigSchemas)[T]>;

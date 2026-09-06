@@ -14,7 +14,7 @@ export default function RegisterForm() {
     <div className="w-full max-w-md">
       <div className="rounded-none border border-brand-200 bg-surface p-8">
         <h1 className="text-xl font-semibold text-neutral-900">创建账号</h1>
-        <p className="mt-1 text-sm text-neutral-500">加入社区，发布图片与游戏资源</p>
+        <p className="mt-1 text-sm text-neutral-500">加入社区</p>
 
         {state.error && (
           <p className="mt-4 rounded-none bg-red-50 px-3 py-2 text-sm text-red-600">
@@ -53,7 +53,7 @@ export default function RegisterForm() {
                 name="username"
                 required
                 className={inputCls}
-                placeholder="用英文，用于主页"
+                placeholder="英文，用于主页"
               />
               {state.fieldErrors?.username && (
                 <p className="mt-1 text-xs text-red-500">{state.fieldErrors.username[0]}</p>
@@ -103,7 +103,7 @@ export default function RegisterForm() {
         </Link>
       </p>
       <p className="mt-2 text-center text-xs text-neutral-400">
-        新用户投稿需经过审核（白名单作者可免审直发）。
+        新用户投稿需审核（白名单作者免审直发）。
       </p>
     </div>
   );

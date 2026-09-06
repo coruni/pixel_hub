@@ -9,7 +9,7 @@ import { getUploadLimits } from "@/lib/upload-limits";
 
 export const runtime = "nodejs";
 
-const MAX_FILES = 12;
+import { COUNT_RANGE } from "@/lib/upload-config";
 
 // 服务端魔数嗅探 + 扩展名白名单（不信任客户端 mime）
 function sniff(buf: Buffer): { mime: string; ext: string } | null {
@@ -37,6 +37,14 @@ export async function POST(req: NextRequest) {
   // 单张上限以后台 /admin/uploads 配置为准（缺失回退默认 20MB）
   const L = await getUploadLimits();
   const maxBytes = L.galleryImageMaxMb * MIB;
+
+  // 单次上传张数上限：优先取客户端（向导按类型传入）的 max 参数，并钳制在合法范围，
+  // 缺失/越界时回退后台 galleryImageMaxCount；这是上传入口的安全网，最终上限由发布 action 强制。
+  const maxParam = Number(req.nextUrl.searchParams.get("max"));
+  const MAX_FILES =
+    Number.isFinite(maxParam) && maxParam >= COUNT_RANGE.min && maxParam <= COUNT_RANGE.max
+      ? Math.floor(maxParam)
+      : L.galleryImageMaxCount;
 
   const form = await req.formData();
   const entries = form.getAll("files").filter((f): f is File => f instanceof File);

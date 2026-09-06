@@ -76,7 +76,15 @@ export default async function ResourcePage({ params }: PageProps) {
   if (detail.status === "PUBLISHED" && detail.nsfw && !meId) notFound();
 
   // 相关推荐只对已发布内容计算（草稿/待审不需要）
-  const related = detail.status === "PUBLISHED" ? await getRelated(detail) : [];
+  const related =
+    detail.status === "PUBLISHED"
+      ? await getRelated({
+          id: detail.id,
+          type: detail.type,
+          category: detail.category,
+          tags: detail.tags.map((t) => ({ slug: t.tag.slug })),
+        })
+      : [];
 
   const ctx: DetailCtx = {
     detail,

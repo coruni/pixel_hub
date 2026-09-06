@@ -35,7 +35,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
             </p>
           ) : (
             <p className="mt-4 text-sm text-neutral-400">
-              输入关键词开始搜索，支持按资源标题与简介匹配
+              输入关键词搜索，按标题与简介匹配
             </p>
           )}
         </div>

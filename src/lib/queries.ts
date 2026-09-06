@@ -514,22 +514,24 @@ export const getResourceDetail = cache(async (slug: string, viewerId?: string) =
 });
 
 // ---------- 相关推荐 ----------
-// 同分类热门优先，不足补同类型热门（排除自身与已取条目），复用 getFeed 的取数逻辑
-export async function getRelated(resource: {
+// 打分排序：同分类 + 同标签（权重最高）+ 同类型 + 热度（点赞/浏览/下载，对数归一）+ 时效衰减。
+// 候选来自三个池（同分类热门 / 同标签热门 / 同类型热门），合并去重后统一打分取前 LIMIT。
+export type RelatedSeed = {
   id: string;
   type: ResourceType;
   category: { slug: string } | null;
-}): Promise<FeedCard[]> {
+  tags: { slug: string }[];
+};
+
+export async function getRelated(resource: RelatedSeed): Promise<FeedCard[]> {
   const LIMIT = 6;
   const seen = new Set<string>([resource.id]);
-  const out: FeedItem[] = [];
-  const add = (items: FeedItem[]) => {
+  const pool: FeedItem[] = [];
+  const push = (items: FeedItem[]) => {
     for (const i of items) {
-      if (out.length >= LIMIT) break;
-      if (!seen.has(i.id)) {
-        seen.add(i.id);
-        out.push(i);
-      }
+      if (seen.has(i.id)) continue;
+      seen.add(i.id);
+      pool.push(i);
     }
   };
 
@@ -537,16 +539,434 @@ export async function getRelated(resource: {
     const { items } = await getFeed({
       categorySlug: resource.category.slug,
       sort: "popular",
-      pageSize: LIMIT,
+      pageSize: LIMIT * 2,
     });
-    add(items);
+    push(items);
   }
-  if (out.length < LIMIT) {
-    // 同类型热门池取大一点，过滤掉已占位后仍有余量
+  if (resource.tags.length > 0) {
+    const { items } = await getFeed({
+      tagSlugs: resource.tags.map((t) => t.slug),
+      sort: "popular",
+      pageSize: LIMIT * 2,
+    });
+    push(items);
+  }
+  {
+    // 同类型热门池兜底（分类/标签池不足时补足多样性）
     const { items } = await getFeed({ type: resource.type, sort: "popular", pageSize: LIMIT * 2 });
-    add(items);
+    push(items);
   }
-  return out.map(toFeedCard);
+
+  const baseTags = new Set(resource.tags.map((t) => t.slug));
+  return pool
+    .map((it) => ({ it, s: relatedScore(resource, baseTags, it) }))
+    .sort((a, b) => b.s - a.s)
+    .slice(0, LIMIT)
+    .map((x) => toFeedCard(x.it));
+}
+
+function relatedScore(
+  base: { category: { slug: string } | null; type: string },
+  baseTags: Set<string>,
+  cand: FeedItem,
+): number {
+  let s = 0;
+  if (base.category?.slug && cand.category?.slug === base.category.slug) s += 6;
+  let shared = 0;
+  for (const t of cand.tags) if (baseTags.has(t.slug)) shared++;
+  s += shared * 2.5;
+  if (base.type === cand.type) s += 1.5;
+  s +=
+    Math.log10(1 + cand.likeCount) * 0.6 +
+    Math.log10(1 + cand.viewCount) * 0.35 +
+    Math.log10(1 + cand.downloadCount) * 0.5;
+  if (cand.publishedAt) {
+    const ageDays = (Date.now() - cand.publishedAt.getTime()) / 86_400_000;
+    s += ageDays < 30 ? 1.2 : ageDays < 90 ? 0.6 : ageDays < 365 ? 0.2 : 0;
+  }
+  return s;
+}
+
+// ---------- 首页「为你推荐」----------
+// 登录用户：构建「用户画像」（综合点赞/收藏/评论/关注的加权、带时间衰减信号）做内容相似度
+// + 质量 + 新颖度打分；并通过「探索槽位 + MMR 多样性选择 + 最少分类覆盖」主动打破信息茧房。
+// 游客 / scope=all：按配置回退全站热门。
+export type RecommendScope = "personal" | "all";
+
+export type RecommendOpts = {
+  userId?: string;
+  count?: number;
+  scope?: RecommendScope;
+  type?: ResourceType | "ALL";
+  categorySlugs?: string[];
+  /** 探索（打破信息茧房）槽位占比 0–0.6，默认 0.3 */
+  explorationRatio?: number;
+  /** 最终列表最少覆盖的不同分类数，0 = 自动 min(3, count) */
+  minCategories?: number;
+};
+
+// 各信号基础权重：收藏 > 评论 > 点赞；关注创作者单独计权重
+const SIGNAL_WEIGHT = { like: 1.0, favorite: 2.0, comment: 1.5, follow: 1.2 } as const;
+// 时间衰减半衰期（天）：越早的互动影响力越低，使画像紧跟近期习惯
+const HALF_LIFE_DAYS = 90;
+const DAY = 86_400_000;
+// 打分权重
+const W_QUAL = 1.0;
+const W_NOV = 0.6;
+// 相似度归一化后低于此值视为「圈外内容」，用于探索槽位
+const EXPLORE_SIM = 0.15;
+// MMR 多样性惩罚强度
+const MMR_LAMBDA = 0.7;
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+// ---- 用户画像 ----
+type RecProfile = {
+  tagW: Map<string, number>;
+  catW: Map<string, number>;
+  typeW: Map<ResourceType, number>;
+  authorW: Map<string, number>; // 关注的创作者 / 高频互动作者
+  totalWeight: number;
+  signalCount: number;
+  engagedIds: string[]; // 已互动资源，候选池排除，避免重复推荐
+};
+
+type EngagedResource = {
+  id: string;
+  type: ResourceType;
+  authorId: string;
+  category: { slug: string | null } | null;
+  tags: { tag: { slug: string } }[];
+};
+
+async function buildRecProfile(userId: string): Promise<RecProfile> {
+  const now = Date.now();
+  const decay = (createdAt: Date) =>
+    Math.pow(0.5, (now - createdAt.getTime()) / (HALF_LIFE_DAYS * DAY));
+
+  const tagW = new Map<string, number>();
+  const catW = new Map<string, number>();
+  const typeW = new Map<ResourceType, number>();
+  const authorW = new Map<string, number>();
+  const engagedIds: string[] = [];
+
+  const accTag = (slug: string, w: number) => tagW.set(slug, (tagW.get(slug) ?? 0) + w);
+  const accCat = (slug: string | null, w: number) => {
+    if (slug) catW.set(slug, (catW.get(slug) ?? 0) + w);
+  };
+  const accType = (t: ResourceType, w: number) => typeW.set(t, (typeW.get(t) ?? 0) + w);
+  const accAuthor = (id: string, w: number) => authorW.set(id, (authorW.get(id) ?? 0) + w);
+
+  const resSelect = {
+    id: true,
+    type: true,
+    authorId: true,
+    category: { select: { slug: true } },
+    tags: { select: { tag: { select: { slug: true } } } },
+  } satisfies Prisma.ResourceSelect;
+
+  const [likes, favorites, comments, follows] = await prisma.$transaction([
+    prisma.like.findMany({
+      where: { userId },
+      take: 120,
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true, resource: { select: resSelect } },
+    }),
+    prisma.favorite.findMany({
+      where: { userId },
+      take: 120,
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true, resource: { select: resSelect } },
+    }),
+    prisma.comment.findMany({
+      where: { authorId: userId },
+      take: 120,
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true, resource: { select: resSelect } },
+    }),
+    prisma.follow.findMany({
+      where: { followerId: userId },
+      take: 120,
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true, followingId: true },
+    }),
+  ]);
+
+  let signalCount = 0;
+  const ingest = (createdAt: Date, weight: number, res: EngagedResource) => {
+    const w = weight * decay(createdAt);
+    if (w <= 0) return;
+    signalCount++;
+    accType(res.type, w);
+    accCat(res.category?.slug ?? null, w);
+    for (const t of res.tags) accTag(t.tag.slug, w);
+    accAuthor(res.authorId, w * 0.5); // 互动过的作者也反映口味
+  };
+
+  const pushRes = (createdAt: Date, weight: number, res: EngagedResource | null) => {
+    if (!res) return;
+    engagedIds.push(res.id);
+    ingest(createdAt, weight, res);
+  };
+
+  for (const l of likes) pushRes(l.createdAt, SIGNAL_WEIGHT.like, l.resource);
+  for (const f of favorites) pushRes(f.createdAt, SIGNAL_WEIGHT.favorite, f.resource);
+  for (const c of comments) pushRes(c.createdAt, SIGNAL_WEIGHT.comment, c.resource);
+  for (const f of follows) {
+    const w = SIGNAL_WEIGHT.follow * decay(f.createdAt);
+    if (w > 0) {
+      signalCount++;
+      accAuthor(f.followingId, w);
+    }
+  }
+
+  let totalWeight = 0;
+  for (const v of tagW.values()) totalWeight += v;
+  for (const v of catW.values()) totalWeight += v;
+  for (const v of typeW.values()) totalWeight += v;
+  for (const v of authorW.values()) totalWeight += v;
+
+  return { tagW, catW, typeW, authorW, totalWeight, signalCount, engagedIds };
+}
+
+// 推荐专属取数字段（含 author.id 供作者亲和度打分；不复用共享 feedSelect 以保持最小改动）
+const recSelect = {
+  id: true,
+  slug: true,
+  title: true,
+  summary: true,
+  type: true,
+  publishedAt: true,
+  createdAt: true,
+  likeCount: true,
+  viewCount: true,
+  favoriteCount: true,
+  commentCount: true,
+  downloadCount: true,
+  loginRequired: true,
+  nsfw: true,
+  coverMedia: { select: coverSelect },
+  author: { select: { id: true, username: true, name: true } },
+  category: { select: { slug: true, name: true } },
+  tags: { select: { tag: { select: { slug: true, name: true } } } },
+} satisfies Prisma.ResourceSelect;
+
+type RecRow = Prisma.ResourceGetPayload<{ select: typeof recSelect }>;
+type RecItem = FeedItem & { authorId: string };
+const toRecItem = (r: RecRow): RecItem => ({ ...toFeedItem(r), authorId: r.author.id });
+
+type Scored = {
+  item: RecItem;
+  sim: number; // 画像相似度（绝对权重）
+  simNorm: number; // 归一化 0..1
+  quality: number;
+  novelty: number;
+  rank: number; // 个性化综合分
+};
+
+function scoreCandidates(items: RecItem[], p: RecProfile, now: number): Scored[] {
+  return items.map((it) => {
+    let sim = 0;
+    let matched = false;
+    for (const t of it.tags) {
+      const w = p.tagW.get(t.slug);
+      if (w) {
+        sim += w;
+        matched = true;
+      }
+    }
+    const cw = it.category?.slug ? p.catW.get(it.category.slug) : undefined;
+    if (cw) {
+      sim += cw * 1.3;
+      matched = true;
+    }
+    const tw = p.typeW.get(it.type) ?? 0;
+    if (tw) {
+      sim += tw * 0.8;
+      matched = true;
+    }
+    const aw = p.authorW.get(it.authorId);
+    if (aw) {
+      sim += aw * 1.0;
+      matched = true;
+    }
+    const quality =
+      Math.log10(1 + it.likeCount) * 0.5 +
+      Math.log10(1 + it.viewCount) * 0.25 +
+      Math.log10(1 + it.downloadCount) * 0.4 +
+      Math.log10(1 + it.favoriteCount) * 0.3;
+    const ageDays = it.publishedAt ? (now - it.publishedAt.getTime()) / DAY : 9999;
+    const novelty = ageDays < 30 ? 1.0 : ageDays < 90 ? 0.6 : ageDays < 180 ? 0.3 : 0.1;
+    // 完全无交集仅轻微降权（仍可能因质量/新颖度少量入选，保证不空白）
+    if (!matched) sim -= 0.5;
+    const simNorm = p.totalWeight > 0 ? clamp(sim / (p.totalWeight * 0.5), 0, 1) : 0;
+    const rank = sim * 2 + quality * W_QUAL + novelty * W_NOV;
+    return { item: it, sim, simNorm, quality, novelty, rank };
+  });
+}
+
+// 两资源间的相似度（0..1）：同分类最强，共享标签次之，同作者补充
+function itemSim(a: RecItem, b: RecItem): number {
+  let s = 0;
+  if (a.category?.slug && a.category.slug === b.category?.slug) s = 1;
+  const ta = new Set(a.tags.map((t) => t.slug));
+  let shared = 0;
+  for (const t of b.tags) if (ta.has(t.slug)) shared++;
+  s = Math.max(s, Math.min(1, shared * 0.5));
+  if (a.authorId === b.authorId) s = Math.max(s, 0.3);
+  return s;
+}
+
+// 多样性选择：先放探索槽位（圈外高质量），再用 MMR 兼顾相关性与多样性，最后补齐最少分类覆盖
+function diverseSelect(
+  scored: Scored[],
+  count: number,
+  explorationRatio: number,
+  minCategories: number,
+): FeedCard[] {
+  const explorePool = scored
+    .filter((s) => s.simNorm < EXPLORE_SIM)
+    .sort((a, b) => b.quality + b.novelty - (a.quality + a.novelty));
+  const personalPool = scored
+    .filter((s) => s.simNorm >= EXPLORE_SIM)
+    .sort((a, b) => b.rank - a.rank);
+
+  const picked: Scored[] = [];
+  const contains = (x: Scored) => picked.some((p) => p.item.id === x.item.id);
+  const penalty = (cand: Scored) => {
+    let m = 0;
+    for (const p of picked) m = Math.max(m, itemSim(cand.item, p.item));
+    return m;
+  };
+  const takeBest = (pool: Scored[], val: (s: Scored) => number) => {
+    let bi = -1;
+    let bs = -Infinity;
+    for (let i = 0; i < pool.length; i++) {
+      if (contains(pool[i])) continue;
+      const v = val(pool[i]) - MMR_LAMBDA * penalty(pool[i]);
+      if (v > bs) {
+        bs = v;
+        bi = i;
+      }
+    }
+    if (bi >= 0) picked.push(pool[bi]);
+  };
+
+  // 1) 先放探索槽位，主动打破信息茧房（推荐用户「没怎么接触过」的优质/新内容）
+  const exploreN = Math.min(Math.round(count * explorationRatio), explorePool.length);
+  for (let i = 0; i < exploreN; i++) takeBest(explorePool, (s) => s.quality + s.novelty);
+
+  // 2) 其余个性化槽位，MMR 在相关性与多样性间权衡
+  while (picked.length < count) {
+    takeBest(personalPool, (s) => s.rank);
+    if (picked.length >= count) break;
+    const before = picked.length;
+    // 个性化池耗尽则回退到全池（按质量 + 新颖度）
+    takeBest(scored, (s) => s.quality + s.novelty);
+    if (picked.length === before) break; // 无更多可选
+  }
+
+  // 3) 保证最少覆盖分类数，避免整页同质（信息茧房的最终兜底）
+  const wantCats = minCategories > 0 ? minCategories : Math.min(3, count);
+  const haveCats = new Set(picked.map((p) => p.item.category?.slug));
+  if (haveCats.size < wantCats) {
+    const missing = wantCats - haveCats.size;
+    const forNewCat = scored
+      .filter((s) => !contains(s) && !haveCats.has(s.item.category?.slug))
+      .sort((a, b) => b.quality + b.novelty - (a.quality + a.novelty));
+    for (let i = 0; i < missing && i < forNewCat.length; i++) {
+      const add = forNewCat[i];
+      // 用新分类候选项替换分最低的个性化项（保留探索项）
+      let lowIdx = -1;
+      let low = Infinity;
+      picked.forEach((p, idx) => {
+        if (p.simNorm >= EXPLORE_SIM && p.rank < low) {
+          low = p.rank;
+          lowIdx = idx;
+        }
+      });
+      if (lowIdx >= 0) picked.splice(lowIdx, 1, add);
+      else if (picked.length < count) picked.push(add);
+    }
+  }
+
+  return picked.map((p) => toFeedCard(p.item));
+}
+
+export async function getRecommendations(opts: RecommendOpts): Promise<FeedCard[]> {
+  const count = Math.max(1, Math.min(48, opts.count ?? 12));
+  const personal = !!opts.userId && opts.scope !== "all";
+
+  if (!personal) {
+    const { items } = await getFeed({
+      type: opts.type,
+      sort: "popular",
+      pageSize: count,
+      categorySlugs: opts.categorySlugs,
+    });
+    return items.map(toFeedCard);
+  }
+
+  const userId = opts.userId!;
+  const profile = await buildRecProfile(userId);
+
+  // 无信号 → 回退热门（与游客一致），保证不空白
+  if (profile.signalCount === 0) {
+    const { items } = await getFeed({
+      type: opts.type,
+      sort: "popular",
+      pageSize: count,
+      categorySlugs: opts.categorySlugs,
+    });
+    return items.map(toFeedCard);
+  }
+
+  // 探索占比：弱画像 / 冷启动时更高，主动拓宽视野；强画像按配置收敛到精准
+  const cold = profile.signalCount < 3;
+  const explorationRatio = Math.min(0.7, clamp(opts.explorationRatio ?? 0.3, 0, 0.6) * (cold ? 1.4 : 1));
+  const minCategories = opts.minCategories && opts.minCategories > 0 ? opts.minCategories : 0;
+
+  // 候选池：质量池（已被验证的好内容）+ 新鲜池（近 180 天新内容）合并去重，
+  // 兼顾经典与新鲜，从根源降低「只看老内容」的茧房倾向。
+  const where: Prisma.ResourceWhereInput = {
+    status: "PUBLISHED",
+    authorId: { not: userId },
+    id: profile.engagedIds.length ? { notIn: profile.engagedIds } : undefined,
+  };
+  if (opts.type && opts.type !== "ALL") where.type = opts.type;
+  if (opts.categorySlugs && opts.categorySlugs.length > 0)
+    where.category = { slug: { in: opts.categorySlugs } };
+
+  const recentCut = new Date(Date.now() - 180 * DAY);
+  const [quality, fresh] = await Promise.all([
+    prisma.resource.findMany({
+      where,
+      orderBy: [{ likeCount: "desc" }, { publishedAt: "desc" }],
+      take: 250,
+      select: recSelect,
+    }),
+    prisma.resource.findMany({
+      where: { ...where, publishedAt: { gte: recentCut } },
+      orderBy: [{ publishedAt: "desc" }, { likeCount: "desc" }],
+      take: 250,
+      select: recSelect,
+    }),
+  ]);
+  const poolMap = new Map<string, RecRow>();
+  for (const r of quality) poolMap.set(r.id, r);
+  for (const r of fresh) poolMap.set(r.id, r);
+  if (poolMap.size === 0) {
+    const { items } = await getFeed({
+      type: opts.type,
+      sort: "popular",
+      pageSize: count,
+      categorySlugs: opts.categorySlugs,
+    });
+    return items.map(toFeedCard);
+  }
+
+  const candidates = [...poolMap.values()].map(toRecItem);
+  const scored = scoreCandidates(candidates, profile, Date.now());
+  return diverseSelect(scored, count, explorationRatio, minCategories);
 }
 
 // ---------- 个人主页 ----------

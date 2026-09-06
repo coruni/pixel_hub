@@ -29,6 +29,11 @@ export const MB_RANGE = {
   image: { min: 1, max: 100 },
 } as const;
 
+/** 单批次/单资源图片数量上限范围（张）。图集/文章插图共用此档位；评论图单独更窄的默认 */
+export const COUNT_RANGE = { min: 1, max: 60 } as const;
+/** 评论附图数量上限范围（张） */
+export const COMMENT_COUNT_RANGE = { min: 0, max: 20 } as const;
+
 /**
  * 硬拒后缀：即使管理员手滑加入也不允许。被本站以可执行/脚本型 content-type 同源托管会有
  * 存储型 XSS / 下载执行风险（html/svg/xml 内嵌脚本、js/wasm/swf 可直接执行、exe/msi 等诱骗下载）。
@@ -79,6 +84,12 @@ export type UploadLimits = {
   galleryImageMaxMb: number;
   commentImageMaxMb: number;
   avatarMaxMb: number;
+  /** 图集 / 原图：单个资源可上传的图片张数上限（IMAGE 类型预览图） */
+  galleryImageMaxCount: number;
+  /** 文章插图：单个文章资源可上传的插图张数上限（ARTICLE 类型插图） */
+  articleImageMaxCount: number;
+  /** 评论附图：单条评论可附带的图片张数上限 */
+  commentImageMaxCount: number;
 };
 
 /** 默认 = 今日各处硬编码值原样迁入（附件 200MB + 29 后缀；图集 20；评论图 5；头像 5） */
@@ -120,6 +131,9 @@ export const DEFAULT_UPLOAD_LIMITS: UploadLimits = {
   galleryImageMaxMb: 20,
   commentImageMaxMb: 5,
   avatarMaxMb: 5,
+  galleryImageMaxCount: 12,
+  articleImageMaxCount: 12,
+  commentImageMaxCount: 3,
 };
 
 // ---------- 数值 / 后缀校验（纯函数） ----------
@@ -178,6 +192,24 @@ export function parseUploadLimits(raw: unknown): UploadLimits {
     galleryImageMaxMb: clampInt(o.galleryImageMaxMb, MB_RANGE.image.min, MB_RANGE.image.max, 20),
     commentImageMaxMb: clampInt(o.commentImageMaxMb, MB_RANGE.image.min, MB_RANGE.image.max, 5),
     avatarMaxMb: clampInt(o.avatarMaxMb, MB_RANGE.image.min, MB_RANGE.image.max, 5),
+    galleryImageMaxCount: clampInt(
+      o.galleryImageMaxCount,
+      COUNT_RANGE.min,
+      COUNT_RANGE.max,
+      12,
+    ),
+    articleImageMaxCount: clampInt(
+      o.articleImageMaxCount,
+      COUNT_RANGE.min,
+      COUNT_RANGE.max,
+      12,
+    ),
+    commentImageMaxCount: clampInt(
+      o.commentImageMaxCount,
+      COMMENT_COUNT_RANGE.min,
+      COMMENT_COUNT_RANGE.max,
+      3,
+    ),
   };
 }
 

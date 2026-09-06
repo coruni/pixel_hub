@@ -42,8 +42,7 @@ export default function Comments({
 
   const merged = useCommentPolling(resourceId, comments);
 
-  // 通知等外部链接带 #comment-<id>：挂载后定位到目标评论（居中 + 闪烁）。
-  // 原生锚点只滚动到贴顶且无高亮，这里统一接管；目标已删时无元素，静默不处理。
+  // 外部链接带 #comment-<id>：挂载后定位并高亮（居中+闪烁）；目标已删则静默跳过。
   const didLocate = useRef(false);
   useEffect(() => {
     if (didLocate.current) return;

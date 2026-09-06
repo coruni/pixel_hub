@@ -43,7 +43,8 @@ export const imageMetaSchema = z.object({
   original: z.boolean().default(false),
   license: z.string().max(40).default(""),
   sourceNote: z.string().max(200).optional(),
-  download: imageDownloadSchema.default({ mode: "none", url: "" }), // 旧数据无此键 → none
+  download: imageDownloadSchema.default({ mode: "none", url: "" }), // 旧数据无此键 → none（向后兼容单附件）
+  downloads: z.array(articleItemSchema).max(20).default([]), // 多附件图包/整套清单（与 ARTICLE 同源）
 });
 export type ImageMeta = z.infer<typeof imageMetaSchema>;
 
@@ -105,7 +106,8 @@ export function parseMeta(
 
 /** 该资源是否实际提供 meta 驱动的下载（服务端计数守卫用）。GAME 走 externalUrl，返回 false */
 export function metaHasDownload(m: ResourceMetaOutput): boolean {
-  if (m.kind === "IMAGE") return m.download.mode !== "none" && !!m.download.url;
+  if (m.kind === "IMAGE")
+    return m.downloads.length > 0 || (m.download.mode !== "none" && !!m.download.url);
   if (m.kind === "ARTICLE") return m.downloads.length > 0;
   return false;
 }

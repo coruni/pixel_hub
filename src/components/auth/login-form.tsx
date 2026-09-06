@@ -24,7 +24,7 @@ export default function LoginForm({
     <div className="w-full max-w-md">
       <div className="rounded-none border border-brand-200 bg-surface p-8">
         <h1 className="text-xl font-semibold text-neutral-900">登录</h1>
-        <p className="mt-1 text-sm text-neutral-500">欢迎回来，继续发现和分享资源</p>
+        <p className="mt-1 text-sm text-neutral-500">欢迎回来</p>
 
         {state.error && (
           <p className="mt-4 rounded-none bg-red-50 px-3 py-2 text-sm text-red-600">
@@ -74,7 +74,6 @@ export default function LoginForm({
               <p className="mt-1 text-xs text-red-500">{state.fieldErrors.password[0]}</p>
             )}
           </div>
-          {/* 密码找回入口 */}
           <div className="text-right">
             <Link
               href="/forgot-password"

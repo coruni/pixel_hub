@@ -79,12 +79,7 @@ export default async function AdminHomePage() {
         </Link>
       </div>
       <p className="mb-4 rounded-none border border-brand-200 bg-surface px-4 py-3 text-xs leading-5 text-neutral-500">
-        像搭建 WordPress
-        首页一样管理首页：板块按顺序渲染，可拖拽排序、开关与增删，每个板块有独立配置。
-        可加「内容流板块」做条件列表（类型/排序 +
-        分类与标签多选，卡片·列表），用「专题精选」把指定资源组成专题，
-        或插「广告位」（图片+链接 或 HTML 联盟代码）在板块流任意位置。
-        此页仅管理员可见；「浏览」(/browse) 页为独立归档页，不受影响。
+        板块按顺序渲染，可拖拽排序、开关与增删；每个板块有独立配置。仅管理员可见。
       </p>
       <HomeManager rows={viewRows} picksMap={picksMap} categories={categories} tags={tags} />
     </div>
