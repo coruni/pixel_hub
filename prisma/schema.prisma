@@ -380,6 +380,26 @@ model SiteSetting {
   updatedAt DateTime @updatedAt
 }
 
+// ---------- 云端附件驱动器（Microsoft Graph app-only） ----------
+// 仅大文件 ATTACHMENT 写 active 驱动器；图片管线仍用 STORAGE_DRIVER。
+// locator（Graph 驱动定位）：drives/{driveId} | sites/{siteId}/drive
+//   | sites/{host}:/sites/{team}:/drive | users/{upn}/drive | groups/{groupId}/drive
+// rootPath 只影响新上传（/od 存储引用自带完整路径，改 rootPath 不影响存量下载）。
+model CloudDrive {
+  id        String   @id @default(cuid())
+  label     String // 展示名（后台识别用）
+  locator   String // Graph 驱动定位串（见上注释，唯一可换成新建盘）
+  rootPath  String   @default("") // 顶层前缀 [A-Za-z0-9._-]，单段，可空
+  active    Boolean  @default(false) // 全局仅一个为 true（由 action 事务维护）
+  enabled   Boolean  @default(true) // 关闭后新上传回退原存储
+  lastError String?  @db.Text // 最近一次上传/探测失败信息（后台排查）
+  lastOkAt  DateTime? // 最近一次成功连通（上传/探测）
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active, enabled])
+}
+
 // ---------- 枚举 ----------
 
 enum Role {

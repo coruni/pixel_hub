@@ -7,12 +7,14 @@ import {
   Flag,
   FolderOpen,
   FolderTree,
+  HardDrive,
   Images,
   LayoutDashboard,
   LayoutTemplate,
   PanelsTopLeft,
   ScrollText,
   Tag,
+  Upload,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -31,6 +33,8 @@ const TAB_ICONS: Record<string, LucideIcon> = {
   "/admin/categories": FolderTree,
   "/admin/tags": Tag,
   "/admin/media": Images,
+  "/admin/drives": HardDrive,
+  "/admin/uploads": Upload,
 };
 
 /** 后台侧栏导航：桌面左侧竖排（sticky），移动端横向滚动；当前路由橙色高亮 */

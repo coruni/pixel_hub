@@ -19,6 +19,8 @@ const tabs: { href: string; label: string; adminOnly?: boolean }[] = [
   { href: "/admin/logs", label: "操作日志" },
   { href: "/admin/categories", label: "分类管理", adminOnly: true },
   { href: "/admin/tags", label: "标签管理", adminOnly: true },
+  { href: "/admin/drives", label: "云盘", adminOnly: true },
+  { href: "/admin/uploads", label: "上传限制", adminOnly: true },
   { href: "/admin/home", label: "首页布局", adminOnly: true },
   { href: "/admin/site", label: "站点布局", adminOnly: true },
 ];

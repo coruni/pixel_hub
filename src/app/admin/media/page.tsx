@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FileArchive } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { publicUrl } from "@/lib/storage";
@@ -145,7 +146,17 @@ export default async function MediaPage({
                 return (
                   <tr key={m.id} className="hover:bg-neutral-50/60">
                     <td className="px-4 py-2">
-                      <MediaThumb url={url} bigUrl={bigUrl} fileName={m.fileName} />
+                      {/* 附件（zip 等）：非图片不请求缩略图/查看器，显示中性文件图标 */}
+                      {m.kind === "ATTACHMENT" ? (
+                        <span
+                          className="grid h-12 w-12 place-items-center rounded-none border border-brand-200 bg-neutral-100 text-neutral-400"
+                          title={m.fileName ?? "附件"}
+                        >
+                          <FileArchive size={20} aria-hidden />
+                        </span>
+                      ) : (
+                        <MediaThumb url={url} bigUrl={bigUrl} fileName={m.fileName} />
+                      )}
                     </td>
                     <td className="px-4 py-2.5">
                       <span className="block max-w-56 truncate font-medium text-neutral-900">

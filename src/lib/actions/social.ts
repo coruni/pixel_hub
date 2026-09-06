@@ -13,6 +13,8 @@ import { parseMeta, metaHasDownload } from "@/lib/meta";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
 import { notifyByEmail } from "@/lib/mail-notify";
 import { audit } from "@/lib/actions/_guards";
+import { MIB } from "@/lib/upload-config";
+import { getUploadLimits } from "@/lib/upload-limits";
 
 async function requiredUser() {
   const s = await auth();
@@ -251,8 +253,7 @@ const commentSchema = z.object({
 });
 export type CommentActionState = { error?: string; ok?: boolean };
 
-// 评论附图：压缩为单张 webp（最长边 ≤1200），≤3 张、各 ≤5MB
-const COMMENT_IMG_MAX_BYTES = 5 * 1024 * 1024;
+// 评论附图：压缩为单张 webp（最长边 ≤1200），≤3 张、各 ≤后台配置上限
 const COMMENT_IMG_MAX_COUNT = 3;
 
 function sniffImage(buf: Buffer): boolean {
@@ -269,9 +270,11 @@ function sniffImage(buf: Buffer): boolean {
 
 async function saveCommentImage(
   file: File,
+  maxBytes: number,
 ): Promise<{ key: string; width: number; height: number; size: number } | null> {
   const buf = Buffer.from(await file.arrayBuffer());
-  if (buf.byteLength > COMMENT_IMG_MAX_BYTES) throw new Error("单张图片不能超过 5MB");
+  if (buf.byteLength > maxBytes)
+    throw new Error(`单张图片不能超过 ${Math.round(maxBytes / MIB)}MB`);
   if (!sniffImage(buf)) throw new Error("不支持的图片格式");
   const out = await sharp(buf, { failOn: "none" })
     .rotate()
@@ -315,11 +318,15 @@ export async function addCommentAction(
   const images = fd.getAll("images").filter((f): f is File => f instanceof File && f.size > 0);
   if (images.length > COMMENT_IMG_MAX_COUNT)
     return { error: `附图最多 ${COMMENT_IMG_MAX_COUNT} 张` };
+  const L = await getUploadLimits();
+  const commentMaxBytes = L.commentImageMaxMb * MIB;
   let saved: { key: string; width: number; height: number; size: number }[] = [];
   if (images.length > 0) {
     try {
       saved = (
-        await Promise.all(images.slice(0, COMMENT_IMG_MAX_COUNT).map(saveCommentImage))
+        await Promise.all(
+          images.slice(0, COMMENT_IMG_MAX_COUNT).map((f) => saveCommentImage(f, commentMaxBytes)),
+        )
       ).filter((x): x is { key: string; width: number; height: number; size: number } => !!x);
     } catch (e) {
       // 图片失败不阻断文字评论

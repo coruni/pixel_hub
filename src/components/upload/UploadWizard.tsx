@@ -4,6 +4,8 @@ import Link from "next/link";
 import { Gamepad2, Image as ImageIcon, Newspaper } from "lucide-react";
 import { useActionState, useRef, useState } from "react";
 import { createResourceAction, type ResourceActionState } from "@/lib/actions/resource";
+import type { UploadLimits } from "@/lib/upload-config";
+import { uploadAttachment } from "@/lib/upload-attachment-client";
 import MediaPicker from "./media-picker";
 import { ArticleSection, AttachmentUpload, GameSection, ImageSection } from "./wizard-sections";
 import {
@@ -21,8 +23,15 @@ const TYPES = [
   { k: "ARTICLE", label: "文章", desc: "图文教程 / 心得 / 资讯", Icon: Newspaper },
 ] as const;
 
-/** 发布资源向导：类型选择 + 基础信息 + 类型化信息 + 预览图上传 + 发布选项 */
-export default function UploadWizard({ categories }: { categories: Cat[] }) {
+/** 发布资源向导：类型选择 + 基础信息 + 类型化信息 + 预览图上传 + 发布选项。
+ *  limits 由服务端宿主读取后台配置后传入（见 app/upload/page.tsx），驱动各体积/后缀提示动态化 */
+export default function UploadWizard({
+  categories,
+  limits,
+}: {
+  categories: Cat[];
+  limits: UploadLimits;
+}) {
   const [type, setType] = useState<"GAME" | "IMAGE" | "ARTICLE">("IMAGE");
   const [files, setFiles] = useState<Uploaded[]>([]);
   const [coverId, setCoverId] = useState<string>("");
@@ -33,25 +42,21 @@ export default function UploadWizard({ categories }: { categories: Cat[] }) {
   // GAME：下载外链（受控，附件直传成功后回填站内路径）
   const [extUrl, setExtUrl] = useState("");
   const [attUploading, setAttUploading] = useState(false);
+  const [attProgress, setAttProgress] = useState<number | null>(null);
 
   async function onAttachment(file: File | null) {
     if (!file) return;
     setAttUploading(true);
+    setAttProgress(0);
     setUploadMsg(null);
     try {
-      const fd = new FormData();
-      fd.set("file", file);
-      const res = await fetch("/api/upload/attachment", { method: "POST", body: fd });
-      const data = await res.json();
-      if (!data.ok) {
-        setUploadMsg(data.error ?? "附件上传失败");
-        return;
-      }
-      setExtUrl(data.url as string);
+      const data = await uploadAttachment(file, setAttProgress);
+      setExtUrl(data.url);
     } catch {
       setUploadMsg("附件上传失败，请重试");
     } finally {
       setAttUploading(false);
+      setAttProgress(null);
     }
   }
 
@@ -234,8 +239,8 @@ export default function UploadWizard({ categories }: { categories: Cat[] }) {
       </section>
 
       {/* 类型化信息：图片 D2 声明+整包下载 / 游戏外链+版本 / 文章正文即内容+附件清单 */}
-      {type === "IMAGE" && <ImageSection fieldErrors={state.fieldErrors} />}
-      {type === "ARTICLE" && <ArticleSection fieldErrors={state.fieldErrors} />}
+      {type === "IMAGE" && <ImageSection fieldErrors={state.fieldErrors} limits={limits} />}
+      {type === "ARTICLE" && <ArticleSection fieldErrors={state.fieldErrors} limits={limits} />}
       {type === "GAME" && (
         <GameSection
           extUrl={extUrl}
@@ -244,8 +249,10 @@ export default function UploadWizard({ categories }: { categories: Cat[] }) {
           attachment={
             <AttachmentUpload
               uploading={attUploading}
+              progress={attProgress}
               onUpload={onAttachment}
               filled={extUrl.startsWith("/")}
+              limits={limits}
             />
           }
         />
@@ -257,6 +264,7 @@ export default function UploadWizard({ categories }: { categories: Cat[] }) {
         coverId={coverId}
         uploading={uploading}
         isArticle={type === "ARTICLE"}
+        maxMb={limits.galleryImageMaxMb}
         uploadMsg={uploadMsg}
         fieldError={state.fieldErrors?.mediaIds}
         onPick={onFiles}

@@ -18,11 +18,13 @@ export default function AvatarForm({
   username,
   avatarKey,
   trusted,
+  avatarMaxMb = 5,
 }: {
   name: string | null;
   username: string;
   avatarKey: string | null;
   trusted: boolean;
+  avatarMaxMb?: number;
 }) {
   const [state, formAction, pending] = useActionState<SettingsActionState, FormData>(
     uploadAvatarAction,
@@ -81,7 +83,7 @@ export default function AvatarForm({
       <Avatar name={name} username={username} avatarKey={preview ?? avatarKey} size="lg" />
       <form action={formAction} className="min-w-0 flex-1">
         <p className="text-xs leading-5 text-neutral-400">
-          支持 png / jpg / webp，最大 5MB；选图后可拖动/缩放调整裁剪区域
+          支持 png / jpg / webp，最大 {avatarMaxMb}MB；选图后可拖动/缩放调整裁剪区域
           {trusted && "；GIF 动图免裁剪直接上传"}
         </p>
         {state.ok && <p className="mt-1 text-sm text-emerald-600">✓ 已更新</p>}

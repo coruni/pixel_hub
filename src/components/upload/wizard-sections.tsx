@@ -3,7 +3,17 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { FileText, Link as LinkIcon, Plus, Trash2, UploadCloud } from "lucide-react";
+import {
+  attachmentAcceptAttr,
+  attachmentExtsSample,
+  mbText,
+  type UploadLimits,
+} from "@/lib/upload-config";
+import { uploadAttachment } from "@/lib/upload-attachment-client";
 import { fieldErr, wizInput, wizLabel, SectionTitle } from "./wizard-shared";
+
+/** 附件分节只关心附件体积+后缀两个字段 */
+type AttachLimits = Pick<UploadLimits, "attachmentMaxMb" | "attachmentExts">;
 
 /** 发布向导的类型化分节：游戏信息（外链 + 版本/平台等元数据）、图片 D2 声明、图片整包下载、文章附件清单 */
 
@@ -130,30 +140,37 @@ export function GameSection({
   );
 }
 
-/** 附件直传：成功后回填站内路径到外链输入框（受控由父组件持有 extUrl） */
+/** 附件直传：成功后回填站内路径到外链输入框（受控由父组件持有 extUrl）；上限/后缀提示来自后台配置 */
 export function AttachmentUpload({
   uploading,
+  progress,
   onUpload,
   filled,
+  limits,
 }: {
   uploading: boolean;
+  progress?: number | null;
   onUpload: (file: File | null) => void;
   filled: boolean;
+  limits: AttachLimits;
 }) {
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2">
       <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-none border border-brand-200 bg-surface px-3 py-1.5 text-xs text-neutral-600 hover:border-brand-500 hover:text-neutral-900">
         <UploadCloud size={14} aria-hidden />
-        {uploading ? "上传中…" : "或直接上传文件"}
+        {uploading ? (progress == null ? "上传中…" : `上传中 ${progress}%`) : "或直接上传文件"}
         <input
           type="file"
           hidden
           disabled={uploading}
+          accept={attachmentAcceptAttr(limits.attachmentExts)}
           onChange={(e) => onUpload(e.target.files?.[0] ?? null)}
         />
       </label>
       {filled && <span className="text-xs text-emerald-600">✓ 已上传站内附件</span>}
-      <span className="text-xs text-neutral-400">zip/7z/pdf/音频视频等，≤200MB</span>
+      <span className="text-xs text-neutral-400">
+        {`支持 ${attachmentExtsSample(limits.attachmentExts, 6)} 格式，单文件 ${mbText(limits.attachmentMaxMb)}`}
+      </span>
     </div>
   );
 }
@@ -168,21 +185,12 @@ function formatBytes(n: number): string {
   return `${(mb / 1024).toFixed(1)} GB`;
 }
 
-/** 附件直传：POST /api/upload/attachment，成功返回 url/name/size，失败返回 null（错误提示由调用方负责） */
+/** 附件直传：OneDrive 使用浏览器分片直传，其他存储回退既有 API。 */
 async function postAttachment(
   file: File,
 ): Promise<{ url: string; name: string; size: number } | null> {
-  const fd = new FormData();
-  fd.set("file", file);
   try {
-    const res = await fetch("/api/upload/attachment", { method: "POST", body: fd });
-    const data = await res.json();
-    if (!data.ok) return null;
-    return {
-      url: data.url as string,
-      name: (data.name as string) ?? file.name,
-      size: data.size as number,
-    };
+    return await uploadAttachment(file);
   } catch {
     return null;
   }
@@ -195,8 +203,10 @@ const segIdle = "border-brand-200 bg-surface text-neutral-600 hover:border-brand
 /** IMAGE 整包/图包下载（可选）：站内附件(zip) 或 网盘外链，单条主下载，区别于 GAME 版本表 */
 export function ImageSection({
   fieldErrors,
+  limits,
 }: {
   fieldErrors?: Record<string, string[]>;
+  limits: AttachLimits;
 }) {
   const [dlMode, setDlMode] = useState<"none" | "file" | "link">("none");
   const [dlUrl, setDlUrl] = useState("");
@@ -336,6 +346,7 @@ export function ImageSection({
               uploading={dlUploading}
               onUpload={onDlFile}
               filled={!!dlUrl}
+              limits={limits}
             />
             {dlMsg && <p className="mt-1 text-xs text-amber-600">{dlMsg}</p>}
             {dlUrl && (
@@ -449,8 +460,10 @@ const uid = () => `att-${++uidSeed}-${Math.random().toString(36).slice(2, 8)}`;
 /** ARTICLE 文末附件清单（可选）：站内附件 / 网盘外链多行，逐行展示于详情页底部 */
 export function ArticleSection({
   fieldErrors,
+  limits,
 }: {
   fieldErrors?: Record<string, string[]>;
+  limits: AttachLimits;
 }) {
   const [rows, setRows] = useState<AttachRow[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -467,7 +480,10 @@ export function ArticleSection({
         setMsg("附件上传失败，请重试");
         return;
       }
-      setRows((p) => [...p, { key: uid(), kind: "file", name: r.name, url: r.url, size: formatBytes(r.size) }]);
+      setRows((p) => [
+        ...p,
+        { key: uid(), kind: "file", name: r.name, url: r.url, size: formatBytes(r.size) },
+      ]);
     } catch {
       setMsg("附件上传失败，请重试");
     } finally {
@@ -504,7 +520,10 @@ export function ArticleSection({
 
   return (
     <section className="mt-4 space-y-4 rounded-none border border-brand-200 bg-surface p-5">
-      <SectionTitle n={2} tail={<span className="font-normal text-neutral-400">文末清单 · 可选</span>}>
+      <SectionTitle
+        n={2}
+        tail={<span className="font-normal text-neutral-400">文末清单 · 可选</span>}
+      >
         附件下载
       </SectionTitle>
       <p className="-mt-2 text-xs text-neutral-400">
@@ -527,7 +546,11 @@ export function ArticleSection({
                     : "border-sky-200 bg-sky-50 text-sky-700"
                 }`}
               >
-                {r.kind === "file" ? <FileText size={11} aria-hidden /> : <LinkIcon size={11} aria-hidden />}
+                {r.kind === "file" ? (
+                  <FileText size={11} aria-hidden />
+                ) : (
+                  <LinkIcon size={11} aria-hidden />
+                )}
                 {r.kind === "file" ? "附件" : "外链"}
               </span>
               <input
@@ -581,18 +604,12 @@ export function ArticleSection({
           uploading={uploading}
           onUpload={onFile}
           filled={false}
+          limits={limits}
         />
-        <button
-          type="button"
-          onClick={addLink}
-          disabled={rows.length >= 20}
-          className={addBtn}
-        >
+        <button type="button" onClick={addLink} disabled={rows.length >= 20} className={addBtn}>
           <Plus size={13} aria-hidden /> 添加网盘外链
         </button>
-        <span className="text-xs tabular-nums text-neutral-400">
-          {rows.length}/20
-        </span>
+        <span className="text-xs tabular-nums text-neutral-400">{rows.length}/20</span>
         {msg && <span className="text-xs text-amber-600">{msg}</span>}
       </div>
 

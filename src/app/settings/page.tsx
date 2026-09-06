@@ -5,6 +5,7 @@ import { ArrowUpRight } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { getProfile } from "@/lib/queries";
+import { getUploadLimits } from "@/lib/upload-limits";
 import SettingsForm from "@/components/auth/settings-form";
 import AvatarForm from "@/components/auth/avatar-form";
 import { EmailForm, PasswordForm } from "@/components/auth/security-forms";
@@ -37,7 +38,7 @@ export default async function SettingsPage({
   const session = await auth();
   if (!session?.user) redirect("/login?callbackUrl=/settings");
 
-  const { bind } = await searchParams;
+  const [bind, limits] = await Promise.all([searchParams.then((s) => s.bind), getUploadLimits()]);
   const bindMsg = bind ? (BIND_MESSAGES[bind] ?? null) : null;
 
   const me = session.user;
@@ -95,6 +96,7 @@ export default async function SettingsPage({
           username={me.username}
           avatarKey={profile?.avatarKey ?? null}
           trusted={!!me.trusted}
+          avatarMaxMb={limits.avatarMaxMb}
         />
       </section>
 

@@ -7,7 +7,16 @@ import {
   bumpVersionDownloadAction,
   type ResourceActionState,
 } from "@/lib/actions/resource";
+import {
+  attachmentAcceptAttr,
+  attachmentExtsSample,
+  mbText,
+  type UploadLimits,
+} from "@/lib/upload-config";
 import { INPUT } from "@/lib/ui/cls";
+import { uploadAttachment } from "@/lib/upload-attachment-client";
+
+type AttachLimits = Pick<UploadLimits, "attachmentMaxMb" | "attachmentExts">;
 
 /** 单个版本的下载：新窗口打开地址 + 计数（会话去重） */
 export function VersionDownloadButton({
@@ -40,8 +49,8 @@ export function VersionDownloadButton({
   );
 }
 
-/** 作者追加新版本（可折叠表单） */
-export function VersionForm({ resourceId }: { resourceId: string }) {
+/** 作者追加新版本（可折叠表单）；附件上限/后缀提示由宿主按后台配置传入 */
+export function VersionForm({ resourceId, limits }: { resourceId: string; limits: AttachLimits }) {
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState<ResourceActionState, FormData>(
     addVersionAction,
@@ -55,11 +64,8 @@ export function VersionForm({ resourceId }: { resourceId: string }) {
     if (!file) return;
     setAttUploading(true);
     try {
-      const fd = new FormData();
-      fd.set("file", file);
-      const res = await fetch("/api/upload/attachment", { method: "POST", body: fd });
-      const data = await res.json();
-      if (data.ok) setUrl(data.url as string);
+      const data = await uploadAttachment(file);
+      setUrl(data.url);
     } finally {
       setAttUploading(false);
     }
@@ -122,13 +128,16 @@ export function VersionForm({ resourceId }: { resourceId: string }) {
                 type="file"
                 hidden
                 disabled={attUploading}
+                accept={attachmentAcceptAttr(limits.attachmentExts)}
                 onChange={(e) => onAttachment(e.target.files?.[0] ?? null)}
               />
             </label>
             {url.startsWith("/") && (
               <span className="text-xs text-emerald-600">✓ 已上传站内附件</span>
             )}
-            <span className="text-xs text-neutral-400">zip/7z/pdf 等，≤200MB</span>
+            <span className="text-xs text-neutral-400">
+              {`支持 ${attachmentExtsSample(limits.attachmentExts, 6)} 格式，单文件 ${mbText(limits.attachmentMaxMb)}`}
+            </span>
           </div>
           <div>
             <label className="mb-1 block text-xs text-neutral-500" htmlFor="v-changelog">

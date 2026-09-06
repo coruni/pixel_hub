@@ -17,6 +17,7 @@ import {
 } from "@/components/social/interactions";
 import ReportButton from "@/components/social/ReportButton";
 import { VersionDownloadButton, VersionForm } from "@/components/resource/version";
+import { getUploadLimits } from "@/lib/upload-limits";
 
 export type DetailCtx = {
   detail: Exclude<ResourceDetail, null>;
@@ -271,11 +272,13 @@ export function TypeInfoCard({ ctx }: { ctx: DetailCtx }) {
   );
 }
 
-/** 版本历史：列表 + 下载（作者可追加新版本） */
-export function VersionSection({ ctx }: { ctx: DetailCtx }) {
+/** 版本历史：列表 + 下载（作者可追加新版本，附件上限提示跟随后台配置） */
+export async function VersionSection({ ctx }: { ctx: DetailCtx }) {
   const { detail, isAuthor } = ctx;
   const versions = detail.versions;
   if (versions.length === 0) return null;
+  // 仅作者会看到「发布新版本」表单时才读配置，省一次 DB 查询
+  const L = isAuthor ? await getUploadLimits() : null;
   return (
     <section className="rounded-none border border-brand-200 bg-surface p-6">
       <h2 className="text-sm font-semibold text-neutral-400">版本历史（{versions.length}）</h2>
@@ -301,9 +304,15 @@ export function VersionSection({ ctx }: { ctx: DetailCtx }) {
           </li>
         ))}
       </ul>
-      {isAuthor && (
+      {isAuthor && L && (
         <div className="mt-4 border-t border-neutral-100 pt-4">
-          <VersionForm resourceId={detail.id} />
+          <VersionForm
+            resourceId={detail.id}
+            limits={{
+              attachmentMaxMb: L.attachmentMaxMb,
+              attachmentExts: L.attachmentExts,
+            }}
+          />
         </div>
       )}
     </section>

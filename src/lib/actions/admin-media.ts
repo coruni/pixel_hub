@@ -5,6 +5,9 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db/prisma";
 import { audit, staff } from "@/lib/actions/_guards";
 import { makeKey, saveFile, delFile, isStorageUrl } from "@/lib/storage";
+import { deleteStoredCloudRef, parseCloudRef } from "@/lib/storage/onedrive";
+import { MIB } from "@/lib/upload-config";
+import { getUploadLimits } from "@/lib/upload-limits";
 
 /** 删除媒体：被资源（封面/图集/评论图）或头像引用时拒绝，需先解除引用 */
 export async function deleteMediaAction(mediaId: string): Promise<{ ok: boolean; error?: string }> {
@@ -34,13 +37,18 @@ export async function deleteMediaAction(mediaId: string): Promise<{ ok: boolean;
 
   await prisma.media.delete({ where: { id: mediaId } });
   await audit(me.id, "DELETE_MEDIA", "MEDIA", mediaId, m.fileName ?? undefined);
+  // /od 云附件引用 → 连 Graph 上文件一并删（best-effort）；否则走统一存储层，
   // local 驱动的 del 不接受带前导斜杠的路径（越界校验），相对 key 先剥掉
-  for (const k of keys) await delFile(isStorageUrl(k) ? k : k.replace(/^\/+/, "")).catch(() => {});
+  for (const k of keys) {
+    if (parseCloudRef(k)) {
+      await deleteStoredCloudRef(k);
+    } else {
+      await delFile(isStorageUrl(k) ? k : k.replace(/^\/+/, "")).catch(() => {});
+    }
+  }
   revalidatePath("/admin/media");
   return { ok: true };
 }
-
-const UPLOAD_MAX = 20 * 1024 * 1024;
 
 function sniffImage(buf: Buffer): boolean {
   if (buf.length < 12) return false;
@@ -54,7 +62,7 @@ function sniffImage(buf: Buffer): boolean {
   return false;
 }
 
-/** 管理员直传：原图直存统一存储层，落 Media 记录（不关联资源） */
+/** 管理员直传：原图直存统一存储层，落 Media 记录（不关联资源）。上限跟随后台图集/原图档配置 */
 export async function uploadMediaAction(
   _prev: { ok?: boolean; error?: string },
   fd: FormData,
@@ -62,10 +70,13 @@ export async function uploadMediaAction(
   const me = await staff();
   if (me?.role !== "ADMIN") return { error: "仅管理员可直传" };
 
+  const L = await getUploadLimits();
+  const maxBytes = L.galleryImageMaxMb * MIB;
+
   const file = fd.get("file");
   if (!(file instanceof File) || file.size === 0) return { error: "请选择文件" };
   const buf = Buffer.from(await file.arrayBuffer());
-  if (buf.byteLength > UPLOAD_MAX) return { error: "文件不能超过 20MB" };
+  if (buf.byteLength > maxBytes) return { error: `文件不能超过 ${L.galleryImageMaxMb}MB` };
   if (!sniffImage(buf)) return { error: "仅支持 png/jpg/webp/gif 图片" };
 
   const ext = file.name.match(/\.[a-z0-9]+$/i)?.[0]?.toLowerCase() ?? "";

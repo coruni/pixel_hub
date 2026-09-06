@@ -13,7 +13,7 @@ import {
   ShieldCheck,
   UserRound,
 } from "lucide-react";
-import { DEFAULT_ATTACH_EXTS, type UploadLimits } from "@/lib/upload-config";
+import { DEFAULT_ATTACH_EXTS, MB_RANGE, type UploadLimits } from "@/lib/upload-config";
 import { useAction } from "@/lib/hooks";
 import { resetUploadLimitsAction, saveUploadLimitsAction } from "@/lib/actions/uploads";
 import { BTN_DANGER_SM, BTN_PRIMARY_SM, INPUT_SM } from "@/lib/ui/cls";
@@ -30,8 +30,8 @@ const NUM_FIELDS: {
     key: "attachmentMaxMb",
     label: "附件单文件上限（MB）",
     min: 1,
-    max: 250,
-    hint: "zip/rar/PDF/音视频等站内附件。250 为 OneDrive Graph 单请求硬顶，即使未开云盘也全局一致。",
+    max: MB_RANGE.attachment.max,
+    hint: "zip/rar/PDF/音视频等站内附件。启用 OneDrive 时使用分片上传，最大支持 250GB；其他存储仍受自身限制。",
   },
   {
     key: "galleryImageMaxMb",
@@ -64,6 +64,11 @@ const OVERVIEW_FIELDS = [
 ] as const;
 
 const IMAGE_FIELDS = NUM_FIELDS.filter((field) => field.key !== "attachmentMaxMb");
+
+const limitText = (mb: number) => {
+  if (!Number.isFinite(mb)) return "—";
+  return mb >= 1024 ? `${mb / 1024}GB` : `${mb}MB`;
+};
 
 type Draft = {
   attachmentMaxMb: string;
@@ -136,7 +141,7 @@ export default function UploadLimitsManager({ limits }: { limits: UploadLimits }
             <div className="min-w-0">
               <p className="truncate text-xs text-neutral-500">{label}</p>
               <p className="mt-0.5 text-base font-semibold tabular-nums text-neutral-900">
-                {draft[key]} <span className="text-xs font-normal text-neutral-400">MB</span>
+                {limitText(Number(draft[key]))}
               </p>
               <p className="text-[10px] text-neutral-400">{note}</p>
             </div>
@@ -215,14 +220,14 @@ export default function UploadLimitsManager({ limits }: { limits: UploadLimits }
                 >
                   附件单文件上限（MB）
                 </label>
-                <span className="text-[10px] text-neutral-400">1–250 MB</span>
+                <span className="text-[10px] text-neutral-400">1MB–250GB</span>
               </div>
               <input
                 id="ul-attachmentMaxMb"
                 type="number"
                 inputMode="numeric"
                 min={1}
-                max={250}
+                max={MB_RANGE.attachment.max}
                 step={1}
                 value={draft.attachmentMaxMb}
                 onChange={(e) => set("attachmentMaxMb", e.target.value)}

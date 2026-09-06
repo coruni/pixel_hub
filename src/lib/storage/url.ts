@@ -10,6 +10,9 @@ export function isUrl(key: string): boolean {
 export function publicUrl(key: string): string {
   // 浏览器本地预览（blob:）与 data URI 原样返回
   if (isUrl(key) || /^(blob:|data:)/i.test(key)) return key;
+  // /od 云附件引用已可直接访问（经 /od/[driveId]/[…key] 网关 307 到 MS 预鉴权下载 URL）——
+  // 幂等返回，须在 s3 拼接分支之前，避免被篡成 ${S3_BASE}/od/… 或 /uploads/od/…
+  if (/^\/?od\//i.test(key)) return "/" + key.replace(/\\/g, "/").replace(/^\/+/, "");
   if (process.env.STORAGE_DRIVER === "s3") {
     const base = (
       process.env.S3_PUBLIC_BASE ?? `${process.env.S3_ENDPOINT}/${process.env.S3_BUCKET ?? ""}`

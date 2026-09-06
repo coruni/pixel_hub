@@ -8,6 +8,8 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { rateLimit } from "@/lib/rate-limit";
 import { makeKey, saveFile, delFile } from "@/lib/storage";
+import { MIB } from "@/lib/upload-config";
+import { getUploadLimits } from "@/lib/upload-limits";
 
 export type SettingsActionState = {
   ok?: boolean;
@@ -43,9 +45,7 @@ export async function updateProfileAction(
   return { ok: true };
 }
 
-// ---- 头像上传：方形居中裁切 256px webp，走统一存储层 ----
-
-const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
+// ---- 头像上传：方形居中裁切 256px webp，走统一存储层（上限跟随后台 /admin/uploads 头像档） ----
 
 function sniffImage(buf: Buffer): boolean {
   if (buf.length < 12) return false;
@@ -66,10 +66,13 @@ export async function uploadAvatarAction(
   const user = (await auth())?.user;
   if (!user) return { error: "请先登录" };
 
+  const L = await getUploadLimits();
+  const avatarMaxBytes = L.avatarMaxMb * MIB;
+
   const file = fd.get("avatar");
   if (!(file instanceof File) || file.size === 0) return { error: "请选择图片文件" };
   const buf = Buffer.from(await file.arrayBuffer());
-  if (buf.byteLength > AVATAR_MAX_BYTES) return { error: "头像不能超过 5MB" };
+  if (buf.byteLength > avatarMaxBytes) return { error: `头像不能超过 ${L.avatarMaxMb}MB` };
   if (!sniffImage(buf)) return { error: "不支持的图片格式（仅 png/jpg/webp/gif）" };
 
   const isGif = buf.length >= 6 && buf.subarray(0, 6).toString("latin1").startsWith("GIF8");

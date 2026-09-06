@@ -4,10 +4,11 @@ import { prisma } from "@/lib/db/prisma";
 import { processImage, publicUrl } from "@/lib/media/process";
 import { rateLimit } from "@/lib/rate-limit";
 import { sameOrigin } from "@/lib/origin";
+import { MIB } from "@/lib/upload-config";
+import { getUploadLimits } from "@/lib/upload-limits";
 
 export const runtime = "nodejs";
 
-const MAX_BYTES = 20 * 1024 * 1024; // 单张 20MB
 const MAX_FILES = 12;
 
 // 服务端魔数嗅探 + 扩展名白名单（不信任客户端 mime）
@@ -33,6 +34,10 @@ export async function POST(req: NextRequest) {
   if (!rateLimit(`upload:${session.user.id}`, 30, 60 * 60_000))
     return NextResponse.json({ ok: false, error: "上传过于频繁，请稍后再试" }, { status: 429 });
 
+  // 单张上限以后台 /admin/uploads 配置为准（缺失回退默认 20MB）
+  const L = await getUploadLimits();
+  const maxBytes = L.galleryImageMaxMb * MIB;
+
   const form = await req.formData();
   const entries = form.getAll("files").filter((f): f is File => f instanceof File);
   if (entries.length === 0)
@@ -45,8 +50,8 @@ export async function POST(req: NextRequest) {
     const buf = Buffer.from(await file.arrayBuffer());
     const name = file.name || "image";
     try {
-      if (buf.byteLength > MAX_BYTES) {
-        results.push({ name, ok: false, error: "超过 20MB 限制" });
+      if (buf.byteLength > maxBytes) {
+        results.push({ name, ok: false, error: `超过 ${L.galleryImageMaxMb}MB 限制` });
         continue;
       }
       const sniffed = sniff(buf);

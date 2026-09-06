@@ -3,12 +3,13 @@
 import { X } from "lucide-react";
 import { SectionTitle, type Uploaded } from "./wizard-shared";
 
-/** 预览图/插图选择网格：上传、点选封面、移除（最多 12 张） */
+/** 预览图/插图选择网格：上传、点选封面、移除（最多 12 张）；单张上限 MB 由宿主传入展示提示 */
 export default function MediaPicker({
   files,
   coverId,
   uploading,
   isArticle,
+  maxMb,
   uploadMsg,
   fieldError,
   onPick,
@@ -20,6 +21,7 @@ export default function MediaPicker({
   coverId: string;
   uploading: boolean;
   isArticle: boolean;
+  maxMb: number;
   uploadMsg: string | null;
   fieldError?: string[];
   onPick: (fl: FileList | null) => void;
@@ -80,7 +82,7 @@ export default function MediaPicker({
           <span className="px-2 text-xs">
             {uploading ? "处理中…" : files.length >= 12 ? "已达上限" : "＋ 上传图片"}
             <span className="mt-0.5 block font-normal text-[10px] opacity-70">
-              png/jpg/webp ≤20MB
+              png/jpg/webp ≤{maxMb}MB
             </span>
           </span>
           <input
