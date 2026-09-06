@@ -11,9 +11,9 @@ export default function ResourceRow({ item }: { item: FeedCard }) {
   return (
     <Link
       href={`/resources/${item.slug}`}
-      className="group flex items-center gap-3 rounded-none border border-brand-200 bg-surface p-2 transition hover:border-brand-500"
+      className="group flex w-full min-w-0 items-center gap-3 rounded-none border border-brand-200 bg-surface p-2 transition hover:border-brand-500"
     >
-      <span className="relative block h-16 w-24 shrink-0 overflow-hidden rounded-none bg-neutral-100">
+      <span className="relative block h-16 w-24 flex-shrink-0 overflow-hidden rounded-none bg-neutral-100">
         {item.cover ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
