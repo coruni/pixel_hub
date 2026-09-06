@@ -4,7 +4,7 @@ import { Lock } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { getCollectionDetail } from "@/lib/queries";
 import { formatCount } from "@/lib/format";
-import MasonryGrid from "@/components/resource/MasonryGrid";
+import ResourceGrid from "@/components/resource/ResourceGrid";
 
 type PageProps = { params: Promise<{ id: string }> };
 
@@ -51,9 +51,9 @@ export default async function CollectionPage({ params }: PageProps) {
       </div>
       {col.description && <p className="mt-2 text-sm text-neutral-500">{col.description}</p>}
 
-      {/* 内容流 */}
+      {/* 内容流：统一 3:4 竖版卡 */}
       {col.items.length > 0 ? (
-        <MasonryGrid className="mt-6" items={col.items} />
+        <ResourceGrid className="mt-6" items={col.items} display="card" ratio="3:4" />
       ) : (
         <div className="mt-4 grid place-items-center rounded-none border-2 border-dashed border-brand-300 py-16 text-sm text-neutral-400">
           收藏夹还是空的

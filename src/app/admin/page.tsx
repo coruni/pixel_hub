@@ -121,14 +121,14 @@ export default async function AdminIndex() {
     prisma.visit.count(),
     // 近 7 日按天聚合（PV = 行数，IP = 去重 ipHash）下推到 SQL，不把分组明细拉回 JS
     prisma.$queryRaw<Array<{ day: string; pv: number | bigint; ips: number | bigint }>>`
- SELECT day, COUNT(*) AS pv, COUNT(DISTINCT ipHash) AS ips
- FROM Visit
+ SELECT day, COUNT(*) AS pv, COUNT(DISTINCT "ipHash") AS ips
+ FROM "Visit"
  WHERE day >= ${weekStart}
  GROUP BY day`,
     // 累计独立 IP：DISTINCT 计数下推，避免全表 groupBy 拉回全部键
     prisma.$queryRaw<
       Array<{ ips: number | bigint }>
-    >`SELECT COUNT(DISTINCT ipHash) AS ips FROM Visit`,
+    >`SELECT COUNT(DISTINCT "ipHash") AS ips FROM "Visit"`,
   ]);
   const todayIps = Number(weekRows.find((r) => r.day === today)?.ips ?? 0);
   const yesterdayIps = Number(weekRows.find((r) => r.day === yesterday)?.ips ?? 0);

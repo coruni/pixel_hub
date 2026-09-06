@@ -30,7 +30,7 @@ export default function MediaPicker({
   return (
     <section className="mt-4 rounded-none border border-brand-200 bg-surface p-5">
       <SectionTitle
-        n={isArticle ? 2 : 3}
+        n={3}
         tail={
           <span className="font-normal tabular-nums text-neutral-400">
             {files.filter((f) => f.ok).length}/12

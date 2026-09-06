@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { CalendarDays, Download, Eye } from "lucide-react";
 import { formatCount, timeAgo } from "@/lib/format";
 import Gallery from "@/components/resource/Gallery";
+import { DownloadPanel } from "./download-panel";
 import {
   ActionBar,
   AuthorIdentity,
@@ -90,6 +91,9 @@ export default function DetailPost({
     <div className="mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-6">
       {/* 展厅：直接以作品开场 */}
       <Gallery media={detail.gallery} />
+
+      {/* 图包/整套下载（IMAGE 单条；其余类型返回 null） */}
+      <DownloadPanel ctx={ctx} />
 
       {/* 展签 */}
       <div className="mt-6 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between lg:gap-x-8">

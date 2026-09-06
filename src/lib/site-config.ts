@@ -132,7 +132,7 @@ const hotCfg = z.object({
   type: z.enum(["ALL", "IMAGE", "GAME", "ARTICLE"]).default("ALL"),
   sort: z.enum(["latest", "popular", "downloads"]).default("popular"),
   count: z.number().int().min(3).max(12).default(6),
-  display: z.enum(["card", "list", "masonry"]).default("list"),
+  display: z.enum(["card", "list"]).default("list"),
 });
 const categoriesCfg = z.object({
   slugs: z.array(z.string()).max(30).default([]), // 空 = 展示全部分类；否则仅展示所选分类
@@ -248,6 +248,11 @@ export type SidebarWidget = {
 export function parseSidebarConfig(kind: SidebarWidgetKind, value: unknown): SidebarWidgetConfig {
   const schema = sidebarConfigSchemas[kind];
   if (!schema) return {} as SidebarWidgetConfig;
+  // 存量迁移：hot 的 display="masonry" 已下线 → 字段级归一到 "card"（与旧「小瀑布」同款紧凑卡），保住 type/sort/count
+  if (kind === "hot" && value && typeof value === "object" && !Array.isArray(value)) {
+    const o = value as Record<string, unknown>;
+    if (o.display === "masonry") o.display = "card";
+  }
   const r = schema.safeParse(value ?? {});
   return r.success ? (r.data as SidebarWidgetConfig) : (schema.parse({}) as SidebarWidgetConfig);
 }

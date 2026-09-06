@@ -219,3 +219,69 @@ export function DownloadButton({
     </button>
   );
 }
+
+/** meta 驱动的下载按钮（IMAGE 整包 / ARTICLE 附件行）：非 GAME externalUrl 路径。
+ *  登录墙与计数语义与 DownloadButton 一致（loginRequired && !authed → 登录链接）。 */
+export function MetaDownloadButton({
+  resourceId,
+  url,
+  label,
+  loginRequired,
+  authed,
+  callbackPath,
+  count,
+  small,
+}: {
+  resourceId: string;
+  url: string;
+  label: string;
+  loginRequired: boolean;
+  authed: boolean;
+  callbackPath?: string;
+  /** 传入则在按钮右侧显示次数（点击后乐观 +1）；缺省不显示 */
+  count?: number;
+  /** ARTICLE 清单行内紧凑样式 */
+  small?: boolean;
+}) {
+  const [n, setN] = useState(count ?? 0);
+  const [prevCount, setPrevCount] = useState(count);
+  // 服务端 refresh 后以最新 props 为准（渲染期派生 state，避免 effect 内 setState）
+  if (prevCount !== count) {
+    setPrevCount(count);
+    setN(count ?? 0);
+  }
+  const [pending, start] = useTransition();
+  const path = callbackPath ?? `/resources/${resourceId}`;
+  const showCount = count !== undefined;
+  if (loginRequired && !authed) {
+    return (
+      <a
+        href={`/login?callbackUrl=${encodeURIComponent(path)}`}
+        className={`inline-flex items-center gap-1.5 rounded-none border border-emerald-600 bg-emerald-600 font-medium text-white hover:bg-emerald-500 ${
+          small ? "px-2.5 py-1 text-xs" : "px-5 py-2 text-sm"
+        }`}
+      >
+        <Download size={small ? 13 : 15} aria-hidden /> 登录后下载
+      </a>
+    );
+  }
+  return (
+    <button
+      type="button"
+      disabled={pending}
+      onClick={() =>
+        start(async () => {
+          await incrementDownloadAction(resourceId);
+          if (showCount) setN((x) => x + 1);
+          window.open(url, "_blank", "noopener");
+        })
+      }
+      className={`inline-flex items-center gap-1.5 rounded-none border border-emerald-600 bg-emerald-600 font-medium text-white transition hover:bg-emerald-500 disabled:opacity-60 ${
+        small ? "px-2.5 py-1 text-xs" : "px-5 py-2 text-sm"
+      }`}
+    >
+      <Download size={small ? 13 : 15} aria-hidden /> {label}
+      {showCount ? ` ${n > 0 ? n : ""}`.trimEnd() : ""}
+    </button>
+  );
+}

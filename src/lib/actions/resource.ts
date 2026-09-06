@@ -7,6 +7,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { imageMetaSchema, gameMetaSchema, articleMetaSchema } from "@/lib/meta";
 import { randomTail, uniqueSlug, slugify } from "@/lib/slug";
+import { translateToEnglish } from "@/lib/edge-translate";
 import { revalidatePath } from "next/cache";
 
 export type ResourceActionState = {
@@ -63,9 +64,38 @@ export async function createResourceAction(
   });
   if (!common.success) return { fieldErrors: common.error.flatten().fieldErrors };
   const { type, title, summary, description, categoryId, externalUrl } = common.data;
+  // 外链下载语义仅属于 GAME（版本表/externalUrl 驱动 DownloadButton）；IMAGE/ARTICLE 的下载走 meta，
+  // 这里把 externalUrl 对二者钉死为空，防伪造表单触发版本创建或外链下载按钮。
+  const effectiveUrl = type === "GAME" ? externalUrl : "";
 
   // —— 类型化 meta ——
   const license = String(fd.get("license") ?? "").trim();
+
+  // IMAGE 整包下载（dlMode none/file/link）；非 none 时 url 必为 http(s) 或站内 /uploads 路径
+  const dlModeRaw = fd.get("dlMode");
+  const dlMode = dlModeRaw === "file" || dlModeRaw === "link" ? dlModeRaw : "none";
+  let download: { mode: "file" | "link"; url: string; fileName?: string; size?: string } | undefined;
+  if (dlMode !== "none") {
+    const url = String(fd.get("dlUrl") ?? "").trim();
+    if (!/^https?:\/\/.+/i.test(url) && !/^\/[^/].*$/i.test(url))
+      return { fieldErrors: { downloadUrl: ["选择文件/外链后需填写 http(s):// 或站内附件路径"] } };
+    download = {
+      mode: dlMode,
+      url,
+      fileName: String(fd.get("dlName") ?? "").trim() || undefined,
+      size: String(fd.get("dlSize") ?? "").trim() || undefined,
+    };
+  }
+
+  // ARTICLE 附件清单：单个 downloads JSON（客户端受控序列化）
+  let downloads: unknown = [];
+  try {
+    downloads = JSON.parse(String(fd.get("downloads") ?? "[]"));
+  } catch {
+    downloads = [];
+  }
+  if (!Array.isArray(downloads)) downloads = [];
+
   let metaStr: string;
   if (type === "IMAGE") {
     const im = imageMetaSchema.safeParse({
@@ -75,11 +105,12 @@ export async function createResourceAction(
       original: fd.get("original") === "on",
       license,
       sourceNote: String(fd.get("sourceNote") ?? "").trim() || undefined,
+      download,
     });
     if (!im.success) return { fieldErrors: im.error.flatten().fieldErrors };
     metaStr = JSON.stringify(im.data);
   } else if (type === "ARTICLE") {
-    const am = articleMetaSchema.safeParse({ license });
+    const am = articleMetaSchema.safeParse({ license, downloads });
     if (!am.success) return { fieldErrors: am.error.flatten().fieldErrors };
     metaStr = JSON.stringify(am.data);
   } else {
@@ -123,7 +154,27 @@ export async function createResourceAction(
   const directPublish = user.trusted || user.role === "ADMIN" || user.role === "MODERATOR";
   const status = directPublish ? "PUBLISHED" : "PENDING";
 
-  const slug = await uniqueSlug(title);
+  // SEO slug：标题含中文时先经 Edge 微软翻译成英文再 slugify；接口失败回退原文（保留原行为）
+  const slug = await uniqueSlug((await translateToEnglish(title)) ?? title);
+
+  // —— 标签：去重 + 预翻译 slug ——
+  // 放事务外先算好，避免把逐条翻译的网络请求（可能各等几秒超时）挂进 DB 事务。
+  const names = [
+    ...new Set(
+      String(fd.get("tags") ?? "")
+        .split(/[,，、\s]+/)
+        .map((t) => t.trim())
+        .filter(Boolean),
+    ),
+  ].slice(0, 12);
+  // 标签 slug：含中文的名称同样先经 Edge 微软翻译成英文再 slugify，利于 SEO 与稳定外链；
+  // 纯符号名 slugify 为空时用随机串兜底（不走 uniqueSlug——它查的是 resource 表）
+  const tagEntries = await Promise.all(
+    names.map(async (name) => ({
+      name,
+      slugName: slugify((await translateToEnglish(name)) ?? name) || `tag-${randomTail()}`,
+    })),
+  );
 
   let resource;
   try {
@@ -139,30 +190,27 @@ export async function createResourceAction(
           authorId: user.id,
           status,
           meta: metaStr,
-          externalUrl: externalUrl || null,
+          externalUrl: effectiveUrl || null,
           loginRequired: fd.get("loginRequired") === "on",
           allowComments: fd.get("allowComments") !== "off",
           publishedAt: status === "PUBLISHED" ? new Date() : null,
         },
       });
 
-      // 标签（去重 + 计数）
-      const names = [
-        ...new Set(
-          String(fd.get("tags") ?? "")
-            .split(/[,，、\s]+/)
-            .map((t) => t.trim())
-            .filter(Boolean),
-        ),
-      ].slice(0, 12);
-      for (const name of names) {
-        // 标签 slug：直接取名称 slugify；纯符号名 slugify 为空时用随机串兜底（不走 uniqueSlug——它查的是 resource 表）
-        const slugName = slugify(name) || `tag-${randomTail()}`;
-        const tag = await tx.tag.upsert({
-          where: { slug: slugName },
-          update: {},
-          create: { slug: slugName, name },
-        });
+      // 标签（建/取 Tag 关联，唯一计数；slug 已在事务外翻译好，见上 tagEntries）
+      for (const { name, slugName } of tagEntries) {
+        // 命中顺序：新译英文 slug → 既存同名标签（改译前遗留的中文 slug 老标签，避免撞 name 唯一键建同名词条）→ 新建
+        const tag =
+          (await tx.tag.findUnique({ where: { slug: slugName } })) ??
+          (await tx.tag.findUnique({ where: { name } })) ??
+          (await tx.tag.create({ data: { slug: slugName, name } }).catch(async () => {
+            // 并发下 create 撞唯一键：抓回先建好的同 slug/同名标签
+            return (
+              (await tx.tag.findUnique({ where: { slug: slugName } })) ??
+              (await tx.tag.findUnique({ where: { name } }))
+            );
+          }));
+        if (!tag) continue; // 兜底失败才走到（理论上不可达），放弃本条关联不阻塞发布
         const link = await tx.tagOnResource
           .create({ data: { resourceId: r.id, tagId: tag.id } })
           .catch(() => null); // 并发去重
@@ -185,8 +233,8 @@ export async function createResourceAction(
       if (finalCover)
         await tx.resource.update({ where: { id: r.id }, data: { coverMediaId: finalCover } });
 
-      // 有下载地址的资源落首个版本记录（版本号取 meta.version，缺省 1.0）
-      if (externalUrl) {
+      // 有下载地址的资源落首个版本记录（仅 GAME，版本号取 meta.version，缺省 1.0）
+      if (effectiveUrl) {
         const ver =
           type === "GAME"
             ? (() => {
@@ -202,7 +250,7 @@ export async function createResourceAction(
             resourceId: r.id,
             version: ver,
             changelog: String(fd.get("changelog") ?? "").trim() || null,
-            url: externalUrl,
+            url: effectiveUrl,
           },
         });
       }

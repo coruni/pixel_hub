@@ -31,17 +31,17 @@ export const HOME_KIND_META: Record<
   },
   list: {
     label: "内容流板块",
-    desc: "自选条件的内容列表：类型/排序/数量/分类标签多选，卡片·列表·瀑布流",
+    desc: "自选条件的内容列表：类型/排序/数量/分类标签多选，卡片·列表",
     defaultTitle: "精选内容",
   },
   featured: {
     label: "专题精选",
-    desc: "把指定资源组成一个专题网格（支持卡片/列表/瀑布流）",
+    desc: "把指定资源组成一个专题网格（支持卡片/列表）",
     defaultTitle: "专题",
   },
   feed: {
     label: "全站浏览",
-    desc: "可翻页的瀑布流全站浏览（跟 /browse 一致，跟随页面查询参数）",
+    desc: "统一 3:4 卡片网格的全站内容浏览（跟 /browse 一致，跟随页面查询参数）",
     defaultTitle: "发现",
   },
   stats: { label: "数据一览", desc: "社区规模数字横幅", defaultTitle: "社区数据" },
@@ -77,13 +77,13 @@ const listCfg = z.object({
   count: z.number().int().min(1).max(48).default(12),
   categorySlugs: z.array(z.string()).max(30).default([]), // 空 = 不限
   tagSlugs: z.array(z.string()).max(30).default([]), // 空 = 不限；否则任一命中
-  display: z.enum(["card", "list", "masonry"]).default("masonry"),
+  display: z.enum(["card", "list"]).default("card"),
   paged: z.boolean().default(false), // 允许「下一页 / 加载更多」
-  ratio: ratioEnum, // 卡片封面比例；auto=卡片沿用 4:3、瀑布沿用原图
+  ratio: ratioEnum, // 卡片封面比例；auto=默认 3:4
 });
 const featuredCfg = z.object({
   featuredIds: z.array(z.string()).max(24).default([]), // 专题挑选的资源 id；为空自动兜底近期热门
-  display: z.enum(["card", "list", "masonry"]).default("card"),
+  display: z.enum(["card", "list"]).default("card"),
   ratio: ratioEnum,
 });
 const feedCfg = z.object({
@@ -127,11 +127,11 @@ export type HomeSectionConfig =
       count: number;
       categorySlugs: string[];
       tagSlugs: string[];
-      display: "card" | "list" | "masonry";
+      display: "card" | "list";
       paged: boolean;
       ratio: CardRatio;
     } // list
-  | { featuredIds: string[]; display: "card" | "list" | "masonry"; ratio: CardRatio } // featured
+  | { featuredIds: string[]; display: "card" | "list"; ratio: CardRatio } // featured
   | { showTags: boolean } // feed
   | Record<string, never> // stats
   | { count: number } // creators
@@ -157,6 +157,11 @@ export function parseSectionConfig(kind: HomeSectionKind, raw: string | null): H
     } catch {
       obj = {};
     }
+  }
+  // 存量迁移：display="masonry" 已下线 → 字段级归一到 "card"，保住 type/sort/count/分类/标签 等其它字段
+  if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+    const o = obj as Record<string, unknown>;
+    if ((kind === "list" || kind === "featured") && o.display === "masonry") o.display = "card";
   }
   const schema = homeConfigSchemas[kind];
   const r = schema.safeParse(obj);

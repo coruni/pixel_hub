@@ -4,6 +4,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db/prisma";
 import { slugify } from "@/lib/slug";
+import { translateToEnglish } from "@/lib/edge-translate";
 import { adminOnly, audit } from "@/lib/actions/_guards";
 
 type Result = { ok: true } | { ok: false; error: string };
@@ -21,8 +22,12 @@ export async function createCategoryAction(input: { name: string; slug: string }
   const admin = await adminOnly();
   if (!admin) return { ok: false, error: "仅管理员可操作" };
   const name = cleanName(input.name);
-  const slug = slugify(typeof input.slug === "string" && input.slug.trim() ? input.slug : name);
   if (!name) return { ok: false, error: "名称必填" };
+  // slug 自动翻译：显式填写的 slug 原样采用；留空则把（含中文的）名称经 Edge 微软翻译成英文再 slugify，利于 SEO
+  const explicit = typeof input.slug === "string" ? input.slug.trim() : "";
+  const slug = explicit
+    ? slugify(explicit)
+    : slugify((await translateToEnglish(name)) ?? name) || name;
   if (!slug) return { ok: false, error: "slug 必填（字母/数字/中文）" };
   const hit = await prisma.category.findUnique({ where: { slug } });
   if (hit) return { ok: false, error: `slug「${slug}」已被占用` };
@@ -39,19 +44,30 @@ export async function updateCategoryAction(input: {
 }): Promise<Result> {
   const admin = await adminOnly();
   if (!admin) return { ok: false, error: "仅管理员可操作" };
-  const data: { name?: string; sort?: number } = {};
+  const existing = await prisma.category.findUnique({ where: { id: input.id } });
+  if (!existing) return { ok: false, error: "分类不存在" };
+
+  const data: { name?: string; slug?: string; sort?: number } = {};
   if (input.name !== undefined) {
     const name = cleanName(input.name);
     if (!name) return { ok: false, error: "名称不能为空" };
     data.name = name;
+    // 改名时同步 slug：与标签一致，把新名（含中文）经 Edge 翻译成英文 slug；撞 slug 报错不静默改
+    if (name !== existing.name) {
+      const slug = slugify((await translateToEnglish(name)) ?? name);
+      if (slug && slug !== existing.slug) {
+        const clash = await prisma.category.findUnique({ where: { slug } });
+        if (clash) return { ok: false, error: `slug「${slug}」已被分类「${clash.name}」占用` };
+        data.slug = slug;
+      }
+    }
   }
   if (typeof input.sort === "number" && Number.isFinite(input.sort))
     data.sort = Math.trunc(input.sort);
   if (Object.keys(data).length === 0) return { ok: true };
-  // updateMany + count：目标不存在时给友好错误而非 P2025 500
-  const r = await prisma.category.updateMany({ where: { id: input.id }, data });
-  if (r.count === 0) return { ok: false, error: "分类不存在" };
-  await audit(admin.id, "EDIT_CATEGORY", "CATEGORY", input.id, `更新分类 ${data.name ?? input.id}`);
+
+  await prisma.category.update({ where: { id: input.id }, data });
+  await audit(admin.id, "EDIT_CATEGORY", "CATEGORY", input.id, `更新分类 ${data.name ?? ""}(${data.slug ?? input.id})`);
   revalidateAll();
   return { ok: true };
 }
@@ -115,7 +131,8 @@ export async function renameTagAction(input: { id: string; name: string }): Prom
     revalidateAll();
     return { ok: true };
   }
-  const slug = slugify(name) || t.slug;
+  // 重命名时同步 slug：含中文的名称同样先经 Edge 微软翻译成英文再 slugify（SEO 友好稳定外链）
+  const slug = slugify((await translateToEnglish(name)) ?? name) || t.slug;
   const bySlug = await prisma.tag.findFirst({ where: { slug, id: { not: t.id } } });
   if (bySlug) return { ok: false, error: `slug「${slug}」已被标签「${bySlug.name}」占用` };
   await prisma.tag.update({ where: { id: t.id }, data: { name, slug } });

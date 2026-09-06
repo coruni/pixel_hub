@@ -10,7 +10,7 @@ export async function renderHot(w: SidebarWidget) {
     type: "ALL" | "IMAGE" | "GAME";
     sort: "latest" | "popular" | "downloads";
     count: number;
-    display: "card" | "list" | "masonry";
+    display: "card" | "list";
   };
   const { items } = await getFeed({
     type: cfg.type === "ALL" ? undefined : cfg.type,

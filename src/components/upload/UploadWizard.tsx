@@ -5,7 +5,7 @@ import { Gamepad2, Image as ImageIcon, Newspaper } from "lucide-react";
 import { useActionState, useRef, useState } from "react";
 import { createResourceAction, type ResourceActionState } from "@/lib/actions/resource";
 import MediaPicker from "./media-picker";
-import { AttachmentUpload, GameSection, ImageSection } from "./wizard-sections";
+import { ArticleSection, AttachmentUpload, GameSection, ImageSection } from "./wizard-sections";
 import {
   SectionTitle,
   fieldErr,
@@ -233,8 +233,9 @@ export default function UploadWizard({ categories }: { categories: Cat[] }) {
         </div>
       </section>
 
-      {/* 类型化信息（文章无额外信息，正文即内容） */}
-      {type === "IMAGE" && <ImageSection />}
+      {/* 类型化信息：图片 D2 声明+整包下载 / 游戏外链+版本 / 文章正文即内容+附件清单 */}
+      {type === "IMAGE" && <ImageSection fieldErrors={state.fieldErrors} />}
+      {type === "ARTICLE" && <ArticleSection fieldErrors={state.fieldErrors} />}
       {type === "GAME" && (
         <GameSection
           extUrl={extUrl}
@@ -266,7 +267,7 @@ export default function UploadWizard({ categories }: { categories: Cat[] }) {
 
       {/* 发布选项 */}
       <section className="mt-4 flex flex-wrap gap-x-6 gap-y-2 rounded-none border border-brand-200 bg-surface p-5 text-sm text-neutral-700">
-        <SectionTitle n={type === "ARTICLE" ? 3 : 4}>发布选项</SectionTitle>
+        <SectionTitle n={4}>发布选项</SectionTitle>
         <label className="flex items-center gap-2">
           <input type="checkbox" name="loginRequired" className="h-4 w-4 accent-brand-500" />
           下载需登录
@@ -287,7 +288,7 @@ export default function UploadWizard({ categories }: { categories: Cat[] }) {
         <button
           type="submit"
           disabled={pending || uploading}
-          className="rounded-none border border-brand-600 bg-brand-500 px-8 py-3 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-50"
+          className="rounded-none border border-brand-600 bg-brand-500 px-8 py-2 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-50"
         >
           {pending
             ? "提交中…"

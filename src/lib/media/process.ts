@@ -6,7 +6,7 @@ import { makeKey, saveFile, publicUrl } from "@/lib/storage";
 export type ProcessedImage = {
   storageKey: string; // local/s3: 相对 key；chevereto: 远端完整 URL
   bigKey: string | null; // 最长边 ≤1600 webp（灯箱）
-  thumbKey: string | null; // 最长边 ≤480 webp（卡片/瀑布流）
+  thumbKey: string | null; // 最长边 ≤480 webp（卡片封面）
   placeholder: string | null; // 16px PNG data URI（LQIP）
   width: number;
   height: number;

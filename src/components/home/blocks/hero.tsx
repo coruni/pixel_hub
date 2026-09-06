@@ -72,7 +72,7 @@ export default async function HeroBlock({
             ) : (
               <div className="absolute inset-0 bg-stone-700" />
             )}
-            <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,.88)_0%,rgba(0,0,0,.88)_52%,rgba(0,0,0,.45)_52%,rgba(0,0,0,.45)_72%,transparent_72.5%)]" />
+            <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,.88)_0%,rgba(0,0,0,.88)_37%,transparent_37%,transparent_100%)]" />
             <div className="absolute left-3 top-3">
               <TypeBadge type={big.type} />
             </div>
@@ -127,7 +127,7 @@ export default async function HeroBlock({
                   ) : (
                     <div className="absolute inset-0 bg-stone-700" />
                   )}
-                  <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,.85)_0%,rgba(0,0,0,.85)_50%,transparent_50.5%)]" />
+                  <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,.85)_0%,rgba(0,0,0,.85)_38%,transparent_38%)]" />
                   <div className="absolute left-2 top-2">
                     <TypeBadge type={item.type} />
                   </div>

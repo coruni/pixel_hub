@@ -57,7 +57,7 @@ function KindIcon({ kind, size = 15 }: { kind: HomeSectionKind; size?: number })
   return <Icon size={size} aria-hidden />;
 }
 
-const dispLabel: Record<string, string> = { card: "卡片", list: "列表", masonry: "瀑布流" };
+const dispLabel: Record<string, string> = { card: "卡片", list: "列表" };
 const sortLabel: Record<string, string> = {
   latest: "最新",
   popular: "最热",
@@ -87,7 +87,7 @@ function cfgSummary(row: ManagerRow): string {
       ];
       if (n(c.categorySlugs)) parts.push(`${n(c.categorySlugs)} 个分类`);
       if (n(c.tagSlugs)) parts.push(`${n(c.tagSlugs)} 个标签`);
-      parts.push(dispLabel[String(c.display ?? "masonry")] ?? "瀑布流");
+      parts.push(dispLabel[String(c.display ?? "card")] ?? "卡片");
       if (c.paged === true) parts.push("可翻页");
       return parts.join(" · ");
     }

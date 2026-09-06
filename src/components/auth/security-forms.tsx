@@ -16,7 +16,7 @@ function FieldError({ msg }: { msg?: string[] }) {
 }
 
 const submitBtn =
-  "rounded-none border border-brand-600 bg-brand-500 px-6 py-2.5 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50";
+  "rounded-none border border-brand-600 bg-brand-500 px-6 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50";
 
 export function PasswordForm() {
   const [state, formAction, pending] = useActionState<SettingsActionState, FormData>(

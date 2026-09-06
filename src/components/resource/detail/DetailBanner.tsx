@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import Gallery from "@/components/resource/Gallery";
 import { DownloadButton } from "@/components/social/interactions";
 import CollapsibleAside from "./CollapsibleAside";
+import { DownloadPanel } from "./download-panel";
 import {
   ActionBar,
   AuthorStrip,
@@ -75,6 +76,9 @@ export default function DetailBanner({
           )}
         </div>
       </div>
+
+      {/* IMAGE/ARTICLE 下载（横幅覆盖按钮仅 GAME externalUrl；面板对 GAME 返回 null） */}
+      <DownloadPanel ctx={ctx} />
 
       <div className="relative">
         <CollapsibleAside

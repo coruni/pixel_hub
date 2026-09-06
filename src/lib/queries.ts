@@ -625,7 +625,7 @@ export async function getCollections(userId: string): Promise<CollectionRow[]> {
   return rows.map((r) => ({ id: r.id, name: r.name, count: r._count.items }));
 }
 
-// 收藏夹详情：owner 本人或 isPublic 才可见；条目按收藏时间倒序（FeedCard 形状喂 MasonryGrid）
+// 收藏夹详情：owner 本人或 isPublic 才可见；条目按收藏时间倒序（FeedCard 形状喂 ResourceGrid）
 // cache()：同请求内 metadata 与 page 各调一次时只查一遍库（两处须传相同 viewerId）
 export const getCollectionDetail = cache(async (id: string, viewerId?: string) => {
   const col = await prisma.collection.findUnique({

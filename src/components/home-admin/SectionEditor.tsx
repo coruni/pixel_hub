@@ -30,7 +30,7 @@ const field = LABEL_STRONG;
 
 type TypeFilter = "ALL" | ContentType;
 type SortKey = "latest" | "popular" | "downloads";
-type Display = "card" | "list" | "masonry";
+type Display = "card" | "list";
 
 const strArr = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : []);
 
@@ -74,13 +74,7 @@ export default function SectionEditor({
   const [tagSel, setTagSel] = useState<string[]>(
     kind === "tags" ? strArr(cfg.slugs) : kind === "list" ? strArr(cfg.tagSlugs) : [],
   );
-  const [display, setDisplay] = useState<Display>(
-    cfg.display === "list" || cfg.display === "card"
-      ? (cfg.display as Display)
-      : kind === "featured"
-        ? "card"
-        : "masonry",
-  );
+  const [display, setDisplay] = useState<Display>(cfg.display === "list" ? "list" : "card");
   const [ratio, setRatio] = useState<CardRatio>(
     (CARD_RATIO_KEYS as string[]).includes(String(cfg.ratio)) ? (cfg.ratio as CardRatio) : "auto",
   );
@@ -264,7 +258,7 @@ export default function SectionEditor({
           </div>
         )}
 
-        {/* list/featured：卡片比例（列表行不适用；auto=卡片沿用 4:3、瀑布保留原图） */}
+        {/* list/featured：卡片比例（列表行不适用；auto=默认 3:4 竖版） */}
         {(kind === "list" || kind === "featured") && display !== "list" && (
           <div>
             <label className={field} htmlFor={`r-${row.id}`}>
@@ -284,10 +278,8 @@ export default function SectionEditor({
             </select>
             <p className="mt-1 text-[11px] text-neutral-400">
               {ratio === "auto"
-                ? display === "card"
-                  ? "卡片沿用默认 4:3 封面"
-                  : "瀑布流保留每张原图比例（错落）"
-                : `所选比例下卡片统一裁剪，瀑布流会变为整齐的 ${CARD_RATIOS[ratio].label} 网格`}
+                ? "沿用默认 3:4 竖版封面"
+                : `卡片统一裁剪为 ${CARD_RATIOS[ratio].label} 网格`}
             </p>
           </div>
         )}

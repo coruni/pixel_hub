@@ -11,8 +11,10 @@ import {
   RelatedSection,
   type DetailCtx,
 } from "./parts";
+import { DownloadPanel } from "./download-panel";
 
-/** D · 杂志阅读式 —— 文章专属：编辑部排版（左对齐大标题 + 作者 meta 行 + 阅读列正文），无下载/信息卡等资源向面板 */
+/** D · 杂志阅读式 —— 文章专属：编辑部排版（左对齐大标题 + 作者 meta 行 + 阅读列正文），
+ *  可带文末附件清单（DownloadPanel），无游戏向版本/信息卡面板 */
 export default function DetailArticle({
   ctx,
   middleSlot,
@@ -101,6 +103,9 @@ export default function DetailArticle({
           ))}
         </div>
       )}
+
+      {/* 文末附件清单（ARTICLE；其余类型返回 null） */}
+      <DownloadPanel ctx={ctx} />
 
       {/* 底部操作条 */}
       <div className="mt-8 flex justify-center pt-2">

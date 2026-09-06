@@ -9,7 +9,7 @@ export type FeaturedBlockCfg = {
   ratio: CardRatio;
 };
 
-/** 专题板块：手动挑选的资源组成的网格（卡片/列表/瀑布流）；未挑选时自动兜底近期热门 */
+/** 专题板块：手动挑选的资源组成的网格（卡片网格/列表行）；未挑选时自动兜底近期热门 */
 export default async function FeaturedBlock({
   title,
   cfg,
@@ -28,14 +28,12 @@ export default async function FeaturedBlock({
   }
   if (items.length === 0) return null;
 
-  // ratio 非 auto（且非 list）：卡片/瀑布统一为所选比例的规整网格
-  const ratio = cfg.ratio ?? "auto";
-  const uniformRatio = ratio !== "auto" && cfg.display !== "list" ? ratio : undefined;
-  const showAs: ContentDisplay = uniformRatio ? "card" : cfg.display;
+  // ratio 仅对卡片网格生效（list 行不受比例影响）
+  const ratio = cfg.display === "list" ? undefined : cfg.ratio;
 
   return (
     <BlockShell title={title}>
-      <ResourceGrid items={items} display={showAs} ratio={uniformRatio} />
+      <ResourceGrid items={items} display={cfg.display} ratio={ratio} />
     </BlockShell>
   );
 }

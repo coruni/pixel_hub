@@ -366,7 +366,7 @@ export function RelatedSection({ ctx }: { ctx: DetailCtx }) {
                 </div>
               )}
             </div>
-            <p className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-[linear-gradient(to_top,rgba(0,0,0,.85)_0%,rgba(0,0,0,.85)_60%,transparent_100%)] px-1.5 pb-1 pt-4 text-[11px] leading-tight text-white">
+            <p className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-[linear-gradient(to_top,rgba(0,0,0,.85)_0%,rgba(0,0,0,.85)_60%,transparent_60%)] px-1.5 pb-1 pt-4 text-[11px] leading-tight text-white">
               {item.title}
             </p>
           </Link>

@@ -9,6 +9,7 @@ import { makeKey, saveFile } from "@/lib/storage";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
+import { parseMeta, metaHasDownload } from "@/lib/meta";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
 import { notifyByEmail } from "@/lib/mail-notify";
 import { audit } from "@/lib/actions/_guards";
@@ -398,8 +399,16 @@ export async function deleteCommentAction(commentId: string): Promise<{ ok: bool
 
 // ---------- 下载计数（会话去重） ----------
 export async function incrementDownloadAction(resourceId: string): Promise<{ ok: boolean }> {
-  const resource = await prisma.resource.findUnique({ where: { id: resourceId } });
-  if (!resource || !resource.externalUrl) return { ok: false };
+  // 下载源：GAME 走 externalUrl；IMAGE/ARTICLE 走 meta（download / downloads）
+  const resource = await prisma.resource.findUnique({
+    where: { id: resourceId },
+    select: { id: true, type: true, externalUrl: true, meta: true },
+  });
+  if (!resource) return { ok: false };
+  const hasDl =
+    !!resource.externalUrl ||
+    metaHasDownload(parseMeta(resource.type as "GAME" | "IMAGE" | "ARTICLE", resource.meta));
+  if (!hasDl) return { ok: false };
   // 内存限流兜底 cookie 伪造：每 IP 60 次 / 分钟，超限静默不计数（下载本身不受影响）
   if (!rateLimit(`dl:${clientIp(await headers())}`, 60, 60_000)) return { ok: true };
   const ck = await cookies();

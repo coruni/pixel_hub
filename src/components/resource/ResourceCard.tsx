@@ -10,22 +10,19 @@ import {
 } from "lucide-react";
 import type { FeedCard } from "@/lib/queries";
 import { formatCount } from "@/lib/format";
-import { CARD_RATIOS, TYPE_LABEL, clampedAspect, type CardRatio } from "@/lib/display";
+import { CARD_DEFAULT_ASPECT, CARD_RATIOS, TYPE_LABEL, type CardRatio } from "@/lib/display";
 import CoverPlaceholder from "./CoverPlaceholder";
 
 /**
  * 统一资源卡（信息全覆盖图，无图下白条）：
  * 标题 / 作者·分类 / 赞藏评(·下载) 全部压在封面底部的黑色渐变上，视觉即纯图卡。
- * uniform=true 封面按 ratio 裁切（card 网格；ratio 未给时默认 4:3）；false 保持上传原比例（瀑布流）。
- * 卡片高度 == 封面高度 → 瀑布流列底干净、估算只需 cover 比例。
+ * 封面按 ratio 裁切（默认 3:4 竖版；显式给了 ratio 才换别的比例），同一网格内高度一致。
  */
 export default function ResourceCard({
   item,
-  uniform = false,
   ratio,
 }: {
   item: FeedCard;
-  uniform?: boolean;
   ratio?: CardRatio | null;
 }) {
   const w = item.cover?.width && item.cover.width > 0 ? item.cover.width : 3;
@@ -34,12 +31,8 @@ export default function ResourceCard({
   const author = item.author.name ?? item.author.username;
   const meta = item.category?.name ?? TYPE_LABEL[item.type] ?? item.type;
 
-  // uniform 且显式给了比例 → 按选择裁切；uniform 未给比例 → 沿用 4:3 网格默认
-  // 瀑布流（非 uniform）：保留原图比例但限幅 [3/4, 4/3] ——
-  // 竖图封顶 3/4 不拉长卡片；横图最扁 4/3，避免超矮卡上信息层盖满整图
-  const boxAspect = uniform
-    ? ((ratio && ratio !== "auto" ? CARD_RATIOS[ratio].aspect : undefined) ?? "4 / 3")
-    : String(clampedAspect(w, h));
+  // 显式给定比例 → 按选择裁切；未给/auto → 统一 3:4 竖版
+  const boxAspect = (ratio ? CARD_RATIOS[ratio].aspect : undefined) ?? CARD_DEFAULT_ASPECT;
 
   return (
     <Link
@@ -75,9 +68,8 @@ export default function ResourceCard({
         )}
       </span>
 
-      {/* 底部渐变 + 全覆盖信息。遮罩用固定 px 高度（非 %）：瀑布流卡片高低不一，
-          百分比会让竖图卡黑掉大半、横图卡信息挤成一团；px 版所有卡信息带等高、错落只留给图片 */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-[linear-gradient(to_top,rgba(0,0,0,.92)_0px,rgba(0,0,0,.92)_68px,rgba(0,0,0,.55)_68px,rgba(0,0,0,.55)_96px,transparent_96px)] px-3 pb-2 pt-9">
+      {/* 底部渐变 + 全覆盖信息。遮罩用固定 px 高度（非 %）：卡片统一比例后信息带等高，px 版不随比例变化 */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-[linear-gradient(to_top,rgba(0,0,0,.92)_0px,rgba(0,0,0,.92)_68px,transparent_68px)] px-3 pb-2 pt-9">
         <p className="truncate text-sm font-medium leading-snug text-white drop-shadow">
           {item.title}
         </p>

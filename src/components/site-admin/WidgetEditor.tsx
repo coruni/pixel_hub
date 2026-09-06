@@ -47,8 +47,8 @@ export default function WidgetEditor({
             ? 4
             : 6,
   );
-  const [display, setDisplay] = useState<"card" | "list" | "masonry">(
-    cfg.display === "card" || cfg.display === "masonry" ? cfg.display : "list",
+  const [display, setDisplay] = useState<"card" | "list">(
+    cfg.display === "card" ? "card" : "list",
   );
   const [cats, setCats] = useState<string[]>((cfg.slugs as string[]) ?? []);
   const [text, setText] = useState<string>(typeof cfg.text === "string" ? cfg.text : "");
@@ -230,7 +230,6 @@ export default function WidgetEditor({
               >
                 <option value="list">列表行</option>
                 <option value="card">小卡片</option>
-                <option value="masonry">小瀑布</option>
               </select>
             </div>
           </>

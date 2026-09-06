@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import Gallery from "@/components/resource/Gallery";
+import { DownloadPanel } from "./download-panel";
 import {
   ActionBar,
   AuthorStrip,
@@ -64,6 +65,9 @@ export default function DetailTwocol({
           <TypeInfoCard ctx={ctx} />
         </aside>
       </div>
+
+      {/* IMAGE/ARTICLE 下载（面板对无关类型返回 null） */}
+      <DownloadPanel ctx={ctx} />
 
       {/* 描述与评论横跨整条内容宽度 */}
       <div className="mt-8 space-y-5">

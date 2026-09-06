@@ -58,7 +58,7 @@ export default async function HomeRenderer({
                   count: typeof cfg.count === "number" ? cfg.count : 12,
                   categorySlugs: (cfg.categorySlugs as string[]) ?? [],
                   tagSlugs: (cfg.tagSlugs as string[]) ?? [],
-                  display: (cfg.display as "card" | "list" | "masonry") ?? "masonry",
+                  display: (cfg.display as "card" | "list") ?? "card",
                   paged: cfg.paged === true,
                   ratio: (cfg.ratio as CardRatio) ?? "auto",
                 }}
@@ -71,7 +71,7 @@ export default async function HomeRenderer({
                 title={s.title}
                 cfg={{
                   featuredIds: (cfg.featuredIds as string[]) ?? [],
-                  display: (cfg.display as "card" | "list" | "masonry") ?? "card",
+                  display: (cfg.display as "card" | "list") ?? "card",
                   ratio: (cfg.ratio as CardRatio) ?? "auto",
                 }}
               />

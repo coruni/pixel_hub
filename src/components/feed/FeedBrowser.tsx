@@ -57,7 +57,7 @@ export default async function FeedBrowser({
       q: follow ? undefined : q,
       followOnlyOf: follow ? userId : undefined,
       page,
-      pageSize: 30,
+      pageSize: 32,
     }),
     // 热门标签仅浏览页需要，其余页直接空数组
     showTags ? getTopTags() : Promise.resolve([] as Awaited<ReturnType<typeof getTopTags>>),

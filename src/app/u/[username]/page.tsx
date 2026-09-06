@@ -19,7 +19,7 @@ import {
   deleteCollectionAction,
 } from "@/lib/actions/social";
 import { formatCount } from "@/lib/format";
-import MasonryGrid from "@/components/resource/MasonryGrid";
+import ResourceGrid from "@/components/resource/ResourceGrid";
 import Avatar from "@/components/ui/Avatar";
 import { FollowButton } from "@/components/social/interactions";
 
@@ -288,22 +288,24 @@ export default async function UserPage({
         </div>
       </div>
 
-      {/* 统计：三格主数据 + 侧挂累计数据 */}
-      <div className="mt-6 flex flex-wrap gap-3">
-        {[
-          { n: formatCount(pubCount), k: "发布" },
-          { n: formatCount(profile.followerCount), k: "粉丝" },
-          { n: formatCount(profile.followingCount), k: "关注" },
-        ].map((s) => (
-          <div
-            key={s.k}
-            className="w-28 rounded-none border border-brand-200 bg-brand-50/40 py-3 text-center"
-          >
-            <div className="text-lg font-semibold tabular-nums text-brand-700">{s.n}</div>
-            <div className="text-[11px] text-neutral-400">{s.k}</div>
-          </div>
-        ))}
-        <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-x-5 gap-y-1 text-xs text-neutral-400">
+      {/* 统计：三格主数据（窄屏三等分占满一行，宽屏固定宽度左排）+ 侧挂累计数据 */}
+      <div className="mt-6 flex flex-col gap-3 lg:flex-row lg:items-center">
+        <div className="flex w-full gap-3 lg:w-auto">
+          {[
+            { n: formatCount(pubCount), k: "发布" },
+            { n: formatCount(profile.followerCount), k: "粉丝" },
+            { n: formatCount(profile.followingCount), k: "关注" },
+          ].map((s) => (
+            <div
+              key={s.k}
+              className="min-w-0 flex-1 rounded-none border border-brand-200 bg-brand-50/40 py-3 text-center lg:w-28 lg:flex-none"
+            >
+              <div className="text-lg font-semibold tabular-nums text-brand-700">{s.n}</div>
+              <div className="mt-0.5 text-[11px] text-neutral-400">{s.k}</div>
+            </div>
+          ))}
+        </div>
+        <div className="flex min-w-0 flex-1 flex-wrap items-center justify-start gap-x-5 gap-y-1 text-xs text-neutral-400 lg:justify-end">
           <span className="inline-flex items-center gap-1">
             <Eye size={12} aria-hidden /> 累计浏览 {formatCount(agg._sum.viewCount ?? 0)}
           </span>
@@ -335,7 +337,7 @@ export default async function UserPage({
       {/* 内容 */}
       {tab === "works" &&
         (works.length > 0 ? (
-          <MasonryGrid className="mt-4" items={works} />
+          <ResourceGrid className="mt-4 lg:grid-cols-5" items={works} display="card" ratio="3:4" />
         ) : (
           emptyBox("还没有发布内容")
         ))}
@@ -415,7 +417,7 @@ export default async function UserPage({
       )}
       {tab === "favorites" &&
         (works.length > 0 ? (
-          <MasonryGrid className="mt-4" items={works} />
+          <ResourceGrid className="mt-4" items={works} display="card" ratio="3:4" />
         ) : (
           emptyBox("还没有收藏内容")
         ))}

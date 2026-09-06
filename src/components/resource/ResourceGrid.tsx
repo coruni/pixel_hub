@@ -2,9 +2,8 @@ import type { FeedCard } from "@/lib/queries";
 import type { ContentDisplay, CardRatio } from "@/lib/display";
 import ResourceRow from "./ResourceRow";
 import ResourceCard from "./ResourceCard";
-import MasonryGrid from "./MasonryGrid";
 
-// 按显示形态渲染资源集合：masonry=精确 JS 瀑布流(保原比例、最短列优先) / card=统一比例卡片网格 / list=横向行列表。
+// 按显示形态渲染资源集合：card=统一比例卡片网格(默认 3:4，可显式传 ratio) / list=横向行列表。
 export default function ResourceGrid({
   items,
   display,
@@ -28,17 +27,12 @@ export default function ResourceGrid({
     );
   }
 
-  if (display === "card") {
-    // 列数用标准视口断点：移动 2 / md(iPad) 3 / lg(PC) 4
-    return (
-      <div className={`grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 ${className}`}>
-        {items.map((item) => (
-          <ResourceCard key={item.id} item={item} uniform ratio={ratio} />
-        ))}
-      </div>
-    );
-  }
-
-  // masonry：精确 JS 瀑布流（SSR 先以 CSS 多列占位，JS 接管后最短列优先）
-  return <MasonryGrid items={items} className={className} />;
+  // card：列数用标准视口断点：移动 2 / md(iPad) 3 / lg(PC) 4
+  return (
+    <div className={`grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 ${className}`}>
+      {items.map((item) => (
+        <ResourceCard key={item.id} item={item} ratio={ratio} />
+      ))}
+    </div>
+  );
 }
