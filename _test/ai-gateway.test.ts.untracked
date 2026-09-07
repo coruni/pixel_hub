@@ -1,0 +1,44 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { buildRedactedInput } from "../src/lib/ai/redact";
+import { parseStructuredOutput, gameResearchOutputSchema } from "../src/lib/ai/schema";
+import { createOpenAICompatibleProvider } from "../src/lib/ai/provider";
+
+test("redacts secrets and direct personal identifiers from provider input", () => {
+  const result = buildRedactedInput({
+    title: "Test game",
+    email: "person@example.com",
+    password: "secret",
+    apiKey: "sk-secret",
+    description: "Public text",
+  });
+  assert.equal(result.email, "[REDACTED]");
+  assert.equal(result.password, "[REDACTED]");
+  assert.equal(result.apiKey, "[REDACTED]");
+  assert.equal(result.description, "Public text");
+});
+
+test("parses and validates structured game research output", () => {
+  const parsed = parseStructuredOutput(gameResearchOutputSchema, JSON.stringify({
+    summary: "A concise summary",
+    facts: [{ label: "Developer", value: "Studio", confidence: "high" }],
+    caveats: ["No network research performed"],
+  }));
+  assert.equal(parsed.facts[0].label, "Developer");
+});
+
+test("rejects malformed structured output", () => {
+  assert.throws(() => parseStructuredOutput(gameResearchOutputSchema, "not json"));
+});
+
+test("returns readable error when provider configuration is missing", async () => {
+  const provider = createOpenAICompatibleProvider({ baseUrl: "", apiKey: "", model: "" });
+  await assert.rejects(() => provider.complete({ system: "sys", user: "user" }), /AI provider is not configured/i);
+});
+
+test("maps chat completion content and usage", async () => {
+  const provider = createOpenAICompatibleProvider({ baseUrl: "https://example.test", apiKey: "key", model: "model", fetchImpl: async () => new Response(JSON.stringify({ choices: [{ message: { content: '{"ok":true}' } }], usage: { prompt_tokens: 3, completion_tokens: 4, total_tokens: 7 } }), { status: 200 }) });
+  const result = await provider.complete({ system: "sys", user: "user" });
+  assert.equal(result.content, '{"ok":true}');
+  assert.deepEqual(result.usage, { inputTokens: 3, outputTokens: 4, totalTokens: 7 });
+});

@@ -9,6 +9,7 @@ import { getUploadLimits } from "@/lib/upload-limits";
 import { TYPE_LABEL } from "@/lib/display";
 import { ResourceEditForm } from "@/components/admin/ResourceEditForm";
 import { ContentActions } from "@/components/admin/buttons";
+import AiGenerateButton from "@/components/admin/AiGenerateButton";
 
 export const metadata: Metadata = { title: "编辑内容" };
 
@@ -31,7 +32,10 @@ export default async function EditResourcePage({ params }: { params: Promise<{ i
         },
       },
     }),
-    prisma.category.findMany({ orderBy: [{ sort: "asc" }, { name: "asc" }], select: { id: true, name: true } }),
+    prisma.category.findMany({
+      orderBy: [{ sort: "asc" }, { name: "asc" }],
+      select: { id: true, name: true },
+    }),
     getUploadLimits(),
   ]);
   if (!resource) notFound();
@@ -45,12 +49,18 @@ export default async function EditResourcePage({ params }: { params: Promise<{ i
           <h2 className="text-lg font-medium text-neutral-900">编辑内容</h2>
           <p className="mt-0.5 truncate text-xs text-neutral-400">
             {TYPE_LABEL[resource.type]} · @{resource.author.username} ·{" "}
-            <Link href={`/resources/${resource.slug}`} className="hover:text-brand-700 hover:underline">
+            <Link
+              href={`/resources/${resource.slug}`}
+              className="hover:text-brand-700 hover:underline"
+            >
               /{resource.slug}
             </Link>
           </p>
         </div>
-        <ContentActions resourceId={resource.id} status={resource.status} />
+        <div className="flex flex-wrap items-center gap-2">
+          <AiGenerateButton resourceId={resource.id} />
+          <ContentActions resourceId={resource.id} status={resource.status} />
+        </div>
       </div>
 
       <ResourceEditForm

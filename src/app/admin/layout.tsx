@@ -13,6 +13,7 @@ const tabs: { href: string; label: string; adminOnly?: boolean }[] = [
   { href: "/admin", label: "概览" },
   { href: "/admin/queue", label: "审核队列" },
   { href: "/admin/content", label: "内容库" },
+  { href: "/admin/ai", label: "网站管家" },
   { href: "/admin/reports", label: "举报" },
   { href: "/admin/users", label: "用户管理" },
   { href: "/admin/media", label: "媒体库" },
