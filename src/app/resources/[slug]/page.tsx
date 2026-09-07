@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
-import { getCollections, getRelated, getResourceDetail } from "@/lib/queries";
+import { getCollections, getRelated, getResourceDetail, type ResourceDetail } from "@/lib/queries";
 import { parseMeta } from "@/lib/meta";
 import { getTheme, detailTemplateFor } from "@/lib/site";
 import { sidebarVisible } from "@/lib/site-config";
@@ -14,9 +14,54 @@ import DetailTwocol from "@/components/resource/detail/DetailTwocol";
 import DetailArticle from "@/components/resource/detail/DetailArticle";
 import { PendingBanner, type DetailCtx } from "@/components/resource/detail/parts";
 import { TYPE_LABEL } from "@/lib/display";
-import { siteName } from "@/lib/site-url";
+import { siteName, siteUrl } from "@/lib/site-url";
+import { getSeoConfig, jsonLd } from "@/lib/seo-config";
 
 type PageProps = { params: Promise<{ slug: string }> };
+
+const SITE_ORIGIN = `${siteUrl()}/`;
+const absUrl = (path: string) => new URL(path, SITE_ORIGIN).toString();
+
+/** 详情页结构化数据：Article + BreadcrumbList（仅已发布 SFW 内容；图片/日期缺省时省略对应字段） */
+function buildDetailLd(detail: NonNullable<ResourceDetail>): { article: object; breadcrumb: object } {
+  const authorName = detail.author.name || detail.author.username;
+  const itemListElement: object[] = [
+    { "@type": "ListItem", position: 1, name: siteName(), item: siteUrl() },
+  ];
+  if (detail.category)
+    itemListElement.push({
+      "@type": "ListItem",
+      position: 2,
+      name: detail.category.name,
+      item: absUrl(`/browse?cat=${encodeURIComponent(detail.category.slug)}`),
+    });
+  itemListElement.push({
+    "@type": "ListItem",
+    position: itemListElement.length + 1,
+    name: detail.title,
+    item: absUrl(`/resources/${detail.slug}`),
+  });
+  const cover = detail.gallery[0];
+  const article = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: detail.title.slice(0, 110),
+    ...(detail.summary ? { description: detail.summary } : {}),
+    ...(cover ? { image: [absUrl(cover.bigUrl)] } : {}),
+    ...(detail.publishedAt ? { datePublished: detail.publishedAt.toISOString() } : {}),
+    dateModified: detail.updatedAt.toISOString(),
+    author: { "@type": "Person", name: authorName, url: absUrl(`/u/${detail.author.username}`) },
+    publisher: { "@type": "Organization", name: siteName() },
+    mainEntityOfPage: absUrl(`/resources/${detail.slug}`),
+    inLanguage: "zh-CN",
+  };
+  const breadcrumb = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement,
+  };
+  return { article, breadcrumb };
+}
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
@@ -101,6 +146,10 @@ export default async function ResourcePage({ params }: PageProps) {
   const showSidebar = sidebarVisible(theme, "detail") && detail.status === "PUBLISHED";
   const isPreview = detail.status !== "PUBLISHED";
 
+  // 结构化数据仅对可收录内容输出（预览/草稿与 NSFW 均已 noindex）
+  const seo = await getSeoConfig();
+  const detailLd = seo.structuredData && !isPreview && !detail.nsfw ? buildDetailLd(detail) : null;
+
   // 详情页正文槽位（上/中/下，仅已发布内容；中部节点传给模板插在描述与评论之间）
   const detailCtx: DetailWidgetCtx = {
     id: detail.id,
@@ -144,6 +193,18 @@ export default async function ResourcePage({ params }: PageProps) {
         showSidebar ? <SiteSidebar theme={theme} page="detail" detail={detailCtx} /> : undefined
       }
     >
+      {detailLd && (
+        <>
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: jsonLd(detailLd.article) }}
+          />
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: jsonLd(detailLd.breadcrumb) }}
+          />
+        </>
+      )}
       {topSlot && <div className="mx-auto max-w-6xl px-4 pt-6 sm:px-6">{topSlot}</div>}
       {isPreview && (
         <div className={previewCls}>

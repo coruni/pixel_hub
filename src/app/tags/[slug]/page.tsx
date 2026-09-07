@@ -11,7 +11,11 @@ type PageProps = { params: Promise<{ slug: string }>; searchParams: Promise<SP> 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
   const tag = await prisma.tag.findUnique({ where: { slug } });
-  return { title: tag ? `#${tag.name}` : "标签" };
+  // canonical 锚定到无参数形态：分页/筛选 query 不产生重复收录
+  return {
+    title: tag ? `#${tag.name}` : "标签",
+    alternates: { canonical: `/tags/${slug}` },
+  };
 }
 
 export default async function TagPage({ params, searchParams }: PageProps) {

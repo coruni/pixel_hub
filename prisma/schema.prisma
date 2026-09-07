@@ -539,6 +539,7 @@ enum AiTaskKind {
   RESOURCE_REVIEW // 发布前内容审核
   IMAGE_DESCRIBE // 图片描述与打标
   GAME_RESEARCH // 游戏资料研究（首期无检索适配器，执行时明确失败）
+  SITE_OVERVIEW // 站点级周期运营建议（输入=最近 7 日访客浏览聚合快照，产出只读建议，不写资源）
 }
 
 enum AiTaskStatus {

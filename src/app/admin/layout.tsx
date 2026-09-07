@@ -24,6 +24,7 @@ const tabs: { href: string; label: string; adminOnly?: boolean }[] = [
   { href: "/admin/uploads", label: "上传限制", adminOnly: true },
   { href: "/admin/home", label: "首页布局", adminOnly: true },
   { href: "/admin/site", label: "站点布局", adminOnly: true },
+  { href: "/admin/seo", label: "SEO 配置", adminOnly: true },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {

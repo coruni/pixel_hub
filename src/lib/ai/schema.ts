@@ -1,11 +1,12 @@
 import { z } from "zod";
 
-// 任务类型（slug 形态，对应 AiTaskKind 的四种）。
+// 任务类型（slug 形态，对应 AiTaskKind 的五种）。
 export const aiTaskKindSchema = z.enum([
   "resource.enrich",
   "resource.review",
   "image.describe",
   "game.research",
+  "site.overview",
 ]);
 export type AiTaskKindSlug = z.infer<typeof aiTaskKindSchema>;
 
@@ -83,6 +84,30 @@ export const gameResearchOutputSchema = z.object({
 
 export type GameResearchOutput = z.infer<typeof gameResearchOutputSchema>;
 
+// 站点级运营建议（site.overview）：输入为最近周期的访客浏览聚合快照，产出只读的经营建议。
+// 建议是给站长看的结论，不是资源字段建议，因此没有接受/拒绝语义。
+export const siteInsightAreaSchema = z.enum([
+  "content", // 内容方向/选品
+  "search", // 搜索与 SEO
+  "promotion", // 推广与曝光
+  "community", // 社区与互动
+  "experience", // 浏览体验
+  "operations", // 运营与治理
+]);
+export const siteInsightPrioritySchema = z.enum(["high", "medium", "low"]);
+export const siteOverviewInsightSchema = z.object({
+  area: siteInsightAreaSchema,
+  priority: siteInsightPrioritySchema,
+  title: z.string().min(1).max(120), // 一句话结论（如「像素素材是近 7 日浏览主力」）
+  evidence: z.string().max(800).optional(), // 依据：引用快照中的具体指标
+  advice: z.string().min(1).max(1000), // 可执行建议
+});
+export const siteOverviewOutputSchema = z.object({
+  summary: z.string().min(1).max(1500), // 面向站长的本期运营摘要
+  insights: z.array(siteOverviewInsightSchema).max(12).default([]),
+});
+export type SiteOverviewOutput = z.infer<typeof siteOverviewOutputSchema>;
+
 // 每种任务的提示词版本 + 系统提示 + 输出契约，集中一处便于版本追溯。
 export const taskContracts = {
   "resource.enrich": {
@@ -108,6 +133,12 @@ export const taskContracts = {
     systemPrompt:
       "你是 Pixel Hub 游戏资料研究助手。所有事实必须来自已抓取的允许来源；仅返回符合约定的 JSON。",
     outputSchema: gameResearchOutputSchema,
+  },
+  "site.overview": {
+    promptVersion: "site-overview.v1",
+    systemPrompt:
+      "你是 Pixel Hub 站点运营顾问。只允许基于用户消息中给出的统计快照下结论与提建议；数据样本不足或过低时必须明确说明，不臆测访客画像、不推断用户隐私、不虚构竞品或外部数据；按领域（内容方向、搜索与 SEO、推广、社区与互动、浏览体验、运营与治理）给出结构化建议并说明每条的数据依据；使用简体中文；仅返回符合约定的 JSON。",
+    outputSchema: siteOverviewOutputSchema,
   },
 } as const satisfies Record<
   AiTaskKindSlug,

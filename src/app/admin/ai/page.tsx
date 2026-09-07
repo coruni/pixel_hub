@@ -6,6 +6,7 @@ import { enumParam, intParam, type SP } from "@/lib/search-params";
 import { ADMIN_PAGE_SIZE, STABLE_NEWEST, adminQuery } from "@/lib/admin/paging";
 import { TableFooter } from "@/components/admin/DataTable";
 import AiReviewPanel from "@/components/admin/AiReviewPanel";
+import { BTN_PRIMARY_SM, SELECT_SM } from "@/lib/ui/cls";
 import type { AiTaskKind, AiTaskStatus } from "@prisma/client";
 
 export const metadata: Metadata = { title: "网站管家" };
@@ -48,8 +49,10 @@ export default async function AiAdminPage({ searchParams }: { searchParams: Prom
   const page = intParam(sp, "page", 1);
   const pageSize = Math.min(100, intParam(sp, "size", ADMIN_PAGE_SIZE));
 
+  // 站点级建议（SITE_OVERVIEW）归属 /admin 概览「AI 运营建议」卡片，不在此资源管家列表展示
+  //（该页 AiReviewPanel 仅处理四类资源任务，避免误渲染/误出现「接受」按钮）。
   const where = {
-    ...(kind ? { kind: kind as AiTaskKind } : {}),
+    ...(kind ? { kind: kind as AiTaskKind } : { kind: { not: "SITE_OVERVIEW" as AiTaskKind } }),
     ...(status ? { status: status as AiTaskStatus } : {}),
   };
   const [tasks, total] = await Promise.all([
@@ -126,7 +129,7 @@ export default async function AiAdminPage({ searchParams }: { searchParams: Prom
           id="ai-kind"
           name="kind"
           defaultValue={kind}
-          className="rounded-none border border-brand-200 bg-surface px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-brand-400"
+          className={SELECT_SM}
         >
           <option value="">全部类型</option>
           {KINDS.map((x) => (
@@ -142,7 +145,7 @@ export default async function AiAdminPage({ searchParams }: { searchParams: Prom
           id="ai-status"
           name="status"
           defaultValue={status}
-          className="rounded-none border border-brand-200 bg-surface px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-brand-400"
+          className={SELECT_SM}
         >
           <option value="">全部状态</option>
           {STATUSES.map((x) => (
@@ -151,10 +154,7 @@ export default async function AiAdminPage({ searchParams }: { searchParams: Prom
             </option>
           ))}
         </select>
-        <button
-          type="submit"
-          className="rounded-none border border-brand-600 bg-brand-700 px-3 py-2 text-sm font-medium text-white focus-visible:ring-2 focus-visible:ring-brand-400"
-        >
+        <button type="submit" className={BTN_PRIMARY_SM}>
           筛选
         </button>
       </form>

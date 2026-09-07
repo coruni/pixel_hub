@@ -47,6 +47,7 @@ const kindToDb = {
   "resource.review": "RESOURCE_REVIEW",
   "image.describe": "IMAGE_DESCRIBE",
   "game.research": "GAME_RESEARCH",
+  "site.overview": "SITE_OVERVIEW",
 } as const;
 const dbToKind = Object.fromEntries(
   Object.entries(kindToDb).map(([slug, db]) => [db, slug]),
@@ -74,7 +75,9 @@ export async function createAiTaskAction(raw: z.input<typeof inputSchema>): Prom
   const parsed = inputSchema.safeParse(raw);
   if (!parsed.success) return { error: "任务参数不正确" };
   const { kind, resourceId, input, idempotencyKey } = parsed.data;
-  if (kind !== "game.research" && !resourceId) return { error: "该任务需要资源" };
+  // game.research / site.overview 无资源目标：前者首期失败，后者输入为站点聚合快照。
+  if (kind !== "game.research" && kind !== "site.overview" && !resourceId)
+    return { error: "该任务需要资源" };
 
   // 幂等：同一键已存在则直接返回既有任务，避免触发器/重复点击产生重复任务。
   const existing = await prisma.aiTask.findUnique({

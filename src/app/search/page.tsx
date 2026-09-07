@@ -4,7 +4,16 @@ import { str, type SP } from "@/lib/search-params";
 import FeedBrowser from "@/components/feed/FeedBrowser";
 import ArchiveShell from "@/components/feed/ArchiveShell";
 
-export const metadata: Metadata = { title: "搜索" };
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<SP>;
+}): Promise<Metadata> {
+  // 带查询词的结果页拒绝索引：防止搜索引擎收录海量低质查询 URL（Google 官方建议）
+  const sp = await searchParams;
+  const hasQuery = !!str(sp, "q")?.trim();
+  return { title: "搜索", ...(hasQuery ? { robots: { index: false, follow: true } } : {}) };
+}
 
 export default async function SearchPage({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = await searchParams;

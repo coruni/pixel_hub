@@ -2,6 +2,12 @@ import Link from "next/link";
 import { prisma } from "@/lib/db/prisma";
 import { dayKey } from "@/lib/format";
 import type { Metadata } from "next";
+import type { Prisma } from "@prisma/client";
+import { siteOverviewOutputSchema } from "@/lib/ai/schema";
+import SiteOverviewCard, {
+  type SiteOverviewItemView,
+  type SiteOverviewView,
+} from "@/components/admin/SiteOverviewCard";
 
 export const metadata: Metadata = { title: "管理概览" };
 
@@ -15,6 +21,58 @@ function formatSize(bytes: number | null | undefined): string {
     i++;
   }
   return `${v >= 100 ? Math.round(v) : v.toFixed(1)} ${units[i]}`;
+}
+
+type OverviewTaskRow = Prisma.AiTaskGetPayload<{
+  include: {
+    suggestions: { orderBy: { createdAt: "desc" }; take: number };
+  };
+}>;
+
+/** 把最近一条 SITE_OVERVIEW 任务整理成卡片可读形态：模型输出已按 Zod 校验，非法即 parseFailed。 */
+function buildOverviewView(task: OverviewTaskRow): SiteOverviewView {
+  let from: string | null = null;
+  let to: string | null = null;
+  try {
+    const input = JSON.parse(task.inputJson) as { period?: { from?: string; to?: string } };
+    from = input.period?.from ?? null;
+    to = input.period?.to ?? null;
+  } catch {
+    /* 畸形输入不展示数据窗口 */
+  }
+  const raw = task.suggestions[0]?.outputJson ?? "";
+  let summary = "";
+  let insights: SiteOverviewItemView[] = [];
+  let parseFailed = false;
+  if (task.status === "SUCCEEDED" && raw) {
+    try {
+      const result = siteOverviewOutputSchema.safeParse(JSON.parse(raw));
+      if (result.success) {
+        summary = result.data.summary;
+        insights = result.data.insights.map((item) => ({
+          area: item.area,
+          priority: item.priority,
+          title: item.title,
+          evidence: item.evidence ?? "",
+          advice: item.advice,
+        }));
+      } else {
+        parseFailed = true;
+      }
+    } catch {
+      parseFailed = true;
+    }
+  }
+  return {
+    taskId: task.id,
+    status: task.status,
+    createdAt: task.createdAt.toISOString(),
+    from,
+    to,
+    summary,
+    parseFailed,
+    insights,
+  };
 }
 
 export default async function AdminIndex() {
@@ -172,8 +230,19 @@ export default async function AdminIndex() {
     { k: "已打回", v: reports, href: "/admin/content?status=REJECTED", hl: false },
   ];
 
+  // ---- AI 运营建议：最近一条 SITE_OVERVIEW 任务（含模型输出） ----
+  const overviewTask = await prisma.aiTask.findFirst({
+    where: { kind: "SITE_OVERVIEW" },
+    orderBy: { createdAt: "desc" },
+    include: {
+      suggestions: { orderBy: { createdAt: "desc" }, take: 1 },
+    },
+  });
+  const overview = overviewTask ? buildOverviewView(overviewTask) : null;
+
   return (
     <div>
+      <SiteOverviewCard view={overview} />
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {cards.map((c) => (
           <Link

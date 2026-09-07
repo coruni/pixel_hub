@@ -6,28 +6,61 @@ import PageTracker from "@/components/layout/PageTracker";
 import PresencePing from "@/components/layout/PresencePing";
 import { auth } from "@/lib/auth";
 import { siteUrl, siteName } from "@/lib/site-url";
+import { getSeoConfig, jsonLd } from "@/lib/seo-config";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
-export const metadata: Metadata = {
-  title: { default: siteName(), template: `%s · ${siteName()}` },
-  description: `分享与发现图片、游戏等数字资源的${siteName()}平台`,
-  metadataBase: new URL(siteUrl()),
-  openGraph: {
-    type: "website",
-    siteName: siteName(),
+export async function generateMetadata(): Promise<Metadata> {
+  const seo = await getSeoConfig();
+  const description =
+    seo.defaultDescription || `分享与发现图片、游戏等数字资源的${siteName()}平台`;
+  // 站长平台验证码仅在后台配置了对应项时输出；msvalidate.01 同时覆盖 Bing 与 Yahoo
+  const verification: Metadata["verification"] = {
+    ...(seo.verifications.google ? { google: seo.verifications.google } : {}),
+    ...(seo.verifications.yandex ? { yandex: seo.verifications.yandex } : {}),
+    other: {
+      ...(seo.verifications.bing ? { "msvalidate.01": seo.verifications.bing } : {}),
+      ...(seo.verifications.baidu
+        ? { "baidu-site-verification": seo.verifications.baidu }
+        : {}),
+    },
+  };
+  return {
     title: { default: siteName(), template: `%s · ${siteName()}` },
-    description: `分享与发现图片、游戏等数字资源的${siteName()}平台`,
-  },
-  twitter: { card: "summary_large_image" },
-};
+    description,
+    metadataBase: new URL(siteUrl()),
+    openGraph: {
+      type: "website",
+      siteName: siteName(),
+      locale: seo.ogLocale,
+      title: { default: siteName(), template: `%s · ${siteName()}` },
+      description,
+    },
+    twitter: { card: "summary_large_image" },
+    verification,
+  };
+}
 
 // 首帧同步主题（放 body 前、阻塞渲染执行，防止暗色闪白）：localStorage 未设置时跟随系统
 const themeInitScript = `try{var t=localStorage.getItem("theme");var d=t?t==="dark":window.matchMedia("(prefers-color-scheme: dark)").matches;if(d)document.documentElement.classList.add("dark")}catch(e){}`;
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const session = await auth();
+  const [session, seo] = await Promise.all([auth(), getSeoConfig()]);
+  const websiteLd = seo.structuredData
+    ? jsonLd({
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        name: siteName(),
+        url: siteUrl(),
+        inLanguage: "zh-CN",
+        potentialAction: {
+          "@type": "SearchAction",
+          target: `${siteUrl()}/search?q={search_term_string}`,
+          "query-input": "required name=search_term_string",
+        },
+      })
+    : null;
   return (
     <html
       lang="zh-CN"
@@ -36,6 +69,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     >
       <body className="flex min-h-full flex-col bg-background text-neutral-900">
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        {websiteLd && (
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: websiteLd }}
+          />
+        )}
         <PageTracker />
         <PresencePing signedIn={Boolean(session?.user)} />
         <Navbar />

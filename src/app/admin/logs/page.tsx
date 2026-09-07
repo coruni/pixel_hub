@@ -41,6 +41,7 @@ const ACTION_LABELS: Record<string, string> = {
   REMOVE_THEME_WIDGET: "删除组件",
   REORDER_THEME_WIDGET: "调整组件顺序",
   EDIT_THEME_NAV: "编辑导航",
+  EDIT_SEO: "编辑 SEO 配置",
   EDIT_UPLOAD_LIMITS: "编辑上传限制",
   RESET_UPLOAD_LIMITS: "重置上传限制",
   DELETE_COMMENT: "删除评论",
