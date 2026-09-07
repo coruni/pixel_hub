@@ -9,6 +9,7 @@ import { ADMIN_PAGE_SIZE, STABLE_NEWEST, adminQuery } from "@/lib/admin/paging";
 import { TableFooter } from "@/components/admin/DataTable";
 import { UserActions } from "@/components/admin/buttons";
 import type { Metadata } from "next";
+import { BTN_FILTER, INPUT_FILTER } from "@/lib/ui/cls";
 
 export const metadata: Metadata = { title: "用户管理" };
 
@@ -20,9 +21,6 @@ function yesNo(sp: SP, key: string): "0" | "1" | "" {
   const v = str(sp, key);
   return v === "0" || v === "1" ? v : "";
 }
-
-const input =
-  "rounded-none border border-brand-200 bg-surface px-3 py-1.5 text-sm outline-none transition focus:border-brand-500";
 
 export default async function UsersPage({ searchParams }: { searchParams: Promise<SP> }) {
   const session = await auth();
@@ -98,12 +96,12 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
           name="q"
           defaultValue={q}
           placeholder="用户名 / 昵称 / 邮箱"
-          className={`${input} w-52 text-xs`}
+          className={`${INPUT_FILTER} w-52`}
         />
         <label className="sr-only" htmlFor="user-role">
           角色
         </label>
-        <select id="user-role" name="role" defaultValue={role} className={`${input} text-xs`}>
+        <select id="user-role" name="role" defaultValue={role} className={INPUT_FILTER}>
           <option value="">全部角色</option>
           {ROLES.map((r) => (
             <option key={r} value={r}>
@@ -113,7 +111,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
         </select>
         <button
           type="submit"
-          className="rounded-none border border-brand-200 bg-surface px-3 py-1.5 text-xs text-neutral-700 transition hover:border-brand-500"
+          className={BTN_FILTER}
         >
           筛选
         </button>

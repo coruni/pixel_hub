@@ -16,6 +16,7 @@ import {
 } from "@/components/admin/media-orphan";
 import { SquareCheckbox } from "@/components/admin/SquareCheckbox";
 import type { Metadata } from "next";
+import { BTN_FILTER, INPUT_FILTER } from "@/lib/ui/cls";
 
 export const metadata: Metadata = { title: "媒体库" };
 
@@ -32,9 +33,6 @@ const statusLabel: Record<string, string> = {
   READY: "就绪",
   FAILED: "失败",
 };
-
-const input =
-  "rounded-none border border-brand-200 bg-surface px-3 py-1.5 text-sm outline-none transition focus:border-brand-500";
 
 export default async function MediaPage({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = await searchParams;
@@ -126,7 +124,7 @@ export default async function MediaPage({ searchParams }: { searchParams: Promis
           name="fileName"
           defaultValue={fileName}
           placeholder="文件名"
-          className={`${input} w-44 text-xs`}
+          className={`${INPUT_FILTER} w-44`}
         />
         <label className="sr-only" htmlFor="media-user">
           上传者
@@ -136,12 +134,12 @@ export default async function MediaPage({ searchParams }: { searchParams: Promis
           name="user"
           defaultValue={user}
           placeholder="上传者用户名"
-          className={`${input} w-36 text-xs`}
+          className={`${INPUT_FILTER} w-36`}
         />
         <label className="sr-only" htmlFor="media-kind">
           媒体类型
         </label>
-        <select id="media-kind" name="kind" defaultValue={kind} className={`${input} text-xs`}>
+        <select id="media-kind" name="kind" defaultValue={kind} className={INPUT_FILTER}>
           <option value="">全部类型</option>
           {KINDS.map((k) => (
             <option key={k} value={k}>
@@ -152,7 +150,7 @@ export default async function MediaPage({ searchParams }: { searchParams: Promis
         <label className="sr-only" htmlFor="media-status">
           处理状态
         </label>
-        <select id="media-status" name="status" defaultValue={status} className={`${input} text-xs`}>
+        <select id="media-status" name="status" defaultValue={status} className={INPUT_FILTER}>
           <option value="">全部状态</option>
           {STATUSES.map((s) => (
             <option key={s} value={s}>
@@ -166,7 +164,7 @@ export default async function MediaPage({ searchParams }: { searchParams: Promis
         </label>
         <button
           type="submit"
-          className="rounded-none border border-brand-200 bg-surface px-3 py-1.5 text-xs text-neutral-700 transition hover:border-brand-500"
+          className={BTN_FILTER}
         >
           筛选
         </button>

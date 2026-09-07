@@ -13,6 +13,13 @@ export const LABEL_STRONG = "mb-1 block text-xs font-medium text-neutral-500";
 export const SELECT_SM =
   "rounded-none border border-brand-200 bg-surface px-2 py-1.5 text-sm outline-none transition focus:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-400";
 
+/** 后台列表页筛选输入框/下拉（与既有列表页统一：px-3 py-1.5 text-xs + 焦点环） */
+export const INPUT_FILTER =
+  "rounded-none border border-brand-200 bg-surface px-3 py-1.5 text-xs outline-none transition focus:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-400";
+/** 后台列表页筛选提交按钮（ghost 风格，全后台列表页统一） */
+export const BTN_FILTER =
+  "rounded-none border border-brand-200 bg-surface px-3 py-1.5 text-xs text-neutral-700 transition hover:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-400";
+
 /** 主按钮（小尺寸，后台操作） */
 export const BTN_PRIMARY_SM =
   "inline-flex items-center gap-1 rounded-none border border-brand-600 bg-brand-500 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-brand-600 focus-visible:ring-2 focus-visible:ring-brand-400 disabled:opacity-50";

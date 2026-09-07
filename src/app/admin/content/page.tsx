@@ -11,6 +11,7 @@ import { ADMIN_PAGE_SIZE, STABLE_NEWEST, adminQuery } from "@/lib/admin/paging";
 import { TableFooter } from "@/components/admin/DataTable";
 import { ContentActions } from "@/components/admin/buttons";
 import type { Prisma, ResourceType } from "@prisma/client";
+import { BTN_FILTER, INPUT_FILTER } from "@/lib/ui/cls";
 
 export const metadata: Metadata = { title: "内容库" };
 
@@ -24,9 +25,6 @@ const statusLabel: Record<string, { text: string; cls: string }> = {
 
 const STATUSES = ["PUBLISHED", "PENDING", "REJECTED", "REMOVED", "DRAFT"] as const;
 const TYPES = ["GAME", "IMAGE", "ARTICLE"] as const;
-
-const input =
-  "rounded-none border border-brand-200 bg-surface px-3 py-1.5 text-sm outline-none transition focus:border-brand-500";
 
 export default async function ContentPage({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = await searchParams;
@@ -122,7 +120,7 @@ export default async function ContentPage({ searchParams }: { searchParams: Prom
           name="q"
           defaultValue={q}
           placeholder="标题 / 简介 / 正文"
-          className={`${input} w-44 text-xs`}
+          className={`${INPUT_FILTER} w-44`}
         />
         <label className="sr-only" htmlFor="content-author">
           作者
@@ -132,12 +130,12 @@ export default async function ContentPage({ searchParams }: { searchParams: Prom
           name="author"
           defaultValue={author}
           placeholder="作者用户名 / 昵称"
-          className={`${input} w-40 text-xs`}
+          className={`${INPUT_FILTER} w-40`}
         />
         <label className="sr-only" htmlFor="content-type">
           类型
         </label>
-        <select id="content-type" name="type" defaultValue={type} className={`${input} text-xs`}>
+        <select id="content-type" name="type" defaultValue={type} className={INPUT_FILTER}>
           <option value="">全部类型</option>
           {TYPES.map((t) => (
             <option key={t} value={t}>
@@ -148,7 +146,7 @@ export default async function ContentPage({ searchParams }: { searchParams: Prom
         <label className="sr-only" htmlFor="content-cat">
           分类
         </label>
-        <select id="content-cat" name="cat" defaultValue={cat} className={`${input} text-xs`}>
+        <select id="content-cat" name="cat" defaultValue={cat} className={INPUT_FILTER}>
           <option value="">全部分类</option>
           {categories.map((c) => (
             <option key={c.id} value={c.id}>
@@ -158,7 +156,7 @@ export default async function ContentPage({ searchParams }: { searchParams: Prom
         </select>
         <button
           type="submit"
-          className="rounded-none border border-brand-200 bg-surface px-3 py-1.5 text-xs text-neutral-700 transition hover:border-brand-500"
+          className={BTN_FILTER}
         >
           筛选
         </button>

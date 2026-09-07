@@ -8,6 +8,7 @@ import { intParam, str, type SP } from "@/lib/search-params";
 import { ADMIN_PAGE_SIZE, STABLE_NEWEST, adminQuery } from "@/lib/admin/paging";
 import { TableFooter } from "@/components/admin/DataTable";
 import type { Prisma } from "@prisma/client";
+import { BTN_FILTER, INPUT_FILTER } from "@/lib/ui/cls";
 
 export const metadata: Metadata = { title: "操作日志" };
 
@@ -48,9 +49,6 @@ const ACTION_LABELS: Record<string, string> = {
 };
 
 const ACTIONS = Object.keys(ACTION_LABELS);
-
-const input =
-  "rounded-none border border-brand-200 bg-surface px-3 py-1.5 text-sm outline-none transition focus:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-400";
 
 export default async function LogsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const session = await auth();
@@ -106,7 +104,7 @@ export default async function LogsPage({ searchParams }: { searchParams: Promise
         <label className="sr-only" htmlFor="log-action">
           动作类型
         </label>
-        <select id="log-action" name="action" defaultValue={action} className={input}>
+        <select id="log-action" name="action" defaultValue={action} className={INPUT_FILTER}>
           <option value="">全部动作</option>
           {ACTIONS.map((a) => (
             <option key={a} value={a}>
@@ -117,7 +115,7 @@ export default async function LogsPage({ searchParams }: { searchParams: Promise
         <label className="sr-only" htmlFor="log-admin">
           操作人
         </label>
-        <select id="log-admin" name="admin" defaultValue={adminId} className={input}>
+        <select id="log-admin" name="admin" defaultValue={adminId} className={INPUT_FILTER}>
           <option value="">全部操作人</option>
           {[...adminMap.values()].map((u) => (
             <option key={u.id} value={u.id}>
@@ -125,7 +123,7 @@ export default async function LogsPage({ searchParams }: { searchParams: Promise
             </option>
           ))}
         </select>
-        <button type="submit" className={input}>
+        <button type="submit" className={BTN_FILTER}>
           筛选
         </button>
         {(action || adminId) && (

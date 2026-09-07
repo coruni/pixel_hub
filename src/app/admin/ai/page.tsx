@@ -6,7 +6,8 @@ import { enumParam, intParam, type SP } from "@/lib/search-params";
 import { ADMIN_PAGE_SIZE, STABLE_NEWEST, adminQuery } from "@/lib/admin/paging";
 import { TableFooter } from "@/components/admin/DataTable";
 import AiReviewPanel from "@/components/admin/AiReviewPanel";
-import { BTN_PRIMARY_SM, SELECT_SM } from "@/lib/ui/cls";
+import Link from "next/link";
+import { BTN_FILTER, INPUT_FILTER } from "@/lib/ui/cls";
 import type { AiTaskKind, AiTaskStatus } from "@prisma/client";
 
 export const metadata: Metadata = { title: "网站管家" };
@@ -129,7 +130,7 @@ export default async function AiAdminPage({ searchParams }: { searchParams: Prom
           id="ai-kind"
           name="kind"
           defaultValue={kind}
-          className={SELECT_SM}
+          className={INPUT_FILTER}
         >
           <option value="">全部类型</option>
           {KINDS.map((x) => (
@@ -145,7 +146,7 @@ export default async function AiAdminPage({ searchParams }: { searchParams: Prom
           id="ai-status"
           name="status"
           defaultValue={status}
-          className={SELECT_SM}
+          className={INPUT_FILTER}
         >
           <option value="">全部状态</option>
           {STATUSES.map((x) => (
@@ -154,9 +155,17 @@ export default async function AiAdminPage({ searchParams }: { searchParams: Prom
             </option>
           ))}
         </select>
-        <button type="submit" className={BTN_PRIMARY_SM}>
+        <button type="submit" className={BTN_FILTER}>
           筛选
         </button>
+        {(kind || status) && (
+          <Link
+            href="/admin/ai"
+            className="text-xs text-neutral-400 underline-offset-2 hover:text-brand-700 hover:underline"
+          >
+            清空筛选
+          </Link>
+        )}
       </form>
       <AiReviewPanel
         tasks={rows}
