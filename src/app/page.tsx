@@ -8,10 +8,13 @@ import { getTheme } from "@/lib/site";
 import { sidebarVisible } from "@/lib/site-config";
 import type { SP } from "@/lib/search-params";
 
-import { siteName } from "@/lib/site-url";
+import { getSeoConfig, resolveSiteName } from "@/lib/seo-config";
 
 // root layout 的 title.template 不作用于与其同段的首页，需自行拼接站点名
-export const metadata: Metadata = { title: `发现 · ${siteName()}` };
+export async function generateMetadata(): Promise<Metadata> {
+  const name = resolveSiteName(await getSeoConfig());
+  return { title: `发现 · ${name}` };
+}
 
 export default async function HomePage({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = await searchParams;

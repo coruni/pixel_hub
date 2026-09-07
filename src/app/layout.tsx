@@ -5,16 +5,17 @@ import Navbar from "@/components/layout/Navbar";
 import PageTracker from "@/components/layout/PageTracker";
 import PresencePing from "@/components/layout/PresencePing";
 import { auth } from "@/lib/auth";
-import { siteUrl, siteName } from "@/lib/site-url";
-import { getSeoConfig, jsonLd } from "@/lib/seo-config";
+import { siteUrl } from "@/lib/site-url";
+import { getSeoConfig, jsonLd, resolveSiteName } from "@/lib/seo-config";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export async function generateMetadata(): Promise<Metadata> {
   const seo = await getSeoConfig();
+  const name = resolveSiteName(seo);
   const description =
-    seo.defaultDescription || `分享与发现图片、游戏等数字资源的${siteName()}平台`;
+    seo.defaultDescription || `分享与发现图片、游戏等数字资源的${name}平台`;
   // 站长平台验证码仅在后台配置了对应项时输出；msvalidate.01 同时覆盖 Bing 与 Yahoo
   const verification: Metadata["verification"] = {
     ...(seo.verifications.google ? { google: seo.verifications.google } : {}),
@@ -27,14 +28,16 @@ export async function generateMetadata(): Promise<Metadata> {
     },
   };
   return {
-    title: { default: siteName(), template: `%s · ${siteName()}` },
+    title: { default: name, template: `%s · ${name}` },
     description,
+    // meta keywords：Google 忽略，百度/Yandex 仍参考；未配置不输出
+    keywords: seo.keywords || undefined,
     metadataBase: new URL(siteUrl()),
     openGraph: {
       type: "website",
-      siteName: siteName(),
+      siteName: name,
       locale: seo.ogLocale,
-      title: { default: siteName(), template: `%s · ${siteName()}` },
+      title: { default: name, template: `%s · ${name}` },
       description,
     },
     twitter: { card: "summary_large_image" },
@@ -47,11 +50,12 @@ const themeInitScript = `try{var t=localStorage.getItem("theme");var d=t?t==="da
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const [session, seo] = await Promise.all([auth(), getSeoConfig()]);
+  const name = resolveSiteName(seo);
   const websiteLd = seo.structuredData
     ? jsonLd({
         "@context": "https://schema.org",
         "@type": "WebSite",
-        name: siteName(),
+        name,
         url: siteUrl(),
         inLanguage: "zh-CN",
         potentialAction: {
@@ -85,7 +89,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               社区规则
             </a>
             <span className="mx-2">·</span>
-            {siteName()} · 分享与发现 · 请遵守平台规则，勿上传侵权与违法内容
+            {name} · 分享与发现 · 请遵守平台规则，勿上传侵权与违法内容
           </p>
         </footer>
       </body>

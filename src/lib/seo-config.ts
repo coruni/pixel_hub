@@ -4,10 +4,15 @@
 import { cache } from "react";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
+import { siteName as fallbackSiteName } from "@/lib/site-url";
 
 export const SEO_KEY = "seo";
 
 export const seoConfigSchema = z.object({
+  // 站点名称（<title> / OG siteName / JSON-LD / 导航徽标）；空 = 回退 env NEXT_PUBLIC_SITE_NAME
+  siteName: z.string().default(""),
+  // meta keywords（Google 忽略，百度/Yandex 仍参考）；逗号分隔；空 = 不输出
+  keywords: z.string().default(""),
   // 各搜索引擎站长平台验证码；空 = 不输出对应 meta
   verifications: z
     .object({
@@ -35,6 +40,8 @@ const LOCALE_RE = /^[a-z]{2}(_[A-Za-z]{2,4})?$/;
 export function sanitizeSeo(config: SeoConfig): SeoConfig {
   const locale = config.ogLocale.trim().slice(0, 12).replace("-", "_");
   return {
+    siteName: config.siteName.trim().slice(0, 40),
+    keywords: config.keywords.trim().slice(0, 200),
     verifications: {
       google: config.verifications.google.trim().slice(0, 200),
       bing: config.verifications.bing.trim().slice(0, 200),
@@ -87,4 +94,9 @@ export async function getSeoWithVersion(): Promise<{ config: SeoConfig; version:
 /** JSON-LD 序列化：转义 < 防 </script> 提前闭合（XSS 兜底） */
 export function jsonLd(data: unknown): string {
   return JSON.stringify(data).replace(/</g, "\\u003c");
+}
+
+/** 站点名解析：后台配置优先，未配置回退 env NEXT_PUBLIC_SITE_NAME（站点展示统一入口） */
+export function resolveSiteName(seo: SeoConfig): string {
+  return seo.siteName || fallbackSiteName();
 }

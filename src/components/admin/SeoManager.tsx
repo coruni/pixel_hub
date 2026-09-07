@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { updateSeoConfigAction } from "@/lib/actions/seo";
 import type { SeoConfig } from "@/lib/seo-config";
+import { SquareCheckbox } from "@/components/admin/SquareCheckbox";
 import { BTN_PRIMARY_SM, INPUT, LABEL_STRONG } from "@/lib/ui/cls";
 
 const VERIFICATION_FIELDS: { key: keyof SeoConfig["verifications"]; label: string; hint: string }[] =
@@ -26,6 +27,8 @@ export default function SeoManager({
   const [pending, start] = useTransition();
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const [form, setForm] = useState({
+    siteName: config.siteName,
+    keywords: config.keywords,
     google: config.verifications.google,
     bing: config.verifications.bing,
     yandex: config.verifications.yandex,
@@ -42,6 +45,8 @@ export default function SeoManager({
       setMessage(null);
       const result = await updateSeoConfigAction(
         {
+          siteName: form.siteName,
+          keywords: form.keywords,
           verifications: {
             google: form.google,
             bing: form.bing,
@@ -64,6 +69,48 @@ export default function SeoManager({
 
   return (
     <div className="max-w-2xl space-y-6">
+      <section className="border border-brand-200 bg-surface p-5">
+        <h3 className="text-sm font-semibold text-neutral-900">站点信息</h3>
+        <p className="mt-1 text-xs text-neutral-400">
+          站点名称用于 &lt;title&gt;、OG、结构化数据与导航徽标；留空回退环境变量 NEXT_PUBLIC_SITE_NAME。
+        </p>
+        <div className="mt-4 space-y-4">
+          <div>
+            <label htmlFor="seo-site-name" className={LABEL_STRONG}>
+              网站名称
+            </label>
+            <input
+              id="seo-site-name"
+              value={form.siteName}
+              onChange={(e) => set({ siteName: e.target.value })}
+              className={INPUT}
+              maxLength={40}
+              placeholder="留空使用环境变量配置"
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </div>
+          <div>
+            <label htmlFor="seo-keywords" className={LABEL_STRONG}>
+              meta 关键词
+            </label>
+            <textarea
+              id="seo-keywords"
+              value={form.keywords}
+              onChange={(e) => set({ keywords: e.target.value })}
+              className={`${INPUT} min-h-16`}
+              maxLength={200}
+              placeholder="逗号分隔，如：像素画,游戏资源,壁纸（留空不输出）"
+              autoComplete="off"
+              spellCheck={false}
+            />
+            <p className="mt-1 text-[10px] leading-4 text-neutral-400">
+              Google 已忽略该标签，百度/Yandex 仍参考；建议 5~10 个，逗号分隔。
+            </p>
+          </div>
+        </div>
+      </section>
+
       <section className="border border-brand-200 bg-surface p-5">
         <h3 className="text-sm font-semibold text-neutral-900">站长平台验证</h3>
         <p className="mt-1 text-xs text-neutral-400">
@@ -126,11 +173,11 @@ export default function SeoManager({
             </p>
           </div>
           <label className="flex cursor-pointer items-start gap-2.5">
-            <input
-              type="checkbox"
+            <SquareCheckbox
               checked={form.structuredData}
-              onChange={(e) => set({ structuredData: e.target.checked })}
-              className="mt-0.5 h-4 w-4 shrink-0 appearance-none rounded-none border border-brand-200 bg-surface checked:border-brand-600 checked:bg-brand-500 disabled:opacity-50"
+              onChange={(next) => set({ structuredData: next })}
+              ariaLabel="输出结构化数据（JSON-LD）"
+              className="mt-0.5"
             />
             <span>
               <span className="block text-sm text-neutral-900">输出结构化数据（JSON-LD）</span>

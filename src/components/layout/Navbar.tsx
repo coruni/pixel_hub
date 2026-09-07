@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { NAV_ICON_MAP } from "@/lib/nav-icons";
-import { siteName, siteLogo } from "@/lib/site-url";
+import { siteLogo } from "@/lib/site-url";
+import { getSeoConfig, resolveSiteName } from "@/lib/seo-config";
 import { prisma } from "@/lib/db/prisma";
 import { publicUrl } from "@/lib/storage";
 import { getTheme } from "@/lib/site";
@@ -16,7 +17,8 @@ const navBtn = "inline-flex items-center gap-1.5 transition hover:text-neutral-9
 const iconSize = 15;
 
 export default async function Navbar() {
-  const session = await auth();
+  const [session, seo] = await Promise.all([auth(), getSeoConfig()]);
+  const name = resolveSiteName(seo);
   const u = session?.user;
   const isStaff = u?.role === "ADMIN" || u?.role === "MODERATOR";
   const theme = await getTheme();
@@ -65,9 +67,9 @@ export default async function Navbar() {
         >
           <span className="grid h-8 w-8 place-items-center overflow-hidden rounded-none border border-brand-600 bg-surface">
             {/* eslint-disable-next-line @next/next/no-img-element -- 站点徽标来自 env/静态 svg，不走 next/image */}
-            <img src={siteLogo()} alt={siteName()} className="h-full w-full object-contain" />
+            <img src={siteLogo()} alt={name} className="h-full w-full object-contain" />
           </span>
-          <span>{siteName()}</span>
+          <span>{name}</span>
         </Link>
 
         {(items.length > 0 || catMenu) && (
