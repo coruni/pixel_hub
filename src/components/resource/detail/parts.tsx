@@ -288,7 +288,7 @@ export async function VersionSection({ ctx }: { ctx: DetailCtx }) {
   // 仅作者会看到「发布新版本」表单时才读配置，省一次 DB 查询
   const L = isAuthor ? await getUploadLimits() : null;
   return (
-    <section className="rounded-none border border-brand-200 bg-surface p-6">
+    <section className="rounded-none border border-brand-200 bg-surface p-5">
       <h2 className="text-sm font-semibold text-neutral-400">版本历史（{versions.length}）</h2>
       <ul className="mt-3 divide-y divide-neutral-100">
         {versions.map((v) => (
@@ -330,7 +330,7 @@ export async function VersionSection({ ctx }: { ctx: DetailCtx }) {
 /** 长描述卡（Markdown 富文本，见 DESIGN 描述=富文本） */
 export function DescriptionBlock({ ctx }: { ctx: DetailCtx }) {
   return (
-    <section className="rounded-none border border-brand-200 bg-surface p-6">
+    <section className="rounded-none border border-brand-200 bg-surface p-5">
       <h2 className="text-sm font-semibold text-neutral-400">描述</h2>
       <div className="mt-3 md-body md-body--lg">
         <Markdown>{ctx.detail.description}</Markdown>
