@@ -5,6 +5,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { updateRuntimeConfigAction } from "@/lib/actions/runtime-config";
+import SubTabs from "@/components/admin/SubTabs";
 import type { RuntimeConfig } from "@/lib/runtime-config";
 import { SquareCheckbox } from "@/components/admin/SquareCheckbox";
 import { BTN_PRIMARY_SM, INPUT, LABEL_STRONG } from "@/lib/ui/cls";
@@ -40,6 +41,7 @@ export default function RuntimeConfigManager({
     s3SecretAccessKey: config.s3SecretAccessKey,
     s3PublicBase: config.s3PublicBase,
     s3AclPrivate: config.s3AclPrivate,
+    attachmentCloud: config.attachmentCloud,
     smtpHost: config.smtpHost,
     smtpPort: config.smtpPort,
     smtpUser: config.smtpUser,
@@ -47,6 +49,14 @@ export default function RuntimeConfigManager({
     mailFrom: config.mailFrom,
     mailNotify: config.mailNotify,
     emailCodeRequired: config.emailCodeRequired,
+    graphTenant: config.graphTenant,
+    graphClientId: config.graphClientId,
+    graphClientSecret: config.graphClientSecret,
+    graphEndpoint: config.graphEndpoint,
+    graphScope: config.graphScope,
+    aiBaseUrl: config.aiBaseUrl,
+    aiApiKey: config.aiApiKey,
+    aiModel: config.aiModel,
   });
 
   const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
@@ -54,7 +64,8 @@ export default function RuntimeConfigManager({
   const save = () =>
     start(async () => {
       setMessage(null);
-      const result = await updateRuntimeConfigAction(form, version);
+      // 本页只渲染部分字段：提交时以未编辑的 config 全量打底，避免把其他页（如云盘 Graph 凭据）保存的字段抹掉
+      const result = await updateRuntimeConfigAction({ ...config, ...form }, version);
       if (result.ok) {
         setMessage({ kind: "ok", text: "已保存，立即生效（无需重启）" });
         router.refresh();
@@ -64,7 +75,21 @@ export default function RuntimeConfigManager({
     });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
+      <p className="text-xs leading-5 text-neutral-500">
+        按分组保存，全部立即生效（无需重启）；留空的项回退读取旧 .env（迁移期兼容）。
+      </p>
+      <SubTabs
+        tabs={[
+          { key: "login", label: "登录" },
+          { key: "storage", label: "存储" },
+          { key: "mail", label: "邮件" },
+          { key: "cloud", label: "云盘" },
+          { key: "ai", label: "AI" },
+        ]}
+        panels={{
+          login: (
+            <>
       {/* ---- 登录 ---- */}
       <section className="border border-brand-200 bg-surface p-5">
         <h3 className="text-sm font-semibold text-neutral-900">GitHub 登录</h3>
@@ -108,7 +133,10 @@ export default function RuntimeConfigManager({
           </div>
         </div>
       </section>
-
+            </>
+          ),
+          storage: (
+            <>
       {/* ---- 存储 ---- */}
       <section className="border border-brand-200 bg-surface p-5">
         <h3 className="text-sm font-semibold text-neutral-900">存储</h3>
@@ -133,6 +161,25 @@ export default function RuntimeConfigManager({
               ))}
             </select>
           </div>
+
+          <label className="flex cursor-pointer items-start gap-2.5">
+            <SquareCheckbox
+              checked={
+                form.attachmentCloud === "on" ||
+                (form.attachmentCloud === "auto" && form.storageDriver === "chevereto")
+              }
+              onChange={(next) => set({ attachmentCloud: next ? "on" : "off" })}
+              ariaLabel="附件上传走云盘"
+              className="mt-0.5"
+            />
+            <span>
+              <span className="block text-sm text-neutral-900">附件上传走云盘（OneDrive）</span>
+              <span className="mt-0.5 block text-xs text-neutral-400">
+                勾选后附件经 Microsoft Graph 分片直传活跃云盘（需已配置云盘凭据与活跃盘）；
+                不勾则走上方所选存储驱动。存储驱动为 Chevereto 时默认勾选（大附件分片上传更稳）。
+              </span>
+            </span>
+          </label>
 
           {form.storageDriver === "chevereto" && (
             <>
@@ -284,7 +331,10 @@ export default function RuntimeConfigManager({
           )}
         </div>
       </section>
-
+            </>
+          ),
+          mail: (
+            <>
       {/* ---- 邮件 ---- */}
       <section className="border border-brand-200 bg-surface p-5">
         <h3 className="text-sm font-semibold text-neutral-900">SMTP 邮件</h3>
@@ -399,8 +449,157 @@ export default function RuntimeConfigManager({
           </label>
         </div>
       </section>
+            </>
+          ),
+          cloud: (
+            <>
+      {/* ---- 云盘附件（Microsoft Graph）---- */}
+      <section className="border border-brand-200 bg-surface p-5">
+        <h3 className="text-sm font-semibold text-neutral-900">云盘附件（Microsoft Graph）</h3>
+        <p className="mt-1 text-xs leading-5 text-neutral-400">
+          大附件分片上传到 OneDrive / SharePoint 的应用级凭据（client-credentials），
+          「云盘」页登记的具体驱动器共用这一套；Endpoint / Scope 留空用默认值。
+        </p>
+        <div className="mt-4 grid gap-4 sm:grid-cols-3">
+          <div>
+            <label htmlFor="rc-graph-tenant" className={LABEL_STRONG}>
+              Tenant ID
+            </label>
+            <input
+              id="rc-graph-tenant"
+              value={form.graphTenant}
+              onChange={(e) => set({ graphTenant: e.target.value })}
+              className={INPUT}
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="租户 GUID 或域名"
+            />
+          </div>
+          <div>
+            <label htmlFor="rc-graph-client" className={LABEL_STRONG}>
+              Client ID
+            </label>
+            <input
+              id="rc-graph-client"
+              value={form.graphClientId}
+              onChange={(e) => set({ graphClientId: e.target.value })}
+              className={INPUT}
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="应用注册 Client ID"
+            />
+          </div>
+          <div>
+            <label htmlFor="rc-graph-secret" className={LABEL_STRONG}>
+              Client Secret
+            </label>
+            <input
+              id="rc-graph-secret"
+              type="password"
+              value={form.graphClientSecret}
+              onChange={(e) => set({ graphClientSecret: e.target.value })}
+              className={INPUT}
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="••••••••••••••••••••"
+            />
+          </div>
+          <div>
+            <label htmlFor="rc-graph-endpoint" className={LABEL_STRONG}>
+              Graph Endpoint
+            </label>
+            <input
+              id="rc-graph-endpoint"
+              value={form.graphEndpoint}
+              onChange={(e) => set({ graphEndpoint: e.target.value })}
+              className={INPUT}
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="默认 https://graph.microsoft.com"
+            />
+          </div>
+          <div>
+            <label htmlFor="rc-graph-scope" className={LABEL_STRONG}>
+              Graph Scope
+            </label>
+            <input
+              id="rc-graph-scope"
+              value={form.graphScope}
+              onChange={(e) => set({ graphScope: e.target.value })}
+              className={INPUT}
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="默认 {endpoint}/.default"
+            />
+          </div>
+        </div>
+      </section>
+            </>
+          ),
+          ai: (
+            <>
+      {/* ---- 网站管家 AI ---- */}
+      <section className="border border-brand-200 bg-surface p-5">
+        <h3 className="text-sm font-semibold text-neutral-900">网站管家 AI</h3>
+        <p className="mt-1 text-xs leading-5 text-neutral-400">
+          OpenAI 兼容接口（/chat/completions），驱动内容补全、内容审核、图片描述与游戏资料任务；
+          三项齐全后网站管家即可运行（留空回退读取旧 .env）。
+        </p>
+        <div className="mt-4 space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="rc-ai-base" className={LABEL_STRONG}>
+                Base URL
+              </label>
+              <input
+                id="rc-ai-base"
+                value={form.aiBaseUrl}
+                onChange={(e) => set({ aiBaseUrl: e.target.value })}
+                className={INPUT}
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="https://api.example.com/v1"
+              />
+            </div>
+            <div>
+              <label htmlFor="rc-ai-model" className={LABEL_STRONG}>
+                模型
+              </label>
+              <input
+                id="rc-ai-model"
+                value={form.aiModel}
+                onChange={(e) => set({ aiModel: e.target.value })}
+                className={INPUT}
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="gpt-4o-mini / deepseek-chat …"
+              />
+            </div>
+          </div>
+          <div>
+            <label htmlFor="rc-ai-key" className={LABEL_STRONG}>
+              API Key
+            </label>
+            <input
+              id="rc-ai-key"
+              type="password"
+              value={form.aiApiKey}
+              onChange={(e) => set({ aiApiKey: e.target.value })}
+              className={INPUT}
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="••••••••••••••••••••"
+            />
+          </div>
+        </div>
+      </section>
+            </>
+          ),
+        }}
+      />
 
       <div className="flex items-center gap-3">
+
         <button type="button" onClick={save} disabled={pending} className={BTN_PRIMARY_SM}>
           {pending ? "保存中…" : "保存配置"}
         </button>

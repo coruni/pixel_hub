@@ -47,8 +47,9 @@ export async function updateRuntimeConfigAction(
     if (!created || created.count !== 1) return CONFLICT;
   }
   await audit(admin.id, "EDIT_RUNTIME_CONFIG", "SITE_SETTING", RUNTIME_CONFIG_KEY);
-  // 登录页（GitHub 按钮）、设置页（绑定入口）读此配置；刷新首页兜底
+  // 登录页（GitHub 按钮）、设置页（绑定入口）、云盘页（Graph 凭据卡）读此配置；刷新首页兜底
   revalidatePath("/admin/runtime");
+  revalidatePath("/admin/drives");
   revalidatePath("/login");
   revalidatePath("/settings");
   revalidatePath("/");

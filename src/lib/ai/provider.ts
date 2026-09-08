@@ -1,5 +1,7 @@
-// OpenAI-compatible /chat/completions 客户端：读取服务端环境变量，缺配置即报可读错误。
+// OpenAI-compatible /chat/completions 客户端：读取后台运行配置（env 回退），缺配置即报可读错误。
 // 固定超时/响应上限/数值校验，避免把外部响应或越界 token 直接写库。
+import { getRuntimeConfig, aiBaseUrl, aiApiKey, aiModel } from "@/lib/runtime-config";
+
 export type ProviderConfig = {
   baseUrl?: string;
   apiKey?: string;
@@ -84,11 +86,12 @@ export function createOpenAICompatibleProvider(config: ProviderConfig = {}) {
   };
 }
 
-/** 从服务端环境变量构造默认 provider（缺任一配置由 complete 抛可读错误）。 */
-export function providerFromEnv() {
+/** 从后台运行配置构造默认 provider（env 回退；缺任一配置由 complete 抛可读错误）。 */
+export async function providerFromConfig() {
+  const c = await getRuntimeConfig();
   return createOpenAICompatibleProvider({
-    baseUrl: process.env.AI_PROVIDER_BASE_URL,
-    apiKey: process.env.AI_PROVIDER_API_KEY,
-    model: process.env.AI_PROVIDER_MODEL,
+    baseUrl: aiBaseUrl(c),
+    apiKey: aiApiKey(c),
+    model: aiModel(c),
   });
 }

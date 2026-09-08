@@ -8,7 +8,8 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { adminOnly, audit, staff } from "@/lib/actions/_guards";
-import { providerFromEnv } from "@/lib/ai/provider";
+import { providerFromConfig } from "@/lib/ai/provider";
+import { getRuntimeConfig, aiModel as cfgAiModel } from "@/lib/runtime-config";
 import { buildRedactedInput } from "@/lib/ai/redact";
 import {
   aiTaskKindSchema,
@@ -170,6 +171,8 @@ export async function executeAiTaskAction(taskId: string): Promise<AiActionState
   const startedAt = new Date();
   let runId: string | undefined;
   try {
+    // 后台运行配置（cache() 同请求去重）：AiRun 的 model 记录与 provider 构造共用
+    const runtimeCfg = await getRuntimeConfig();
     // 原子抢占：只有把 QUEUED 置为 RUNNING 的调用方才能继续，防并发重复执行。
     const claim = await prisma.$transaction(async (tx) => {
       const changed = await tx.aiTask.updateMany({
@@ -181,7 +184,7 @@ export async function executeAiTaskAction(taskId: string): Promise<AiActionState
         data: {
           taskId,
           provider: "openai-compatible",
-          model: process.env.AI_PROVIDER_MODEL ?? "",
+          model: cfgAiModel(runtimeCfg),
           status: "RUNNING",
           startedAt,
         },
@@ -203,7 +206,8 @@ export async function executeAiTaskAction(taskId: string): Promise<AiActionState
       throw new Error("图片描述失败：没有可访问的图片输入");
 
     const contract = taskContracts[kind];
-    const result = await providerFromEnv().complete({
+    const provider = await providerFromConfig();
+    const result = await provider.complete({
       system: contract.systemPrompt,
       user: JSON.stringify({ kind, input: JSON.parse(task.inputJson) }),
       imageUrls,

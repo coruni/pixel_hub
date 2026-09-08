@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { makeKey, saveFile } from "@/lib/storage";
+import { attachmentCloudEnabled, getRuntimeConfig } from "@/lib/runtime-config";
 import { rateLimit } from "@/lib/rate-limit";
 import { sameOrigin } from "@/lib/origin";
 import {
@@ -39,7 +40,8 @@ export async function POST(req: NextRequest) {
   const L = await getUploadLimits();
   const maxBytes = L.attachmentMaxMb * MIB;
   const allowedExts = new Set(L.attachmentExts);
-  const cloud = graphEnabled() ? await activeCloudDrive() : null;
+  const cfg = await getRuntimeConfig();
+  const cloud = (await graphEnabled()) && attachmentCloudEnabled(cfg) ? await activeCloudDrive() : null;
 
   const form = await req.formData();
   const file = form.get("file");

@@ -9,11 +9,19 @@
 
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { prisma } from "@/lib/db/prisma";
+import {
+  getRuntimeConfig,
+  graphClientId as cfgClientId,
+  graphClientSecret as cfgClientSecret,
+  graphEndpoint as cfgEndpoint,
+  graphScope as cfgScope,
+  graphTenant as cfgTenant,
+} from "@/lib/runtime-config";
 import type { CloudDrive } from "@prisma/client";
 
 export type { CloudDrive };
 
-// ---------- 环境配置（凭据只走 env，不进数据库） ----------
+// ---------- 环境配置（凭据走后台运行配置 site-runtime，旧 env 仅作回退） ----------
 
 export type GraphCreds = {
   tenant: string;
@@ -23,22 +31,18 @@ export type GraphCreds = {
   scope: string;
 };
 
-export function graphCreds(): GraphCreds | null {
-  const tenant = process.env.GRAPH_TENANT_ID?.trim() ?? "";
-  const clientId = process.env.GRAPH_CLIENT_ID?.trim() ?? "";
-  const clientSecret = process.env.GRAPH_CLIENT_SECRET?.trim() ?? "";
+export async function graphCreds(): Promise<GraphCreds | null> {
+  const c = await getRuntimeConfig();
+  const tenant = cfgTenant(c);
+  const clientId = cfgClientId(c);
+  const clientSecret = cfgClientSecret(c);
   if (!tenant || !clientId || !clientSecret) return null;
-  const endpoint = (process.env.GRAPH_ENDPOINT?.trim() || "https://graph.microsoft.com").replace(
-    /\/+$/,
-    "",
-  );
-  const scope = process.env.GRAPH_SCOPE?.trim() || `${endpoint}/.default`;
-  return { tenant, clientId, clientSecret, endpoint, scope };
+  return { tenant, clientId, clientSecret, endpoint: cfgEndpoint(c), scope: cfgScope(c) };
 }
 
 /** 三件凭据齐备才算启用；否则附件回退原存储（行为同未配置） */
-export function graphEnabled(): boolean {
-  return !!graphCreds();
+export async function graphEnabled(): Promise<boolean> {
+  return !!(await graphCreds());
 }
 
 // ---------- 校验 / 引用工具（纯函数） ----------
@@ -134,7 +138,7 @@ async function requestToken(creds: GraphCreds): Promise<string> {
 }
 
 async function graphToken(force = false): Promise<string> {
-  const creds = graphCreds();
+  const creds = await graphCreds();
   if (!creds) throw new GraphError("GRAPH 未配置（缺 GRAPH_TENANT_ID/CLIENT_ID/CLIENT_SECRET）");
   if (!force && tokenCache && tokenCache.expiresAt > Date.now() + 60_000) return tokenCache.token;
   return requestToken(creds);
@@ -244,7 +248,7 @@ export async function createDriveUploadSession(
   drive: CloudDrive,
   itemPath: string,
 ): Promise<DriveUploadSession> {
-  const creds = graphCreds();
+  const creds = await graphCreds();
   if (!creds) throw new GraphError("GRAPH 未配置");
   await ensureFolders(creds, drive, itemPath);
   const url = `${driveRoot(creds, drive)}:/${encPath(itemPath)}:/createUploadSession`;
@@ -273,7 +277,7 @@ export async function verifyDriveUpload(
   itemPath: string,
   expectedSize: number,
 ): Promise<void> {
-  const creds = graphCreds();
+  const creds = await graphCreds();
   if (!creds) throw new GraphError("GRAPH 未配置");
   const url = `${driveRoot(creds, drive)}:/${encPath(itemPath)}?select=id,size`;
   const res = await graphRequest(url);
@@ -295,10 +299,10 @@ type DriveUploadTicket = {
   expiresAt: number;
 };
 
-function ticketSecret(): string {
+async function ticketSecret(): Promise<string> {
   const secret = process.env.AUTH_SECRET?.trim() || process.env.NEXTAUTH_SECRET?.trim();
   if (secret) return secret;
-  const creds = graphCreds();
+  const creds = await graphCreds();
   if (creds?.clientSecret) return creds.clientSecret;
   throw new GraphError("缺少上传会话签名密钥");
 }
@@ -307,23 +311,28 @@ function encodeTicketPart(value: string): string {
   return Buffer.from(value, "utf8").toString("base64url");
 }
 
-function signTicket(payload: string): string {
-  return createHmac("sha256", ticketSecret()).update(payload).digest("base64url");
+async function signTicket(payload: string): Promise<string> {
+  return createHmac("sha256", await ticketSecret()).update(payload).digest("base64url");
 }
 
 /** 给完成接口使用的短期签名凭证，不把 uploadUrl 或文件内容交回 Vercel。 */
-export function createDriveUploadTicket(input: Omit<DriveUploadTicket, "expiresAt">): string {
+export async function createDriveUploadTicket(
+  input: Omit<DriveUploadTicket, "expiresAt">,
+): Promise<string> {
   const payload = encodeTicketPart(
     // 250GiB 在慢速网络上可能需要数天；Graph 自身仍会在无活动时过期会话。
     JSON.stringify({ ...input, expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000 }),
   );
-  return `${payload}.${signTicket(payload)}`;
+  return `${payload}.${await signTicket(payload)}`;
 }
 
-export function readDriveUploadTicket(ticket: string, userId: string): DriveUploadTicket {
+export async function readDriveUploadTicket(
+  ticket: string,
+  userId: string,
+): Promise<DriveUploadTicket> {
   const [payload, signature] = (ticket ?? "").split(".");
   if (!payload || !signature) throw new GraphError("上传会话凭证无效", 400);
-  const expected = signTicket(payload);
+  const expected = await signTicket(payload);
   const actualBytes = Buffer.from(signature, "utf8");
   const expectedBytes = Buffer.from(expected, "utf8");
   if (actualBytes.length !== expectedBytes.length || !timingSafeEqual(actualBytes, expectedBytes))
@@ -358,7 +367,7 @@ export async function uploadDriveFile(
   itemPath: string,
   buf: Buffer,
 ): Promise<void> {
-  const creds = graphCreds();
+  const creds = await graphCreds();
   if (!creds) throw new GraphError("GRAPH 未配置");
   await ensureFolders(creds, drive, itemPath);
   const url = `${driveRoot(creds, drive)}:/${encPath(itemPath)}:/content`;
@@ -380,7 +389,7 @@ export async function resolveDriveDownloadUrl(
   drive: CloudDrive,
   itemPath: string,
 ): Promise<string | null> {
-  const creds = graphCreds();
+  const creds = await graphCreds();
   if (!creds) throw new GraphError("GRAPH 未配置");
   const base = driveRoot(creds, drive);
   const enc = encPath(itemPath);
@@ -408,7 +417,7 @@ export async function resolveDriveDownloadUrl(
 
 /** 删除：先按路径取 item id 再 DELETE；404（两处任一）视为已删除 */
 export async function deleteDriveFile(drive: CloudDrive, itemPath: string): Promise<void> {
-  const creds = graphCreds();
+  const creds = await graphCreds();
   if (!creds) throw new GraphError("GRAPH 未配置");
   const base = driveRoot(creds, drive);
   const enc = encPath(itemPath);

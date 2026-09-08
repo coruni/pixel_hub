@@ -133,7 +133,7 @@ export async function testDriveAction(input: { id: string }): Promise<Result> {
   if (!admin) return { ok: false, error: "仅管理员可操作" };
   const drive = await prisma.cloudDrive.findUnique({ where: { id: input.id } });
   if (!drive) return { ok: false, error: "云盘不存在" };
-  if (!graphEnabled())
+  if (!(await graphEnabled()))
     return { ok: false, error: "未配置 GRAPH_TENANT_ID/CLIENT_ID/CLIENT_SECRET，无法测试" };
   const r = await probeDrive(drive);
   if (r.ok) {

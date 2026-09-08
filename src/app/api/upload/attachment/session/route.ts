@@ -12,6 +12,7 @@ import {
 } from "@/lib/storage/onedrive";
 import { MIB, attachmentExtsSample } from "@/lib/upload-config";
 import { getUploadLimits } from "@/lib/upload-limits";
+import { attachmentCloudEnabled, getRuntimeConfig } from "@/lib/runtime-config";
 
 export const runtime = "nodejs";
 
@@ -56,7 +57,8 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     );
 
-  const cloud = graphEnabled() ? await activeCloudDrive() : null;
+  const cfg = await getRuntimeConfig();
+  const cloud = (await graphEnabled()) && attachmentCloudEnabled(cfg) ? await activeCloudDrive() : null;
   if (!cloud)
     return NextResponse.json(
       { ok: false, code: "NO_CLOUD", error: "未启用活跃 OneDrive 云盘" },
@@ -66,7 +68,7 @@ export async function POST(req: NextRequest) {
   try {
     const itemPath = itemPathFor(cloud, cloudRelKey(`.${ext}`));
     const upload = await createDriveUploadSession(cloud, itemPath);
-    const ticket = createDriveUploadTicket({
+    const ticket = await createDriveUploadTicket({
       driveId: cloud.id,
       itemPath,
       size,

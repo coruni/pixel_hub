@@ -36,7 +36,7 @@ export default async function DrivesAdminPage() {
           登记 OneDrive / SharePoint 驱动器；大附件写入<b>活跃盘</b>，切活跃不影响历史下载。
         </p>
       </div>
-      <DriveManager rows={rows} credsConfigured={graphEnabled()} />
+      <DriveManager rows={rows} credsConfigured={await graphEnabled()} />
     </div>
   );
 }

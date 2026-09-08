@@ -192,8 +192,9 @@ export function DriveManager({
     <div className="space-y-6">
       {!canCloud && (
         <div className="rounded-none border border-amber-300 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">
-          未配置 GRAPH_TENANT_ID / GRAPH_CLIENT_ID / GRAPH_CLIENT_SECRET：登记盘仅作占位，附件仍走
-          STORAGE_DRIVER（local/s3/chevereto）。配置后到 .env 补全并重启即可启用。
+          尚未配置 Microsoft Graph 三件凭据：登记盘仅作占位，附件仍走 STORAGE_DRIVER（local/s3/chevereto）。
+          到 <a href="/admin/runtime" className="font-medium underline underline-offset-2">站点配置 → 运行配置</a>{" "}
+          的「云盘附件」中补全并保存即可启用，无需改 .env 重启。
         </div>
       )}
 

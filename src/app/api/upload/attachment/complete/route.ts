@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "上传会话无效" }, { status: 400 });
 
   try {
-    const ticket = readDriveUploadTicket(body.ticket, session.user.id);
+    const ticket = await readDriveUploadTicket(body.ticket, session.user.id);
     const drive = await getCloudDrive(ticket.driveId);
     if (!drive)
       return NextResponse.json({ ok: false, error: "OneDrive 云盘不存在" }, { status: 404 });
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
     const ticket = typeof body?.ticket === "string" ? body.ticket : "";
     if (ticket) {
       try {
-        const parsed = readDriveUploadTicket(ticket, session.user.id);
+        const parsed = await readDriveUploadTicket(ticket, session.user.id);
         await recordDriveError(parsed.driveId, message);
       } catch {
         // 凭证本身无效时不再重复处理

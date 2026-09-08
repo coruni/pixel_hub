@@ -36,7 +36,8 @@ export default async function AdminRuntimePage() {
           runtime: (
             <>
               <p className="mb-4 text-xs leading-5 text-neutral-500">
-                GitHub 登录、文件存储与 SMTP 邮件；对应旧 .env 的 GITHUB_* / STORAGE / S3 / SMTP 配置。
+                按「登录 / 存储 / 邮件 / 云盘 / AI」分组维护，对应旧 .env 的
+                GITHUB_* / STORAGE / S3 / SMTP / GRAPH_* / AI_PROVIDER_* 配置；底部统一保存，立即生效。
               </p>
               <RuntimeConfigManager
                 config={runtime.config}
