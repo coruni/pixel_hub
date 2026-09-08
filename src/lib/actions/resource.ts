@@ -13,6 +13,7 @@ import { revalidatePath } from "next/cache";
 import { resourceTextFields } from "@/lib/resource-fields";
 import { applyResourceEdit, type ResourceEditState } from "@/lib/actions/_resource-edit";
 import { getUploadLimits } from "@/lib/upload-limits";
+import { ARTICLE_MEDIA_MAX } from "@/lib/upload-config";
 import { enqueueResourceAiTriggers } from "@/lib/ai/enqueue";
 
 export type ResourceActionState = {
@@ -128,8 +129,10 @@ export async function createResourceAction(
   const L = await getUploadLimits();
   if (type === "IMAGE" && mediaIds.length > L.galleryImageMaxCount)
     return { fieldErrors: { mediaIds: [`图片不能超过 ${L.galleryImageMaxCount} 张`] } };
-  if (type === "ARTICLE" && mediaIds.length > L.articleImageMaxCount)
-    return { fieldErrors: { mediaIds: [`文章插图不能超过 ${L.articleImageMaxCount} 张`] } };
+  if (type === "ARTICLE" && mediaIds.length > ARTICLE_MEDIA_MAX)
+    return {
+      fieldErrors: { mediaIds: [`文章只需 ${ARTICLE_MEDIA_MAX} 张封面图，其余插图放正文里`] },
+    };
 
   // D6：可信/管理员免审直发，否则进审核队列
   const directPublish = user.trusted || user.role === "ADMIN" || user.role === "MODERATOR";

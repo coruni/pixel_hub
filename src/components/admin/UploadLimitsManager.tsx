@@ -64,7 +64,7 @@ const NUM_FIELDS: {
 
 /** 图片数量限制字段：key / label / 范围（张） */
 const COUNT_FIELDS: {
-  key: "galleryImageMaxCount" | "articleImageMaxCount" | "commentImageMaxCount";
+  key: "galleryImageMaxCount" | "commentImageMaxCount";
   label: string;
   min: number;
   max: number;
@@ -76,13 +76,6 @@ const COUNT_FIELDS: {
     min: COUNT_RANGE.min,
     max: COUNT_RANGE.max,
     hint: "单个【图片】资源可上传的预览图张数（含首图）。超出后上传入口禁用。",
-  },
-  {
-    key: "articleImageMaxCount",
-    label: "文章插图 张数上限",
-    min: COUNT_RANGE.min,
-    max: COUNT_RANGE.max,
-    hint: "单个【文章】资源可上传的插图张数。设为与图集不同的值可分别管控两类内容。",
   },
   {
     key: "commentImageMaxCount",
@@ -114,7 +107,6 @@ type Draft = {
   commentImageMaxMb: string;
   avatarMaxMb: string;
   galleryImageMaxCount: string;
-  articleImageMaxCount: string;
   commentImageMaxCount: string;
 };
 
@@ -125,7 +117,6 @@ const toDraft = (l: UploadLimits): Draft => ({
   commentImageMaxMb: String(l.commentImageMaxMb),
   avatarMaxMb: String(l.avatarMaxMb),
   galleryImageMaxCount: String(l.galleryImageMaxCount),
-  articleImageMaxCount: String(l.articleImageMaxCount),
   commentImageMaxCount: String(l.commentImageMaxCount),
 });
 
@@ -151,7 +142,6 @@ export default function UploadLimitsManager({ limits }: { limits: UploadLimits }
         commentImageMaxMb: Number(draft.commentImageMaxMb),
         avatarMaxMb: Number(draft.avatarMaxMb),
         galleryImageMaxCount: Number(draft.galleryImageMaxCount),
-        articleImageMaxCount: Number(draft.articleImageMaxCount),
         commentImageMaxCount: Number(draft.commentImageMaxCount),
       }),
     );

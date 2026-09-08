@@ -42,7 +42,7 @@ export default function MediaPicker({
           </span>
         }
       >
-        {isArticle ? "插图" : "预览图"}
+        {isArticle ? "封面" : "预览图"}
         {!isArticle && <span className="text-red-500">*</span>}
       </SectionTitle>
       <div className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-4">
@@ -92,7 +92,7 @@ export default function MediaPicker({
             ref={fileRef}
             type="file"
             accept="image/*"
-            multiple
+            multiple={maxCount > 1}
             disabled={uploading || files.length >= maxCount}
             onChange={(e) => onPick(e.target.files)}
             className="hidden"

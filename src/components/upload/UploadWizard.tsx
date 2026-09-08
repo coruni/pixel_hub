@@ -4,7 +4,8 @@ import Link from "next/link";
 import { Gamepad2, Image as ImageIcon, Newspaper } from "lucide-react";
 import { useActionState, useRef, useState } from "react";
 import { createResourceAction, type ResourceActionState } from "@/lib/actions/resource";
-import type { UploadLimits } from "@/lib/upload-config";
+import { ARTICLE_MEDIA_MAX, type UploadLimits } from "@/lib/upload-config";
+import MdEditor from "@/components/rte/MdEditor";
 import MediaPicker from "./media-picker";
 import { ArticleSection, GameSection, ImageSection } from "./wizard-sections";
 import { SquareCheckbox } from "../admin/SquareCheckbox";
@@ -38,6 +39,7 @@ export default function UploadWizard({
   const [uploadMsg, setUploadMsg] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [catId, setCatId] = useState("");
+  const [description, setDescription] = useState("");
 
   const [state, formAction, pending] = useActionState<ResourceActionState, FormData>(
     createResourceAction,
@@ -56,7 +58,7 @@ export default function UploadWizard({
     setUploading(true);
     setUploadMsg(null);
     const maxCount =
-      type === "ARTICLE" ? limits.articleImageMaxCount : limits.galleryImageMaxCount;
+      type === "ARTICLE" ? ARTICLE_MEDIA_MAX : limits.galleryImageMaxCount;
     const fd = new FormData();
     for (const f of Array.from(fl)) fd.append("files", f);
     try {
@@ -96,7 +98,7 @@ export default function UploadWizard({
     <form action={formAction} className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
       <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">发布资源</h1>
       <p className="mt-2 rounded-none border border-brand-200 bg-brand-50/60 px-3 py-2 text-xs leading-5 text-brand-800">
-        支持图片、游戏外链与文章发布；可信用户免审直发，其余提交后进入审核队列。
+        免审用户直接上架，其他人等审核通过。
       </p>
 
       <input type="hidden" name="type" value={type} />
@@ -155,31 +157,17 @@ export default function UploadWizard({
           />
         </div>
         <div>
-          <label className={wizLabel} htmlFor="description">
+          <label className={wizLabel}>
             {type === "ARTICLE" ? "正文" : "详细描述"}
           </label>
-          <textarea
-            id="description"
-            name="description"
-            required
-            rows={type === "ARTICLE" ? 12 : 5}
-            maxLength={20000}
-            placeholder={
-              type === "ARTICLE"
-                ? "正文（Markdown），至少 10 字"
-                : "玩法/用途/方法/注意事项……至少 10 字"
-            }
-            className={wizInput}
+          <MdEditor
+            defaultValue=""
+            onChange={setDescription}
+            minHeight={type === "ARTICLE" ? "24rem" : "12rem"}
+            ariaLabel={type === "ARTICLE" ? "正文" : "详细描述"}
           />
+          <input type="hidden" name="description" value={description} />
           {fieldErr(state.fieldErrors?.description)}
-          <p className="mt-1 text-xs leading-5 text-neutral-400">
-            支持 Markdown：空行分段；
-            <code className="rounded-none bg-neutral-100 px-1">#</code> 标题、
-            <code className="rounded-none bg-neutral-100 px-1">-</code> 列表、
-            <code className="rounded-none bg-neutral-100 px-1">**加粗**</code>、
-            <code className="rounded-none bg-neutral-100 px-1">`代码`</code>、
-            <code className="rounded-none bg-neutral-100 px-1">[链接](地址)</code>。
-          </p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
@@ -232,7 +220,7 @@ export default function UploadWizard({
         isArticle={type === "ARTICLE"}
         maxMb={limits.galleryImageMaxMb}
         maxCount={
-          type === "ARTICLE" ? limits.articleImageMaxCount : limits.galleryImageMaxCount
+          type === "ARTICLE" ? ARTICLE_MEDIA_MAX : limits.galleryImageMaxCount
         }
         uploadMsg={uploadMsg}
         fieldError={state.fieldErrors?.mediaIds}

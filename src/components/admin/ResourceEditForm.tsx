@@ -12,7 +12,7 @@ import { BTN_GHOST_SM } from "@/lib/ui/cls";
 import { updateResourceAdminAction } from "@/lib/actions/admin-content";
 import type { ResourceEditState } from "@/lib/actions/_resource-edit";
 import type { ResourceMetaOutput } from "@/lib/meta";
-import type { UploadLimits } from "@/lib/upload-config";
+import { ARTICLE_MEDIA_MAX, type UploadLimits } from "@/lib/upload-config";
 import {
   fieldErr,
   SectionTitle,
@@ -119,7 +119,9 @@ export function ResourceEditForm({
       const good = list.filter((f) => f.ok);
       const bad = list.filter((f) => !f.ok);
       if (good.length > 0) {
-        const next = [...files, ...good].slice(0, 12);
+        const maxCount =
+          resource.type === "ARTICLE" ? ARTICLE_MEDIA_MAX : limits.galleryImageMaxCount;
+        const next = [...files, ...good].slice(0, maxCount);
         setFiles(next);
         if (!coverId && next.length > 0) setCoverId(next[0].id);
       }
@@ -251,10 +253,6 @@ export function ResourceEditForm({
           initial={{
             isAiGenerated: resource.meta.isAiGenerated,
             original: resource.meta.original,
-            aiTool: resource.meta.aiTool,
-            aiModel: resource.meta.aiModel,
-            license: resource.meta.license,
-            sourceNote: resource.meta.sourceNote,
             downloads: legacyImageDownloads,
           }}
           fieldErrors={fe}
@@ -272,6 +270,9 @@ export function ResourceEditForm({
         uploading={uploading}
         isArticle={resource.type === "ARTICLE"}
         maxMb={limits.galleryImageMaxMb}
+        maxCount={
+          resource.type === "ARTICLE" ? ARTICLE_MEDIA_MAX : limits.galleryImageMaxCount
+        }
         uploadMsg={uploadMsg}
         fieldError={fe.mediaIds}
         onPick={onFiles}

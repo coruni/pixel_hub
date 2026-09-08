@@ -86,11 +86,12 @@ export type UploadLimits = {
   avatarMaxMb: number;
   /** 图集 / 原图：单个资源可上传的图片张数上限（IMAGE 类型预览图） */
   galleryImageMaxCount: number;
-  /** 文章插图：单个文章资源可上传的插图张数上限（ARTICLE 类型插图） */
-  articleImageMaxCount: number;
   /** 评论附图：单条评论可附带的图片张数上限 */
   commentImageMaxCount: number;
 };
+
+/** 文章媒体固定为 1 张封面，其余插图放正文（编辑器内上传），不做后台配置 */
+export const ARTICLE_MEDIA_MAX = 1;
 
 /** 默认 = 今日各处硬编码值原样迁入（附件 200MB + 29 后缀；图集 20；评论图 5；头像 5） */
 export const DEFAULT_ATTACH_EXTS: readonly string[] = [
@@ -132,7 +133,6 @@ export const DEFAULT_UPLOAD_LIMITS: UploadLimits = {
   commentImageMaxMb: 5,
   avatarMaxMb: 5,
   galleryImageMaxCount: 12,
-  articleImageMaxCount: 12,
   commentImageMaxCount: 3,
 };
 
@@ -194,12 +194,6 @@ export function parseUploadLimits(raw: unknown): UploadLimits {
     avatarMaxMb: clampInt(o.avatarMaxMb, MB_RANGE.image.min, MB_RANGE.image.max, 5),
     galleryImageMaxCount: clampInt(
       o.galleryImageMaxCount,
-      COUNT_RANGE.min,
-      COUNT_RANGE.max,
-      12,
-    ),
-    articleImageMaxCount: clampInt(
-      o.articleImageMaxCount,
       COUNT_RANGE.min,
       COUNT_RANGE.max,
       12,

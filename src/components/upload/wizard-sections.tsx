@@ -78,9 +78,9 @@ export function GameSection({
           filled={extUrl.startsWith("/")}
           limits={limits}
         />
-        <p className="mt-1 text-xs text-neutral-400">
-          仅发布<b>有权分发</b>的内容（原创/已授权/免费），严禁盗版与侵权。
-        </p>
+        {/* <p className="mt-1 text-xs text-neutral-400">
+          只发你有权分发的内容，盗版勿发。
+        </p> */}
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
@@ -416,10 +416,6 @@ export function ImageSection({
   initial?: {
     isAiGenerated?: boolean;
     original?: boolean;
-    aiTool?: string;
-    aiModel?: string;
-    license?: string;
-    sourceNote?: string;
     downloads?: { name: string; kind: "file" | "link"; url: string; size?: string }[];
   };
   fieldErrors?: Record<string, string[]>;
@@ -450,68 +446,12 @@ export function ImageSection({
           本人原创
         </label>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label className={wizLabel} htmlFor="aiTool">
-            生成工具（如选 AI）
-          </label>
-          <input
-            id="aiTool"
-            name="aiTool"
-            maxLength={60}
-            defaultValue={initial?.aiTool ?? ""}
-            placeholder="Midjourney / Stable Diffusion…"
-            className={wizInput}
-          />
-        </div>
-        <div>
-          <label className={wizLabel} htmlFor="aiModel">
-            模型/参数（可选）
-          </label>
-          <input
-            id="aiModel"
-            name="aiModel"
-            maxLength={60}
-            defaultValue={initial?.aiModel ?? ""}
-            placeholder="v6.1 / SDXL…"
-            className={wizInput}
-          />
-        </div>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label className={wizLabel} htmlFor="license">
-            授权/许可（可选）
-          </label>
-          <input
-            id="license"
-            name="license"
-            maxLength={40}
-            defaultValue={initial?.license ?? ""}
-            placeholder="仅自用 / CC BY / 可商用…"
-            className={wizInput}
-          />
-        </div>
-        <div>
-          <label className={wizLabel} htmlFor="sourceNote">
-            素材来源（转素材请填）
-          </label>
-          <input
-            id="sourceNote"
-            name="sourceNote"
-            maxLength={200}
-            defaultValue={initial?.sourceNote ?? ""}
-            placeholder="作者/原址，避免侵权纠纷"
-            className={wizInput}
-          />
-        </div>
-      </div>
 
       <div className="rounded-none border border-brand-200 p-4">
         <p className="text-sm font-medium text-neutral-700">整包 / 图包下载（可选）</p>
-        <p className="mt-0.5 text-xs text-neutral-400">
-          提供原画集/整套 zip 或网盘链接，可添加多个；不提供可跳过。
-        </p>
+        {/* <p className="mt-0.5 text-xs text-neutral-400">
+          可放原画集或网盘链接，没有就跳过。
+        </p> */}
         <AttachmentListEditor
           rows={rows}
           setRows={setRows}
@@ -519,10 +459,6 @@ export function ImageSection({
           errors={fieldErrors?.downloads}
         />
       </div>
-
-      <p className="text-xs text-neutral-400">
-        请尊重版权：转载注明来源，AI 生成如实标注。
-      </p>
     </section>
   );
 }
@@ -555,9 +491,6 @@ export function ArticleSection({
       >
         附件下载
       </SectionTitle>
-      <p className="-mt-2 text-xs text-neutral-400">
-        附件以清单展示于文章底部，访客逐行下载。
-      </p>
 
       <AttachmentListEditor
         rows={rows}

@@ -348,3 +348,110 @@ summary {
 ::-webkit-scrollbar-corner {
   background: transparent;
 }
+
+/* ---------- Milkdown Crepe（/upload 所见即所得编辑器）----------
+   主题色全部映射到站点 token，明暗自动跟随（token 在 html.dark 下重定义）。
+   frame-dark.css 未引入——它把暗色变量无条件写在 .milkdown 上，会压掉浅色。 */
+.md-editor .milkdown {
+  --crepe-color-background: var(--surface);
+  --crepe-color-on-background: var(--foreground);
+  --crepe-color-surface: var(--surface);
+  --crepe-color-surface-low: var(--background);
+  --crepe-color-on-surface: var(--foreground);
+  --crepe-color-on-surface-variant: var(--md-muted);
+  --crepe-color-outline: var(--brand-200);
+  --crepe-color-primary: var(--brand-500);
+  --crepe-color-secondary: var(--brand-100);
+  --crepe-color-on-secondary: var(--brand-800);
+  --crepe-color-inverse: var(--neutral-900);
+  --crepe-color-on-inverse: #fff;
+  --crepe-color-inline-code: var(--brand-700);
+  --crepe-color-error: #dc2626;
+  --crepe-color-hover: var(--brand-50);
+  --crepe-color-selected: var(--brand-100);
+  --crepe-color-inline-area: var(--neutral-100);
+  --crepe-base-font-size: 14px;
+  /* 像素站点字体优先，标题不做衬线分家 */
+  --crepe-font-title: inherit;
+  --crepe-font-default: inherit;
+  --crepe-font-code:
+    ui-monospace, SFMono-Regular, Menlo, Consolas, "Courier New", monospace;
+  font-family: inherit;
+  min-height: inherit;
+}
+
+/* 直角像素语言：编辑器内（含弹层/工具栏/菜单）一律无圆角 */
+.md-editor .milkdown,
+.md-editor .milkdown * {
+  border-radius: 0 !important;
+}
+
+/* 内容区贴合站点输入框内距（crepe 默认 60px 120px 过大，压缩可编辑区）；
+   三层选择器抬高优先级，避免被主题 CSS 的加载顺序翻回去 */
+.md-editor .milkdown .ProseMirror {
+  padding: 12px 14px;
+  min-height: inherit;
+}
+
+/* ---------- 全屏编写 ----------
+   工具条之外整层铺满视口，滚动交给 .milkdown；dvh 兜底 vh 兼容移动端地址栏 */
+.md-editor[data-fullscreen] {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* host 层与 .milkdown 撑满视口全部空间 */
+.md-editor[data-fullscreen] .md-editor-host {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.md-editor[data-fullscreen] .milkdown {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* 全屏时补回大内边距：块操作柄（+ 添加 / 拖拽）定位在内容左缘外约 82px，
+   铺满视口且无缓冲时会被挤出屏幕；恢复 crepe 量级的 padding 让快捷工具落在可视区内 */
+.md-editor[data-fullscreen] .milkdown .ProseMirror {
+  padding: 48px 120px;
+}
+
+/* ---------- 移动端快捷块适配 ----------
+   块操作柄（+ 添加 / 拖拽）由 floating-ui 定位在编辑区左缘外 offset 16 + 66px，
+   flip 只翻上下不救左右，窄屏必然超出屏幕；触摸端无拖拽价值，隐藏（输入 / 仍可快捷添加）。
+   slash 菜单保留：限宽限高防出屏，滚动集中在菜单层。 */
+@media (max-width: 767px) {
+  .md-editor .milkdown .milkdown-block-handle {
+    display: none !important;
+  }
+
+  /* 移动端全屏：左侧留出操作柄空间（offset 16 + 柄宽 66 ≈ 82px），恢复显示 handle */
+  .md-editor[data-fullscreen] .milkdown .ProseMirror {
+    padding: 40px 24px 40px 88px;
+  }
+
+  .md-editor[data-fullscreen] .milkdown .milkdown-block-handle {
+    display: flex !important;
+  }
+
+  /* slash 菜单：仅限宽防出屏；滚动保持在官方 menu-groups 层（双层滚动容器
+     会让移动端触摸手势被外层吞掉导致滚不动，故外层不限高不 overflow） */
+  .md-editor .milkdown .milkdown-slash-menu {
+    max-width: calc(100vw - 24px);
+  }
+
+  .md-editor .milkdown .milkdown-slash-menu .menu-groups {
+    /* 预留 tab 组与光标行，软键盘弹出后 vh 缩水仍不出屏 */
+    max-height: min(52vh, 420px);
+  }
+}
+

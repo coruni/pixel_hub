@@ -35,8 +35,6 @@ export type SaveUploadLimitsInput = {
   avatarMaxMb?: number;
   /** 图集/原图：单个资源图片张数上限 */
   galleryImageMaxCount?: number;
-  /** 文章插图：单个文章图片张数上限 */
-  articleImageMaxCount?: number;
   /** 评论附图：单条评论图片张数上限 */
   commentImageMaxCount?: number;
 };
@@ -85,13 +83,6 @@ export async function saveUploadLimitsAction(input: SaveUploadLimitsInput): Prom
       COUNT_RANGE.min,
       COUNT_RANGE.max,
       l.galleryImageMaxCount,
-    );
-  if (typeof input.articleImageMaxCount === "number")
-    l.articleImageMaxCount = clampInt(
-      input.articleImageMaxCount,
-      COUNT_RANGE.min,
-      COUNT_RANGE.max,
-      l.articleImageMaxCount,
     );
   if (typeof input.commentImageMaxCount === "number")
     l.commentImageMaxCount = clampInt(

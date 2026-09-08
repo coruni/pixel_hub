@@ -5,6 +5,7 @@ import { z } from "zod";
 import { articleMetaSchema, gameMetaSchema, imageMetaSchema } from "@/lib/meta";
 import { randomTail, slugify } from "@/lib/slug";
 import { MAX_TAGS, resourceTextFields } from "@/lib/resource-fields";
+import { ARTICLE_MEDIA_MAX } from "@/lib/upload-config";
 
 export type ResourceEditState = {
   ok?: boolean;
@@ -174,9 +175,13 @@ export async function applyResourceEdit(
   }
   const coverRaw = String(fd.get("coverId") ?? "").trim();
 
-  // 非文章类型至少保留一张图（与发布一致）
+  // 非文章类型至少保留一张图（与发布一致）；文章固定一张封面，其余插图放正文
   if (type !== "ARTICLE" && mediaIds.length === 0)
     return { fieldErrors: { mediaIds: ["请至少保留一张图片"] } };
+  if (type === "ARTICLE" && mediaIds.length > ARTICLE_MEDIA_MAX)
+    return {
+      fieldErrors: { mediaIds: [`文章只需 ${ARTICLE_MEDIA_MAX} 张封面图，其余插图放正文里`] },
+    };
 
   const existingMedia = await tx.media.findMany({
     where: { resourceId: id },
