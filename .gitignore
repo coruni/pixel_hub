@@ -56,3 +56,5 @@ _dev.log
 
 .vercel
 .env*
+
+.workbuddy/tmp
