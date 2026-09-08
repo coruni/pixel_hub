@@ -8,6 +8,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
 import { sendMail } from "@/lib/mailer";
+import { renderMailHtml } from "@/lib/mail-template";
 import { siteName, siteUrl } from "@/lib/site-url";
 
 // ---------- 请求重置（忘记密码页） ----------
@@ -50,6 +51,13 @@ export async function requestPasswordResetAction(
     parsed.data.email,
     `【${siteName()}】找回密码`,
     `你（或他人）正在用这个邮箱重置 ${siteName()} 账号的密码。\n\n打开下面的链接设置新密码（30 分钟内有效，仅可使用一次）：\n${link}\n\n如果这不是你的操作，请忽略本邮件。`,
+    renderMailHtml({
+      title: "找回密码",
+      lines: [`你（或他人）正在用这个邮箱重置 ${siteName()} 账号的密码。`],
+      linkUrl: link,
+      linkText: "重置密码",
+      note: "链接 30 分钟内有效，仅可使用一次；如按钮无法点击，可将链接复制到浏览器打开。如果这不是你的操作，请忽略本邮件。",
+    }),
   );
 
   // 未配置 SMTP 的开发环境：把重置链接直接返回给页面，保证流程可联调

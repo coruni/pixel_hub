@@ -8,6 +8,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { signIn, signOut } from "@/lib/auth";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
+import { emailCodeRequired, verifyRegisterCode } from "@/lib/register-code";
 
 // ---------- 登录 ----------
 
@@ -66,7 +67,13 @@ const registerFields = z.object({
 });
 export type RegisterState = {
   error?: string;
-  fieldErrors?: { email?: string[]; username?: string[]; password?: string[]; name?: string[] };
+  fieldErrors?: {
+    email?: string[];
+    username?: string[];
+    password?: string[];
+    name?: string[];
+    code?: string[];
+  };
 };
 
 export async function registerAction(_prev: RegisterState, fd: FormData): Promise<RegisterState> {
@@ -82,6 +89,23 @@ export async function registerAction(_prev: RegisterState, fd: FormData): Promis
   if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
 
   const { email, username, name, password } = parsed.data;
+
+  // 邮箱验证码校验（后台开启 + SMTP 可用时启用；见 register-code.ts）
+  if (await emailCodeRequired()) {
+    const code = String(fd.get("code") ?? "").trim();
+    if (!/^\d{6}$/.test(code)) return { fieldErrors: { code: ["请输入 6 位邮箱验证码"] } };
+    const v = verifyRegisterCode(email, code);
+    if (!v.ok) {
+      const msg =
+        v.reason === "expired"
+          ? "验证码已过期，请重新获取"
+          : v.reason === "attempts"
+            ? "错误次数过多，请重新获取验证码"
+            : "验证码不正确";
+      return { fieldErrors: { code: [msg] } };
+    }
+  }
+
   // 并发下仍可能有唯一键冲突，预检给出友好错误
   const [byEmail, byName] = await Promise.all([
     prisma.user.findUnique({ where: { email } }),
