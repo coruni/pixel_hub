@@ -66,8 +66,8 @@ export default async function Navbar() {
           className="flex items-center gap-2 text-lg font-semibold tracking-tight text-neutral-900"
         >
           <span className="grid h-8 w-8 place-items-center overflow-hidden rounded-none border border-brand-600 bg-surface">
-            {/* eslint-disable-next-line @next/next/no-img-element -- 站点徽标来自 env/静态 svg，不走 next/image */}
-            <img src={siteLogo()} alt={name} className="h-full w-full object-contain" />
+            {/* eslint-disable-next-line @next/next/no-img-element -- 站点徽标来自后台配置/静态 svg，不走 next/image */}
+            <img src={seo.siteLogo || siteLogo()} alt={name} className="h-full w-full object-contain" />
           </span>
           <span>{name}</span>
         </Link>

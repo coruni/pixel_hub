@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/layout/Navbar";
+import Footer from "@/components/layout/Footer";
 import PageTracker from "@/components/layout/PageTracker";
 import PresencePing from "@/components/layout/PresencePing";
 import { auth } from "@/lib/auth";
@@ -83,15 +84,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <PresencePing signedIn={Boolean(session?.user)} />
         <Navbar />
         <main className="flex-1">{children}</main>
-        <footer className="mt-10 border-t border-brand-200 py-8 text-center text-xs text-neutral-400">
-          <p>
-            <a href="/rules" className="hover:text-neutral-900">
-              社区规则
-            </a>
-            <span className="mx-2">·</span>
-            {name} · 分享与发现 · 请遵守平台规则，勿上传侵权与违法内容
-          </p>
-        </footer>
+        <Footer
+          name={name}
+          footerText={seo.footerText}
+          icp={seo.icp}
+          contactEmail={seo.contactEmail}
+        />
       </body>
     </html>
   );

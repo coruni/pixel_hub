@@ -11,6 +11,8 @@ export const SEO_KEY = "seo";
 export const seoConfigSchema = z.object({
   // 站点名称（<title> / OG siteName / JSON-LD / 导航徽标）；空 = 回退 env NEXT_PUBLIC_SITE_NAME
   siteName: z.string().default(""),
+  // 站点 logo（导航徽标）：站内 /uploads 路径或 http(s) URL；空 = 回退 env NEXT_PUBLIC_SITE_LOGO / 内置图标
+  siteLogo: z.string().default(""),
   // meta keywords（Google 忽略，百度/Yandex 仍参考）；逗号分隔；空 = 不输出
   keywords: z.string().default(""),
   // 各搜索引擎站长平台验证码；空 = 不输出对应 meta
@@ -26,6 +28,12 @@ export const seoConfigSchema = z.object({
   ogLocale: z.string().default(""),
   // 默认 meta description；空 = 回退代码内文案（含站点名）
   defaultDescription: z.string().default(""),
+  // 页脚自定义文案（站名之后的一句话）；空 = 不显示
+  footerText: z.string().default(""),
+  // ICP 备案号（页脚展示）；空 = 不显示
+  icp: z.string().default(""),
+  // 站长联系邮箱（页脚「联系我们」）；空 = 不显示
+  contactEmail: z.string().default(""),
   // 结构化数据（WebSite / Article / BreadcrumbList）总开关
   structuredData: z.boolean().default(true),
 });
@@ -41,6 +49,7 @@ export function sanitizeSeo(config: SeoConfig): SeoConfig {
   const locale = config.ogLocale.trim().slice(0, 12).replace("-", "_");
   return {
     siteName: config.siteName.trim().slice(0, 40),
+    siteLogo: config.siteLogo.trim().slice(0, 300),
     keywords: config.keywords.trim().slice(0, 200),
     verifications: {
       google: config.verifications.google.trim().slice(0, 200),
@@ -50,6 +59,9 @@ export function sanitizeSeo(config: SeoConfig): SeoConfig {
     },
     ogLocale: locale && LOCALE_RE.test(locale) ? locale : "zh_CN",
     defaultDescription: config.defaultDescription.trim().slice(0, 300),
+    footerText: config.footerText.trim().slice(0, 120),
+    icp: config.icp.trim().slice(0, 60),
+    contactEmail: config.contactEmail.trim().slice(0, 200),
     structuredData: config.structuredData === true,
   };
 }

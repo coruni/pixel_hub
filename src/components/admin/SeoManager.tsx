@@ -28,7 +28,11 @@ export default function SeoManager({
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const [form, setForm] = useState({
     siteName: config.siteName,
+    siteLogo: config.siteLogo,
     keywords: config.keywords,
+    footerText: config.footerText,
+    icp: config.icp,
+    contactEmail: config.contactEmail,
     google: config.verifications.google,
     bing: config.verifications.bing,
     yandex: config.verifications.yandex,
@@ -46,7 +50,11 @@ export default function SeoManager({
       const result = await updateSeoConfigAction(
         {
           siteName: form.siteName,
+          siteLogo: form.siteLogo,
           keywords: form.keywords,
+          footerText: form.footerText,
+          icp: form.icp,
+          contactEmail: form.contactEmail,
           verifications: {
             google: form.google,
             bing: form.bing,
@@ -68,7 +76,7 @@ export default function SeoManager({
     });
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="space-y-6">
       <section className="border border-brand-200 bg-surface p-5">
         <h3 className="text-sm font-semibold text-neutral-900">站点信息</h3>
         <p className="mt-1 text-xs text-neutral-400">
@@ -91,6 +99,24 @@ export default function SeoManager({
             />
           </div>
           <div>
+            <label htmlFor="seo-site-logo" className={LABEL_STRONG}>
+              站点 Logo
+            </label>
+            <input
+              id="seo-site-logo"
+              value={form.siteLogo}
+              onChange={(e) => set({ siteLogo: e.target.value })}
+              className={INPUT}
+              maxLength={300}
+              placeholder="留空使用环境变量配置或内置站点图标"
+              autoComplete="off"
+              spellCheck={false}
+            />
+            <p className="mt-1 text-[10px] leading-4 text-neutral-400">
+              导航栏徽标：填媒体库的 /uploads/… 地址或完整 http(s) URL。
+            </p>
+          </div>
+          <div>
             <label htmlFor="seo-keywords" className={LABEL_STRONG}>
               meta 关键词
             </label>
@@ -107,6 +133,51 @@ export default function SeoManager({
             <p className="mt-1 text-[10px] leading-4 text-neutral-400">
               Google 已忽略该标签，百度/Yandex 仍参考；建议 5~10 个，逗号分隔。
             </p>
+          </div>
+          <div>
+            <label htmlFor="seo-footer-text" className={LABEL_STRONG}>
+              页脚文案
+            </label>
+            <input
+              id="seo-footer-text"
+              value={form.footerText}
+              onChange={(e) => set({ footerText: e.target.value })}
+              className={INPUT}
+              maxLength={120}
+              placeholder="站名后的一句话，如：分享与发现 · 请遵守平台规则（留空不显示）"
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </div>
+          <div>
+            <label htmlFor="seo-icp" className={LABEL_STRONG}>
+              ICP 备案号
+            </label>
+            <input
+              id="seo-icp"
+              value={form.icp}
+              onChange={(e) => set({ icp: e.target.value })}
+              className={INPUT}
+              maxLength={60}
+              placeholder="如：粤ICP备XXXXXXXX号（留空不在页脚显示）"
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </div>
+          <div>
+            <label htmlFor="seo-contact-email" className={LABEL_STRONG}>
+              联系邮箱
+            </label>
+            <input
+              id="seo-contact-email"
+              value={form.contactEmail}
+              onChange={(e) => set({ contactEmail: e.target.value })}
+              className={INPUT}
+              maxLength={200}
+              placeholder="用于页脚「联系我们」，留空不显示"
+              autoComplete="off"
+              spellCheck={false}
+            />
           </div>
         </div>
       </section>
