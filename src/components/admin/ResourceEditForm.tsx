@@ -8,6 +8,7 @@
 // 保证「改稿」与「发布」在字段、样式、交互上完全一致。slug / 作者 / 计数 / 历史版本由服务端保持不变。
 import { useActionState, useRef, useState } from "react";
 import Link from "next/link";
+import MdEditor from "@/components/rte/MdEditor";
 import { BTN_GHOST_SM } from "@/lib/ui/cls";
 import { updateResourceAdminAction } from "@/lib/actions/admin-content";
 import type { ResourceEditState } from "@/lib/actions/_resource-edit";
@@ -81,6 +82,8 @@ export function ResourceEditForm({
   }));
   const [files, setFiles] = useState<Uploaded[]>(initialFiles);
   const [coverId, setCoverId] = useState(resource.coverMediaId || initialFiles[0]?.id || "");
+  // 正文/描述走与发布向导同款 Markdown 编辑器（非受控），内容经 state 进 hidden input 提交
+  const [description, setDescription] = useState(resource.description);
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -178,23 +181,16 @@ export function ResourceEditForm({
           />
         </div>
         <div>
-          <label className={wizLabel} htmlFor="description">
+          <label className={wizLabel}>
             {resource.type === "ARTICLE" ? "正文" : "详细描述"}
           </label>
-          <textarea
-            id="description"
-            name="description"
-            required
+          <MdEditor
             defaultValue={resource.description}
-            rows={resource.type === "ARTICLE" ? 12 : 5}
-            maxLength={20000}
-            placeholder={
-              resource.type === "ARTICLE"
-                ? "正文（Markdown），至少 10 字"
-                : "玩法/用途/方法/注意事项……至少 10 字"
-            }
-            className={wizInput}
+            onChange={setDescription}
+            minHeight={resource.type === "ARTICLE" ? "24rem" : "12rem"}
+            ariaLabel={resource.type === "ARTICLE" ? "正文" : "详细描述"}
           />
+          <input type="hidden" name="description" value={description} />
           {fieldErr(fe.description)}
         </div>
         <div className="grid gap-4 sm:grid-cols-2">

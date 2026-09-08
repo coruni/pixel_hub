@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Keyboard } from "swiper/modules";
 import type { Swiper as SwiperClass } from "swiper";
@@ -21,6 +21,17 @@ export default function Gallery({ media }: { media: GalleryMedia[] }) {
   const [index, setIndex] = useState(0);
   const [lightbox, setLightbox] = useState(false);
   const [swiper, setSwiper] = useState<SwiperClass | null>(null);
+  const activeThumbRef = useRef<HTMLButtonElement | null>(null);
+
+  // 主图切换（拖动/键盘/箭头/缩略图/灯箱）后，把选中缩略图最小幅度滚入可视区，
+  // 避免缩略图条可滚动时高亮项停在视野外
+  useEffect(() => {
+    activeThumbRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "nearest",
+    });
+  }, [index]);
 
   const multi = media.length > 1;
   const hasPrev = index > 0;
@@ -102,6 +113,7 @@ export default function Gallery({ media }: { media: GalleryMedia[] }) {
               <button
                 type="button"
                 key={m.id}
+                ref={i === index ? activeThumbRef : undefined}
                 onClick={() => {
                   setIndex(i);
                   swiper?.slideTo(i);

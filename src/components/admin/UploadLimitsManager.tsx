@@ -186,7 +186,7 @@ export default function UploadLimitsManager({ limits }: { limits: UploadLimits }
       </div>
 
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(18rem,0.9fr)]">
-        <section className="overflow-hidden border border-brand-200 bg-surface">
+        <section className="overflow-hidden border border-brand-200 bg-surface xl:col-start-1 xl:row-start-1">
           <div className="border-b border-brand-100 px-4 py-4 sm:px-5">
             <div className="flex items-start gap-3">
               <span className="flex h-9 w-9 shrink-0 items-center justify-center bg-brand-50 text-brand-600">
@@ -279,7 +279,7 @@ export default function UploadLimitsManager({ limits }: { limits: UploadLimits }
             ))}
           </div>
         </section>
-        <section className="overflow-hidden border border-brand-200 bg-surface">
+        <section className="overflow-hidden border border-brand-200 bg-surface xl:col-start-2 xl:row-start-1">
           <div className="border-b border-brand-100 px-4 py-4 sm:px-5">
             <div className="flex items-start gap-3">
               <span className="flex h-9 w-9 shrink-0 items-center justify-center bg-brand-50 text-brand-600">

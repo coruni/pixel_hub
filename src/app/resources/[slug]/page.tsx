@@ -90,6 +90,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: r.title,
     description,
+    // 页级 keywords 用资源标签（百度/Yandex 参考；Google 忽略），覆盖根布局的全局关键词
+    keywords: r.tags.map((t) => t.tag.name),
     alternates: { canonical: `/resources/${r.slug}` },
     openGraph: {
       // 页级 openGraph 不与根布局合并，siteName 需自带
