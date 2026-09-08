@@ -12,8 +12,6 @@ import type { CommentImage, CommentShape } from "./comment-types";
 
 export type { CommentAuthor, CommentImage, CommentShape } from "./comment-types";
 
-const IMG_MAX = 3;
-
 /** 资源评论区：主楼发布框（带附图）+ 评论树 + 15s 增量轮询 */
 export default function Comments({
   resourceId,
@@ -21,12 +19,15 @@ export default function Comments({
   viewerId,
   isStaff,
   comments,
+  imageMax,
 }: {
   resourceId: string;
   canPost: boolean;
   viewerId?: string;
   isStaff?: boolean;
   comments: CommentShape[];
+  /** 附图张数上限：后台 /admin/uploads「评论附图张数」，0 = 禁止附图 */
+  imageMax: number;
 }) {
   const router = useRouter();
   const [text, setText] = useState("");
@@ -63,7 +64,7 @@ export default function Comments({
 
   function pickImages(list: FileList | null) {
     if (!list) return;
-    const next = [...files, ...Array.from(list)].slice(0, IMG_MAX);
+    const next = [...files, ...Array.from(list)].slice(0, imageMax);
     setFiles(next);
     setPreviews(next.map((f) => URL.createObjectURL(f)));
   }
@@ -122,11 +123,12 @@ export default function Comments({
             className={commentInputCls}
             aria-label="发表评论"
           />
-          {/* 附图选择 + 预览 */}
+          {/* 附图选择 + 预览（imageMax = 0 时隐藏入口） */}
+          {imageMax > 0 && (
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-none border border-brand-200 bg-surface px-3 py-1.5 text-xs text-neutral-600 hover:border-brand-500 hover:text-neutral-900">
               <ImagePlus size={14} aria-hidden />
-              附图 {files.length}/{IMG_MAX}
+              附图 {files.length}/{imageMax}
               <input
                 ref={fileRef}
                 type="file"
@@ -155,6 +157,7 @@ export default function Comments({
               </span>
             ))}
           </div>
+          )}
           <div className="mt-2 flex justify-end">
             <button
               type="button"

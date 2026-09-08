@@ -254,7 +254,6 @@ const commentSchema = z.object({
 export type CommentActionState = { error?: string; ok?: boolean };
 
 // 评论附图：压缩为单张 webp（最长边 ≤1200）；张数上限与单张字节上限均取后台 /admin/uploads 配置
-const DEFAULT_COMMENT_IMG_MAX_COUNT = 3;
 
 function sniffImage(buf: Buffer): boolean {
   if (buf.length < 12) return false;
@@ -316,9 +315,9 @@ export async function addCommentAction(
 
   // 附图（仅主楼，回复不带图）：先落盘，成功与否不阻断文字评论
   const images = fd.getAll("images").filter((f): f is File => f instanceof File && f.size > 0);
-  // 后台配置优先：张数上限（缺省 3）与单张字节上限
+  // 后台配置优先：张数上限（0 = 禁止附图，parseUploadLimits 已 clamp 0..20）与单张字节上限
   const L = await getUploadLimits();
-  const commentMaxCount = L.commentImageMaxCount || DEFAULT_COMMENT_IMG_MAX_COUNT;
+  const commentMaxCount = L.commentImageMaxCount;
   if (images.length > commentMaxCount)
     return { error: `附图最多 ${commentMaxCount} 张` };
   const commentMaxBytes = L.commentImageMaxMb * MIB;

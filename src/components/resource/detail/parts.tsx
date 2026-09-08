@@ -339,9 +339,10 @@ export function DescriptionBlock({ ctx }: { ctx: DetailCtx }) {
   );
 }
 
-/** 评论区 */
-export function CommentBlock({ ctx }: { ctx: DetailCtx }) {
+/** 评论区（附图上限读后台上传限制配置） */
+export async function CommentBlock({ ctx }: { ctx: DetailCtx }) {
   const { detail, authed, meId, isStaff } = ctx;
+  const L = await getUploadLimits();
   return (
     <Comments
       resourceId={detail.id}
@@ -349,6 +350,7 @@ export function CommentBlock({ ctx }: { ctx: DetailCtx }) {
       viewerId={meId}
       isStaff={isStaff}
       comments={detail.comments}
+      imageMax={L.commentImageMaxCount}
     />
   );
 }
