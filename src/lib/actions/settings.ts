@@ -45,6 +45,29 @@ export async function updateProfileAction(
   return { ok: true };
 }
 
+// ---- 主页隐私：收藏/粉丝/关注列表是否对外展示（本人始终可见） ----
+
+export async function updatePrivacyAction(
+  _prev: SettingsActionState,
+  fd: FormData,
+): Promise<SettingsActionState> {
+  const user = (await auth())?.user;
+  if (!user) return { error: "请先登录" };
+
+  // checkbox 提交语义：勾选 = "on"，未勾选 = 缺失
+  const showFavorites = fd.get("showFavorites") === "on";
+  const showFollowers = fd.get("showFollowers") === "on";
+  const showFollowing = fd.get("showFollowing") === "on";
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { showFavorites, showFollowers, showFollowing },
+  });
+  revalidatePath(`/u/${user.username}`);
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
 // ---- 头像上传：方形居中裁切 256px webp，走统一存储层（上限跟随后台 /admin/uploads 头像档） ----
 
 function sniffImage(buf: Buffer): boolean {

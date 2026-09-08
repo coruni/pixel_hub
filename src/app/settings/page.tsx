@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getProfile } from "@/lib/queries";
 import { getUploadLimits } from "@/lib/upload-limits";
 import SettingsForm from "@/components/auth/settings-form";
+import PrivacyForm from "@/components/auth/privacy-form";
 import AvatarForm from "@/components/auth/avatar-form";
 import { EmailForm, PasswordForm } from "@/components/auth/security-forms";
 import { startGitHubBindAction, unbindGitHubAction } from "@/lib/actions/connections";
@@ -109,6 +110,20 @@ export default async function SettingsPage({
         <p className="mb-4 mt-1 text-xs text-neutral-400">昵称与简介会展示在你的公开主页</p>
         <SettingsForm name={profile?.name ?? null} bio={profile?.bio ?? null} />
       </section>
+
+      {profile && (
+        <section className="mt-4 rounded-none border border-brand-200 bg-surface p-6">
+          <h2 className="text-sm font-semibold text-neutral-800">隐私设置</h2>
+          <p className="mb-4 mt-1 text-xs text-neutral-400">
+            控制个人主页上收藏、粉丝、关注列表的可见范围（你自己始终可见全部）
+          </p>
+          <PrivacyForm
+            showFavorites={profile.showFavorites}
+            showFollowers={profile.showFollowers}
+            showFollowing={profile.showFollowing}
+          />
+        </section>
+      )}
 
       <section className="mt-4 rounded-none border border-brand-200 bg-surface p-6">
         <h2 className="text-sm font-semibold text-neutral-800">账号信息</h2>

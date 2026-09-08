@@ -42,14 +42,16 @@ const roleBadge: Record<string, { label: string; cls: string }> = {
   MODERATOR: { label: "版主", cls: "border-amber-200 bg-amber-50 text-amber-600" },
 };
 
-const TABS = [
-  { key: "works", label: "作品", selfOnly: false },
-  { key: "favorites", label: "收藏", selfOnly: true },
-  { key: "followers", label: "关注者", selfOnly: false },
-  { key: "following", label: "关注中", selfOnly: false },
-] as const;
+type TabKey = "works" | "favorites" | "followers" | "following";
+type PrivacyKey = "showFavorites" | "showFollowers" | "showFollowing";
 
-type TabKey = (typeof TABS)[number]["key"];
+// privacy = 该 tab 对应的用户隐私开关；无 privacy 的 tab 恒可见
+const TABS: { key: TabKey; label: string; privacy?: PrivacyKey }[] = [
+  { key: "works", label: "作品" },
+  { key: "favorites", label: "收藏", privacy: "showFavorites" },
+  { key: "followers", label: "关注者", privacy: "showFollowers" },
+  { key: "following", label: "关注中", privacy: "showFollowing" },
+];
 
 const userSelect = {
   id: true,
@@ -114,10 +116,11 @@ export default async function UserPage({
   const profile = await getProfile(username, meId);
   if (!profile) notFound();
 
-  // 收藏仅本人可见；非法 tab 回落到作品
-  const tab: TabKey = (
-    TABS.find((t) => t.key === tabRaw && (!t.selfOnly || profile.isViewer)) ?? TABS[0]
-  ).key;
+  // tab 可见性：本人始终可见；其余访客按对方的隐私开关（收藏默认仅本人，粉丝/关注默认公开）
+  const tabVisible = (t: (typeof TABS)[number]) =>
+    !t.privacy || profile.isViewer || profile[t.privacy];
+  // 非法/被隐私挡掉的 tab 回落到作品
+  const tab: TabKey = (TABS.find((t) => t.key === tabRaw && tabVisible(t)) ?? TABS[0]).key;
   const page = Math.max(1, Number(pageRaw) || 1);
 
   // D9：作者页统计对齐游客可见范围（NSFW 不计入）；登录访客全站口径
@@ -318,9 +321,9 @@ export default async function UserPage({
         </div>
       </div>
 
-      {/* Tabs（收藏仅本人可见） */}
+      {/* Tabs（收藏/粉丝/关注按隐私开关，本人始终可见） */}
       <div className="mt-8 flex flex-wrap items-center gap-2">
-        {TABS.filter((t) => !t.selfOnly || profile.isViewer).map((t) => (
+        {TABS.filter(tabVisible).map((t) => (
           <Link key={t.key} href={tabHref(t.key)} className={chip(tab === t.key)}>
             {t.label}
             {t.key === "works" && <span className="ml-1 tabular-nums opacity-70">{pubCount}</span>}

@@ -27,6 +27,10 @@ model User {
   bannedAt     DateTime?
   bannedReason String?
   lastSeenAt   DateTime? // 在线状态：客户端心跳间隔更新，5 分钟内视为在线
+  // ---- 主页隐私：收藏/粉丝/关注列表是否对外展示（本人始终可见）----
+  showFavorites Boolean @default(false) // 收藏默认仅本人可见（延续原行为）
+  showFollowers Boolean @default(true) // 粉丝列表默认公开（延续原行为）
+  showFollowing Boolean @default(true) // 关注列表默认公开（延续原行为）
 
   accounts       Account[]
   sessions       Session[]

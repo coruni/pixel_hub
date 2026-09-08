@@ -982,6 +982,10 @@ export type UserProfile = {
   resourceCount: number;
   followerCount: number;
   followingCount: number;
+  // 主页隐私开关：对应列表/收藏 tab 是否对非本人访客可见（本人始终可见）
+  showFavorites: boolean;
+  showFollowers: boolean;
+  showFollowing: boolean;
   isViewer: boolean;
   following: boolean;
   online: boolean;
@@ -1002,6 +1006,9 @@ export const getProfile = cache(
         trusted: true,
         createdAt: true,
         lastSeenAt: true,
+        showFavorites: true,
+        showFollowers: true,
+        showFollowing: true,
         _count: { select: { resources: true, followers: true, following: true } },
       },
     });
@@ -1026,6 +1033,9 @@ export const getProfile = cache(
       resourceCount: user._count.resources,
       followerCount: user._count.followers,
       followingCount: user._count.following,
+      showFavorites: user.showFavorites,
+      showFollowers: user.showFollowers,
+      showFollowing: user.showFollowing,
       isViewer,
       following,
       online: isOnline(user.lastSeenAt),
