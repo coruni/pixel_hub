@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { safeCallbackUrl, type SP } from "@/lib/search-params";
+import { getRuntimeConfig, githubClientId, githubClientSecret } from "@/lib/runtime-config";
 import LoginForm from "@/components/auth/login-form";
 
 export const metadata: Metadata = { title: "登录" };
@@ -7,7 +8,8 @@ export const metadata: Metadata = { title: "登录" };
 export default async function LoginPage({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = await searchParams;
   const callbackUrl = safeCallbackUrl(sp);
-  const githubEnabled = Boolean(process.env.GITHUB_ID && process.env.GITHUB_SECRET);
+  const cfg = await getRuntimeConfig();
+  const githubEnabled = Boolean(githubClientId(cfg) && githubClientSecret(cfg));
   const resetDone = sp.reset === "1";
   return (
     <div className="flex min-h-[70vh] items-center justify-center px-4 py-16">

@@ -1,0 +1,420 @@
+"use client";
+
+// 站点运行配置表单：GitHub OAuth / 存储驱动 / SMTP 邮件。整体提交 + 乐观锁版本。
+// 优先级：此处配置 > 旧 .env（迁移期回退，.env 可删）。
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { updateRuntimeConfigAction } from "@/lib/actions/runtime-config";
+import type { RuntimeConfig } from "@/lib/runtime-config";
+import { SquareCheckbox } from "@/components/admin/SquareCheckbox";
+import { BTN_PRIMARY_SM, INPUT, LABEL_STRONG } from "@/lib/ui/cls";
+
+const DRIVERS = [
+  { value: "local", label: "本地磁盘（public/uploads）" },
+  { value: "chevereto", label: "Chevereto 图床" },
+  { value: "s3", label: "S3 兼容对象存储（S3 / R2 / MinIO）" },
+] as const;
+
+export default function RuntimeConfigManager({
+  config,
+  version,
+  siteUrl,
+}: {
+  config: RuntimeConfig;
+  version: number;
+  siteUrl: string;
+}) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+  const [form, setForm] = useState({
+    githubId: config.githubId,
+    githubSecret: config.githubSecret,
+    storageDriver: config.storageDriver,
+    cheveretoBase: config.cheveretoBase,
+    cheveretoApiKey: config.cheveretoApiKey,
+    s3Endpoint: config.s3Endpoint,
+    s3Region: config.s3Region,
+    s3Bucket: config.s3Bucket,
+    s3AccessKeyId: config.s3AccessKeyId,
+    s3SecretAccessKey: config.s3SecretAccessKey,
+    s3PublicBase: config.s3PublicBase,
+    s3AclPrivate: config.s3AclPrivate,
+    smtpHost: config.smtpHost,
+    smtpPort: config.smtpPort,
+    smtpUser: config.smtpUser,
+    smtpPass: config.smtpPass,
+    mailFrom: config.mailFrom,
+    mailNotify: config.mailNotify,
+    emailCodeRequired: config.emailCodeRequired,
+  });
+
+  const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
+
+  const save = () =>
+    start(async () => {
+      setMessage(null);
+      const result = await updateRuntimeConfigAction(form, version);
+      if (result.ok) {
+        setMessage({ kind: "ok", text: "已保存，立即生效（无需重启）" });
+        router.refresh();
+      } else {
+        setMessage({ kind: "error", text: result.error ?? "保存失败，请重试" });
+      }
+    });
+
+  return (
+    <div className="space-y-6">
+      {/* ---- 登录 ---- */}
+      <section className="border border-brand-200 bg-surface p-5">
+        <h3 className="text-sm font-semibold text-neutral-900">GitHub 登录</h3>
+        <p className="mt-1 text-xs leading-5 text-neutral-400">
+          在 GitHub → Settings → Developer settings → OAuth Apps 创建应用，
+          Authorization callback URL 填：
+          <code className="mx-1 bg-brand-50 px-1 py-0.5 text-brand-700">
+            {siteUrl}/api/auth/callback/github
+          </code>
+          两项都填写后 GitHub 登录按钮即刻出现（留空则关闭）。此处留空时回退读取旧 .env。
+        </p>
+        <div className="mt-4 space-y-4">
+          <div>
+            <label htmlFor="rc-github-id" className={LABEL_STRONG}>
+              Client ID
+            </label>
+            <input
+              id="rc-github-id"
+              value={form.githubId}
+              onChange={(e) => set({ githubId: e.target.value })}
+              className={INPUT}
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="Iv1.xxxxxxxxxxxxxxxx"
+            />
+          </div>
+          <div>
+            <label htmlFor="rc-github-secret" className={LABEL_STRONG}>
+              Client Secret
+            </label>
+            <input
+              id="rc-github-secret"
+              type="password"
+              value={form.githubSecret}
+              onChange={(e) => set({ githubSecret: e.target.value })}
+              className={INPUT}
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="••••••••••••••••••••"
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* ---- 存储 ---- */}
+      <section className="border border-brand-200 bg-surface p-5">
+        <h3 className="text-sm font-semibold text-neutral-900">存储</h3>
+        <p className="mt-1 text-xs leading-5 text-neutral-400">
+          上传文件的存放位置。切换驱动只影响之后的上传，已落库的 URL 不变。
+        </p>
+        <div className="mt-4 space-y-4">
+          <div>
+            <label htmlFor="rc-driver" className={LABEL_STRONG}>
+              存储驱动
+            </label>
+            <select
+              id="rc-driver"
+              value={form.storageDriver}
+              onChange={(e) => set({ storageDriver: e.target.value })}
+              className={INPUT}
+            >
+              {DRIVERS.map((d) => (
+                <option key={d.value} value={d.value}>
+                  {d.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {form.storageDriver === "chevereto" && (
+            <>
+              <div>
+                <label htmlFor="rc-chev-base" className={LABEL_STRONG}>
+                  Chevereto 站点地址
+                </label>
+                <input
+                  id="rc-chev-base"
+                  value={form.cheveretoBase}
+                  onChange={(e) => set({ cheveretoBase: e.target.value })}
+                  className={INPUT}
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder="https://img.example.com"
+                />
+              </div>
+              <div>
+                <label htmlFor="rc-chev-key" className={LABEL_STRONG}>
+                  API Key
+                </label>
+                <input
+                  id="rc-chev-key"
+                  type="password"
+                  value={form.cheveretoApiKey}
+                  onChange={(e) => set({ cheveretoApiKey: e.target.value })}
+                  className={INPUT}
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder="••••••••••••••••"
+                />
+                <p className="mt-1 text-[10px] leading-4 text-neutral-400">
+                  Chevereto 用户设置 → API 接入 中获取。
+                </p>
+              </div>
+            </>
+          )}
+
+          {form.storageDriver === "s3" && (
+            <>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="rc-s3-endpoint" className={LABEL_STRONG}>
+                    Endpoint
+                  </label>
+                  <input
+                    id="rc-s3-endpoint"
+                    value={form.s3Endpoint}
+                    onChange={(e) => set({ s3Endpoint: e.target.value })}
+                    className={INPUT}
+                    autoComplete="off"
+                    spellCheck={false}
+                    placeholder="https://s3.example.com"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="rc-s3-region" className={LABEL_STRONG}>
+                    Region
+                  </label>
+                  <input
+                    id="rc-s3-region"
+                    value={form.s3Region}
+                    onChange={(e) => set({ s3Region: e.target.value })}
+                    className={INPUT}
+                    autoComplete="off"
+                    spellCheck={false}
+                    placeholder="auto"
+                  />
+                </div>
+              </div>
+              <div>
+                <label htmlFor="rc-s3-bucket" className={LABEL_STRONG}>
+                  Bucket
+                </label>
+                <input
+                  id="rc-s3-bucket"
+                  value={form.s3Bucket}
+                  onChange={(e) => set({ s3Bucket: e.target.value })}
+                  className={INPUT}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="rc-s3-ak" className={LABEL_STRONG}>
+                    Access Key ID
+                  </label>
+                  <input
+                    id="rc-s3-ak"
+                    value={form.s3AccessKeyId}
+                    onChange={(e) => set({ s3AccessKeyId: e.target.value })}
+                    className={INPUT}
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="rc-s3-sk" className={LABEL_STRONG}>
+                    Secret Access Key
+                  </label>
+                  <input
+                    id="rc-s3-sk"
+                    type="password"
+                    value={form.s3SecretAccessKey}
+                    onChange={(e) => set({ s3SecretAccessKey: e.target.value })}
+                    className={INPUT}
+                    autoComplete="off"
+                    spellCheck={false}
+                    placeholder="••••••••••••••••"
+                  />
+                </div>
+              </div>
+              <div>
+                <label htmlFor="rc-s3-base" className={LABEL_STRONG}>
+                  公开访问基址
+                </label>
+                <input
+                  id="rc-s3-base"
+                  value={form.s3PublicBase}
+                  onChange={(e) => set({ s3PublicBase: e.target.value })}
+                  className={INPUT}
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder="留空用 Endpoint/Bucket 拼接；私有桶填 CDN 地址"
+                />
+              </div>
+              <label className="flex cursor-pointer items-start gap-2.5">
+                <SquareCheckbox
+                  checked={form.s3AclPrivate}
+                  onChange={(next) => set({ s3AclPrivate: next })}
+                  ariaLabel="私有桶（不设置 public-read ACL）"
+                  className="mt-0.5"
+                />
+                <span>
+                  <span className="block text-sm text-neutral-900">私有桶</span>
+                  <span className="mt-0.5 block text-xs text-neutral-400">
+                    上传时不设置 public-read ACL；公开访问基址需指向 CDN。
+                  </span>
+                </span>
+              </label>
+            </>
+          )}
+
+          {form.storageDriver === "local" && (
+            <p className="text-xs leading-5 text-neutral-400">
+              本地模式无需配置，文件存放在 public/uploads 下。
+            </p>
+          )}
+        </div>
+      </section>
+
+      {/* ---- 邮件 ---- */}
+      <section className="border border-brand-200 bg-surface p-5">
+        <h3 className="text-sm font-semibold text-neutral-900">SMTP 邮件</h3>
+        <p className="mt-1 text-xs leading-5 text-neutral-400">
+          用于密码重置与邮件通知（评论回复、审核结果）。主机/用户/密码齐备后发信功能自动启用。
+        </p>
+        <div className="mt-4 space-y-4">
+          <div className="grid gap-4 sm:grid-cols-[1fr_120px]">
+            <div>
+              <label htmlFor="rc-smtp-host" className={LABEL_STRONG}>
+                SMTP 主机
+              </label>
+              <input
+                id="rc-smtp-host"
+                value={form.smtpHost}
+                onChange={(e) => set({ smtpHost: e.target.value })}
+                className={INPUT}
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="smtp.example.com"
+              />
+            </div>
+            <div>
+              <label htmlFor="rc-smtp-port" className={LABEL_STRONG}>
+                端口
+              </label>
+              <input
+                id="rc-smtp-port"
+                value={form.smtpPort}
+                onChange={(e) => set({ smtpPort: e.target.value })}
+                className={INPUT}
+                inputMode="numeric"
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="587"
+              />
+              <p className="mt-1 text-[10px] leading-4 text-neutral-400">465 走 SSL，其余 STARTTLS</p>
+            </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="rc-smtp-user" className={LABEL_STRONG}>
+                SMTP 用户名
+              </label>
+              <input
+                id="rc-smtp-user"
+                value={form.smtpUser}
+                onChange={(e) => set({ smtpUser: e.target.value })}
+                className={INPUT}
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </div>
+            <div>
+              <label htmlFor="rc-smtp-pass" className={LABEL_STRONG}>
+                SMTP 密码 / 授权码
+              </label>
+              <input
+                id="rc-smtp-pass"
+                type="password"
+                value={form.smtpPass}
+                onChange={(e) => set({ smtpPass: e.target.value })}
+                className={INPUT}
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="••••••••••••"
+              />
+            </div>
+          </div>
+          <div>
+            <label htmlFor="rc-mail-from" className={LABEL_STRONG}>
+              发件地址（From）
+            </label>
+            <input
+              id="rc-mail-from"
+              value={form.mailFrom}
+              onChange={(e) => set({ mailFrom: e.target.value })}
+              className={INPUT}
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="留空用 noreply@站点域名"
+            />
+          </div>
+          <label className="flex cursor-pointer items-start gap-2.5">
+            <SquareCheckbox
+              checked={form.mailNotify}
+              onChange={(next) => set({ mailNotify: next })}
+              ariaLabel="开启邮件通知"
+              className="mt-0.5"
+            />
+            <span>
+              <span className="block text-sm text-neutral-900">开启邮件通知</span>
+              <span className="mt-0.5 block text-xs text-neutral-400">
+                评论回复与审核结果邮件提醒（每用户每小时最多 5 封）；关闭后仅站内通知。
+              </span>
+            </span>
+          </label>
+          <label className="flex cursor-pointer items-start gap-2.5">
+            <SquareCheckbox
+              checked={form.emailCodeRequired}
+              onChange={(next) => set({ emailCodeRequired: next })}
+              ariaLabel="注册需邮箱验证码"
+              className="mt-0.5"
+            />
+            <span>
+              <span className="block text-sm text-neutral-900">注册需邮箱验证码</span>
+              <span className="mt-0.5 block text-xs text-neutral-400">
+                开启后注册表单要求输入发送到邮箱的 6 位验证码（10 分钟有效）；需 SMTP 可用，
+                未配置邮件服务时自动关闭验证以保底可用。
+              </span>
+            </span>
+          </label>
+        </div>
+      </section>
+
+      <div className="flex items-center gap-3">
+        <button type="button" onClick={save} disabled={pending} className={BTN_PRIMARY_SM}>
+          {pending ? "保存中…" : "保存配置"}
+        </button>
+        {message?.kind === "ok" && (
+          <span className="text-xs text-emerald-700" role="status">
+            {message.text}
+          </span>
+        )}
+        {message?.kind === "error" && (
+          <span className="text-xs text-red-600" role="alert">
+            {message.text}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}

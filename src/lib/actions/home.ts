@@ -12,7 +12,7 @@ import {
 } from "@/lib/home-config";
 
 function homeRevalidate() {
-  revalidatePath("/admin/home");
+  revalidatePath("/admin/site"); // 首页布局已并入站点布局页
   revalidatePath("/");
   revalidatePath("/admin");
 }

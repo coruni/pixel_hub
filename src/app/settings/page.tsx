@@ -10,6 +10,7 @@ import SettingsForm from "@/components/auth/settings-form";
 import AvatarForm from "@/components/auth/avatar-form";
 import { EmailForm, PasswordForm } from "@/components/auth/security-forms";
 import { startGitHubBindAction, unbindGitHubAction } from "@/lib/actions/connections";
+import { getRuntimeConfig, githubClientId, githubClientSecret } from "@/lib/runtime-config";
 
 export const metadata: Metadata = { title: "账户设置", robots: { index: false } };
 
@@ -38,7 +39,11 @@ export default async function SettingsPage({
   const session = await auth();
   if (!session?.user) redirect("/login?callbackUrl=/settings");
 
-  const [bind, limits] = await Promise.all([searchParams.then((s) => s.bind), getUploadLimits()]);
+  const [bind, limits, runtimeCfg] = await Promise.all([
+    searchParams.then((s) => s.bind),
+    getUploadLimits(),
+    getRuntimeConfig(),
+  ]);
   const bindMsg = bind ? (BIND_MESSAGES[bind] ?? null) : null;
 
   const me = session.user;
@@ -47,7 +52,7 @@ export default async function SettingsPage({
     where: { userId: me.id, provider: "github" },
     select: { providerAccountId: true },
   });
-  const githubEnabled = Boolean(process.env.GITHUB_ID && process.env.GITHUB_SECRET);
+  const githubEnabled = Boolean(githubClientId(runtimeCfg) && githubClientSecret(runtimeCfg));
   const joined = profile
     ? new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "long", day: "numeric" }).format(
         profile.createdAt,

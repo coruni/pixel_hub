@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { AuthError } from "next-auth";
 import { auth, signIn } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
+import { getRuntimeConfig, githubClientId, githubClientSecret } from "@/lib/runtime-config";
 
 // ---- GitHub 账号绑定 ----
 // 复用 GitHub 登录的 OAuth 回调 /api/auth/callback/github（GitHub OAuth App 只能配一个
@@ -15,7 +16,8 @@ import { prisma } from "@/lib/db/prisma";
 export async function startGitHubBindAction(): Promise<void> {
   const user = (await auth())?.user;
   if (!user) redirect("/login?callbackUrl=/settings");
-  if (!process.env.GITHUB_ID || !process.env.GITHUB_SECRET) redirect("/settings?bind=err");
+  const cfg = await getRuntimeConfig();
+  if (!githubClientId(cfg) || !githubClientSecret(cfg)) redirect("/settings?bind=err");
 
   try {
     // 授权后回到 /api/auth/callback/github：绑定完成，跳回设置页

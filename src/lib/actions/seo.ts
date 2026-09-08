@@ -39,8 +39,8 @@ export async function updateSeoConfigAction(
     if (!created || created.count !== 1) return CONFLICT;
   }
   await audit(admin.id, "EDIT_SEO", "SITE_SETTING", SEO_KEY);
-  // metadata 全站动态读取；刷新首页路由缓存与后台自身
-  revalidatePath("/admin/seo");
+  // metadata 全站动态读取；刷新首页路由缓存与后台自身（SEO 配置已并入 /admin/runtime）
+  revalidatePath("/admin/runtime");
   revalidatePath("/");
   return { ok: true };
 }

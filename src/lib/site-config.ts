@@ -408,7 +408,7 @@ export const SIDEBAR_PAGE_KEYS: SidebarPageKey[] = ["home", "archive", "detail"]
 /** 详情页正文槽位：上（正文前）/ 中（描述与评论之间）/ 下（页尾） */
 export type DetailSlotKey = "detailTop" | "detailMiddle" | "detailBottom";
 
-/** 归档页正文槽位：上（内容流之前）/ 下（内容流之后）——动态信息流无固定中部；首页布局由 /admin/home 专门管理，无槽位 */
+/** 归档页正文槽位：上（内容流之前）/ 下（内容流之后）——动态信息流无固定中部；首页板块流在站点布局页的「首页布局」区管理，无槽位 */
 export type FeedSlotKey = "archiveTop" | "archiveBottom";
 
 /** 全部内容槽位 key */

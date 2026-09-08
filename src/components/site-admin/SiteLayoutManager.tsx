@@ -111,11 +111,7 @@ export default function SiteLayoutManager({
             <h2 className="text-base font-semibold text-neutral-900">页面组件</h2>
             <p className="mt-0.5 text-xs text-neutral-500">
               按区域分别配置：侧边栏三类页面，以及归档页、详情页的各正文槽位；组件各自独立，可排序、开关、删除。
-              首页板块流在
-              <Link href="/admin/home" className="mx-0.5 text-brand-600 hover:underline">
-                首页布局
-              </Link>
-              页管理。
+              首页板块流在本页上方「首页布局」区管理。
             </p>
           </div>
           <Link

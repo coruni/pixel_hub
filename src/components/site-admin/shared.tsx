@@ -43,7 +43,7 @@ export function KindIcon({ kind, size = 15 }: { kind: SidebarWidgetKind; size?: 
   return <Icon size={size} aria-hidden />;
 }
 
-/** 组件可投放区域页签：3 个侧边栏页面 + 5 个内容槽位（详情上/中/下 + 归档上/下）；首页布局在 /admin/home 专门管理 */
+/** 组件可投放区域页签：3 个侧边栏页面 + 5 个内容槽位（详情上/中/下 + 归档上/下）；首页板块流在站点布局页上方区域管理 */
 export const AREA_TABS: { key: WidgetAreaKey; label: string; hint: string }[] = [
   { key: "home", label: "首页侧栏", hint: "首页右侧边栏" },
   { key: "archive", label: "归档侧栏", hint: "浏览 / 搜索 / 标签页右侧边栏" },

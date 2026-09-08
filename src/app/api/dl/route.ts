@@ -3,6 +3,7 @@ import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
+import { getRuntimeConfig } from "@/lib/runtime-config";
 
 // 下载网关：所有「本站托管的附件」（local /uploads、S3 外链、OneDrive /od 引用）统一经此处，
 // 由服务端在响应里设置 Content-Disposition: attachment; filename*=UTF-8''<原名>，
@@ -26,27 +27,27 @@ const GRAPH_HOSTS = [
   "blob.core.windows.net",
 ];
 
-function s3Hosts(): string[] {
-  const out: string[] = [];
-  const b = process.env.S3_PUBLIC_BASE ?? process.env.S3_ENDPOINT;
-  if (b) {
+// 外链白名单基址：后台「站点配置」的 S3 / chevereto 基址（旧 env 回退），运行时动态读取
+async function externalHosts(): Promise<{ s3: string[]; chevereto: string | null }> {
+  const c = await getRuntimeConfig();
+  const out = { s3: [] as string[], chevereto: null as string | null };
+  const s3Base = c.s3PublicBase || process.env.S3_PUBLIC_BASE || c.s3Endpoint || process.env.S3_ENDPOINT;
+  if (s3Base) {
     try {
-      out.push(new URL(b).host);
+      out.s3.push(new URL(s3Base).host);
     } catch {
-      /* 忽略非法 env */
+      /* 忽略非法配置 */
+    }
+  }
+  const chevBase = c.cheveretoBase || process.env.CHEVERETO_BASE;
+  if (chevBase) {
+    try {
+      out.chevereto = new URL(chevBase).host;
+    } catch {
+      out.chevereto = null;
     }
   }
   return out;
-}
-
-function cheveretoHost(): string | null {
-  const b = process.env.CHEVERETO_BASE;
-  if (!b) return null;
-  try {
-    return new URL(b).host;
-  } catch {
-    return null;
-  }
 }
 
 /** 受控拼接本地路径：越界（路径穿越）返回 null */
@@ -127,9 +128,10 @@ export async function GET(req: NextRequest) {
       }
     } else {
       const host = parsed.host.toLowerCase();
+      const hosts = await externalHosts();
       if (GRAPH_HOSTS.some((h) => host === h || host.endsWith("." + h))) {
         target = { kind: "redirect", url: parsed.toString() };
-      } else if (s3Hosts().includes(host) || cheveretoHost() === host) {
+      } else if (hosts.s3.includes(host) || hosts.chevereto === host) {
         target = { kind: "external", url: parsed.toString() };
       }
     }
