@@ -6,6 +6,7 @@ import { LayoutGrid, Menu, X } from "lucide-react";
 import { NAV_ICON_MAP } from "@/lib/nav-icons";
 import type { NavCategory } from "./NavCategoriesMenu";
 import { Button } from "@/components/ui/Button";
+import SearchBox from "./SearchBox";
 
 export type MobileNavItem = {
   id: string;
@@ -59,6 +60,12 @@ export default function MobileNav({
       {open && (
         <div className="fixed inset-x-0 top-16 z-40 max-h-[calc(100dvh-4rem)] overflow-y-auto border-b border-brand-200 bg-surface shadow-lg">
           <nav className="mx-auto grid max-w-7xl gap-1 px-4 py-4">
+            {/* 站内搜索（全文检索）：提交即收起抽屉跳搜索结果 */}
+            <SearchBox
+              onSubmitted={close}
+              className="mb-3 w-full"
+              placeholder="搜索资源、作者或标签…"
+            />
             {items.map((it) => {
               const Icon = it.icon ? NAV_ICON_MAP[it.icon] : null;
               return (

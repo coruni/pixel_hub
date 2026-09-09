@@ -13,7 +13,8 @@
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
     "db:seed:extra": "tsx prisma/seed-extra.ts",
-    "db:seed:bulk": "tsx prisma/seed-bulk.ts"
+    "db:seed:bulk": "tsx prisma/seed-bulk.ts",
+    "search:reindex": "tsx prisma/search-reindex.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",

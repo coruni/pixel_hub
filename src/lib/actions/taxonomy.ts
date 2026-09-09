@@ -10,7 +10,7 @@ import { adminOnly, audit } from "@/lib/actions/_guards";
 type Result = { ok: true } | { ok: false; error: string };
 
 function revalidateAll() {
-  for (const p of ["/", "/browse", "/search", "/admin/categories", "/admin/tags"])
+  for (const p of ["/", "/browse", "/admin/categories", "/admin/tags"])
     revalidatePath(p);
 }
 

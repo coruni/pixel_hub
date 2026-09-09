@@ -8,6 +8,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db/prisma";
 import { audit, staff } from "@/lib/actions/_guards";
 import { applyResourceEdit, type ResourceEditState } from "@/lib/actions/_resource-edit";
+import { syncResourceSearch } from "@/lib/search";
 
 export type AdminResourceState = ResourceEditState;
 
@@ -36,6 +37,9 @@ export async function updateResourceAdminAction(
     console.error("[updateResourceAdmin]", e);
     return { error: "保存失败，请稍后重试" };
   }
+
+  // 全文索引同步（正文已变更；失败仅告警，不影响保存结果）
+  await syncResourceSearch(id);
 
   await audit(me.id, "UPDATE_RESOURCE", "RESOURCE", id, resource.slug);
   revalidatePath("/admin/content");

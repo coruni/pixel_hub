@@ -31,7 +31,6 @@ function themeRevalidate() {
   revalidatePath("/admin");
   revalidatePath("/");
   revalidatePath("/browse");
-  revalidatePath("/search");
 }
 
 function uid(): string {

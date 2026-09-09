@@ -12,6 +12,7 @@ import UserMenu from "./UserMenu";
 import NavCategoriesMenu from "./NavCategoriesMenu";
 import ThemeToggle from "./ThemeToggle";
 import MobileNav from "./MobileNav";
+import SearchBox from "./SearchBox";
 
 const navBtn = "inline-flex items-center gap-1.5 transition hover:text-neutral-900";
 const iconSize = 15;
@@ -82,6 +83,8 @@ export default async function Navbar() {
         )}
 
         <div className="ml-auto flex items-center gap-3">
+          {/* 站内搜索（全文检索）：≥sm 行内显示；窄屏在汉堡抽屉顶部提供 */}
+          <SearchBox className="hidden w-40 sm:block lg:w-52" placeholder="搜索资源…" />
           <ThemeToggle />
           {/* 小屏汉堡菜单：导航项 + 分类直达（桌面端隐藏） */}
           <MobileNav

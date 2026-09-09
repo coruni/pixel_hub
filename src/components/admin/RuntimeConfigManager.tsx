@@ -55,6 +55,14 @@ export default function RuntimeConfigManager({
     graphClientSecret: config.graphClientSecret,
     graphEndpoint: config.graphEndpoint,
     graphScope: config.graphScope,
+    searchEngine: config.searchEngine,
+    esUrl: config.esUrl,
+    esIndex: config.esIndex,
+    esApiKey: config.esApiKey,
+    esUsername: config.esUsername,
+    esPassword: config.esPassword,
+    esAnalyzer: config.esAnalyzer,
+    searchCandidateLimit: config.searchCandidateLimit,
   });
 
   const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
@@ -83,6 +91,7 @@ export default function RuntimeConfigManager({
           { key: "storage", label: "存储" },
           { key: "mail", label: "邮件" },
           { key: "cloud", label: "云盘" },
+          { key: "search", label: "搜索" },
         ]}
         panels={{
           login: (
@@ -528,6 +537,145 @@ export default function RuntimeConfigManager({
               spellCheck={false}
               placeholder="默认 {endpoint}/.default"
             />
+          </div>
+        </div>
+      </section>
+            </>
+          ),
+          search: (
+            <>
+      {/* ---- 全文搜索 ---- */}
+      <section className="border border-brand-200 bg-surface p-5">
+        <h3 className="text-sm font-semibold text-neutral-900">全文搜索</h3>
+        <p className="mt-1 text-xs leading-5 text-neutral-400">
+          前台搜索的检索引擎与候选规模。默认 PostgreSQL（pg_trgm，无需外部服务，Supabase 自带扩展）；
+          数据量大后可切 Elasticsearch——填好下方地址与认证后保存即生效（无需重启），然后跑
+          <code className="mx-1 bg-brand-50 px-1 py-0.5 text-brand-700">npm run search:reindex</code>
+          全量重建索引。本组留空项回退读取旧 .env（SEARCH_ENGINE / ES_*），全部迁到后台后即可从 .env 删除。
+        </p>
+        <div className="mt-4 space-y-4">
+          <div>
+            <label htmlFor="rc-search-engine" className={LABEL_STRONG}>
+              检索引擎
+            </label>
+            <select
+              id="rc-search-engine"
+              value={form.searchEngine}
+              onChange={(e) => set({ searchEngine: e.target.value })}
+              className={INPUT}
+            >
+              <option value="">跟随旧 .env / 默认 PostgreSQL</option>
+              <option value="postgres">PostgreSQL（pg_trgm）</option>
+              <option value="elasticsearch">Elasticsearch</option>
+            </select>
+            <p className="mt-1 text-xs text-neutral-400">
+              切换 Elasticsearch 后新发布内容自动写入 ES；存量内容需跑 search:reindex 重建。
+            </p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="rc-es-url" className={LABEL_STRONG}>
+                ES 地址
+              </label>
+              <input
+                id="rc-es-url"
+                value={form.esUrl}
+                onChange={(e) => set({ esUrl: e.target.value })}
+                className={INPUT}
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="https://your-cluster.es:9243"
+              />
+            </div>
+            <div>
+              <label htmlFor="rc-es-index" className={LABEL_STRONG}>
+                ES 索引名
+              </label>
+              <input
+                id="rc-es-index"
+                value={form.esIndex}
+                onChange={(e) => set({ esIndex: e.target.value })}
+                className={INPUT}
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="默认 pixel-hub-resources"
+              />
+            </div>
+            <div>
+              <label htmlFor="rc-es-apikey" className={LABEL_STRONG}>
+                API Key
+              </label>
+              <input
+                id="rc-es-apikey"
+                type="password"
+                value={form.esApiKey}
+                onChange={(e) => set({ esApiKey: e.target.value })}
+                className={INPUT}
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="ApiKey 认证（与账号二选一）"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:col-span-2">
+              <div>
+                <label htmlFor="rc-es-user" className={LABEL_STRONG}>
+                  ES 用户名
+                </label>
+                <input
+                  id="rc-es-user"
+                  value={form.esUsername}
+                  onChange={(e) => set({ esUsername: e.target.value })}
+                  className={INPUT}
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder="Basic 认证用"
+                />
+              </div>
+              <div>
+                <label htmlFor="rc-es-pass" className={LABEL_STRONG}>
+                  ES 密码
+                </label>
+                <input
+                  id="rc-es-pass"
+                  type="password"
+                  value={form.esPassword}
+                  onChange={(e) => set({ esPassword: e.target.value })}
+                  className={INPUT}
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder="••••••••••••"
+                />
+              </div>
+            </div>
+            <div>
+              <label htmlFor="rc-es-analyzer" className={LABEL_STRONG}>
+                分析器
+              </label>
+              <input
+                id="rc-es-analyzer"
+                value={form.esAnalyzer}
+                onChange={(e) => set({ esAnalyzer: e.target.value })}
+                className={INPUT}
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="中文生产建议 ik_max_word（留空 = 默认）"
+              />
+            </div>
+            <div>
+              <label htmlFor="rc-search-limit" className={LABEL_STRONG}>
+                候选上限
+              </label>
+              <input
+                id="rc-search-limit"
+                type="number"
+                min={1000}
+                max={50000}
+                value={form.searchCandidateLimit}
+                onChange={(e) => set({ searchCandidateLimit: e.target.value })}
+                className={INPUT}
+                placeholder="默认 5000（1000–50000）"
+              />
+            </div>
           </div>
         </div>
       </section>

@@ -10,7 +10,7 @@ import SubTabs from "@/components/admin/SubTabs";
 
 export const metadata: Metadata = { title: "站点配置" };
 
-// 站点配置：运行配置（GitHub OAuth / 存储 / SMTP，原 .env 迁入）+ SEO 配置，tab 切换避免页面过长。
+// 站点配置：运行配置（GitHub OAuth / 存储 / SMTP / 全文搜索，原 .env 迁入）+ SEO 配置，tab 切换避免页面过长。
 export default async function AdminRuntimePage() {
   const session = await auth();
   if (session?.user?.role !== "ADMIN") redirect("/admin");
@@ -36,8 +36,9 @@ export default async function AdminRuntimePage() {
           runtime: (
             <>
               <p className="mb-4 text-xs leading-5 text-neutral-500">
-                按「登录 / 存储 / 邮件 / 云盘」分组维护，对应旧 .env 的
-                GITHUB_* / STORAGE / S3 / SMTP / GRAPH_* 配置；底部统一保存，立即生效。
+                按「登录 / 存储 / 邮件 / 云盘 / 搜索」分组维护，对应旧 .env 的
+                GITHUB_* / STORAGE / S3 / SMTP / GRAPH_* / SEARCH_* / ES_* 配置；
+                底部统一保存，立即生效（搜索引擎切换后重跑 npm run search:reindex 重建存量）。
               </p>
               <RuntimeConfigManager
                 config={runtime.config}

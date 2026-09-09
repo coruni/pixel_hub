@@ -183,41 +183,46 @@ export default async function FeedBrowser({
           </Link>
         )}
         <span className="mx-2 h-4 w-px bg-neutral-300" />
-        <span className="flex items-center gap-1.5 text-xs">
-          <Link
-            scroll={false}
-            href={href({ sort: "latest" })}
-            className={
-              sort === "latest"
-                ? "font-semibold text-neutral-900"
-                : "text-neutral-500 hover:text-neutral-800"
-            }
-          >
-            最新
-          </Link>
-          <Link
-            scroll={false}
-            href={href({ sort: "popular" })}
-            className={
-              sort === "popular"
-                ? "font-semibold text-neutral-900"
-                : "text-neutral-500 hover:text-neutral-800"
-            }
-          >
-            最热
-          </Link>
-          <Link
-            scroll={false}
-            href={href({ sort: "downloads" })}
-            className={
-              sort === "downloads"
-                ? "font-semibold text-neutral-900"
-                : "text-neutral-500 hover:text-neutral-800"
-            }
-          >
-            最多下载
-          </Link>
-        </span>
+        {q ? (
+          // 全文检索态：结果按相关度排序（引擎相关度），不再提供 最新/最热 等字段排序切换
+          <span className="flex items-center text-xs text-neutral-500">按相关度排序</span>
+        ) : (
+          <span className="flex items-center gap-1.5 text-xs">
+            <Link
+              scroll={false}
+              href={href({ sort: "latest" })}
+              className={
+                sort === "latest"
+                  ? "font-semibold text-neutral-900"
+                  : "text-neutral-500 hover:text-neutral-800"
+              }
+            >
+              最新
+            </Link>
+            <Link
+              scroll={false}
+              href={href({ sort: "popular" })}
+              className={
+                sort === "popular"
+                  ? "font-semibold text-neutral-900"
+                  : "text-neutral-500 hover:text-neutral-800"
+              }
+            >
+              最热
+            </Link>
+            <Link
+              scroll={false}
+              href={href({ sort: "downloads" })}
+              className={
+                sort === "downloads"
+                  ? "font-semibold text-neutral-900"
+                  : "text-neutral-500 hover:text-neutral-800"
+              }
+            >
+              最多下载
+            </Link>
+          </span>
+        )}
         <span className="mx-1 text-neutral-300">|</span>
         <span className="flex items-center gap-1.5 text-xs">
           {(["all", "day", "week", "month"] as const).map((p) => (

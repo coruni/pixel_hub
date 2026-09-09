@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // 构建/迁移临时备份目录（非源码，避免扫描产物与移除中的路由）
+    ".next-bak-*/**",
+    ".build-backup/**",
   ]),
 ]);
 

@@ -64,7 +64,7 @@ export default function Gallery({ media }: { media: GalleryMedia[] }) {
           {media.map((m) => (
             <SwiperSlide
               key={m.id}
-              className="flex h-[50vh]! items-center justify-center"
+              className="flex! h-[50vh]! items-center justify-center"
               onClick={() => {
                 // swiper 的 preventClicks 会吞掉拖动后的 click，这里只处理真点击
                 setLightbox(true);

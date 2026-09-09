@@ -7,6 +7,10 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "50mb",
     },
   },
+  // /search 已并入 /browse（同一 FeedBrowser 承载浏览与全文搜索），旧直达链接 301 保留兼容
+  async redirects() {
+    return [{ source: "/search", destination: "/browse", permanent: true }];
+  },
 };
 
 export default nextConfig;

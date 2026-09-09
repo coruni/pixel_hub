@@ -41,6 +41,15 @@ export const runtimeConfigSchema = z.object({
   graphClientSecret: z.string().default(""),
   graphEndpoint: z.string().default(""), // 空 = https://graph.microsoft.com
   graphScope: z.string().default(""), // 空 = {endpoint}/.default
+  // ---- 全文搜索（SEARCH_* / ES_* → 后台化；留空 = 默认或回退旧 .env）----
+  searchEngine: z.string().default(""), // postgres（默认，Supabase pg_trgm）| elasticsearch
+  esUrl: z.string().default(""),
+  esIndex: z.string().default(""), // 空 = pixel-hub-resources
+  esApiKey: z.string().default(""), // 与账号密码二选一
+  esUsername: z.string().default(""),
+  esPassword: z.string().default(""),
+  esAnalyzer: z.string().default(""), // 空 = ES 默认分析器；中文生产建议 ik_max_word
+  searchCandidateLimit: z.string().default(""), // 候选 id 上限，空 = 5000（1000–50000）
 });
 
 export type RuntimeConfig = z.infer<typeof runtimeConfigSchema>;
@@ -57,6 +66,11 @@ export function sanitizeRuntimeConfig(config: RuntimeConfig): RuntimeConfig {
     : "local";
   const port = config.smtpPort.trim();
   const normUrl = (v: string) => v.trim().replace(/\/+$/, "");
+  const engineRaw = config.searchEngine.trim().toLowerCase();
+  const engine = engineRaw === "elasticsearch" ? "elasticsearch" : engineRaw === "postgres" ? "postgres" : "";
+  const esIndex = config.esIndex.trim().replace(/[^a-z0-9_.\-]/gi, "").toLowerCase().slice(0, 100);
+  const limitRaw = config.searchCandidateLimit.trim();
+  const limit = /^\d+$/.test(limitRaw) ? String(Math.min(50000, Math.max(1000, Number(limitRaw)))) : "";
   return {
     githubId: config.githubId.trim().slice(0, SECRET_MAX),
     githubSecret: config.githubSecret.trim().slice(0, SECRET_MAX),
@@ -85,6 +99,14 @@ export function sanitizeRuntimeConfig(config: RuntimeConfig): RuntimeConfig {
     graphClientSecret: config.graphClientSecret.trim().slice(0, SECRET_MAX),
     graphEndpoint: normUrl(config.graphEndpoint).slice(0, SECRET_MAX),
     graphScope: config.graphScope.trim().slice(0, SECRET_MAX),
+    searchEngine: engine,
+    esUrl: normUrl(config.esUrl).slice(0, SECRET_MAX),
+    esIndex,
+    esApiKey: config.esApiKey.trim().slice(0, SECRET_MAX),
+    esUsername: config.esUsername.trim().slice(0, SECRET_MAX),
+    esPassword: config.esPassword.trim().slice(0, SECRET_MAX),
+    esAnalyzer: config.esAnalyzer.trim().slice(0, 100),
+    searchCandidateLimit: limit,
   };
 }
 
@@ -96,6 +118,7 @@ export function runtimeConfigIssues(c: RuntimeConfig): string[] {
     [c.s3Endpoint, "S3 Endpoint"],
     [c.s3PublicBase, "S3 公开访问基址"],
     [c.graphEndpoint, "Graph Endpoint"],
+    [c.esUrl, "Elasticsearch 地址"],
   ] as const;
   for (const [v, label] of fields) {
     if (v && !URL_RE.test(v)) issues.push(`${label} 不是合法的 http(s) 地址`);
@@ -179,6 +202,45 @@ export function graphEndpoint(c: RuntimeConfig): string {
 
 export function graphScope(c: RuntimeConfig): string {
   return c.graphScope || process.env.GRAPH_SCOPE || `${graphEndpoint(c)}/.default`;
+}
+
+// ---- 全文搜索生效值（后台 > 旧 .env 回退；env 删掉后纯靠后台）----
+
+export function searchEngineName(c: RuntimeConfig): "postgres" | "elasticsearch" {
+  const raw = (c.searchEngine || process.env.SEARCH_ENGINE || "postgres").trim().toLowerCase();
+  return raw === "elasticsearch" ? "elasticsearch" : "postgres";
+}
+
+export function esUrl(c: RuntimeConfig): string {
+  return c.esUrl || process.env.ES_URL || "";
+}
+
+export function esIndex(c: RuntimeConfig): string {
+  const idx = (c.esIndex || process.env.ES_INDEX || "pixel-hub-resources").trim();
+  return idx.replace(/[^a-z0-9_.\-]/gi, "").toLowerCase() || "pixel-hub-resources";
+}
+
+export function esApiKey(c: RuntimeConfig): string {
+  return c.esApiKey || process.env.ES_API_KEY || "";
+}
+
+export function esUsername(c: RuntimeConfig): string {
+  return c.esUsername || process.env.ES_USERNAME || "";
+}
+
+export function esPassword(c: RuntimeConfig): string {
+  return c.esPassword || process.env.ES_PASSWORD || "";
+}
+
+export function esAnalyzer(c: RuntimeConfig): string {
+  return (c.esAnalyzer || process.env.SEARCH_ES_ANALYZER || "").trim();
+}
+
+export function searchCandidateLimit(c: RuntimeConfig): number {
+  const raw = (c.searchCandidateLimit || process.env.SEARCH_CANDIDATE_LIMIT || "5000").trim();
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return 5000;
+  return Math.min(50_000, Math.max(1000, Math.trunc(n)));
 }
 
 /**

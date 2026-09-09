@@ -6,8 +6,69 @@
 - Local:         http://localhost:3000
 - Network:       http://198.18.0.1:3000
 - Environments: .env
-✓ Ready in 1218ms
-✓ Running next.config.ts took 35ms
+✓ Ready in 538ms
+✓ Running next.config.ts took 36ms
 - Experiments (use with caution):
   · serverActions
 
+ POST /api/track 204 in 813ms (next.js: 72ms, application-code: 741ms)
+ GET /browse?sort=latest&period=all 200 in 14.1s (next.js: 254ms, application-code: 13.9s)
+ GET / 200 in 12.5s (next.js: 40ms, application-code: 12.5s)
+ POST /api/presence 204 in 1967ms (next.js: 115ms, application-code: 1852ms)
+ GET /browse 200 in 2.1s (next.js: 6ms, application-code: 2.1s)
+ GET /browse 200 in 5.6s (next.js: 7ms, application-code: 5.6s)
+ GET /browse?q=%E7%A2%A7%E8%93%9D%E8%88%AA%E7%BA%BF 200 in 7.8s (next.js: 4ms, application-code: 7.8s)
+ GET /browse?q=%E7%A2%A7%E8%93%9D%E8%88%AA%E7%BA%BF 200 in 5.7s (next.js: 5ms, application-code: 5.7s)
+ GET /browse?q=chuyin 200 in 5.1s (next.js: 5ms, application-code: 5.1s)
+ GET /browse?q=%E7%A2%A7%E8%93%9D%E8%88%AA%E7%BA%BF 200 in 4.2s (next.js: 4ms, application-code: 4.2s)
+ POST /api/presence 204 in 1842ms (next.js: 6ms, application-code: 1837ms)
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Io, cause: Some(Os { code: 10054, kind: ConnectionReset, message: "远程主机强迫关闭了一个现有的连接。" }) }
+prisma:error Error in PostgreSQL connection: Error { kind: Io, cause: Some(Os { code: 10054, kind: ConnectionReset, message: "远程主机强迫关闭了一个现有的连接。" }) }
+prisma:error Error in PostgreSQL connection: Error { kind: Io, cause: Some(Os { code: 10054, kind: ConnectionReset, message: "远程主机强迫关闭了一个现有的连接。" }) }
+prisma:error Error in PostgreSQL connection: Error { kind: Io, cause: Some(Os { code: 10054, kind: ConnectionReset, message: "远程主机强迫关闭了一个现有的连接。" }) }
+⨯ The directory at "E:\项目\pixel_hub\.next\dev" was deleted.
+
+Deleting this directory while Next.js is running can lead to undefined behavior. Restarting the server to recover...
+▲ Next.js 16.3.4 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.13:3000
+- Environments: .env
+✓ Ready in 630ms
+✓ Running next.config.ts took 41ms
+- Experiments (use with caution):
+  · serverActions
+
+[browser] Uncaught TypeError: network error
+TypeError: network error
+[browser] [global-error] TypeError: network error
+    at ErroredHtml (file://E:/项目/pixel_hub/.next/dev/static/chunks/node_modules_next_dist_1e8vcs8._.js:833:47)
+    at AppDevOverlayErrorBoundary.render (file://E:/项目/pixel_hub/.next/dev/static/chunks/node_modules_next_dist_1e8vcs8._.js:864:54)
+    at HotReload (file://E:/项目/pixel_hub/.next/dev/static/chunks/node_modules_next_dist_client_0_90u2t._.js:16268:47)
+    at Router (file://E:/项目/pixel_hub/.next/dev/static/chunks/node_modules_next_dist_client_0_90u2t._.js:1753:53)
+    at AppRouter (file://E:/项目/pixel_hub/.next/dev/static/chunks/node_modules_next_dist_client_0_90u2t._.js:1796:54)
+    at ServerRoot (file://E:/项目/pixel_hub/.next/dev/static/chunks/node_modules_next_dist_client_0_90u2t._.js:412:54) (file://E:/项目/pixel_hub/.next/dev/static/chunks/_16l4hjj._.js:120:21)
+[browser] [global-error] TypeError: network error
+    at ErroredHtml (file://E:/项目/pixel_hub/.next/dev/static/chunks/node_modules_next_dist_1e8vcs8._.js:833:47)
+    at AppDevOverlayErrorBoundary.render (file://E:/项目/pixel_hub/.next/dev/static/chunks/node_modules_next_dist_1e8vcs8._.js:864:54)
+    at HotReload (file://E:/项目/pixel_hub/.next/dev/static/chunks/node_modules_next_dist_client_0_90u2t._.js:16268:47)
+    at Router (file://E:/项目/pixel_hub/.next/dev/static/chunks/node_modules_next_dist_client_0_90u2t._.js:1753:53)
+    at AppRouter (file://E:/项目/pixel_hub/.next/dev/static/chunks/node_modules_next_dist_client_0_90u2t._.js:1796:54)
+    at ServerRoot (file://E:/项目/pixel_hub/.next/dev/static/chunks/node_modules_next_dist_client_0_90u2t._.js:412:54) (file://E:/项目/pixel_hub/.next/dev/static/chunks/_16l4hjj._.js:120:21)
+ POST /api/track 204 in 366ms (next.js: 252ms, application-code: 115ms)
+ GET /browse?q=chuyin 200 in 5.2s (next.js: 2.6s, application-code: 2.6s)
+ GET /browse?q=chuyin 200 in 779ms (next.js: 54ms, application-code: 725ms)
+ GET /browse 200 in 1045ms (next.js: 5ms, application-code: 1040ms)
+ GET /browse?q=%E7%A2%A7%E8%93%9D%E8%88%AA%E7%BA%BF 200 in 933ms (next.js: 4ms, application-code: 928ms)
+ POST /api/track 204 in 72ms (next.js: 2ms, application-code: 70ms)
+ GET /browse?q=%E7%A2%A7%E8%93%9D%E8%88%AA%E7%BA%BF 200 in 746ms (next.js: 7ms, application-code: 739ms)
+ POST /api/presence 204 in 1035ms (next.js: 709ms, application-code: 326ms)
+ POST /api/presence 204 in 225ms (next.js: 10ms, application-code: 215ms)
+ GET /browse?q= 200 in 1161ms (next.js: 11ms, application-code: 1151ms)
+ POST /api/track 204 in 117ms (next.js: 11ms, application-code: 106ms)
+ POST /api/presence 204 in 249ms (next.js: 22ms, application-code: 227ms)
+ POST /api/presence 204 in 265ms (next.js: 26ms, application-code: 239ms)
+ GET /browse?q=%E5%88%9D%E9%9F%B3 200 in 960ms (next.js: 8ms, application-code: 952ms)
+ GET /browse?q=%E7%A2%A7%E8%93%9D%E8%88%AA%E7%BA%BF 200 in 782ms (next.js: 28ms, application-code: 755ms)
+ GET /browse?q=%E5%88%9D%E9%9F%B3 200 in 1600ms (next.js: 11ms, application-code: 1589ms)
+ POST /api/presence 204 in 314ms (next.js: 5ms, application-code: 309ms)

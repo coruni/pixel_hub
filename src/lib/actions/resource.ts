@@ -13,6 +13,7 @@ import { resourceTextFields } from "@/lib/resource-fields";
 import { applyResourceEdit, type ResourceEditState } from "@/lib/actions/_resource-edit";
 import { getUploadLimits } from "@/lib/upload-limits";
 import { ARTICLE_MEDIA_MAX } from "@/lib/upload-config";
+import { syncResourceSearch } from "@/lib/search";
 
 export type ResourceActionState = {
   error?: string;
@@ -245,6 +246,9 @@ export async function createResourceAction(
     return { error: "发布失败，请稍后重试" };
   }
 
+  // 全文索引同步（事务已提交后执行；内部已容错，失败不影响发布结果）
+  await syncResourceSearch(resource.id);
+
   if (status === "PUBLISHED") {
     revalidatePath("/", "layout");
     redirect(`/resources/${slug}`);
@@ -347,6 +351,9 @@ export async function updateResourceOwnerAction(
     console.error("[updateResourceOwner]", e);
     return { error: "保存失败，请稍后重试" };
   }
+
+  // 全文索引同步（正文已变更；失败仅告警）
+  await syncResourceSearch(resource.id);
 
   revalidatePath(`/resources/${resource.slug}`);
   revalidatePath("/", "layout");

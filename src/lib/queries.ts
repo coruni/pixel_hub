@@ -2,6 +2,7 @@ import { publicUrl } from "@/lib/storage";
 import { prisma } from "@/lib/db/prisma";
 import { isOnline } from "@/lib/online";
 import { auth } from "@/lib/auth";
+import { searchRuntime } from "@/lib/search";
 import { cache } from "react";
 import type { Prisma, ResourceType } from "@prisma/client";
 
@@ -236,14 +237,34 @@ export async function getFeed(
   if (params.authorUsername) authorFilter.username = params.authorUsername;
   if (params.followOnlyOf) authorFilter.followers = { some: { followerId: params.followOnlyOf } };
   if (Object.keys(authorFilter).length > 0) where.author = { is: authorFilter };
+  // 指定 id 集合（首页主推等；q 检索时与候选求交集）
   if (params.ids && params.ids.length > 0) where.id = { in: params.ids };
-  if (params.q) {
-    where.OR = [
-      { title: { contains: params.q } },
-      { summary: { contains: params.q } },
-      { description: { contains: params.q } },
-      { tags: { some: { tag: { name: { contains: params.q } } } } },
-    ];
+
+  // —— 全文检索（可插拔引擎：PostgreSQL pg_trgm 默认 / Elasticsearch 可选，见 src/lib/search）——
+  // 有 q 时进入全文路径：引擎产出「相关度降序的候选 id」，与本页其余业务过滤在主表求交集；
+  // 结果按引擎相关度排序（与默认 latest 的差异：带词检索默认即相关性，UI 在 q 态提示「按相关度排序」）。
+  // 引擎不可用（索引未建/ES 未配置）时回退原子串匹配，保证搜索永远可用。
+  const q = params.q?.trim();
+  let relevanceOrder: string[] | null = null;
+  if (q) {
+    const pinned = params.ids && params.ids.length > 0 ? new Set(params.ids) : null;
+    try {
+      const rt = await searchRuntime();
+      const cand = await rt.engine.search(q, { limit: rt.candidateLimit });
+      let ids = cand.ids;
+      if (pinned) ids = ids.filter((id) => pinned.has(id));
+      if (ids.length === 0) return { items: [], page, hasMore: false };
+      relevanceOrder = ids;
+      where.id = { in: ids };
+    } catch (e) {
+      console.error("[getFeed] 全文索引不可用，回退子串匹配", e);
+      where.OR = [
+        { title: { contains: q } },
+        { summary: { contains: q } },
+        { description: { contains: q } },
+        { tags: { some: { tag: { name: { contains: q } } } } },
+      ];
+    }
   }
   if (params.period && params.period !== "all" && params.includeStatuses?.includes("PUBLISHED")) {
     const days = params.period === "day" ? 1 : params.period === "week" ? 7 : 30;
@@ -251,6 +272,29 @@ export async function getFeed(
   } else if (params.period && params.period !== "all") {
     const days = params.period === "day" ? 1 : params.period === "week" ? 7 : 30;
     where.publishedAt = { gte: new Date(Date.now() - days * 24 * 3600 * 1000) };
+  }
+
+  // 全文相关度分页：候选 id 是结果顺序，先在业务过滤后的交集里取有序全集，再按页切片
+  if (relevanceOrder) {
+    const inter = await prisma.resource.findMany({
+      where,
+      select: { id: true },
+    });
+    const have = new Set(inter.map((r) => r.id));
+    const ordered = relevanceOrder.filter((id) => have.has(id));
+    const total = ordered.length;
+    if (total === 0) return { items: [], page, hasMore: false };
+    const pageIds = ordered.slice((page - 1) * pageSize, page * pageSize);
+    if (pageIds.length === 0) return { items: [], page, hasMore: false };
+    const fetched = await prisma.resource.findMany({
+      where: { id: { in: pageIds } },
+      select: feedSelect,
+    });
+    const byId = new Map(fetched.map((r) => [r.id, r]));
+    const rows = pageIds
+      .map((id) => byId.get(id))
+      .filter((r): r is FeedRow => !!r);
+    return { items: rows.map(toFeedItem), page, hasMore: page * pageSize < total };
   }
 
   // 排序带 id 决胜：同值时结果稳定（分页翻页不跳动）
