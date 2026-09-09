@@ -68,6 +68,25 @@ export async function updatePrivacyAction(
   return { ok: true };
 }
 
+// ---- 邮件通知开关：评论回复 / 审核结果 分别控制（均默认开启） ----
+
+export async function updateEmailNotifyAction(
+  _prev: SettingsActionState,
+  fd: FormData,
+): Promise<SettingsActionState> {
+  const user = (await auth())?.user;
+  if (!user) return { error: "请先登录" };
+
+  const emailNotifyComment = fd.get("emailNotifyComment") === "on";
+  const emailNotifyModeration = fd.get("emailNotifyModeration") === "on";
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { emailNotifyComment, emailNotifyModeration },
+  });
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
 // ---- 头像上传：方形居中裁切 256px webp，走统一存储层（上限跟随后台 /admin/uploads 头像档） ----
 
 function sniffImage(buf: Buffer): boolean {
@@ -141,6 +160,68 @@ export async function removeAvatarAction(_fd?: FormData): Promise<void> {
   if (row?.avatarKey) {
     await prisma.user.update({ where: { id: user.id }, data: { avatarKey: null } });
     await delFile(row.avatarKey).catch(() => {});
+  }
+  revalidatePath(`/u/${user.username}`);
+  revalidatePath("/settings");
+}
+
+// ---- 主页 hero 横幅：客户端裁剪为 1600×500 webp，服务端只过 sniff + 重打 + 落库 ----
+
+export async function uploadHeroAction(
+  _prev: SettingsActionState,
+  fd: FormData,
+): Promise<SettingsActionState> {
+  const user = (await auth())?.user;
+  if (!user) return { error: "请先登录" };
+
+  const L = await getUploadLimits();
+  const maxBytes = L.avatarMaxMb * MIB * 4; // 横幅比头像更宽，限额放宽到 4 倍
+  const file = fd.get("hero");
+  if (!(file instanceof File) || file.size === 0) return { error: "请选择图片文件" };
+  const buf = Buffer.from(await file.arrayBuffer());
+  if (buf.byteLength > maxBytes) return { error: `横幅图不能超过 ${(maxBytes / MIB).toFixed(0)}MB` };
+  if (!sniffImage(buf)) return { error: "不支持的图片格式（仅 png/jpg/webp/gif）" };
+
+  const isGif = buf.length >= 6 && buf.subarray(0, 6).toString("latin1").startsWith("GIF8");
+  if (isGif) return { error: "横幅图不支持 GIF，请使用静态图" };
+
+  try {
+    const out = await sharp(buf, { failOn: "none" })
+      .rotate()
+      .resize(1600, 500, { fit: "cover", position: "attention" })
+      .webp({ quality: 82 })
+      .toBuffer();
+    const key = makeKey("heroes", ".webp");
+    const url = await saveFile(key, out);
+
+    const row = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { heroImageKey: true },
+    });
+    const old = row?.heroImageKey;
+    await prisma.user.update({ where: { id: user.id }, data: { heroImageKey: url } });
+    if (old && old !== url) await delFile(old).catch(() => {});
+
+    revalidatePath(`/u/${user.username}`);
+    revalidatePath("/settings");
+    return { ok: true };
+  } catch (e) {
+    console.error("[hero]", e);
+    return { error: "横幅图处理失败，请重试或更换图片" };
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function removeHeroAction(_fd?: FormData): Promise<void> {
+  const user = (await auth())?.user;
+  if (!user) return;
+  const row = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { heroImageKey: true },
+  });
+  if (row?.heroImageKey) {
+    await prisma.user.update({ where: { id: user.id }, data: { heroImageKey: null } });
+    await delFile(row.heroImageKey).catch(() => {});
   }
   revalidatePath(`/u/${user.username}`);
   revalidatePath("/settings");

@@ -15,7 +15,7 @@ async function smtpCfg() {
   const user = c.smtpUser || process.env.SMTP_USER || "";
   const pass = c.smtpPass || process.env.SMTP_PASS || "";
   const port = Number(c.smtpPort || process.env.SMTP_PORT || 587);
-  const from = c.mailFrom || process.env.MAIL_FROM || `noreply@${new URL(siteUrl()).host}`;
+  const from = c.mailFrom || process.env.MAIL_FROM || `noreply@${new URL(siteUrl()).hostname}`;
   return { host, port, user, pass, from, configured: !!(host && user && pass) };
 }
 

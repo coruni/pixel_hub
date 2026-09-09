@@ -12,6 +12,15 @@ datasource db {
   url        = env("DATABASE_URL")
 }
 
+// ---- 全文搜索镜像表（pg.ts 用 raw SQL 建表，这里加模型占位以防 db push 误删）----
+model ResourceSearchDoc {
+  resourceId String   @id
+  searchText String
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  @@map("ResourceSearchDoc")
+}
+
 // ---------- 认证（Auth.js v5 + prisma adapter） ----------
 
 model User {
@@ -21,6 +30,7 @@ model User {
   passwordHash String? // Credentials 登录
   name         String?
   avatarKey    String?
+  heroImageKey String? // 个人主页 hero 横幅图（可选；未设置则头部按原版展示）
   bio          String?
   role         Role     @default(USER)
   trusted      Boolean  @default(false) // D6 白名单免审
@@ -31,6 +41,8 @@ model User {
   showFavorites Boolean @default(false) // 收藏默认仅本人可见（延续原行为）
   showFollowers Boolean @default(true) // 粉丝列表默认公开（延续原行为）
   showFollowing Boolean @default(true) // 关注列表默认公开（延续原行为）
+  emailNotifyComment Boolean @default(true) // 评论/回复我的内容时邮件提醒（默认开启）
+  emailNotifyModeration Boolean @default(true) // 投稿审核结果邮件提醒（默认开启）
 
   accounts       Account[]
   sessions       Session[]

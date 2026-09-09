@@ -8,6 +8,7 @@ import { TYPE_LABEL } from "@/lib/display";
 import { str, type SP } from "@/lib/search-params";
 import { QueueActions } from "@/components/admin/buttons";
 import SpotActions from "@/components/admin/spot-actions";
+import { QueueMediaStrip } from "@/components/admin/QueueMediaStrip";
 
 export const metadata: Metadata = { title: "审核队列" };
 
@@ -132,35 +133,18 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
                 {spot ? <SpotActions resourceId={r.id} /> : <QueueActions resourceId={r.id} />}
               </div>
 
-              {/* 预览图：点击新窗口看原图核对 */}
+              {/* 预览图：点击进图片查看器（原图核对，多图可切换/缩放/旋转） */}
               {r.media.length > 0 ? (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {r.media.map((m, i) => (
-                    <a
-                      key={m.id}
-                      href={publicUrl(m.storageKey)}
-                      target="_blank"
-                      rel="noreferrer"
-                      title="新窗口打开原图"
-                      className="group relative block h-20 w-28 shrink-0 overflow-hidden rounded-none border border-brand-200 bg-neutral-100"
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={publicUrl(m.bigKey ?? m.storageKey)}
-                        alt=""
-                        className="h-full w-full object-cover"
-                      />
-                      {i === 0 && (
-                        <span className="absolute left-1 top-1 rounded-none border border-brand-600 bg-brand-500 px-1 text-[9px] font-medium text-white">
-                          封面
-                        </span>
-                      )}
-                      <span className="absolute inset-0 grid place-items-center bg-black/0 text-[10px] text-white opacity-0 transition group-hover:bg-black/40 group-hover:opacity-100">
-                        查看原图 ↗
-                      </span>
-                    </a>
-                  ))}
-                </div>
+                <QueueMediaStrip
+                  media={r.media.map((m, i) => ({
+                    id: m.id,
+                    thumbUrl: publicUrl(m.bigKey ?? m.storageKey),
+                    url: publicUrl(m.storageKey),
+                    width: m.width,
+                    height: m.height,
+                    cover: i === 0,
+                  }))}
+                />
               ) : (
                 <p className="mt-3 text-xs text-neutral-400">无预览图（纯外链内容）</p>
               )}

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { CalendarDays, Download, Eye } from "lucide-react";
+import { Bot, CalendarDays, Download, Eye } from "lucide-react";
 import { formatCount, timeAgo } from "@/lib/format";
 import Gallery from "@/components/resource/Gallery";
 import { DownloadPanel } from "./download-panel";
@@ -21,46 +21,52 @@ const chipBase = "rounded-none px-2 py-1 text-[11px] font-medium";
 /** 类型化 meta + 标签 → 轻 chips（展签的「材质/尺寸」部分） */
 function MetaChips({ ctx }: { ctx: DetailCtx }) {
   const { detail, meta } = ctx;
-  const chips: { label: string; cls: string }[] = [];
+  const chips: { node: ReactNode; cls: string }[] = [];
   if (meta.kind === "IMAGE" && meta.isAiGenerated) {
     chips.push({
-      label: `✨ AI 生成${meta.aiTool ? ` · ${meta.aiTool}${meta.aiModel ? ` ${meta.aiModel}` : ""}` : ""}`,
+      node: (
+        <span className="inline-flex items-center gap-1">
+          <Bot size={11} aria-hidden />
+          AI 生成
+          {meta.aiTool ? ` · ${meta.aiTool}${meta.aiModel ? ` ${meta.aiModel}` : ""}` : ""}
+        </span>
+      ),
       cls: "bg-amber-50 text-amber-700",
     });
   }
   if (meta.kind === "IMAGE" && meta.original)
-    chips.push({ label: "✓ 原创声明", cls: "bg-emerald-50 text-emerald-700" });
+    chips.push({ node: "✓ 原创声明", cls: "bg-emerald-50 text-emerald-700" });
   if (meta.license)
     chips.push({
-      label: `授权 · ${meta.license}`,
+      node: `授权 · ${meta.license}`,
       cls: "bg-neutral-100 text-neutral-600",
     });
   if ("sourceNote" in meta && meta.sourceNote)
     chips.push({
-      label: `来源 · ${meta.sourceNote}`,
+      node: `来源 · ${meta.sourceNote}`,
       cls: "bg-neutral-100 text-neutral-600",
     });
   if (meta.kind === "GAME") {
     if (meta.version)
       chips.push({
-        label: `v${meta.version.replace(/^v/i, "")}`,
+        node: `v${meta.version.replace(/^v/i, "")}`,
         cls: "bg-neutral-100 text-neutral-600",
       });
-    if (meta.size) chips.push({ label: meta.size, cls: "bg-neutral-100 text-neutral-600" });
+    if (meta.size) chips.push({ node: meta.size, cls: "bg-neutral-100 text-neutral-600" });
     if (meta.platforms && meta.platforms.length > 0)
       chips.push({
-        label: meta.platforms.join(" / "),
+        node: meta.platforms.join(" / "),
         cls: "bg-neutral-100 text-neutral-600",
       });
-    if (meta.lang) chips.push({ label: meta.lang, cls: "bg-neutral-100 text-neutral-600" });
-    if (meta.note) chips.push({ label: meta.note, cls: "bg-neutral-100 text-neutral-600" });
+    if (meta.lang) chips.push({ node: meta.lang, cls: "bg-neutral-100 text-neutral-600" });
+    if (meta.note) chips.push({ node: meta.note, cls: "bg-neutral-100 text-neutral-600" });
   }
   if (chips.length === 0 && detail.tags.length === 0) return null;
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {chips.map((c, i) => (
         <span key={i} className={`${chipBase} ${c.cls}`}>
-          {c.label}
+          {c.node}
         </span>
       ))}
       {detail.tags.map((t) => (
@@ -145,7 +151,9 @@ export default function DetailPost({
             <AuthorIdentity a={a} />
             <FollowControl ctx={ctx} variant="primary" />
           </div>
-          <ActionBar ctx={ctx} />
+          <div className="flex w-full justify-end">
+            <ActionBar ctx={ctx} />
+          </div>
         </div>
       </div>
 

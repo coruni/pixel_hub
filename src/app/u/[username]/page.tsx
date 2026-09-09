@@ -19,6 +19,7 @@ import {
   deleteCollectionAction,
 } from "@/lib/actions/social";
 import { formatCount } from "@/lib/format";
+import { publicUrl } from "@/lib/storage/url";
 import ResourceGrid from "@/components/resource/ResourceGrid";
 import Avatar from "@/components/ui/Avatar";
 import { FollowButton } from "@/components/social/interactions";
@@ -236,61 +237,129 @@ export default async function UserPage({
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
-      {/* 头部 */}
-      <div className="flex flex-wrap items-center gap-5">
-        <Avatar
-          name={profile.name}
-          username={profile.username}
-          avatarKey={profile.avatarKey}
-          size="lg"
-          online={profile.online}
-        />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="truncate text-2xl font-semibold tracking-tight text-neutral-900">
-              {profile.name ?? profile.username}
-            </h1>
-            <span className="text-sm text-neutral-400">@{profile.username}</span>
-            {roleBadge[profile.role] && (
-              <span
-                className={`rounded-none border px-1.5 py-0.5 text-[10px] font-medium ${roleBadge[profile.role].cls}`}
+      {/* 头部：可选 hero 横幅图，背景与下方之间用 mask-image 渐变平滑过渡到 body 纹理，无硬切分割线 */}
+      {profile.heroImageKey ? (
+        <section className="relative isolate -mx-4 px-4 pb-6 sm:-mx-6 sm:px-6 sm:pb-8">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-48 bg-cover bg-center sm:h-64"
+            style={{
+              backgroundImage: `url(${publicUrl(profile.heroImageKey)})`,
+              maskImage: "linear-gradient(to bottom, black 50%, transparent 100%)",
+              WebkitMaskImage: "linear-gradient(to bottom, black 50%, transparent 100%)",
+            }}
+          />
+          <div className="flex flex-wrap items-center gap-5 pt-2 sm:pt-3">
+            <Avatar
+              name={profile.name}
+              username={profile.username}
+              avatarKey={profile.avatarKey}
+              size="lg"
+              online={profile.online}
+            />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="truncate text-2xl font-semibold tracking-tight text-neutral-900">
+                  {profile.name ?? profile.username}
+                </h1>
+                <span className="text-sm text-neutral-400">@{profile.username}</span>
+                {roleBadge[profile.role] && (
+                  <span
+                    className={`rounded-none border px-1.5 py-0.5 text-[10px] font-medium ${roleBadge[profile.role].cls}`}
+                  >
+                    {roleBadge[profile.role].label}
+                  </span>
+                )}
+                {profile.trusted && (
+                  <span className="rounded-none border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600">
+                    免审发布
+                  </span>
+                )}
+              </div>
+              <p className="mt-1.5 text-sm leading-6 text-neutral-600">
+                {profile.bio || "这个人很懒，还没写简介。"}
+              </p>
+              <p className="mt-1 flex items-center gap-1 text-xs text-neutral-400">
+                <CalendarDays size={12} aria-hidden /> {joined} 加入
+              </p>
+            </div>
+            <div className="flex gap-3">
+              {profile.isViewer ? (
+                <Link
+                  href="/settings"
+                  className="rounded-none border border-brand-200 bg-surface px-4 py-2 text-sm text-neutral-700 hover:border-brand-500 hover:text-neutral-900"
+                >
+                  编辑资料
+                </Link>
+              ) : me ? (
+                <FollowButton targetUserId={profile.id} initialFollowing={profile.following} />
+              ) : (
+                <Link
+                  href={`/login?callbackUrl=${encodeURIComponent(`/u/${profile.username}`)}`}
+                  className="rounded-none border border-brand-600 bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600"
+                >
+                  ＋ 关注
+                </Link>
+              )}
+            </div>
+          </div>
+        </section>
+      ) : (
+        <div className="flex flex-wrap items-center gap-5">
+          <Avatar
+            name={profile.name}
+            username={profile.username}
+            avatarKey={profile.avatarKey}
+            size="lg"
+            online={profile.online}
+          />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="truncate text-2xl font-semibold tracking-tight text-neutral-900">
+                {profile.name ?? profile.username}
+              </h1>
+              <span className="text-sm text-neutral-400">@{profile.username}</span>
+              {roleBadge[profile.role] && (
+                <span
+                  className={`rounded-none border px-1.5 py-0.5 text-[10px] font-medium ${roleBadge[profile.role].cls}`}
+                >
+                  {roleBadge[profile.role].label}
+                </span>
+              )}
+              {profile.trusted && (
+                <span className="rounded-none border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600">
+                  免审发布
+                </span>
+              )}
+            </div>
+            <p className="mt-1.5 text-sm leading-6 text-neutral-600">
+              {profile.bio || "这个人很懒，还没写简介。"}
+            </p>
+            <p className="mt-1 flex items-center gap-1 text-xs text-neutral-400">
+              <CalendarDays size={12} aria-hidden /> {joined} 加入
+            </p>
+          </div>
+          <div className="flex gap-3">
+            {profile.isViewer ? (
+              <Link
+                href="/settings"
+                className="rounded-none border border-brand-200 bg-surface px-4 py-2 text-sm text-neutral-700 hover:border-brand-500 hover:text-neutral-900"
               >
-                {roleBadge[profile.role].label}
-              </span>
-            )}
-            {profile.trusted && (
-              <span className="rounded-none border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600">
-                免审发布
-              </span>
+                编辑资料
+              </Link>
+            ) : me ? (
+              <FollowButton targetUserId={profile.id} initialFollowing={profile.following} />
+            ) : (
+              <Link
+                href={`/login?callbackUrl=${encodeURIComponent(`/u/${profile.username}`)}`}
+                className="rounded-none border border-brand-600 bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600"
+              >
+                ＋ 关注
+              </Link>
             )}
           </div>
-          <p className="mt-1.5 text-sm leading-6 text-neutral-600">
-            {profile.bio || "这个人很懒，还没写简介。"}
-          </p>
-          <p className="mt-1 flex items-center gap-1 text-xs text-neutral-400">
-            <CalendarDays size={12} aria-hidden /> {joined} 加入
-          </p>
         </div>
-        <div className="flex gap-3">
-          {profile.isViewer ? (
-            <Link
-              href="/settings"
-              className="rounded-none border border-brand-200 bg-surface px-4 py-2 text-sm text-neutral-700 hover:border-brand-500 hover:text-neutral-900"
-            >
-              编辑资料
-            </Link>
-          ) : me ? (
-            <FollowButton targetUserId={profile.id} initialFollowing={profile.following} />
-          ) : (
-            <Link
-              href={`/login?callbackUrl=${encodeURIComponent(`/u/${profile.username}`)}`}
-              className="rounded-none border border-brand-600 bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600"
-            >
-              ＋ 关注
-            </Link>
-          )}
-        </div>
-      </div>
+      )}
 
       {/* 统计：三格主数据（窄屏三等分占满一行，宽屏固定宽度左排）+ 侧挂累计数据 */}
       <div className="mt-6 flex flex-col gap-3 lg:flex-row lg:items-center">

@@ -64,6 +64,7 @@ async function notify(
         `${actor.name ?? actor.username} 评论了你的内容`,
         `${actor.name ?? actor.username} 在《${resource.title}》下发表了新评论，快去看看吧。`,
         `/resources/${resource.slug}#comment-${commentId ?? "comments"}`,
+        "comment",
       );
     });
   }

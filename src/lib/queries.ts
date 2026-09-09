@@ -1020,6 +1020,7 @@ export type UserProfile = {
   name: string | null;
   bio: string | null;
   avatarKey: string | null;
+  heroImageKey: string | null;
   role: "USER" | "MODERATOR" | "ADMIN";
   trusted: boolean;
   createdAt: Date;
@@ -1030,6 +1031,9 @@ export type UserProfile = {
   showFavorites: boolean;
   showFollowers: boolean;
   showFollowing: boolean;
+  // 邮件通知开关（仅设置页使用，公开主页不展示）
+  emailNotifyComment: boolean;
+  emailNotifyModeration: boolean;
   isViewer: boolean;
   following: boolean;
   online: boolean;
@@ -1046,6 +1050,7 @@ export const getProfile = cache(
         name: true,
         bio: true,
         avatarKey: true,
+        heroImageKey: true,
         role: true,
         trusted: true,
         createdAt: true,
@@ -1053,6 +1058,8 @@ export const getProfile = cache(
         showFavorites: true,
         showFollowers: true,
         showFollowing: true,
+        emailNotifyComment: true,
+        emailNotifyModeration: true,
         _count: { select: { resources: true, followers: true, following: true } },
       },
     });
@@ -1071,6 +1078,7 @@ export const getProfile = cache(
       name: user.name,
       bio: user.bio,
       avatarKey: user.avatarKey,
+      heroImageKey: user.heroImageKey,
       role: user.role,
       trusted: user.trusted,
       createdAt: user.createdAt,
@@ -1080,6 +1088,8 @@ export const getProfile = cache(
       showFavorites: user.showFavorites,
       showFollowers: user.showFollowers,
       showFollowing: user.showFollowing,
+      emailNotifyComment: user.emailNotifyComment,
+      emailNotifyModeration: user.emailNotifyModeration,
       isViewer,
       following,
       online: isOnline(user.lastSeenAt),

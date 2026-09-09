@@ -23,6 +23,7 @@ async function notifyMod(userId: string, actorId: string, resourceId: string, me
       "你的投稿有审核结果",
       `《${resource.title}》：${message}`,
       `/resources/${resource.slug}`,
+      "moderation",
     );
   });
 }
@@ -187,6 +188,7 @@ export async function handleReportBatchAction(input: {
           "你的内容因举报被下架",
           `《${res.title}》：经核查确认违规，已下架。如有疑问请联系管理员`,
           `/resources/${res.slug}`,
+          "moderation",
         ).catch(() => undefined);
         revalidatePath(`/resources/${res.slug}`);
       } else if (res.status === "PENDING") {

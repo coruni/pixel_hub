@@ -1,7 +1,7 @@
 // 详情页共享部件 —— 纯服务端展示片段，三种模板（post/banner/twocol）复用同一套数据。
 // 组件均为 server component；内部按钮（关注/点赞/下载/评论）为客户端交互组件。
 import Link from "next/link";
-import { CalendarDays, Download, Eye, Heart, Pencil, Star } from "lucide-react";
+import { Bot, CalendarDays, Download, Eye, Heart, Pencil, Star } from "lucide-react";
 import type { ResourceDetail } from "@/lib/queries";
 import type { parseMeta } from "@/lib/meta";
 import { formatCount, timeAgo } from "@/lib/format";
@@ -247,8 +247,9 @@ export function TypeInfoCard({ ctx }: { ctx: DetailCtx }) {
           </>
         )}
         {meta.kind === "IMAGE" && meta.isAiGenerated && (
-          <div className="rounded-none bg-amber-50 px-3 py-1.5 text-xs text-amber-700">
-            ✨ AI 生成
+          <div className="flex items-center gap-1.5 rounded-none bg-amber-50 px-3 py-1.5 text-xs text-amber-700">
+            <Bot size={12} aria-hidden />
+            <span className="font-medium">AI 生成</span>
             {meta.aiTool ? ` · ${meta.aiTool}${meta.aiModel ? ` ${meta.aiModel}` : ""}` : ""}
           </div>
         )}

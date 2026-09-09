@@ -114,7 +114,7 @@ export default async function NotificationsPage({
               href={f.key ? `/notifications?type=${f.key}` : "/notifications"}
               className={`inline-flex items-center gap-1.5 rounded-none border px-3 py-1.5 text-xs transition ${
                 active
-                  ? "border-brand-600 bg-brand-600 text-white"
+                  ? "border-brand-600 bg-brand-500 text-white hover:bg-brand-600"
                   : "border-brand-200 text-neutral-600 hover:border-brand-400 hover:bg-neutral-100"
               }`}
             >

@@ -20,17 +20,27 @@ export async function emailNotifyEnabled(): Promise<boolean> {
   return !!(host && user && pass);
 }
 
+export type EmailNotifyKind = "comment" | "moderation";
+
+// kind 决定按用户哪个开关过滤（设置-通知里对应两类邮件提醒，均默认开启）
 export async function notifyByEmail(
   userId: string,
   subject: string,
   body: string,
   linkPath?: string,
+  kind: EmailNotifyKind = "comment",
 ): Promise<void> {
   try {
     if (!(await emailNotifyEnabled())) return;
     if (!rateLimit(`mail:${userId}`, 5, 60 * 60_000)) return;
-    const u = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+    const u = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, emailNotifyComment: true, emailNotifyModeration: true },
+    });
     if (!u?.email) return;
+    const optedIn =
+      kind === "moderation" ? u.emailNotifyModeration !== false : u.emailNotifyComment !== false;
+    if (!optedIn) return; // 用户可在设置中按类型关闭邮件提醒
     // 通知链接用"当前请求"的公网域名（CDN/反代兼容），勿用 .env 静态域名
     const link = linkPath ? `${await requestSiteUrl()}${linkPath}` : undefined;
     const text = `${body}${link ? `\n\n${link}` : ""}\n\n—— 来自 ${siteName()}（可在设置中关闭邮件提醒）`;

@@ -9,7 +9,10 @@ import { getUploadLimits } from "@/lib/upload-limits";
 import SettingsForm from "@/components/auth/settings-form";
 import PrivacyForm from "@/components/auth/privacy-form";
 import AvatarForm from "@/components/auth/avatar-form";
+import HeroForm from "@/components/auth/HeroForm";
+import NotificationsForm from "@/components/auth/NotificationsForm";
 import { EmailForm, PasswordForm } from "@/components/auth/security-forms";
+import SettingsTabs from "@/components/auth/SettingsTabs";
 import { startGitHubBindAction, unbindGitHubAction } from "@/lib/actions/connections";
 import { getRuntimeConfig, githubClientId, githubClientSecret } from "@/lib/runtime-config";
 import { Button } from "@/components/ui/Button";
@@ -33,16 +36,21 @@ const roleLabel: Record<string, string> = {
   USER: "普通用户",
 };
 
+const sectionCls = "rounded-none border border-brand-200 bg-surface p-6";
+const sectionTitle = "text-sm font-semibold text-neutral-800";
+const sectionHint = "mb-4 mt-1 text-xs text-neutral-400";
+
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ bind?: string }>;
+  searchParams: Promise<{ bind?: string; tab?: string }>;
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login?callbackUrl=/settings");
 
-  const [bind, limits, runtimeCfg] = await Promise.all([
+  const [bind, tabRaw, limits, runtimeCfg] = await Promise.all([
     searchParams.then((s) => s.bind),
+    searchParams.then((s) => s.tab),
     getUploadLimits(),
     getRuntimeConfig(),
   ]);
@@ -67,6 +75,139 @@ export default async function SettingsPage({
     { k: "角色", v: roleLabel[me.role] ?? me.role },
     ...(joined ? [{ k: "加入时间", v: joined }] : []),
   ];
+
+  // 4 个 panel：资料 / 安全 / 第三方 / 账号（头像独立在 tab 外常驻）
+  const tabs = [
+    {
+      key: "profile",
+      label: "资料",
+      panel: (
+        <>
+          <section className={sectionCls}>
+            <h2 className={sectionTitle}>主页横幅</h2>
+            <p className={sectionHint}>展示在公开主页头部，未设置则按原版头部显示</p>
+            <HeroForm heroImageKey={profile?.heroImageKey ?? null} />
+          </section>
+
+          <section className={sectionCls}>
+            <h2 className={sectionTitle}>个人资料</h2>
+            <p className={sectionHint}>昵称与简介会展示在你的公开主页</p>
+            <SettingsForm name={profile?.name ?? null} bio={profile?.bio ?? null} />
+          </section>
+
+          {profile && (
+            <section className={sectionCls}>
+              <h2 className={sectionTitle}>隐私设置</h2>
+              <p className={sectionHint}>
+                控制个人主页上收藏、粉丝、关注列表的可见范围（你自己始终可见全部）
+              </p>
+              <PrivacyForm
+                showFavorites={profile.showFavorites}
+                showFollowers={profile.showFollowers}
+                showFollowing={profile.showFollowing}
+              />
+            </section>
+          )}
+        </>
+      ),
+    },
+    {
+      key: "notifications",
+      label: "通知",
+      panel: (
+        <section className={sectionCls}>
+          <h2 className={sectionTitle}>通知设置</h2>
+          <p className={sectionHint}>控制重要动态的提醒方式（评论回复、审核结果等）</p>
+          <NotificationsForm
+            emailNotifyComment={profile?.emailNotifyComment ?? true}
+            emailNotifyModeration={profile?.emailNotifyModeration ?? true}
+          />
+        </section>
+      ),
+    },
+    {
+      key: "security",
+      label: "安全",
+      panel: (
+        <>
+          <section className={sectionCls}>
+            <h2 className={sectionTitle}>修改密码</h2>
+            <p className={sectionHint}>修改后其他设备需用新密码重新登录</p>
+            <PasswordForm />
+          </section>
+
+          <section className={sectionCls}>
+            <h2 className={sectionTitle}>登录邮箱</h2>
+            <p className={sectionHint}>修改需验证当前密码</p>
+            <EmailForm currentEmail={me.email ?? null} />
+          </section>
+        </>
+      ),
+    },
+    {
+      key: "third",
+      label: "第三方",
+      panel: (
+        <section className={sectionCls}>
+          <h2 className={sectionTitle}>第三方账号</h2>
+          <p className={sectionHint}>通过外部服务登录或绑定到本站账号</p>
+          <div className="mt-4 flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm text-neutral-800">GitHub</p>
+              <p className="mt-0.5 text-xs text-neutral-400">
+                {githubAccount
+                  ? "已绑定，可直接使用 GitHub 登录本账号"
+                  : githubEnabled
+                    ? "未绑定"
+                    : "站点未开启 GitHub 登录"}
+              </p>
+            </div>
+            {githubEnabled &&
+              (githubAccount ? (
+                <form action={unbindGitHubAction}>
+                  <Button
+                    type="submit"
+                    className="rounded-none border border-red-200 px-3 py-1.5 text-xs text-red-500 hover:border-red-400 hover:bg-red-50"
+                  >
+                    解绑
+                  </Button>
+                </form>
+              ) : (
+                <form action={startGitHubBindAction}>
+                  <Button
+                    type="submit"
+                    className="rounded-none border border-brand-200 px-3 py-1.5 text-xs text-neutral-600 hover:border-brand-500 hover:text-neutral-900"
+                  >
+                    绑定 GitHub
+                  </Button>
+                </form>
+              ))}
+          </div>
+        </section>
+      ),
+    },
+    {
+      key: "account",
+      label: "账号",
+      panel: (
+        <section className={sectionCls}>
+          <h2 className={sectionTitle}>账号信息</h2>
+          <p className={sectionHint}>只读展示，无法直接修改；如需变更请联系管理员</p>
+          <dl className="mt-4 space-y-2.5">
+            {info.map((row) => (
+              <div key={row.k} className="flex items-baseline justify-between gap-4 text-sm">
+                <dt className="shrink-0 text-xs text-neutral-400">{row.k}</dt>
+                <dd className="min-w-0 truncate text-neutral-800">{row.v}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      ),
+    },
+  ];
+
+  const allowedKeys = tabs.map((t) => t.key);
+  const initialTab = allowedKeys.includes(tabRaw ?? "") ? (tabRaw as string) : "profile";
 
   return (
     <div className="mx-auto max-w-xl px-4 py-10 sm:px-6">
@@ -94,9 +235,10 @@ export default async function SettingsPage({
         </Link>
       </div>
 
-      <section className="mt-6 rounded-none border border-brand-200 bg-surface p-6">
-        <h2 className="text-sm font-semibold text-neutral-800">头像</h2>
-        <p className="mb-4 mt-1 text-xs text-neutral-400">展示在个人主页、评论区与作者信息</p>
+      {/* 头像：独立在 tab 之外常驻，tab 只切换资料/通知/安全等板块 */}
+      <section className={`${sectionCls} mt-6`}>
+        <h2 className={sectionTitle}>头像</h2>
+        <p className={sectionHint}>展示在个人主页、评论区与作者信息</p>
         <AvatarForm
           name={profile?.name ?? null}
           username={me.username}
@@ -106,85 +248,7 @@ export default async function SettingsPage({
         />
       </section>
 
-      <section className="mt-6 rounded-none border border-brand-200 bg-surface p-6">
-        <h2 className="text-sm font-semibold text-neutral-800">个人资料</h2>
-        <p className="mb-4 mt-1 text-xs text-neutral-400">昵称与简介会展示在你的公开主页</p>
-        <SettingsForm name={profile?.name ?? null} bio={profile?.bio ?? null} />
-      </section>
-
-      {profile && (
-        <section className="mt-4 rounded-none border border-brand-200 bg-surface p-6">
-          <h2 className="text-sm font-semibold text-neutral-800">隐私设置</h2>
-          <p className="mb-4 mt-1 text-xs text-neutral-400">
-            控制个人主页上收藏、粉丝、关注列表的可见范围（你自己始终可见全部）
-          </p>
-          <PrivacyForm
-            showFavorites={profile.showFavorites}
-            showFollowers={profile.showFollowers}
-            showFollowing={profile.showFollowing}
-          />
-        </section>
-      )}
-
-      <section className="mt-4 rounded-none border border-brand-200 bg-surface p-6">
-        <h2 className="text-sm font-semibold text-neutral-800">账号信息</h2>
-        <dl className="mt-4 space-y-2.5">
-          {info.map((row) => (
-            <div key={row.k} className="flex items-baseline justify-between gap-4 text-sm">
-              <dt className="shrink-0 text-xs text-neutral-400">{row.k}</dt>
-              <dd className="min-w-0 truncate text-neutral-800">{row.v}</dd>
-            </div>
-          ))}
-        </dl>
-      </section>
-
-      <section className="mt-4 rounded-none border border-brand-200 bg-surface p-6">
-        <h2 className="text-sm font-semibold text-neutral-800">修改密码</h2>
-        <p className="mb-4 mt-1 text-xs text-neutral-400">修改后其他设备需用新密码重新登录</p>
-        <PasswordForm />
-      </section>
-
-      <section className="mt-4 rounded-none border border-brand-200 bg-surface p-6">
-        <h2 className="text-sm font-semibold text-neutral-800">登录邮箱</h2>
-        <p className="mb-4 mt-1 text-xs text-neutral-400">修改需验证当前密码</p>
-        <EmailForm currentEmail={me.email ?? null} />
-      </section>
-
-      <section className="mt-4 rounded-none border border-brand-200 bg-surface p-6">
-        <h2 className="text-sm font-semibold text-neutral-800">第三方账号</h2>
-        <div className="mt-4 flex items-center justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-sm text-neutral-800">GitHub</p>
-            <p className="mt-0.5 text-xs text-neutral-400">
-              {githubAccount
-                ? "已绑定，可直接使用 GitHub 登录本账号"
-                : githubEnabled
-                  ? "未绑定"
-                  : "站点未开启 GitHub 登录"}
-            </p>
-          </div>
-          {githubEnabled &&
-            (githubAccount ? (
-              <form action={unbindGitHubAction}>
-                <Button
-                  type="submit"
-                  className="rounded-none border border-red-200 px-3 py-1.5 text-xs text-red-500 hover:border-red-400 hover:bg-red-50"
-                >
-                  解绑
-                </Button>
-              </form>
-            ) : (
-              <form action={startGitHubBindAction}>
-                <Button
-                  type="submit"
-                  className="rounded-none border border-brand-200 px-3 py-1.5 text-xs text-neutral-600 hover:border-brand-500 hover:text-neutral-900"
-                >
-                  绑定 GitHub
-                </Button>
-              </form>
-            ))}
-        </div>
-      </section>
+      <SettingsTabs tabs={tabs} initial={initialTab} />
     </div>
   );
 }
