@@ -9,6 +9,7 @@ import {
   incrementDownloadAction,
   setFavoriteCollectionAction,
 } from "@/lib/actions/social";
+import { Button } from "@/components/ui/Button";
 
 const baseBtn =
   "inline-flex items-center gap-1.5 rounded-none border px-3.5 py-2 text-sm transition disabled:opacity-60";
@@ -35,7 +36,7 @@ export function LikeButton({
   }
   const [pending, start] = useTransition();
   return (
-    <button
+    <Button
       type="button"
       disabled={pending}
       onClick={() =>
@@ -55,7 +56,7 @@ export function LikeButton({
     >
       <Heart size={15} aria-hidden className={liked ? "fill-current" : ""} />
       {n > 0 ? ` 点赞 ${n}` : "点赞"}
-    </button>
+    </Button>
   );
 }
 
@@ -95,7 +96,7 @@ export function FavoriteButton({
   const list = collections ?? [];
   return (
     <span className="inline-flex items-stretch gap-1.5">
-      <button
+      <Button
         type="button"
         disabled={pending}
         onClick={() =>
@@ -115,7 +116,7 @@ export function FavoriteButton({
       >
         <Star size={15} aria-hidden className={fav ? "fill-current" : ""} />
         {n > 0 ? ` 收藏 ${n}` : "收藏"}
-      </button>
+      </Button>
       {/* 已收藏且已有夹子可选：下拉切换所属夹子 */}
       {fav && list.length > 0 && (
         <select
@@ -159,7 +160,7 @@ export function FollowButton({
   }
   const [pending, start] = useTransition();
   return (
-    <button
+    <Button
       type="button"
       disabled={pending}
       onClick={() =>
@@ -175,7 +176,7 @@ export function FollowButton({
       }`}
     >
       {following ? "已关注" : "＋ 关注"}
-    </button>
+    </Button>
   );
 }
 
@@ -204,7 +205,7 @@ export function DownloadButton({
     );
   }
   return (
-    <button
+    <Button
       type="button"
       disabled={pending}
       onClick={() =>
@@ -216,7 +217,7 @@ export function DownloadButton({
       className="inline-flex items-center gap-1.5 rounded-none border border-emerald-600 bg-emerald-600 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-60"
     >
       <Download size={15} aria-hidden /> 下载（外链）
-    </button>
+    </Button>
   );
 }
 
@@ -277,7 +278,7 @@ export function MetaDownloadButton({
     );
   }
   return (
-    <button
+    <Button
       type="button"
       disabled={pending}
       onClick={() =>
@@ -293,6 +294,6 @@ export function MetaDownloadButton({
     >
       <Download size={small ? 13 : 15} aria-hidden /> {label}
       {showCount ? ` ${n > 0 ? n : ""}`.trimEnd() : ""}
-    </button>
+    </Button>
   );
 }

@@ -118,7 +118,7 @@ export default function MdEditor({
       style={fullscreen ? undefined : { minHeight }}
     >
       <div ref={hostRef} className="md-editor-host" />
-      <button
+      <Button
         type="button"
         onClick={() => setFullscreen((v) => !v)}
         aria-label={fullscreen ? "退出全屏" : "全屏编写"}
@@ -126,7 +126,9 @@ export default function MdEditor({
         className="absolute right-1.5 top-1.5 z-10 rounded-none border border-brand-200 bg-surface p-1.5 text-neutral-400 transition hover:border-brand-500 hover:text-neutral-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
       >
         {fullscreen ? <Minimize2 size={14} aria-hidden /> : <Maximize2 size={14} aria-hidden />}
-      </button>
+      </Button>
     </div>
   );
 }
+
+import { Button } from "@/components/ui/Button";

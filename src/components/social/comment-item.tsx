@@ -6,6 +6,7 @@ import Avatar from "@/components/ui/Avatar";
 import UserHoverCard from "@/components/ui/UserHoverCard";
 import CommentHoverCard from "./CommentHoverCard";
 import type { CommentImage, CommentShape } from "./comment-types";
+import { Button } from "@/components/ui/Button";
 
 /** 单个根楼层 + 楼中楼回复列表。回复框状态由 Comments 统一持有（同屏只开一个）。 */
 
@@ -74,13 +75,13 @@ export default function CommentItem({
         </Link>
         <span className="text-xs text-neutral-400">· {timeAgo(c.createdAt)}</span>
         {canDel && (
-          <button
+          <Button
             type="button"
             onClick={() => onDelete(c.id)}
             className="ml-auto text-xs text-neutral-400 hover:text-red-500"
           >
             删除
-          </button>
+          </Button>
         )}
       </div>
       <p className="mt-2 whitespace-pre-wrap pl-10 text-sm leading-6 text-neutral-700">
@@ -89,7 +90,7 @@ export default function CommentItem({
       {c.images && c.images.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-2 pl-10">
           {c.images.map((img, i) => (
-            <button
+            <Button
               key={i}
               type="button"
               onClick={() => onViewImages(c.images!, i)}
@@ -102,12 +103,12 @@ export default function CommentItem({
                 loading="lazy"
                 className="max-h-40 rounded-none border border-brand-200 object-cover transition hover:border-brand-500"
               />
-            </button>
+            </Button>
           ))}
         </div>
       )}
       {canPost && (
-        <button
+        <Button
           type="button"
           onClick={() =>
             onReplyChange(
@@ -119,7 +120,7 @@ export default function CommentItem({
           className="mt-1.5 pl-10 text-xs text-neutral-400 hover:text-neutral-700"
         >
           {replyOpen ? "收起" : "回复"}
-        </button>
+        </Button>
       )}
 
       {replyOpen && (
@@ -131,22 +132,22 @@ export default function CommentItem({
             className={`${inputCls} flex-1`}
             aria-label={reply.target ? `回复 @${reply.target.to}` : "写下回复"}
           />
-          <button
+          <Button
             type="button"
             disabled={sending || !reply.text.trim()}
             onClick={() => onPost(reply.target ? reply.target.parent : c.id, reply.text)}
             className="rounded-none border border-brand-600 bg-brand-500 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
           >
             {reply.target ? `回复 @${reply.target.to}` : "回复"}
-          </button>
+          </Button>
           {reply.target && (
-            <button
+            <Button
               type="button"
               onClick={() => onReplyChange({ ...reply, target: null })}
               className="rounded-none border border-brand-200 bg-surface px-3 py-1.5 text-xs text-neutral-500 hover:border-brand-500"
             >
               取消定向
-            </button>
+            </Button>
           )}
         </div>
       )}
@@ -229,24 +230,24 @@ function ReplyItem({
         )}
         <span className="text-[11px] text-neutral-400">· {timeAgo(rp.createdAt)}</span>
         {canDel && (
-          <button
+          <Button
             type="button"
             onClick={() => onDelete(rp.id)}
             className="ml-auto text-[11px] text-neutral-400 hover:text-red-500"
           >
             删除
-          </button>
+          </Button>
         )}
       </div>
       <p className="mt-1.5 whitespace-pre-wrap text-sm leading-6 text-neutral-700">{rp.content}</p>
       {canPost && (
-        <button
+        <Button
           type="button"
           onClick={() => onReplyTo(rp.id, rp.author.name ?? rp.author.username)}
           className="mt-1 text-[11px] text-neutral-400 hover:text-neutral-700"
         >
           回复
-        </button>
+        </Button>
       )}
     </li>
   );

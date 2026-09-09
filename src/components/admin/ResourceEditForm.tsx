@@ -24,6 +24,7 @@ import {
 import { SquareCheckbox } from "./SquareCheckbox";
 import MediaPicker from "@/components/upload/media-picker";
 import { ArticleSection, GameSection, ImageSection } from "@/components/upload/wizard-sections";
+import { Button } from "@/components/ui/Button";
 
 export type GalleryItem = {
   id: string;
@@ -328,13 +329,13 @@ export function ResourceEditForm({
 
       {/* 提交 */}
       <div className="mt-6 flex flex-wrap items-center gap-4">
-        <button
+        <Button
           type="submit"
           disabled={pending || uploading}
           className="rounded-none border border-brand-600 bg-brand-500 px-8 py-2 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-50"
         >
           {pending ? "保存中…" : "保存修改"}
-        </button>
+        </Button>
         <Link href={backHref} className={BTN_GHOST_SM}>
           {backLabel}
         </Link>

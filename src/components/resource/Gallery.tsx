@@ -84,7 +84,7 @@ export default function Gallery({ media }: { media: GalleryMedia[] }) {
         </Swiper>
         {multi && (
           <>
-            <button
+            <Button
               type="button"
               className={arrowBtn("left", hasPrev)}
               disabled={!hasPrev}
@@ -92,8 +92,8 @@ export default function Gallery({ media }: { media: GalleryMedia[] }) {
               aria-label="上一张"
             >
               <ChevronLeft size={18} aria-hidden />
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               className={arrowBtn("right", hasNext)}
               disabled={!hasNext}
@@ -101,7 +101,7 @@ export default function Gallery({ media }: { media: GalleryMedia[] }) {
               aria-label="下一张"
             >
               <ChevronRight size={18} aria-hidden />
-            </button>
+            </Button>
           </>
         )}
       </div>
@@ -110,7 +110,7 @@ export default function Gallery({ media }: { media: GalleryMedia[] }) {
         <div className="mt-2 flex items-center gap-2">
           <div className="flex flex-1 gap-2 overflow-x-auto pb-1">
             {media.map((m, i) => (
-              <button
+              <Button
                 type="button"
                 key={m.id}
                 ref={i === index ? activeThumbRef : undefined}
@@ -127,7 +127,7 @@ export default function Gallery({ media }: { media: GalleryMedia[] }) {
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={m.thumbUrl} alt="" className="h-full w-full object-cover" />
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -151,3 +151,5 @@ export default function Gallery({ media }: { media: GalleryMedia[] }) {
     </div>
   );
 }
+
+import { Button } from "@/components/ui/Button";

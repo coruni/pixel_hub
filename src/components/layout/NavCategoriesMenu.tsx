@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronDown, LayoutGrid } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 
 export type NavCategory = { slug: string; name: string };
 
@@ -35,7 +36,7 @@ export default function NavCategoriesMenu({
 
   return (
     <div ref={boxRef} className="relative">
-      <button
+      <Button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
@@ -49,7 +50,7 @@ export default function NavCategoriesMenu({
           className={`text-neutral-400 transition ${open ? "rotate-180" : ""}`}
           aria-hidden
         />
-      </button>
+      </Button>
 
       {open && (
         <div

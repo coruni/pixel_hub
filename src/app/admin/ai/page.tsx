@@ -9,6 +9,7 @@ import AiReviewPanel from "@/components/admin/AiReviewPanel";
 import Link from "next/link";
 import { BTN_FILTER, INPUT_FILTER } from "@/lib/ui/cls";
 import type { AiTaskKind, AiTaskStatus } from "@prisma/client";
+import { Button } from "@/components/ui/Button";
 
 export const metadata: Metadata = { title: "网站管家" };
 const KINDS = ["RESOURCE_ENRICH", "RESOURCE_REVIEW", "IMAGE_DESCRIBE", "GAME_RESEARCH"] as const;
@@ -155,9 +156,9 @@ export default async function AiAdminPage({ searchParams }: { searchParams: Prom
             </option>
           ))}
         </select>
-        <button type="submit" className={BTN_FILTER}>
+        <Button type="submit" className={BTN_FILTER}>
           筛选
-        </button>
+        </Button>
         {(kind || status) && (
           <Link
             href="/admin/ai"

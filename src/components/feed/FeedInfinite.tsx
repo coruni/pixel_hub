@@ -5,6 +5,7 @@ import { loadBrowseFeedAction, type BrowseFeedParams } from "@/lib/actions/feedm
 import type { FeedCard } from "@/lib/queries";
 import Loader from "@/components/Loader";
 import ResourceGrid from "@/components/resource/ResourceGrid";
+import { Button } from "@/components/ui/Button";
 
 const PAGE_SIZE = 30;
 
@@ -91,14 +92,14 @@ export default function FeedInfinite({
       {err && (
         <div className="mt-5 flex flex-col items-center gap-2 text-center">
           <p className="text-xs text-red-500">{err}</p>
-          <button
+          <Button
             type="button"
             disabled={pending}
             onClick={() => void loadNext()}
             className="rounded-none border border-brand-200 bg-surface px-4 py-1.5 text-xs text-neutral-700 transition hover:border-brand-400 hover:text-brand-700 disabled:opacity-50"
           >
             重试
-          </button>
+          </Button>
         </div>
       )}
 

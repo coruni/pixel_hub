@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import ImageViewer from "@/components/ui/ImageViewer";
+import { Button } from "@/components/ui/Button";
 
 /** 媒体库缩略图：点击进图片查看器（大图查看/缩放/旋转） */
 export function MediaThumb({
@@ -16,7 +17,7 @@ export function MediaThumb({
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button
+      <Button
         type="button"
         onClick={() => setOpen(true)}
         aria-label={fileName ? `查看 ${fileName}` : "查看图片"}
@@ -29,7 +30,7 @@ export function MediaThumb({
           loading="lazy"
           className="h-12 w-12 rounded-none border border-brand-200 object-cover"
         />
-      </button>
+      </Button>
       {open && (
         <ImageViewer
           images={[{ url: bigUrl, width: null, height: null }]}

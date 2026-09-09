@@ -6,6 +6,7 @@ import {
   changeEmailAction,
   type SettingsActionState,
 } from "@/lib/actions/settings";
+import { Button } from "@/components/ui/Button";
 
 const input =
   "w-full rounded-none border border-brand-200 bg-surface px-3.5 py-2.5 text-sm outline-none transition focus:border-brand-500";
@@ -68,9 +69,9 @@ export function PasswordForm() {
       {state.ok && <p className="text-sm text-emerald-600">✓ 密码已更新</p>}
       {state.error && <p className="text-sm text-red-500">{state.error}</p>}
 
-      <button type="submit" disabled={pending} className={submitBtn}>
+      <Button type="submit" disabled={pending} className={submitBtn}>
         {pending ? "提交中…" : "修改密码"}
-      </button>
+      </Button>
     </form>
   );
 }
@@ -113,9 +114,9 @@ export function EmailForm({ currentEmail }: { currentEmail: string | null }) {
       {state.ok && <p className="text-sm text-emerald-600">✓ 邮箱已更新</p>}
       {state.error && <p className="text-sm text-red-500">{state.error}</p>}
 
-      <button type="submit" disabled={pending} className={submitBtn}>
+      <Button type="submit" disabled={pending} className={submitBtn}>
         {pending ? "提交中…" : "修改邮箱"}
-      </button>
+      </Button>
     </form>
   );
 }

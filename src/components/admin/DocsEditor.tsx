@@ -6,7 +6,9 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { resetDocAction, saveDocAction } from "@/lib/actions/docs";
 import MdEditor from "@/components/rte/MdEditor";
+import { confirmDialog } from "@/components/ui/feedback";
 import { BTN_PRIMARY_SM } from "@/lib/ui/cls";
+import { Button } from "@/components/ui/Button";
 
 const btnGhost =
   "inline-flex items-center gap-1.5 rounded-none border border-brand-200 bg-surface px-3 py-1.5 text-xs text-neutral-600 transition hover:border-brand-500 hover:text-neutral-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:opacity-50";
@@ -41,8 +43,14 @@ export default function DocsEditor({
       }
     });
 
-  const reset = () => {
-    if (!window.confirm(`恢复「${label}」为内置默认内容？当前自定义内容将被清除。`)) return;
+  const reset = async () => {
+    const ok = await confirmDialog({
+      title: "恢复内置默认",
+      message: `恢复「${label}」为内置默认内容？当前自定义内容将被清除。`,
+      confirmLabel: "恢复",
+      danger: true,
+    });
+    if (!ok) return;
     start(async () => {
       setMessage(null);
       const r = await resetDocAction(docKey);
@@ -58,13 +66,13 @@ export default function DocsEditor({
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-3">
-        <button type="button" onClick={save} disabled={pending} className={BTN_PRIMARY_SM}>
+        <Button type="button" onClick={save} disabled={pending} className={BTN_PRIMARY_SM}>
           {pending ? "保存中…" : "保存"}
-        </button>
+        </Button>
         {isCustom && (
-          <button type="button" onClick={reset} disabled={pending} className={btnGhost}>
-            恢复内置默认
-          </button>
+          <Button type="button" onClick={reset} disabled={pending} className={btnGhost}>
+            {pending ? "处理中…" : "恢复内置默认"}
+          </Button>
         )}
         <span
           className={`text-xs ${isCustom ? "text-emerald-700" : "text-neutral-400"}`}

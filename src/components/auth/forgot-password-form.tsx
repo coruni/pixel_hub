@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState } from "react";
 import { requestPasswordResetAction } from "@/lib/actions/password-reset";
+import { Button } from "@/components/ui/Button";
 
 const inputCls =
   "w-full rounded-none border border-brand-200 bg-surface px-3.5 py-2.5 text-sm text-neutral-900 outline-none transition placeholder:text-neutral-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10";
@@ -61,13 +62,13 @@ export default function ForgotPasswordForm() {
                 <p className="mt-1 text-xs text-red-500">{state.fieldErrors.email[0]}</p>
               )}
             </div>
-            <button
+            <Button
               type="submit"
               disabled={pending}
               className="w-full rounded-none border border-brand-600 bg-brand-500 py-2.5 text-sm font-medium text-white transition hover:bg-brand-600 disabled:opacity-60"
             >
               {pending ? "发送中…" : "发送重置邮件"}
-            </button>
+            </Button>
           </form>
         )}
       </div>

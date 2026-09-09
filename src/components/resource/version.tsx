@@ -15,6 +15,7 @@ import {
 } from "@/lib/upload-config";
 import { INPUT } from "@/lib/ui/cls";
 import { uploadAttachment } from "@/lib/upload-attachment-client";
+import { Button } from "@/components/ui/Button";
 
 type AttachLimits = Pick<UploadLimits, "attachmentMaxMb" | "attachmentExts">;
 
@@ -31,7 +32,7 @@ export function VersionDownloadButton({
   const [n, setN] = useState(count);
   const [pending, start] = useTransition();
   return (
-    <button
+    <Button
       type="button"
       disabled={pending}
       onClick={() =>
@@ -45,7 +46,7 @@ export function VersionDownloadButton({
     >
       <Download size={12} aria-hidden />
       下载 {n > 0 ? n : ""}
-    </button>
+    </Button>
   );
 }
 
@@ -73,13 +74,13 @@ export function VersionForm({ resourceId, limits }: { resourceId: string; limits
 
   return (
     <div>
-      <button
+      <Button
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="inline-flex items-center gap-1 rounded-none border border-brand-200 bg-surface px-3 py-1 text-xs text-neutral-600 hover:border-brand-500 hover:text-neutral-900"
       >
         <Plus size={12} aria-hidden /> 发布新版本
-      </button>
+      </Button>
       {open && (
         <form
           action={formAction}
@@ -155,13 +156,13 @@ export function VersionForm({ resourceId, limits }: { resourceId: string; limits
           {state.ok && <p className="text-xs text-emerald-600">✓ 新版本已发布</p>}
           {state.error && <p className="text-xs text-red-500">{state.error}</p>}
           <div className="flex justify-end">
-            <button
+            <Button
               type="submit"
               disabled={pending}
               className="rounded-none border border-brand-600 bg-brand-500 px-4 py-1.5 text-xs font-semibold text-white hover:bg-brand-600 disabled:opacity-50"
             >
               {pending ? "发布中…" : "发布版本"}
-            </button>
+            </Button>
           </div>
         </form>
       )}

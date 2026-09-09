@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChevronDown, LayoutDashboard, LogOut, Bell, Settings, Upload, User } from "lucide-react";
 import { logoutAction } from "@/lib/actions";
 import Avatar from "@/components/ui/Avatar";
+import { Button } from "@/components/ui/Button";
 
 export type MenuUser = {
   name: string | null;
@@ -39,7 +40,7 @@ export default function UserMenu({ user }: { user: MenuUser }) {
 
   return (
     <div ref={boxRef} className="relative">
-      <button
+      <Button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
@@ -53,7 +54,7 @@ export default function UserMenu({ user }: { user: MenuUser }) {
           className={`text-neutral-400 transition ${open ? "rotate-180" : ""}`}
           aria-hidden
         />
-      </button>
+      </Button>
 
       {open && (
         <div
@@ -102,9 +103,9 @@ export default function UserMenu({ user }: { user: MenuUser }) {
 
           <div className="mt-1.5 border-t border-neutral-100 pt-1.5">
             <form action={logoutAction}>
-              <button type="submit" className={`${itemCls} text-neutral-500`}>
+              <Button type="submit" className={`${itemCls} text-neutral-500`}>
                 <LogOut size={15} className="text-neutral-400" aria-hidden /> 退出登录
-              </button>
+              </Button>
             </form>
           </div>
         </div>

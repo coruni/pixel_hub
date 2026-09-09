@@ -21,7 +21,9 @@ import {
   updateDriveAction,
 } from "@/lib/actions/drives";
 import { useAction } from "@/lib/hooks";
+import { confirmDialog, toast } from "@/components/ui/feedback";
 import { BTN_DANGER_SM, BTN_GHOST_SM, BTN_PRIMARY_SM, INPUT_SM, LABEL_STRONG } from "@/lib/ui/cls";
+import { Button } from "@/components/ui/Button";
 
 export type DriveRow = {
   id: string;
@@ -135,7 +137,7 @@ function LocatorPicker({
     <div className="space-y-2">
       <div className="flex flex-wrap gap-2">
         {KINDS.map((k) => (
-          <button
+          <Button
             key={k.id}
             type="button"
             onClick={() => {
@@ -145,7 +147,7 @@ function LocatorPicker({
             className={kind === k.id ? BTN_PRIMARY_SM : BTN_GHOST_SM}
           >
             {k.label}
-          </button>
+          </Button>
         ))}
       </div>
       <div>
@@ -234,7 +236,7 @@ export function DriveManager({
             <code className="rounded-none bg-neutral-100 px-2 py-1 font-mono text-[11px] text-neutral-500">
               {newComposed || "（待填）"}
             </code>
-            <button
+            <Button
               type="button"
               disabled={pending || !label.trim() || !newValue.trim()}
               onClick={() =>
@@ -254,8 +256,8 @@ export function DriveManager({
               }
               className={BTN_PRIMARY_SM}
             >
-              <Plus size={13} /> 登记
-            </button>
+              {pending ? "登记中…" : (<><Plus size={13} /> 登记</>)}
+            </Button>
           </div>
         </div>
       </section>
@@ -312,7 +314,7 @@ export function DriveManager({
                         />
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <button
+                        <Button
                           type="button"
                           disabled={pending}
                           onClick={() =>
@@ -329,16 +331,16 @@ export function DriveManager({
                           }
                           className={BTN_GHOST_SM}
                         >
-                          <Save size={12} /> 保存
-                        </button>
-                        <button
+                          {pending ? "保存中…" : (<><Save size={12} /> 保存</>)}
+                        </Button>
+                        <Button
                           type="button"
                           disabled={pending}
                           onClick={() => setEditingId(null)}
                           className={BTN_GHOST_SM}
                         >
                           取消
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   ) : (
@@ -376,15 +378,16 @@ export function DriveManager({
                       ) : null}
                       <span className="ml-auto flex flex-wrap items-center gap-2">
                         {!r.active && (
-                          <button
+                          <Button
                             type="button"
                             disabled={pending}
                             onClick={() =>
                               run(() =>
                                 setActiveDriveAction({ id: r.id }).then((res) => {
                                   if (res.ok)
-                                    window.alert(
+                                    toast(
                                       `已切换活跃盘到「${r.label}」。之后的附件将写入该盘。`,
+                                      "success",
                                     );
                                   return res;
                                 }),
@@ -392,20 +395,21 @@ export function DriveManager({
                             }
                             className={BTN_PRIMARY_SM}
                           >
-                            <Star size={12} /> 设为活跃
-                          </button>
+                            {pending ? "切换中…" : (<><Star size={12} /> 设为活跃</>)}
+                          </Button>
                         )}
-                        <button
+                        <Button
                           type="button"
                           disabled={pending}
                           onClick={() =>
                             run(() =>
                               updateDriveAction({ id: r.id, enabled: !r.enabled }).then((res) => {
                                 if (res.ok && r.active)
-                                  window.alert(
+                                  toast(
                                     r.enabled
                                       ? "活跃盘已停用：新附件将回退 STORAGE_DRIVER，旧 /od 下载不受影响。"
                                       : "活跃盘已重新启用。",
+                                    "success",
                                   );
                                 return res;
                               }),
@@ -413,27 +417,32 @@ export function DriveManager({
                           }
                           className={BTN_GHOST_SM}
                         >
-                          {r.enabled ? "停用" : "启用"}
-                        </button>
+                          {pending ? "处理中…" : (r.enabled ? "停用" : "启用")}
+                        </Button>
                         {canCloud && (
-                          <button
+                          <Button
                             type="button"
                             disabled={pending}
-                            onClick={() => {
-                              if (!window.confirm(`测试连通「${r.label}」？（会上传并删除一个临时文件）`))
-                                return;
+                            onClick={async () => {
+                              const ok = await confirmDialog({
+                                title: "测试连通",
+                                message: `测试连通「${r.label}」？（会上传并删除一个临时文件）`,
+                                confirmLabel: "测试",
+                              });
+                              if (!ok) return;
                               run(async () => {
                                 const res = await testDriveAction({ id: r.id });
-                                if (res.ok) window.alert("连通测试通过：上传→下载链接→删除 均成功。");
+                                if (res.ok)
+                                  toast("连通测试通过：上传→下载链接→删除 均成功。", "success");
                                 return res;
                               });
                             }}
                             className={BTN_GHOST_SM}
                           >
-                            <PlugZap size={12} /> 测试连通
-                          </button>
+                            {pending ? "测试中…" : (<><PlugZap size={12} /> 测试连通</>)}
+                          </Button>
                         )}
-                        <button
+                        <Button
                           type="button"
                           disabled={pending}
                           onClick={() => {
@@ -449,19 +458,24 @@ export function DriveManager({
                           className={BTN_GHOST_SM}
                         >
                           <Pencil size={12} /> 编辑
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
                           disabled={pending}
-                          onClick={() => {
-                            if (!window.confirm(`删除云盘「${r.label}」？（有引用的盘会被拒绝）`))
-                              return;
+                          onClick={async () => {
+                            const ok = await confirmDialog({
+                              title: "删除云盘",
+                              message: `删除云盘「${r.label}」？（有引用的盘会被拒绝）`,
+                              confirmLabel: "删除",
+                              danger: true,
+                            });
+                            if (!ok) return;
                             run(() => deleteDriveAction({ id: r.id }));
                           }}
                           className={BTN_DANGER_SM}
                         >
-                          <Trash2 size={12} /> 删除
-                        </button>
+                          {pending ? "删除中…" : (<><Trash2 size={12} /> 删除</>)}
+                        </Button>
                       </span>
                     </div>
                   )}

@@ -9,6 +9,7 @@ import { ADMIN_PAGE_SIZE, STABLE_NEWEST, adminQuery } from "@/lib/admin/paging";
 import { TableFooter } from "@/components/admin/DataTable";
 import type { Prisma } from "@prisma/client";
 import { BTN_FILTER, INPUT_FILTER } from "@/lib/ui/cls";
+import { Button } from "@/components/ui/Button";
 
 export const metadata: Metadata = { title: "操作日志" };
 
@@ -123,9 +124,9 @@ export default async function LogsPage({ searchParams }: { searchParams: Promise
             </option>
           ))}
         </select>
-        <button type="submit" className={BTN_FILTER}>
+        <Button type="submit" className={BTN_FILTER}>
           筛选
-        </button>
+        </Button>
         {(action || adminId) && (
           <Link
             href="/admin/logs"

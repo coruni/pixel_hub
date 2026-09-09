@@ -24,6 +24,7 @@ import {
   updateCategoryAction,
 } from "@/lib/actions/taxonomy";
 import { useAction } from "@/lib/hooks";
+import { confirmDialog, toast } from "@/components/ui/feedback";
 import {
   BTN_DANGER_SM,
   BTN_GHOST_SM,
@@ -31,6 +32,7 @@ import {
   INPUT_SM,
   SELECT_SM,
 } from "@/lib/ui/cls";
+import { Button } from "@/components/ui/Button";
 
 const SEARCH_SM =
   "rounded-none border border-brand-200 bg-surface px-3 py-1.5 text-sm outline-none transition focus:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-400";
@@ -134,14 +136,20 @@ export function CategoryManager({ rows }: { rows: CategoryRow[] }) {
     });
   };
 
-  const batchDelete = () => {
+  const batchDelete = async () => {
     const ids = [...selected];
     if (ids.length === 0) return;
-    if (!window.confirm(`删除选中的 ${ids.length} 个分类？含内容的分类会被拒绝。`)) return;
+    const ok = await confirmDialog({
+      title: "删除分类",
+      message: `删除选中的 ${ids.length} 个分类？含内容的分类会被拒绝。`,
+      confirmLabel: "删除",
+      danger: true,
+    });
+    if (!ok) return;
     run(async () => {
       for (const id of ids) {
         const res = await deleteCategoryAction({ id });
-        if (!res.ok) window.alert(res.error ?? "删除失败");
+        if (!res.ok) toast(res.error ?? "删除失败");
       }
       setSelected(new Set());
       return { ok: true };
@@ -166,7 +174,7 @@ export function CategoryManager({ rows }: { rows: CategoryRow[] }) {
             className={`${INPUT_SM} w-56`}
             aria-label="新建分类 slug"
           />
-          <button
+          <Button
             type="button"
             disabled={pending || !name.trim()}
             onClick={() =>
@@ -181,8 +189,8 @@ export function CategoryManager({ rows }: { rows: CategoryRow[] }) {
             }
             className={BTN_PRIMARY_SM}
           >
-            <Plus size={13} /> 新建分类
-          </button>
+            {pending ? "创建中…" : (<><Plus size={13} /> 新建分类</>)}
+          </Button>
         </div>
 
       {/* 分类表格 */}
@@ -255,16 +263,16 @@ export function CategoryManager({ rows }: { rows: CategoryRow[] }) {
                     </td>
                     <td className={TD_RIGHT}>
                       <div className="flex flex-wrap items-center justify-end gap-1.5">
-                        <button
+                        <Button
                           type="button"
                           disabled={pending || !dirty}
                           onClick={() => save(r)}
                           className={BTN_GHOST_SM}
                         >
-                          <Save size={12} /> 保存
-                        </button>
+                          {pending ? "保存中…" : (<><Save size={12} /> 保存</>)}
+                        </Button>
                         {!isChild && (
-                          <button
+                          <Button
                             type="button"
                             disabled={pending}
                             onClick={() => {
@@ -275,25 +283,31 @@ export function CategoryManager({ rows }: { rows: CategoryRow[] }) {
                             className={BTN_GHOST_SM}
                           >
                             <Plus size={12} /> 子分类
-                          </button>
+                          </Button>
                         )}
-                        <button
+                        <Button
                           type="button"
                           disabled={pending}
-                          onClick={() => {
+                          onClick={async () => {
                             const tip =
                               r.resourceCount > 0 ? `（含 ${r.resourceCount} 个内容）` : "";
                             const childTip =
                               !isChild && r.childCount > 0
                                 ? `，且下有 ${r.childCount} 个子分类`
                                 : "";
-                            if (!window.confirm(`删除分类「${r.name}」${tip}${childTip}？`)) return;
+                            const ok = await confirmDialog({
+                              title: "删除分类",
+                              message: `删除分类「${r.name}」${tip}${childTip}？`,
+                              confirmLabel: "删除",
+                              danger: true,
+                            });
+                            if (!ok) return;
                             run(() => deleteCategoryAction({ id: r.id }));
                           }}
                           className={BTN_DANGER_SM}
                         >
-                          <Trash2 size={12} /> 删除
-                        </button>
+                          <Trash2 size={12} /> {pending ? "删除中…" : "删除"}
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -320,22 +334,22 @@ export function CategoryManager({ rows }: { rows: CategoryRow[] }) {
                       </td>
                       <td className={TD_RIGHT}>
                         <div className="flex flex-wrap items-center justify-end gap-1.5">
-                          <button
+                          <Button
                             type="button"
                             disabled={pending || !childName.trim()}
                             onClick={() => createChild(r.id)}
                             className={BTN_PRIMARY_SM}
                           >
-                            <Plus size={12} /> 创建
-                          </button>
-                          <button
+                            {pending ? "创建中…" : (<><Plus size={12} /> 创建</>)}
+                          </Button>
+                          <Button
                             type="button"
                             disabled={pending}
                             onClick={() => setNewChildFor(null)}
                             className={BTN_GHOST_SM}
                           >
                             取消
-                          </button>
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -349,14 +363,14 @@ export function CategoryManager({ rows }: { rows: CategoryRow[] }) {
       </div>
 
       <div className="flex items-center justify-end">
-        <button
+        <Button
           type="button"
           disabled={pending || selected.size === 0}
           onClick={batchDelete}
           className={BTN_DANGER_SM}
         >
-          <Trash2 size={12} /> 批量删除{selected.size > 0 ? `（${selected.size}）` : ""}
-        </button>
+          {pending ? "删除中…" : (<><Trash2 size={12} /> 批量删除{selected.size > 0 ? `（${selected.size}）` : ""}</>)}
+        </Button>
       </div>
     </div>
   );
@@ -391,23 +405,34 @@ export function TagManager({
   const allSelected = rows.length > 0 && rows.every((t) => selected.has(t.id));
   const toggleAll = () => setSelected(allSelected ? new Set() : new Set(rows.map((t) => t.id)));
 
-  const merge = (t: TagRow) => {
+  const merge = async (t: TagRow) => {
     const targetId = mergeTarget[t.id];
     if (!targetId) return;
     const target = rows.find((r) => r.id === targetId);
     if (!target || target.id === t.id) return;
-    if (!window.confirm(`将标签「${t.name}」合并到「${target.name}」？关联内容会并入目标。`)) return;
+    const ok = await confirmDialog({
+      title: "合并标签",
+      message: `将标签「${t.name}」合并到「${target.name}」？关联内容会并入目标。`,
+      confirmLabel: "合并",
+    });
+    if (!ok) return;
     run(() => renameTagAction({ id: t.id, name: target.name }));
   };
 
-  const batchDelete = () => {
+  const batchDelete = async () => {
     const ids = [...selected];
     if (ids.length === 0) return;
-    if (!window.confirm(`删除选中的 ${ids.length} 个标签？关联内容将移除该标签。`)) return;
+    const ok = await confirmDialog({
+      title: "删除标签",
+      message: `删除选中的 ${ids.length} 个标签？关联内容将移除该标签。`,
+      confirmLabel: "删除",
+      danger: true,
+    });
+    if (!ok) return;
     run(async () => {
       for (const id of ids) {
         const res = await deleteTagAction({ id });
-        if (!res.ok) window.alert(res.error ?? "删除失败");
+        if (!res.ok) toast(res.error ?? "删除失败");
       }
       setSelected(new Set());
       return { ok: true };
@@ -433,19 +458,19 @@ export function TagManager({
               aria-label="搜索标签"
             />
           </div>
-          <button type="submit" className={BTN_GHOST_SM}>
+          <Button type="submit" className={BTN_GHOST_SM}>
             搜索
-          </button>
+          </Button>
           <input type="hidden" name="size" value={pageSize} />
         </form>
-        <button
+        <Button
           type="button"
           disabled={pending || selected.size === 0}
           onClick={batchDelete}
           className={BTN_DANGER_SM}
         >
-          <Trash2 size={12} /> 批量删除{selected.size > 0 ? `（${selected.size}）` : ""}
-        </button>
+          {pending ? "删除中…" : (<><Trash2 size={12} /> 批量删除{selected.size > 0 ? `（${selected.size}）` : ""}</>)}
+        </Button>
       </div>
 
       {/* 标签表格 */}
@@ -522,15 +547,15 @@ export function TagManager({
                   </td>
                   <td className={TD_RIGHT}>
                     <div className="flex flex-wrap items-center justify-end gap-1.5">
-                      <button
+                      <Button
                         type="button"
                         disabled={pending || !target}
                         onClick={() => merge(t)}
                         className={BTN_GHOST_SM}
                       >
-                        合并
-                      </button>
-                      <button
+                        {pending ? "合并中…" : (<><GitMerge size={13} /> 合并</>)}
+                      </Button>
+                      <Button
                         type="button"
                         disabled={pending || !dirty}
                         onClick={() =>
@@ -558,20 +583,25 @@ export function TagManager({
                         }
                         className={BTN_GHOST_SM}
                       >
-                        <Save size={12} /> 保存
-                      </button>
-                      <button
+                        {pending ? "保存中…" : (<><Save size={12} /> 保存</>)}
+                      </Button>
+                      <Button
                         type="button"
                         disabled={pending}
-                        onClick={() => {
-                          if (!window.confirm(`删除标签「${t.name}」？(${t.count} 个内容移除该标签)`))
-                            return;
+                        onClick={async () => {
+                          const ok = await confirmDialog({
+                            title: "删除标签",
+                            message: `删除标签「${t.name}」？(${t.count} 个内容移除该标签)`,
+                            confirmLabel: "删除",
+                            danger: true,
+                          });
+                          if (!ok) return;
                           run(() => deleteTagAction({ id: t.id }));
                         }}
                         className={BTN_DANGER_SM}
                       >
-                        <Trash2 size={12} /> 删除
-                      </button>
+                        {pending ? "删除中…" : (<><Trash2 size={12} /> 删除</>)}
+                      </Button>
                     </div>
                   </td>
                 </tr>

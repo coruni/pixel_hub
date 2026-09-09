@@ -8,6 +8,7 @@ import { timeAgo } from "@/lib/format";
 import { markAllNotificationsReadAction } from "@/lib/actions/notify";
 import { NotificationDelete, NotificationsClearAll } from "@/components/social/notify-actions";
 import NotificationCardLink from "@/components/social/notification-card-link";
+import { Button } from "@/components/ui/Button";
 
 export const metadata: Metadata = { title: "通知", robots: { index: false } };
 
@@ -90,12 +91,12 @@ export default async function NotificationsPage({
                 await markAllNotificationsReadAction();
               }}
             >
-              <button
+              <Button
                 type="submit"
                 className="rounded-none border border-brand-200 px-3 py-1.5 text-xs text-neutral-600 hover:bg-neutral-100"
               >
                 全部标为已读
-              </button>
+              </Button>
             </form>
           )}
           {rows.length > 0 && <NotificationsClearAll />}

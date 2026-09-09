@@ -17,6 +17,7 @@ import {
   type Cat,
   type Uploaded,
 } from "./wizard-shared";
+import { Button } from "@/components/ui/Button";
 
 const TYPES = [
   { k: "IMAGE", label: "图片", desc: "原创 / AI / 壁纸 / 截图", Icon: ImageIcon },
@@ -134,7 +135,7 @@ export default function UploadWizard({
       {/* 类型切换 */}
       <div className="mt-6 grid grid-cols-3 gap-3">
         {TYPES.map((t) => (
-          <button
+          <Button
             key={t.k}
             type="button"
             onClick={() => applyType(t.k)}
@@ -150,7 +151,7 @@ export default function UploadWizard({
               <span className="block text-sm font-medium leading-tight">{t.label}</span>
               <span className="mt-0.5 block text-[11px] font-normal opacity-75">{t.desc}</span>
             </span>
-          </button>
+          </Button>
         ))}
       </div>
 
@@ -278,7 +279,7 @@ export default function UploadWizard({
 
       {/* 提交 */}
       <div className="mt-6 flex flex-wrap items-center gap-4">
-        <button
+        <Button
           type="submit"
           disabled={pending || uploading}
           className="rounded-none border border-brand-600 bg-brand-500 px-8 py-2 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-50"
@@ -288,7 +289,7 @@ export default function UploadWizard({
             : type !== "ARTICLE" && files.length === 0
               ? "先上传图片"
               : "提交发布"}
-        </button>
+        </Button>
         {state.ok && state.pending && (
           <span className="flex items-center gap-2 text-sm text-emerald-600">
             ✓ 已提交审核，通过后将自动上架

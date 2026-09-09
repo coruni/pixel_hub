@@ -5,6 +5,7 @@
 import { useActionState } from "react";
 import { updatePrivacyAction, type SettingsActionState } from "@/lib/actions/settings";
 import { SquareCheckbox } from "@/components/admin/SquareCheckbox";
+import { Button } from "@/components/ui/Button";
 
 const ITEMS = [
   {
@@ -65,13 +66,13 @@ export default function PrivacyForm({
       {state.ok && <p className="text-sm text-emerald-600">✓ 已保存</p>}
       {state.error && <p className="text-sm text-red-500">{state.error}</p>}
 
-      <button
+      <Button
         type="submit"
         disabled={pending}
         className="rounded-none border border-brand-600 bg-brand-500 px-6 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50"
       >
         {pending ? "保存中…" : "保存"}
-      </button>
+      </Button>
     </form>
   );
 }

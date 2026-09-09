@@ -12,6 +12,7 @@ import AvatarForm from "@/components/auth/avatar-form";
 import { EmailForm, PasswordForm } from "@/components/auth/security-forms";
 import { startGitHubBindAction, unbindGitHubAction } from "@/lib/actions/connections";
 import { getRuntimeConfig, githubClientId, githubClientSecret } from "@/lib/runtime-config";
+import { Button } from "@/components/ui/Button";
 
 export const metadata: Metadata = { title: "账户设置", robots: { index: false } };
 
@@ -165,21 +166,21 @@ export default async function SettingsPage({
           {githubEnabled &&
             (githubAccount ? (
               <form action={unbindGitHubAction}>
-                <button
+                <Button
                   type="submit"
                   className="rounded-none border border-red-200 px-3 py-1.5 text-xs text-red-500 hover:border-red-400 hover:bg-red-50"
                 >
                   解绑
-                </button>
+                </Button>
               </form>
             ) : (
               <form action={startGitHubBindAction}>
-                <button
+                <Button
                   type="submit"
                   className="rounded-none border border-brand-200 px-3 py-1.5 text-xs text-neutral-600 hover:border-brand-500 hover:text-neutral-900"
                 >
                   绑定 GitHub
-                </button>
+                </Button>
               </form>
             ))}
         </div>

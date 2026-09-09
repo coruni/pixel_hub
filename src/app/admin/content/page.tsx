@@ -12,6 +12,7 @@ import { TableFooter } from "@/components/admin/DataTable";
 import { ContentActions } from "@/components/admin/buttons";
 import type { Prisma, ResourceType } from "@prisma/client";
 import { BTN_FILTER, INPUT_FILTER } from "@/lib/ui/cls";
+import { Button } from "@/components/ui/Button";
 
 export const metadata: Metadata = { title: "内容库" };
 
@@ -154,12 +155,12 @@ export default async function ContentPage({ searchParams }: { searchParams: Prom
             </option>
           ))}
         </select>
-        <button
+        <Button
           type="submit"
           className={BTN_FILTER}
         >
           筛选
-        </button>
+        </Button>
         {(q || author || type || cat) && (
           <Link
             href={`/admin/content?status=${status}`}

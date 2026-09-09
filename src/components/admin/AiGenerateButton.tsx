@@ -3,12 +3,13 @@
 import { useAction } from "@/lib/hooks";
 import { createAiTaskAction, executeAiTaskAction, regenerateAiTaskAction } from "@/lib/actions/ai";
 import { BTN_GHOST_SM } from "@/lib/ui/cls";
+import { Button } from "@/components/ui/Button";
 
 /** 内容编辑页的「生成 AI 建议」入口：稳定幂等键，重复点击复用同任务而非堆任务。 */
 export default function AiGenerateButton({ resourceId }: { resourceId: string }) {
   const { run, pending } = useAction();
   return (
-    <button
+    <Button
       type="button"
       disabled={pending}
       className={BTN_GHOST_SM}
@@ -30,6 +31,6 @@ export default function AiGenerateButton({ resourceId }: { resourceId: string })
       }
     >
       {pending ? "生成中…" : "生成 AI 建议"}
-    </button>
+    </Button>
   );
 }

@@ -4,6 +4,7 @@ import { ShieldAlert } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { logoutAction } from "@/lib/actions";
+import { Button } from "@/components/ui/Button";
 
 export const metadata: Metadata = { title: "账号已被封禁", robots: { index: false } };
 
@@ -51,12 +52,12 @@ export default async function BannedPage() {
         <div className="mt-6 flex items-center justify-center gap-3">
           {session?.user ? (
             <form action={logoutAction}>
-              <button
+              <Button
                 type="submit"
                 className="rounded-none border border-brand-600 bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
               >
                 退出登录
-              </button>
+              </Button>
             </form>
           ) : (
             <Link

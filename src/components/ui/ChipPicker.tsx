@@ -1,6 +1,7 @@
 "use client";
 
 import { LABEL_STRONG } from "@/lib/ui/cls";
+import { Button } from "@/components/ui/Button";
 
 /** 多选 chip 选择器：后台编辑器通用（分类/标签挑选），空选项时展示占位提示 */
 export default function ChipPicker({
@@ -29,7 +30,7 @@ export default function ChipPicker({
           {options.map((o) => {
             const on = set.has(o.key);
             return (
-              <button
+              <Button
                 key={o.key}
                 type="button"
                 onClick={() =>
@@ -42,7 +43,7 @@ export default function ChipPicker({
                 }`}
               >
                 {o.label}
-              </button>
+              </Button>
             );
           })}
         </div>

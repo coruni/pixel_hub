@@ -11,6 +11,7 @@ import {
   regenerateAiTaskAction,
 } from "@/lib/actions/ai";
 import { BTN_PRIMARY_SM, BTN_DANGER_SM } from "@/lib/ui/cls";
+import { Button } from "@/components/ui/Button";
 
 type SuggestionItem = { field: string; value: string; reason?: string; confidence?: string };
 type Task = {
@@ -113,34 +114,34 @@ export default function AiReviewPanel({
               {canOperate && (
                 <div className="flex flex-wrap gap-2">
                   {task.status === "FAILED" && (
-                    <button
+                    <Button
                       type="button"
                       disabled={pending}
                       className={BTN_PRIMARY_SM}
                       onClick={() => run(() => invoke(() => retryAiTaskAction(task.id)))}
                     >
                       重试
-                    </button>
+                    </Button>
                   )}
                   {task.status === "QUEUED" && (
-                    <button
+                    <Button
                       type="button"
                       disabled={pending}
                       className={BTN_PRIMARY_SM}
                       onClick={() => run(() => invoke(() => executeAiTaskAction(task.id)))}
                     >
                       执行
-                    </button>
+                    </Button>
                   )}
                   {task.status === "SUCCEEDED" && (
-                    <button
+                    <Button
                       type="button"
                       disabled={pending}
                       className={BTN_PRIMARY_SM}
                       onClick={() => run(() => invoke(() => regenerateAiTaskAction(task.id)))}
                     >
                       重新生成
-                    </button>
+                    </Button>
                   )}
                 </div>
               )}
@@ -174,7 +175,7 @@ export default function AiReviewPanel({
                       </div>
                       {isAdmin && suggestion && !done && suggestion.status === "PENDING" && (
                         <div className="mt-3 flex flex-wrap gap-2">
-                          <button
+                          <Button
                             type="button"
                             disabled={pending}
                             className={BTN_PRIMARY_SM}
@@ -185,8 +186,8 @@ export default function AiReviewPanel({
                             }
                           >
                             接受此字段
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             type="button"
                             disabled={pending}
                             className={BTN_DANGER_SM}
@@ -197,7 +198,7 @@ export default function AiReviewPanel({
                             }
                           >
                             拒绝此字段
-                          </button>
+                          </Button>
                         </div>
                       )}
                       {done && (

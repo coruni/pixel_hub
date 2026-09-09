@@ -17,6 +17,7 @@ import {
 import { SquareCheckbox } from "@/components/admin/SquareCheckbox";
 import type { Metadata } from "next";
 import { BTN_FILTER, INPUT_FILTER } from "@/lib/ui/cls";
+import { Button } from "@/components/ui/Button";
 
 export const metadata: Metadata = { title: "媒体库" };
 
@@ -162,12 +163,12 @@ export default async function MediaPage({ searchParams }: { searchParams: Promis
           <SquareCheckbox name="orphan" value="1" defaultChecked={orphan === "1"} ariaLabel="仅未关联" />
           仅未关联（孤儿）
         </label>
-        <button
+        <Button
           type="submit"
           className={BTN_FILTER}
         >
           筛选
-        </button>
+        </Button>
         {(fileName || user || kind || status || orphan) && (
           <Link
             href="/admin/media"

@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 
 /**
  * 详情页双栏布局：左内容 + 340px 侧栏。
@@ -24,7 +25,7 @@ export default function CollapsibleAside({ main, aside }: { main: ReactNode; asi
       <aside className="mt-6 min-w-0 space-y-4 overflow-hidden lg:mt-0 text-nowrap">{aside}</aside>
 
       {/* 桌面把手 */}
-      <button
+      <Button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
@@ -34,7 +35,7 @@ export default function CollapsibleAside({ main, aside }: { main: ReactNode; asi
         style={{ right: open ? "340px" : "0px" }}
       >
         {open ? <ChevronRight size={14} aria-hidden /> : <ChevronLeft size={14} aria-hidden />}
-      </button>
+      </Button>
     </div>
   );
 }

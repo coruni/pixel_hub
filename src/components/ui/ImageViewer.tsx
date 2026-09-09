@@ -11,6 +11,7 @@ import {
   RotateCw,
   X,
 } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 
 export type ViewerImage = {
   url: string;
@@ -157,21 +158,21 @@ export default function ImageViewer({
       onClick={onClose}
       onWheel={onWheel}
     >
-      <button
+      <Button
         type="button"
         onClick={onClose}
         className="absolute right-5 top-5 z-30 p-1 text-white/70 transition hover:text-white"
         aria-label="关闭"
       >
         <X size={24} />
-      </button>
+      </Button>
 
       {/* 工具栏：旋转 / 缩放 / 复位；z 高于图片，避免放大/拖动后被图盖住 */}
       <div
         className="absolute bottom-5 left-1/2 z-30 flex -translate-x-1/2 items-center gap-1 rounded-none border border-white/15 bg-stone-900/85 p-1 text-white"
         onClick={(e) => e.stopPropagation()}
       >
-        <button
+        <Button
           type="button"
           onClick={() => setRotation((r) => r - 90)}
           className="grid h-9 w-9 place-items-center hover:bg-white/10"
@@ -179,8 +180,8 @@ export default function ImageViewer({
           title="左旋 90°"
         >
           <RotateCcw size={16} aria-hidden />
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
           onClick={() => setRotation((r) => r + 90)}
           className="grid h-9 w-9 place-items-center hover:bg-white/10"
@@ -188,9 +189,9 @@ export default function ImageViewer({
           title="右旋 90°"
         >
           <RotateCw size={16} aria-hidden />
-        </button>
+        </Button>
         <span className="mx-1 h-5 w-px bg-white/15" />
-        <button
+        <Button
           type="button"
           onClick={() => zoomTo(1 / 1.25)}
           className="grid h-9 w-9 place-items-center hover:bg-white/10"
@@ -198,11 +199,11 @@ export default function ImageViewer({
           title="缩小"
         >
           <Minus size={16} aria-hidden />
-        </button>
+        </Button>
         <span className="grid h-9 w-9 select-none place-items-center text-xs tabular-nums text-white/70">
           {Math.round(zoom * 100)}%
         </span>
-        <button
+        <Button
           type="button"
           onClick={() => zoomTo(1.25)}
           className="grid h-9 w-9 place-items-center hover:bg-white/10"
@@ -210,9 +211,9 @@ export default function ImageViewer({
           title="放大"
         >
           <Plus size={16} aria-hidden />
-        </button>
+        </Button>
         <span className="mx-1 h-5 w-px bg-white/15" />
-        <button
+        <Button
           type="button"
           onClick={reset}
           className="grid h-9 w-9 place-items-center hover:bg-white/10"
@@ -220,12 +221,12 @@ export default function ImageViewer({
           title="复位"
         >
           <Maximize size={16} aria-hidden />
-        </button>
+        </Button>
       </div>
 
       {multi && (
         <>
-          <button
+          <Button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
@@ -237,8 +238,8 @@ export default function ImageViewer({
             aria-label="上一张"
           >
             <ChevronLeft size={20} />
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
@@ -250,7 +251,7 @@ export default function ImageViewer({
             aria-label="下一张"
           >
             <ChevronRight size={20} />
-          </button>
+          </Button>
         </>
       )}
       {/* eslint-disable-next-line @next/next/no-img-element */}

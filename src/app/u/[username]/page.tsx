@@ -22,6 +22,7 @@ import { formatCount } from "@/lib/format";
 import ResourceGrid from "@/components/resource/ResourceGrid";
 import Avatar from "@/components/ui/Avatar";
 import { FollowButton } from "@/components/social/interactions";
+import { Button } from "@/components/ui/Button";
 
 export async function generateMetadata({
   params,
@@ -369,12 +370,12 @@ export default async function UserPage({
                   placeholder="新夹子名称"
                   className="w-28 rounded-none border border-brand-200 bg-surface px-2 py-1 text-xs text-neutral-800 placeholder:text-neutral-400 focus:border-brand-500 focus:outline-none"
                 />
-                <button
+                <Button
                   type="submit"
                   className="rounded-none border border-brand-200 bg-surface px-2 py-1 text-xs text-neutral-600 hover:border-brand-500 hover:text-neutral-900"
                 >
                   ＋ 新建夹子
-                </button>
+                </Button>
               </form>
             </div>
           )}
@@ -391,21 +392,21 @@ export default async function UserPage({
                   defaultValue={collections.find((c) => c.id === colFilter)?.name}
                   className="w-36 rounded-none border border-brand-200 bg-surface px-2 py-1 text-xs text-neutral-800 focus:border-brand-500 focus:outline-none"
                 />
-                <button
+                <Button
                   type="submit"
                   className="rounded-none border border-brand-200 bg-surface px-2 py-1 text-xs text-neutral-600 hover:border-brand-500 hover:text-neutral-900"
                 >
                   重命名
-                </button>
+                </Button>
               </form>
               <form action={deleteCollectionAction}>
                 <input type="hidden" name="id" value={colFilter} />
-                <button
+                <Button
                   type="submit"
                   className="rounded-none border border-red-200 bg-surface px-2 py-1 text-xs text-red-500 hover:border-red-400 hover:text-red-600"
                 >
                   删除夹子
-                </button>
+                </Button>
               </form>
               {/* 该夹子的独立页（可分享；夹子本身可设为私密） */}
               <Link

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { LayoutGrid, Menu, X } from "lucide-react";
 import { NAV_ICON_MAP } from "@/lib/nav-icons";
 import type { NavCategory } from "./NavCategoriesMenu";
+import { Button } from "@/components/ui/Button";
 
 export type MobileNavItem = {
   id: string;
@@ -45,7 +46,7 @@ export default function MobileNav({
 
   return (
     <div className="sm:hidden">
-      <button
+      <Button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-label="打开导航菜单"
@@ -53,7 +54,7 @@ export default function MobileNav({
         className="grid h-8 w-8 place-items-center rounded-none border border-brand-200 bg-surface text-neutral-700 transition hover:border-brand-500"
       >
         {open ? <X size={16} /> : <Menu size={16} />}
-      </button>
+      </Button>
 
       {open && (
         <div className="fixed inset-x-0 top-16 z-40 max-h-[calc(100dvh-4rem)] overflow-y-auto border-b border-brand-200 bg-surface shadow-lg">

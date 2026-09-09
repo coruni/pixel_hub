@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { RotateCcw, TriangleAlert } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 
 export default function PageError({
   error,
@@ -24,14 +25,14 @@ export default function PageError({
         页面渲染出错，请重试；若持续出现请联系管理员。
         {error.digest && <span className="ml-1 text-neutral-400">（{error.digest}）</span>}
       </p>
-      <button
+      <Button
         type="button"
         onClick={reset}
         className="mt-6 inline-flex items-center gap-2 rounded-none border border-brand-600 bg-brand-500 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-brand-600"
       >
         <RotateCcw size={14} aria-hidden />
         重试
-      </button>
+      </Button>
     </div>
   );
 }

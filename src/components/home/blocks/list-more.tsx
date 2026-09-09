@@ -5,6 +5,7 @@ import type { CardRatio, ContentDisplay, ContentType } from "@/lib/display";
 import { loadListPageAction } from "@/lib/actions/feedmore";
 import { useLoadMore } from "@/lib/hooks";
 import ResourceGrid from "@/components/resource/ResourceGrid";
+import { Button } from "@/components/ui/Button";
 
 type Sort = "latest" | "popular" | "downloads";
 type Item = Awaited<ReturnType<typeof loadListPageAction>>["items"][number];
@@ -49,7 +50,7 @@ export default function ListMore({
       {err && <p className="mt-2 text-center text-xs text-red-500">{err}</p>}
       {hasMore && (
         <div className="mt-5 flex justify-center">
-          <button
+          <Button
             type="button"
             disabled={pending}
             onClick={loadNext}
@@ -57,7 +58,7 @@ export default function ListMore({
           >
             {pending ? "加载中…" : more.length > 0 ? "下一页" : "加载更多"}
             <ChevronDown size={14} aria-hidden />
-          </button>
+          </Button>
         </div>
       )}
     </div>

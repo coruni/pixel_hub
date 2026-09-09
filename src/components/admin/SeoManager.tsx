@@ -7,6 +7,7 @@ import { updateSeoConfigAction } from "@/lib/actions/seo";
 import type { SeoConfig } from "@/lib/seo-config";
 import { SquareCheckbox } from "@/components/admin/SquareCheckbox";
 import { BTN_PRIMARY_SM, INPUT, LABEL_STRONG } from "@/lib/ui/cls";
+import { Button } from "@/components/ui/Button";
 
 const VERIFICATION_FIELDS: { key: keyof SeoConfig["verifications"]; label: string; hint: string }[] =
   [
@@ -261,9 +262,9 @@ export default function SeoManager({
       </section>
 
       <div className="flex items-center gap-3">
-        <button type="button" onClick={save} disabled={pending} className={BTN_PRIMARY_SM}>
+        <Button type="button" onClick={save} disabled={pending} className={BTN_PRIMARY_SM}>
           {pending ? "保存中…" : "保存配置"}
-        </button>
+        </Button>
         {message?.kind === "ok" && (
           <span className="text-xs text-emerald-700" role="status">
             {message.text}

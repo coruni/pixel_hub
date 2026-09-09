@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Check, RotateCcw, X, ZoomIn, ZoomOut } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 
 // 头像裁剪器：方形视口，拖动平移 + 滚轮/滑杆缩放，导出 256×256。
 
@@ -131,14 +132,14 @@ export default function AvatarCropper({
       <div className="w-full max-w-sm rounded-none border border-brand-300 bg-surface p-5">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-neutral-800">裁剪头像</h3>
-          <button
+          <Button
             type="button"
             onClick={onCancel}
             aria-label="取消"
             className="grid h-7 w-7 place-items-center border border-brand-200 text-neutral-500 hover:border-brand-500 hover:text-neutral-900"
           >
             <X size={14} aria-hidden />
-          </button>
+          </Button>
         </div>
 
         <div
@@ -184,14 +185,14 @@ export default function AvatarCropper({
         </div>
 
         <div className="mt-4 flex items-center gap-2">
-          <button
+          <Button
             type="button"
             onClick={() => zoomTo(zoom / 1.25)}
             aria-label="缩小"
             className="grid h-8 w-8 shrink-0 place-items-center border border-brand-200 text-neutral-600 hover:border-brand-500"
           >
             <ZoomOut size={14} aria-hidden />
-          </button>
+          </Button>
           <input
             type="range"
             min={1}
@@ -202,40 +203,40 @@ export default function AvatarCropper({
             className="h-1.5 min-w-0 flex-1 accent-brand-500"
             aria-label="缩放"
           />
-          <button
+          <Button
             type="button"
             onClick={() => zoomTo(zoom * 1.25)}
             aria-label="放大"
             className="grid h-8 w-8 shrink-0 place-items-center border border-brand-200 text-neutral-600 hover:border-brand-500"
           >
             <ZoomIn size={14} aria-hidden />
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={reset}
             aria-label="重置"
             className="grid h-8 w-8 shrink-0 place-items-center border border-brand-200 text-neutral-600 hover:border-brand-500"
           >
             <RotateCcw size={14} aria-hidden />
-          </button>
+          </Button>
         </div>
 
         <div className="mt-4 flex justify-end gap-2">
-          <button
+          <Button
             type="button"
             onClick={onCancel}
             className="rounded-none border border-brand-200 bg-surface px-4 py-2 text-sm text-neutral-600 hover:border-brand-500"
           >
             取消
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={confirm}
             disabled={!img || busy}
             className="inline-flex items-center gap-1.5 rounded-none border border-brand-600 bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50"
           >
             <Check size={14} aria-hidden /> {busy ? "处理中…" : "确认裁剪"}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

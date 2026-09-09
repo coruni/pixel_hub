@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { ReactNode } from "react";
+import { Button } from "@/components/ui/Button";
 
 // 页内分区 tab：合并页（站点配置=运行配置+SEO、站点布局=首页+全站）用它切换分区，避免页面过长。
 // 两节随页面一次性渲染、仅显隐切换（hidden 属性）——表单/拖拽等未保存状态在切换间保留；
@@ -20,7 +21,7 @@ export default function SubTabs({
         {tabs.map((t) => {
           const on = t.key === active;
           return (
-            <button
+            <Button
               key={t.key}
               type="button"
               role="tab"
@@ -35,7 +36,7 @@ export default function SubTabs({
               }`}
             >
               {t.label}
-            </button>
+            </Button>
           );
         })}
       </div>

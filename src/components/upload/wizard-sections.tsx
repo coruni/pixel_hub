@@ -11,6 +11,7 @@ import {
 import { uploadAttachment } from "@/lib/upload-attachment-client";
 import { fieldErr, wizInput, wizLabel, SectionTitle } from "./wizard-shared";
 import { SquareCheckbox } from "../admin/SquareCheckbox";
+import { Button } from "@/components/ui/Button";
 
 /** 附件分节只关心附件体积+后缀两个字段 */
 type AttachLimits = Pick<UploadLimits, "attachmentMaxMb" | "attachmentExts">;
@@ -374,14 +375,14 @@ export function AttachmentListEditor({
                 aria-label="大小"
                 className="w-20 rounded-none border border-brand-200 bg-surface px-2 py-1.5 text-sm text-neutral-800 focus:border-brand-500 focus:outline-none"
               />
-              <button
+              <Button
                 type="button"
                 onClick={() => remove(i)}
                 aria-label="移除该附件"
                 className="rounded-none p-1.5 text-neutral-400 hover:bg-red-50 hover:text-red-600"
               >
                 <Trash2 size={14} />
-              </button>
+              </Button>
             </li>
           ))}
         </ul>
@@ -394,9 +395,9 @@ export function AttachmentListEditor({
           filled={false}
           limits={limits}
         />
-        <button type="button" onClick={addLink} disabled={rows.length >= 20} className={addBtn}>
+        <Button type="button" onClick={addLink} disabled={rows.length >= 20} className={addBtn}>
           <Plus size={13} aria-hidden /> {addLinkLabel}
-        </button>
+        </Button>
         <span className="text-xs tabular-nums text-neutral-400">{rows.length}/20</span>
         {msg && <span className="text-xs text-amber-600">{msg}</span>}
       </div>

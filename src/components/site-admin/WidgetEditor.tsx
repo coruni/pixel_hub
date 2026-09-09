@@ -9,6 +9,7 @@ import { updateSidebarWidgetAction } from "@/lib/actions/site";
 import AdConfigFields, { initAdConfig } from "@/components/admin-shared/ad-config-fields";
 import ChipPicker from "@/components/ui/ChipPicker";
 import type { SiteCategories, SiteTags } from "./shared";
+import { Button } from "@/components/ui/Button";
 
 // 可编辑行（公告/链接）的稳定 key：模块级自增序号，行内增删改时保持 DOM 复用、避免输入焦点错位
 let rowKeySeq = 0;
@@ -389,19 +390,19 @@ export default function WidgetEditor({
                     className={`min-w-0 flex-1 ${INPUT_SM}`}
                     aria-label={`公告 ${i + 1} 内容`}
                   />
-                  <button
+                  <Button
                     type="button"
                     onClick={() => setNotices((arr) => arr.filter((_, idx) => idx !== i))}
                     aria-label="删除该公告"
                     className="grid h-8 w-8 shrink-0 place-items-center rounded-none text-neutral-400 transition hover:bg-red-50 hover:text-red-500"
                   >
                     <Trash2 size={14} />
-                  </button>
+                  </Button>
                 </div>
               ))}
             </div>
             {notices.length < 10 && (
-              <button
+              <Button
                 type="button"
                 onClick={() =>
                   setNotices((arr) => [...arr, { key: nextRowKey(), level: "info", text: "" }])
@@ -409,7 +410,7 @@ export default function WidgetEditor({
                 className="mt-1.5 inline-flex items-center gap-1 rounded-none border border-brand-200 px-2.5 py-1 text-xs text-neutral-500 transition hover:border-brand-400 hover:text-brand-700"
               >
                 <Plus size={12} /> 添加公告
-              </button>
+              </Button>
             )}
           </div>
         )}
@@ -449,19 +450,19 @@ export default function WidgetEditor({
                       className={`min-w-0 flex-1 ${INPUT_SM}`}
                       aria-label={`链接 ${i + 1} 地址`}
                     />
-                    <button
+                    <Button
                       type="button"
                       onClick={() => setLinks((arr) => arr.filter((_, idx) => idx !== i))}
                       aria-label="删除该链接"
                       className="grid h-8 w-8 shrink-0 place-items-center rounded-none text-neutral-400 transition hover:bg-red-50 hover:text-red-500"
                     >
                       <Trash2 size={14} />
-                    </button>
+                    </Button>
                   </div>
                 ))}
               </div>
               {links.length < 20 && (
-                <button
+                <Button
                   type="button"
                   onClick={() =>
                     setLinks((arr) => [...arr, { key: nextRowKey(), label: "", href: "" }])
@@ -469,7 +470,7 @@ export default function WidgetEditor({
                   className="mt-1.5 inline-flex items-center gap-1 rounded-none border border-brand-200 px-2.5 py-1 text-xs text-neutral-500 transition hover:border-brand-400 hover:text-brand-700"
                 >
                   <Plus size={12} /> 添加链接
-                </button>
+                </Button>
               )}
             </div>
           </>
@@ -486,21 +487,21 @@ export default function WidgetEditor({
 
       {msg && <p className="mt-2 text-xs text-red-500">{msg}</p>}
       <div className="mt-4 flex justify-end gap-2">
-        <button
+        <Button
           type="button"
           onClick={onDone}
           className="rounded-none px-3 py-1.5 text-xs text-neutral-500 hover:bg-neutral-200"
         >
           取消
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
           disabled={pending}
           onClick={save}
           className="rounded-none border border-brand-600 bg-brand-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-brand-600 disabled:opacity-50"
         >
           {pending ? "保存中…" : "保存组件"}
-        </button>
+        </Button>
       </div>
     </div>
   );

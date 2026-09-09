@@ -9,6 +9,7 @@ import ImageViewer from "@/components/ui/ImageViewer";
 import CommentItem, { commentInputCls, type ReplyState } from "./comment-item";
 import { flashComment, useCommentPolling } from "./use-comment-polling";
 import type { CommentImage, CommentShape } from "./comment-types";
+import { Button } from "@/components/ui/Button";
 
 export type { CommentAuthor, CommentImage, CommentShape } from "./comment-types";
 
@@ -146,27 +147,27 @@ export default function Comments({
                   alt=""
                   className="h-14 w-14 rounded-none border border-brand-200 object-cover"
                 />
-                <button
+                <Button
                   type="button"
                   onClick={() => removeImage(i)}
                   aria-label="移除图片"
                   className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-none border border-brand-200 bg-surface text-neutral-500 hover:border-red-300 hover:text-red-500"
                 >
                   <X size={11} aria-hidden />
-                </button>
+                </Button>
               </span>
             ))}
           </div>
           )}
           <div className="mt-2 flex justify-end">
-            <button
+            <Button
               type="button"
               disabled={sending || !text.trim()}
               onClick={() => post(null, text)}
               className="rounded-none border border-brand-600 bg-brand-500 px-4 py-1.5 text-sm font-medium text-white disabled:opacity-50 hover:bg-brand-600"
             >
               发表评论
-            </button>
+            </Button>
           </div>
         </div>
       ) : (

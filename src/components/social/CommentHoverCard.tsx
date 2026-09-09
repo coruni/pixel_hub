@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/Button";
 
 export type HoverCardData = {
   // 卡片锚点：被引用评论（可能不可见，仅用于兜底文案）
@@ -60,7 +61,7 @@ export default function CommentHoverCard({
         setVisible(false);
       }}
     >
-      <button
+      <Button
         type="button"
         onClick={(e) => {
           e.stopPropagation();
@@ -72,7 +73,7 @@ export default function CommentHoverCard({
         aria-label={`跳转到 ${data.author} 的评论`}
       >
         @{data.author}
-      </button>
+      </Button>
       {visible && style && (
         <span
           role="tooltip"

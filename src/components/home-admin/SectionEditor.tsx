@@ -12,6 +12,7 @@ import type { HomeSectionConfig, HomeSectionKind } from "@/lib/home-config";
 import AdConfigFields, { initAdConfig } from "@/components/admin-shared/ad-config-fields";
 import ChipPicker from "@/components/ui/ChipPicker";
 import HeroPick from "./hero-pick";
+import { Button } from "@/components/ui/Button";
 
 export type ManagerRow = {
   id: string;
@@ -147,14 +148,14 @@ export default function SectionEditor({
     <div className="mt-2 rounded-none border border-brand-200 bg-neutral-50/60 p-4 sm:p-5">
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold text-neutral-800">编辑 · {kindLabel}</p>
-        <button
+        <Button
           type="button"
           onClick={onDone}
           aria-label="关闭编辑"
           className="rounded-none p-1 text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700"
         >
           <X size={15} />
-        </button>
+        </Button>
       </div>
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -498,21 +499,21 @@ export default function SectionEditor({
       {msg && <p className="mt-2 text-xs text-red-500">{msg}</p>}
 
       <div className="mt-4 flex justify-end gap-2">
-        <button
+        <Button
           type="button"
           onClick={onDone}
           className="rounded-none px-3 py-1.5 text-xs text-neutral-500 hover:bg-neutral-200"
         >
           取消
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
           disabled={pending}
           onClick={save}
           className="rounded-none border border-brand-600 bg-brand-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-brand-600 disabled:opacity-50"
         >
           {pending ? "保存中…" : "保存板块"}
-        </button>
+        </Button>
       </div>
     </div>
   );

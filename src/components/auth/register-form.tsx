@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { registerAction } from "@/lib/actions";
 import { sendRegisterCodeAction } from "@/lib/actions/register-code";
+import { Button } from "@/components/ui/Button";
 
 const inputCls =
   "w-full rounded-none border border-brand-200 bg-surface px-3.5 py-2.5 text-sm text-neutral-900 outline-none transition placeholder:text-neutral-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10";
@@ -82,7 +83,7 @@ export default function RegisterForm({ codeRequired }: { codeRequired: boolean }
                   placeholder="6 位数字"
                   autoComplete="one-time-code"
                 />
-                <button
+                <Button
                   type="button"
                   onClick={sendCode}
                   disabled={sending || cooldown > 0}
@@ -93,7 +94,7 @@ export default function RegisterForm({ codeRequired }: { codeRequired: boolean }
                     : cooldown > 0
                       ? `${cooldown}s 后重发`
                       : "发送验证码"}
-                </button>
+                </Button>
               </div>
               {codeState.ok && (
                 <p className="mt-1 text-xs text-emerald-600" role="status">
@@ -157,13 +158,13 @@ export default function RegisterForm({ codeRequired }: { codeRequired: boolean }
               <p className="mt-1 text-xs text-red-500">{state.fieldErrors.password[0]}</p>
             )}
           </div>
-          <button
+          <Button
             type="submit"
             disabled={pending}
             className="w-full rounded-none border border-brand-600 bg-brand-500 py-2.5 text-sm font-medium text-white transition hover:bg-brand-600 disabled:opacity-60"
           >
             {pending ? "创建中…" : "注册并登录"}
-          </button>
+          </Button>
         </form>
       </div>
 

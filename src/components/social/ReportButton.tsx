@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Flag } from "lucide-react";
 import { reportResourceAction } from "@/lib/actions/report";
 import { REASONS } from "@/lib/report-options";
+import { Button } from "@/components/ui/Button";
 
 export default function ReportButton({
   resourceId,
@@ -34,14 +35,14 @@ export default function ReportButton({
 
   return (
     <span className="relative inline-flex">
-      <button
+      <Button
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
         className="inline-flex items-center gap-1.5 rounded-none border border-brand-200 bg-surface px-3.5 py-2 text-sm text-neutral-400 transition hover:border-red-300 hover:text-red-500"
       >
         <Flag size={15} aria-hidden /> 举报
-      </button>
+      </Button>
 
       {msg && <span className="ml-2 text-xs text-emerald-600">{msg}</span>}
 
@@ -70,21 +71,21 @@ export default function ReportButton({
             />
           </div>
           <div className="mt-3 flex justify-end gap-2">
-            <button
+            <Button
               type="button"
               onClick={() => setOpen(false)}
               className="rounded-none px-3 py-1.5 text-xs text-neutral-500 hover:bg-neutral-100"
             >
               取消
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={submit}
               disabled={busy}
               className="rounded-none border border-red-600 bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-500 disabled:opacity-50"
             >
               提交举报
-            </button>
+            </Button>
           </div>
           {msg && !msg.startsWith("✓") && <p className="mt-2 text-xs text-red-500">{msg}</p>}
         </div>

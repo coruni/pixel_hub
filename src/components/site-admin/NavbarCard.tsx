@@ -14,6 +14,7 @@ import {
 } from "@/lib/site-config";
 import { updateCategoriesMenuAction, updateNavbarAction } from "@/lib/actions/site";
 import type { RunFn } from "./shared";
+import { Button } from "@/components/ui/Button";
 
 export default function NavbarCard({
   items: initialItems,
@@ -82,7 +83,7 @@ export default function NavbarCard({
             </span>
           )}
         </div>
-        <button
+        <Button
           type="button"
           disabled={pending}
           onClick={() =>
@@ -95,7 +96,7 @@ export default function NavbarCard({
           className="rounded-none border border-brand-600 bg-brand-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-600 disabled:opacity-50"
         >
           {pending ? "保存中…" : dirty ? "保存导航" : "已保存"}
-        </button>
+        </Button>
       </div>
 
       <div className="mt-4 space-y-1.5">
@@ -106,7 +107,7 @@ export default function NavbarCard({
               key={it.id}
               className="flex flex-wrap items-center gap-1.5 rounded-none border border-brand-200 px-2 py-1.5"
             >
-              <button
+              <Button
                 type="button"
                 disabled={pending || i === 0}
                 onClick={() => move(i, -1)}
@@ -114,8 +115,8 @@ export default function NavbarCard({
                 className={iconBtn}
               >
                 <ChevronUp size={14} />
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 disabled={pending || i === items.length - 1}
                 onClick={() => move(i, 1)}
@@ -123,8 +124,8 @@ export default function NavbarCard({
                 className={iconBtn}
               >
                 <ChevronDown size={14} />
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 disabled={pending}
                 onClick={() => setAt(i, { enabled: !it.enabled })}
@@ -132,8 +133,8 @@ export default function NavbarCard({
                 className={iconBtn}
               >
                 {it.enabled ? <Eye size={14} /> : <EyeOff size={14} />}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 disabled={pending}
                 onClick={() => setItems((arr) => arr.filter((_, idx) => idx !== i))}
@@ -141,7 +142,7 @@ export default function NavbarCard({
                 className={`${iconBtn} hover:bg-red-50 hover:text-red-500`}
               >
                 <Trash2 size={14} />
-              </button>
+              </Button>
 
               <span
                 className={`grid h-7 w-7 shrink-0 place-items-center rounded-none ${it.enabled ? "bg-brand-500 text-white" : "bg-neutral-100 text-neutral-400"}`}
@@ -194,14 +195,14 @@ export default function NavbarCard({
       </div>
 
       <div className="mt-3 flex gap-2">
-        <button
+        <Button
           type="button"
           disabled={pending}
           onClick={add}
           className="inline-flex items-center gap-1 rounded-none border border-brand-200 px-3 py-1.5 text-xs text-neutral-600 transition hover:border-brand-400 hover:text-brand-700 disabled:opacity-50"
         >
           <Plus size={12} /> 添加导航项
-        </button>
+        </Button>
         <span className="self-center text-[11px] text-neutral-400">外链需以 http(s):// 开头</span>
       </div>
 

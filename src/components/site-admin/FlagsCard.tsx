@@ -5,6 +5,7 @@ import type { Theme } from "@/lib/site-config";
 import { updateSidebarFlagsAction } from "@/lib/actions/site";
 import { PAGE_LABELS, type RunFn } from "./shared";
 import { SquareCheckbox } from "../admin/SquareCheckbox";
+import { Button } from "@/components/ui/Button";
 
 export default function FlagsCard({
   theme,
@@ -29,7 +30,7 @@ export default function FlagsCard({
         {PAGE_LABELS.map((p) => {
           const on = theme.sidebar.showOn[p.key];
           return (
-            <button
+            <Button
               key={p.key}
               type="button"
               disabled={pending}
@@ -51,7 +52,7 @@ export default function FlagsCard({
                   {p.hint}
                 </span>
               </span>
-            </button>
+            </Button>
           );
         })}
       </div>

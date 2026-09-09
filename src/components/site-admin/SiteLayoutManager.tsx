@@ -23,11 +23,13 @@ import {
   updateSidebarWidgetAction,
   updateSidebarFlagsAction,
 } from "@/lib/actions/site";
+import { confirmDialog, toast } from "@/components/ui/feedback";
 import DetailTemplateCard from "./DetailTemplateCard";
 import FlagsCard from "./FlagsCard";
 import NavbarCard from "./NavbarCard";
 import WidgetEditor from "./WidgetEditor";
 import { AREA_TABS, KindIcon, type RunFn, type SiteCategories, type SiteTags } from "./shared";
+import { Button } from "@/components/ui/Button";
 
 export default function SiteLayoutManager({
   theme: initial,
@@ -56,7 +58,7 @@ export default function SiteLayoutManager({
   const run: RunFn = (fn) =>
     start(async () => {
       const r = await fn();
-      if (!r.ok) window.alert(r.error ?? "操作失败");
+      if (!r.ok) toast(r.error ?? "操作失败");
       else router.refresh();
     });
 
@@ -127,7 +129,7 @@ export default function SiteLayoutManager({
             const on = activeArea === t.key;
             const n = getAreaWidgets(theme, t.key).length;
             return (
-              <button
+              <Button
                 key={t.key}
                 type="button"
                 role="tab"
@@ -151,7 +153,7 @@ export default function SiteLayoutManager({
                 >
                   {n}
                 </span>
-              </button>
+              </Button>
             );
           })}
         </div>
@@ -165,7 +167,7 @@ export default function SiteLayoutManager({
           {!areaOn && (
             <div className="mt-3 flex items-center justify-between rounded-none border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs text-amber-800">
               <span>该页侧边栏已整体关闭，以下组件不会在前台显示。</span>
-              <button
+              <Button
                 type="button"
                 disabled={pending}
                 onClick={() =>
@@ -174,7 +176,7 @@ export default function SiteLayoutManager({
                 className="rounded-none border border-amber-400 bg-amber-100 px-2.5 py-1 font-medium text-amber-800 transition hover:bg-amber-200 disabled:opacity-50"
               >
                 开启该页侧边栏
-              </button>
+              </Button>
             </div>
           )}
 
@@ -235,7 +237,7 @@ export default function SiteLayoutManager({
                       </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
-                      <button
+                      <Button
                         type="button"
                         disabled={pending || index === 0}
                         onClick={() => moveBy(index, -1)}
@@ -243,8 +245,8 @@ export default function SiteLayoutManager({
                         className="rounded-none p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-800 disabled:opacity-30"
                       >
                         <ChevronUp size={15} />
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
                         disabled={pending || index === widgets.length - 1}
                         onClick={() => moveBy(index, 1)}
@@ -252,8 +254,8 @@ export default function SiteLayoutManager({
                         className="rounded-none p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-800 disabled:opacity-30"
                       >
                         <ChevronDown size={15} />
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
                         disabled={pending}
                         onClick={() =>
@@ -263,8 +265,8 @@ export default function SiteLayoutManager({
                         className="rounded-none p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-800 disabled:opacity-30"
                       >
                         {w.enabled ? <Eye size={15} /> : <EyeOff size={15} />}
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
                         disabled={pending}
                         onClick={() => setEditingId(editingId === w.id ? null : w.id)}
@@ -275,20 +277,25 @@ export default function SiteLayoutManager({
                         }`}
                       >
                         <span className="text-xs font-medium">编辑</span>
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
                         disabled={pending}
-                        onClick={() => {
-                          if (!window.confirm(`删除组件「${SIDEBAR_KIND_META[w.kind].label}」？`))
-                            return;
+                        onClick={async () => {
+                          const ok = await confirmDialog({
+                            title: "删除组件",
+                            message: `删除组件「${SIDEBAR_KIND_META[w.kind].label}」？`,
+                            confirmLabel: "删除",
+                            danger: true,
+                          });
+                          if (!ok) return;
                           run(() => removeSidebarWidgetAction(w.id));
                         }}
                         aria-label="删除组件"
                         className="rounded-none p-1.5 text-neutral-400 hover:bg-red-50 hover:text-red-500 disabled:opacity-30"
                       >
                         <Trash2 size={15} />
-                      </button>
+                      </Button>
                     </div>
                   </div>
 
@@ -322,7 +329,7 @@ export default function SiteLayoutManager({
                   activeArea === "detailBottom";
                 const disabled = pending || (detailOnly && !detailArea);
                 return (
-                  <button
+                  <Button
                     key={kind}
                     type="button"
                     disabled={disabled}
@@ -336,7 +343,7 @@ export default function SiteLayoutManager({
                   >
                     <Plus size={12} />
                     {SIDEBAR_KIND_META[kind].label}
-                  </button>
+                  </Button>
                 );
               })}
             </div>

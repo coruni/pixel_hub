@@ -5,8 +5,10 @@
 import { createContext, useContext, useMemo, useState } from "react";
 import { SquareCheckbox } from "@/components/admin/SquareCheckbox";
 import { useAction } from "@/lib/hooks";
+import { confirmDialog } from "@/components/ui/feedback";
 import { BTN_DANGER_SM, BTN_GHOST_SM } from "@/lib/ui/cls";
 import { bulkDeleteOrphanMediaAction } from "@/lib/actions/admin-media";
+import { Button } from "@/components/ui/Button";
 
 type Ctx = {
   ids: string[];
@@ -52,28 +54,34 @@ export function MediaOrphanToolbar() {
       <span className="text-xs text-neutral-500">
         本页孤儿 {ctx.ids.length} 项，已选 {n} 项
       </span>
-      <button
+      <Button
         type="button"
         disabled={pending || n === ctx.ids.length}
         onClick={ctx.selectAll}
         className={BTN_GHOST_SM}
       >
         全选本页
-      </button>
-      <button type="button" disabled={pending || n === 0} onClick={ctx.clear} className={BTN_GHOST_SM}>
+      </Button>
+      <Button type="button" disabled={pending || n === 0} onClick={ctx.clear} className={BTN_GHOST_SM}>
         清空选择
-      </button>
-      <button
+      </Button>
+      <Button
         type="button"
         disabled={pending || n === 0}
-        onClick={() => {
-          if (!window.confirm(`确认清理选中的 ${n} 项孤儿媒体？文件将一并移除且不可恢复。`)) return;
+        onClick={async () => {
+          const ok = await confirmDialog({
+            title: "清理孤儿媒体",
+            message: `确认清理选中的 ${n} 项孤儿媒体？文件将一并移除且不可恢复。`,
+            confirmLabel: "清理",
+            danger: true,
+          });
+          if (!ok) return;
           run(() => bulkDeleteOrphanMediaAction(ctx.selected), { refresh: true });
         }}
         className={BTN_DANGER_SM}
       >
         {pending ? "清理中…" : `清理选中（${n}）`}
-      </button>
+      </Button>
     </div>
   );
 }

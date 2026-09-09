@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Image as ImageIcon, Gamepad2, Search, X } from "lucide-react";
 import { searchResourcesAction, type ResourcePick } from "@/lib/actions/home";
 import type { HeroPickMeta } from "./SectionEditor";
+import { Button } from "@/components/ui/Button";
 
 const input =
   "w-full rounded-none border border-brand-200 bg-surface pl-8 pr-3 py-2 text-sm outline-none transition focus:border-brand-500";
@@ -69,14 +70,14 @@ export default function HeroPick({
               className="inline-flex items-center gap-1.5 rounded-none border border-brand-200 bg-surface px-2.5 py-1 text-xs text-neutral-700"
             >
               {p.title}
-              <button
+              <Button
                 type="button"
                 onClick={() => remove(p.id)}
                 aria-label="移除"
                 className="text-neutral-400 hover:text-red-500"
               >
                 <X size={12} />
-              </button>
+              </Button>
             </span>
           ))}
         </div>
@@ -106,7 +107,7 @@ export default function HeroPick({
               const chosen = value.some((x) => x.id === p.id);
               const full = value.length >= max;
               return (
-                <button
+                <Button
                   key={p.id}
                   type="button"
                   disabled={chosen || full}
@@ -125,7 +126,7 @@ export default function HeroPick({
                   </span>
                   <span className="min-w-0 flex-1 truncate">{p.title}</span>
                   {chosen && <span className="text-neutral-300">已选</span>}
-                </button>
+                </Button>
               );
             })
           )}

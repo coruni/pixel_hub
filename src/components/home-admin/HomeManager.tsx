@@ -35,12 +35,14 @@ import {
   reorderHomeSectionsAction,
   updateHomeSectionAction,
 } from "@/lib/actions/home";
+import { confirmDialog, toast } from "@/components/ui/feedback";
 import SectionEditor, {
   type HeroPickMeta,
   type ManagerRow,
   type PickOptionCat,
   type PickOptionTag,
 } from "./SectionEditor";
+import { Button } from "@/components/ui/Button";
 
 function KindIcon({ kind, size = 15 }: { kind: HomeSectionKind; size?: number }) {
   const map: Record<HomeSectionKind, typeof Sparkles> = {
@@ -155,7 +157,7 @@ export default function HomeManager({
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>) =>
     start(async () => {
       const r = await fn();
-      if (!r.ok) window.alert(r.error ?? "操作失败");
+      if (!r.ok) toast(r.error ?? "操作失败");
       else router.refresh();
     });
 
@@ -260,7 +262,7 @@ export default function HomeManager({
                 </div>
 
                 <div className="flex shrink-0 items-center gap-1">
-                  <button
+                  <Button
                     type="button"
                     disabled={pending || index === 0}
                     onClick={() => moveBy(index, -1)}
@@ -268,8 +270,8 @@ export default function HomeManager({
                     className="rounded-none p-1.5 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-800 disabled:opacity-30"
                   >
                     <ChevronUp size={15} />
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     disabled={pending || index === rows.length - 1}
                     onClick={() => moveBy(index, 1)}
@@ -277,8 +279,8 @@ export default function HomeManager({
                     className="rounded-none p-1.5 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-800 disabled:opacity-30"
                   >
                     <ChevronDown size={15} />
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     disabled={pending}
                     onClick={() =>
@@ -292,8 +294,8 @@ export default function HomeManager({
                     aria-label={row.enabled ? "停用板块" : "启用板块"}
                   >
                     {row.enabled ? <Eye size={15} /> : <EyeOff size={15} />}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     disabled={pending}
                     onClick={() => setEditingId(editingId === row.id ? null : row.id)}
@@ -305,19 +307,25 @@ export default function HomeManager({
                     aria-label="编辑板块"
                   >
                     <span className="text-xs font-medium">编辑</span>
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     disabled={pending}
-                    onClick={() => {
-                      if (!window.confirm(`确认删除板块「${homeKindLabel(row.kind)}」？`)) return;
+                    onClick={async () => {
+                      const ok = await confirmDialog({
+                        title: "删除板块",
+                        message: `确认删除板块「${homeKindLabel(row.kind)}」？`,
+                        confirmLabel: "删除",
+                        danger: true,
+                      });
+                      if (!ok) return;
                       run(() => removeHomeSectionAction(row.id));
                     }}
                     className="rounded-none p-1.5 text-neutral-400 transition hover:bg-red-50 hover:text-red-500"
                     aria-label="删除板块"
                   >
                     <Trash2 size={15} />
-                  </button>
+                  </Button>
                 </div>
               </div>
 
@@ -343,7 +351,7 @@ export default function HomeManager({
         </p>
         <div className="flex flex-wrap gap-2">
           {HOME_SECTION_KINDS.map((kind) => (
-            <button
+            <Button
               key={kind}
               type="button"
               disabled={pending}
@@ -352,7 +360,7 @@ export default function HomeManager({
             >
               <Plus size={12} />
               {HOME_KIND_META[kind].label}
-            </button>
+            </Button>
           ))}
         </div>
         <p className="mt-2 text-[11px] text-neutral-400">

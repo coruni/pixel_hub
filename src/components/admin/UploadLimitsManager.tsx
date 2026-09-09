@@ -21,8 +21,10 @@ import {
   type UploadLimits,
 } from "@/lib/upload-config";
 import { useAction } from "@/lib/hooks";
+import { confirmDialog } from "@/components/ui/feedback";
 import { resetUploadLimitsAction, saveUploadLimitsAction } from "@/lib/actions/uploads";
 import { BTN_DANGER_SM, BTN_PRIMARY_SM, INPUT_SM } from "@/lib/ui/cls";
+import { Button } from "@/components/ui/Button";
 
 /** 数值字段规约：key / label / 范围（提交时服务端还会 clamp，这里仅辅助输入） */
 const NUM_FIELDS: {
@@ -148,13 +150,14 @@ export default function UploadLimitsManager({ limits }: { limits: UploadLimits }
   }
 
   function reset() {
-    if (
-      !window.confirm(
-        "将附件与图片上传限制恢复为站点默认值（200MB + 内置后缀 / 20 / 5 / 5），确定？",
-      )
-    )
-      return;
-    void run(() => resetUploadLimitsAction());
+    void confirmDialog({
+      title: "恢复默认上传限制",
+      message: "将附件与图片上传限制恢复为站点默认值（200MB + 内置后缀 / 20 / 5 / 5），确定？",
+      confirmLabel: "恢复默认",
+      danger: true,
+    }).then((ok) => {
+      if (ok) run(() => resetUploadLimitsAction());
+    });
   }
 
   // 解析输入的后缀 token（空格/逗号分隔；客户端不逐字校验，服务端 save 时兜底）
@@ -353,22 +356,22 @@ export default function UploadLimitsManager({ limits }: { limits: UploadLimits }
       </div>
 
       <div className="flex flex-col gap-2.5 border-t border-brand-100 pt-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
-        <button
+        <Button
           type="button"
           disabled={pending}
           onClick={save}
           className={`${BTN_PRIMARY_SM} min-h-10 w-full justify-center px-4 sm:w-auto`}
         >
-          <Save size={13} aria-hidden /> 保存
-        </button>
-        <button
+          {pending ? "保存中…" : (<><Save size={13} aria-hidden /> 保存</>)}
+        </Button>
+        <Button
           type="button"
           disabled={pending}
           onClick={reset}
           className={`${BTN_DANGER_SM} min-h-10 w-full justify-center px-4 sm:w-auto`}
         >
-          <RotateCcw size={13} aria-hidden /> 恢复默认
-        </button>
+          {pending ? "恢复中…" : (<><RotateCcw size={13} aria-hidden /> 恢复默认</>)}
+        </Button>
         <span className="text-xs leading-5 text-neutral-400 sm:ml-1">
           保存后上传向导 / 版本 / 头像等入口的提示与校验同步更新。
         </span>

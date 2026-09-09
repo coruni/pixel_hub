@@ -1,6 +1,7 @@
 "use client";
 
 import { useAction } from "@/lib/hooks";
+import { confirmDialog, promptDialog } from "@/components/ui/feedback";
 import { BTN_DANGER_SM, BTN_GHOST_SM } from "@/lib/ui/cls";
 import {
   approveResourceAction,
@@ -12,6 +13,7 @@ import {
   setUserRole,
   setUserTrusted,
 } from "@/lib/actions/moderation";
+import { Button } from "@/components/ui/Button";
 
 const OK =
   "rounded-none px-3 py-1.5 text-xs font-medium bg-emerald-600 text-white transition hover:bg-emerald-500 disabled:opacity-50";
@@ -20,26 +22,33 @@ export function QueueActions({ resourceId }: { resourceId: string }) {
   const { run, pending } = useAction();
   return (
     <div className="flex gap-2">
-      <button
+      <Button
         type="button"
         disabled={pending}
         onClick={() => run(() => approveResourceAction(resourceId))}
         className={OK}
       >
-        通过
-      </button>
-      <button
+        {pending ? "处理中…" : "通过"}
+      </Button>
+      <Button
         type="button"
         disabled={pending}
-        onClick={() => {
-          const reason = window.prompt("打回原因（会通知作者）：") ?? "";
+        onClick={async () => {
+          const reason = await promptDialog({
+            title: "打回内容",
+            message: "打回原因会通知作者。",
+            placeholder: "填写打回原因…",
+            required: true,
+            multiline: true,
+            confirmLabel: "打回",
+          });
           if (reason === null) return;
           run(() => rejectResourceAction(resourceId, reason));
         }}
         className="rounded-none px-3 py-1.5 text-xs font-medium border border-amber-300 text-amber-700 transition hover:bg-amber-50 disabled:opacity-50"
       >
-        打回
-      </button>
+        {pending ? "处理中…" : "打回"}
+      </Button>
     </div>
   );
 }
@@ -48,28 +57,34 @@ export function ContentActions({ resourceId, status }: { resourceId: string; sta
   const { run, pending } = useAction();
   if (status === "PUBLISHED")
     return (
-      <button
+      <Button
         type="button"
         disabled={pending}
-        onClick={() => {
-          if (!window.confirm("确认下架该内容？作者将收到通知。")) return;
+        onClick={async () => {
+          const ok = await confirmDialog({
+            title: "下架内容",
+            message: "确认下架该内容？作者将收到通知。",
+            confirmLabel: "下架",
+            danger: true,
+          });
+          if (!ok) return;
           run(() => setResourceRemoved(resourceId));
         }}
         className={BTN_DANGER_SM}
       >
-        下架
-      </button>
+        {pending ? "处理中…" : "下架"}
+      </Button>
     );
   if (status === "REMOVED")
     return (
-      <button
+      <Button
         type="button"
         disabled={pending}
         onClick={() => run(() => restoreResource(resourceId))}
         className={BTN_GHOST_SM}
       >
-        恢复上架
-      </button>
+        {pending ? "处理中…" : "恢复上架"}
+      </Button>
     );
   return <span className="text-xs text-neutral-400">{status}</span>;
 }
@@ -97,22 +112,37 @@ export function ReportActions({
   const dismiss = () => run(() => handleReportBatchAction({ ...base, decision: "dismiss" }));
   return (
     <div className="flex flex-wrap gap-2">
-      <button
+      <Button
         type="button"
         disabled={pending}
-        onClick={() => {
-          if (paused && !window.confirm("驳回举报并将该内容恢复上架？")) return;
+        onClick={async () => {
+          if (paused) {
+            const ok = await confirmDialog({
+              title: "驳回举报",
+              message: "驳回举报并将该内容恢复上架？",
+              confirmLabel: "驳回并恢复",
+            });
+            if (!ok) return;
+          }
           dismiss();
         }}
         className={BTN_GHOST_SM}
       >
-        {paused ? "驳回举报·恢复上架" : "驳回举报"}
-      </button>
-      <button
+        {pending ? "处理中…" : paused ? "驳回举报·恢复上架" : "驳回举报"}
+      </Button>
+      <Button
         type="button"
         disabled={pending}
-        onClick={() => {
-          if (!removed && !window.confirm("确认违规（内容将被下架）并关闭全部同类举报？")) return;
+        onClick={async () => {
+          if (!removed) {
+            const ok = await confirmDialog({
+              title: "确认违规",
+              message: "确认违规（内容将被下架）并关闭全部同类举报？",
+              confirmLabel: "确认违规",
+              danger: true,
+            });
+            if (!ok) return;
+          }
           confirm();
         }}
         className={`rounded-none px-3 py-1.5 text-xs font-medium transition disabled:opacity-50 ${
@@ -121,8 +151,12 @@ export function ReportActions({
             : "bg-red-600 text-white hover:bg-red-500"
         }`}
       >
-        {isRes && !removed ? "确认违规·下架" : "确认违规"}
-      </button>
+        {pending
+          ? "处理中…"
+          : isRes && !removed
+            ? "确认违规·下架"
+            : "确认违规"}
+      </Button>
     </div>
   );
 }
@@ -144,7 +178,7 @@ export function UserActions({
   if (isSelf) return <span className="text-xs text-neutral-400">（你）</span>;
   return (
     <div className="flex flex-wrap gap-2">
-      <button
+      <Button
         type="button"
         disabled={pending || banned}
         onClick={() => run(() => setUserTrusted(userId, !trusted))}
@@ -154,8 +188,8 @@ export function UserActions({
             : "bg-emerald-600 text-white hover:bg-emerald-500"
         }`}
       >
-        {trusted ? "取消免审" : "设为免审"}
-      </button>
+        {pending ? "处理中…" : trusted ? "取消免审" : "设为免审"}
+      </Button>
       {!banned && (
         <select
           defaultValue={role}
@@ -170,12 +204,20 @@ export function UserActions({
           <option value="ADMIN">管理员</option>
         </select>
       )}
-      <button
+      <Button
         type="button"
         disabled={pending}
-        onClick={() => {
-          if (banned) return run(() => setUserBanned(userId, false));
-          const reason = window.prompt("封禁原因（可选）：") ?? undefined;
+        onClick={async () => {
+          if (banned) {
+            run(() => setUserBanned(userId, false));
+            return;
+          }
+          const reason = await promptDialog({
+            title: "封禁用户",
+            message: "填写封禁原因（可选），仅后台可见。",
+            placeholder: "封禁原因…",
+            confirmLabel: "封禁",
+          });
           if (reason === null) return;
           run(() => setUserBanned(userId, true, reason || undefined));
         }}
@@ -185,8 +227,8 @@ export function UserActions({
             : "border border-red-300 text-red-600 hover:bg-red-50"
         }`}
       >
-        {banned ? "解封" : "封禁"}
-      </button>
+        {pending ? "处理中…" : banned ? "解封" : "封禁"}
+      </Button>
     </div>
   );
 }

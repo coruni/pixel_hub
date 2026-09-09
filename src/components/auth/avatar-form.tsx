@@ -9,6 +9,7 @@ import {
   removeAvatarAction,
   type SettingsActionState,
 } from "@/lib/actions/settings";
+import { Button } from "@/components/ui/Button";
 
 // 头像卡：选图 → 裁剪 256×256 → 预览 → 保存。
 // GIF 免裁剪直传（仅受信用户）；blob: 预览 URL 原样放行，避免拼成 /uploads/blob:... 404。
@@ -105,28 +106,28 @@ export default function AvatarForm({
           />
           {/* 裁剪产物经 DataTransfer 注入这里提交；无裁剪时 disabled 阻止提交 */}
           <input ref={hiddenRef} type="file" name="avatar" className="hidden" disabled={!cropped} />
-          <button
+          <Button
             type="button"
             onClick={() => inputRef.current?.click()}
             className="inline-flex items-center gap-1.5 rounded-none border border-brand-600 bg-brand-500 px-3.5 py-2 text-sm font-medium text-white hover:bg-brand-600"
           >
             <Upload size={14} aria-hidden /> {avatarKey ? "更换头像" : "上传头像"}
-          </button>
-          <button
+          </Button>
+          <Button
             type="submit"
             disabled={pending || !cropped}
             className="rounded-none border border-brand-200 bg-surface px-3.5 py-2 text-sm text-neutral-700 hover:border-brand-500 disabled:opacity-50"
           >
             {pending ? "保存中…" : "保存"}
-          </button>
+          </Button>
           {avatarKey && (
-            <button
+            <Button
               type="submit"
               formAction={removeAvatarAction}
               className="inline-flex items-center gap-1.5 rounded-none border border-brand-200 bg-surface px-3.5 py-2 text-sm text-neutral-600 hover:border-red-300 hover:text-red-600"
             >
               <Trash2 size={14} aria-hidden /> 移除
-            </button>
+            </Button>
           )}
         </div>
         {cropped && (

@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { updateProfileAction, type SettingsActionState } from "@/lib/actions/settings";
+import { Button } from "@/components/ui/Button";
 
 const input =
   "w-full rounded-none border border-brand-200 bg-surface px-3.5 py-2.5 text-sm outline-none transition focus:border-brand-500";
@@ -50,13 +51,13 @@ export default function SettingsForm({ name, bio }: { name: string | null; bio: 
       {state.ok && <p className="text-sm text-emerald-600">✓ 已保存</p>}
       {state.error && <p className="text-sm text-red-500">{state.error}</p>}
 
-      <button
+      <Button
         type="submit"
         disabled={pending}
         className="rounded-none border border-brand-600 bg-brand-500 px-6 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50"
       >
         {pending ? "保存中…" : "保存"}
-      </button>
+      </Button>
     </form>
   );
 }

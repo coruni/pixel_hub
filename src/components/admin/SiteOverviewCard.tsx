@@ -5,6 +5,7 @@
 import { useAction } from "@/lib/hooks";
 import { runSiteOverviewAction, refreshSiteOverviewAction } from "@/lib/actions/site-overview";
 import { BTN_GHOST_SM, BTN_PRIMARY_SM } from "@/lib/ui/cls";
+import { Button } from "@/components/ui/Button";
 
 export type SiteOverviewItemView = {
   area: string;
@@ -84,7 +85,7 @@ export default function SiteOverviewCard({ view }: { view: SiteOverviewView | nu
               {statusNote(view.status)}
             </span>
           )}
-          <button
+          <Button
             type="button"
             disabled={pending || view?.status === "RUNNING"}
             className={succeeded ? BTN_GHOST_SM : BTN_PRIMARY_SM}
@@ -97,7 +98,7 @@ export default function SiteOverviewCard({ view }: { view: SiteOverviewView | nu
             }
           >
             {pending ? "处理中…" : succeeded ? "重新生成" : view ? "重试生成" : "生成 AI 运营建议"}
-          </button>
+          </Button>
         </div>
       </div>
 

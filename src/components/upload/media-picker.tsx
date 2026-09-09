@@ -2,6 +2,7 @@
 
 import { X } from "lucide-react";
 import { SectionTitle, type Uploaded } from "./wizard-shared";
+import { Button } from "@/components/ui/Button";
 
 /** 预览图/插图选择：上传、设封面、移除（最多 maxCount 张，默认 12）；单张上限由宿主配置传入 */
 export default function MediaPicker({
@@ -52,7 +53,7 @@ export default function MediaPicker({
             className="group relative overflow-hidden rounded-none border border-brand-200 bg-neutral-100"
           >
             {f.ok && f.bigUrl ? (
-              <button
+              <Button
                 type="button"
                 onClick={() => onSetCover(f.id)}
                 title="设为封面"
@@ -60,7 +61,7 @@ export default function MediaPicker({
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={f.bigUrl} alt={f.name} className="aspect-square w-full object-cover" />
-              </button>
+              </Button>
             ) : (
               <div className="grid aspect-square w-full place-items-center p-2 text-center text-[11px] text-red-500">
                 {f.error ?? "失败"}
@@ -71,14 +72,14 @@ export default function MediaPicker({
                 封面
               </span>
             )}
-            <button
+            <Button
               type="button"
               onClick={() => onRemove(f.id)}
               aria-label="移除"
               className="absolute right-1.5 top-1.5 rounded-none bg-black/55 p-1 text-white opacity-0 transition group-hover:opacity-100"
             >
               <X size={12} />
-            </button>
+            </Button>
           </div>
         ))}
         <label className="grid aspect-square w-full cursor-pointer place-items-center rounded-none border-2 border-dashed border-brand-300 bg-brand-50/40 text-center text-brand-700 transition hover:border-brand-500 hover:bg-brand-50">
