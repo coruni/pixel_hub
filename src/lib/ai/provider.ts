@@ -74,7 +74,7 @@ export function createOpenAICompatibleProvider(config: ProviderConfig = {}) {
       }
       if (!response.ok)
         throw new Error(
-          `AI provider request failed (${response.status}): ${payload.error?.message ?? "unknown error"}`,
+          `AI provider request failed (${response.status}): ${payload.error?.message ?? (raw.slice(0, 200) || "unknown error")}`,
         );
       const content = payload.choices?.[0]?.message?.content;
       if (typeof content !== "string") throw new Error("AI provider returned no message content");

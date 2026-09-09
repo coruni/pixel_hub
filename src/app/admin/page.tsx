@@ -26,8 +26,12 @@ function formatSize(bytes: number | null | undefined): string {
 type OverviewTaskRow = Prisma.AiTaskGetPayload<{
   include: {
     suggestions: { orderBy: { createdAt: "desc" }; take: number };
+    runs: { orderBy: { startedAt: "desc" }; take: number };
   };
 }>;
+
+/** 悬挂 RUNNING 阈值：>5 分钟视为后台任务已中断（进程重启等），页面访问时落库复位为 FAILED。 */
+const STALE_RUNNING_MS = 5 * 60_000;
 
 /** 把最近一条 SITE_OVERVIEW 任务整理成卡片可读形态：模型输出已按 Zod 校验，非法即 parseFailed。 */
 function buildOverviewView(task: OverviewTaskRow): SiteOverviewView {
@@ -236,8 +240,34 @@ export default async function AdminIndex() {
     orderBy: { createdAt: "desc" },
     include: {
       suggestions: { orderBy: { createdAt: "desc" }, take: 1 },
+      runs: { orderBy: { startedAt: "desc" }, take: 1 },
     },
   });
+  // 悬挂 RUNNING 兜底：后台执行若因进程重启/异常中断，run 会残留 RUNNING 使按钮永远禁用。
+  // 访问页面时若发现 RUNNING 超过阈值，落库置 FAILED（保留排查信息），让「重试生成」恢复可用。
+  if (overviewTask?.status === "RUNNING") {
+    const staleRun = overviewTask.runs[0];
+    // RSC 数据获取期取服务器时钟判定 stale 窗口，不参与客户端渲染输出。
+    // eslint-disable-next-line react-hooks/purity
+    const staleMs = staleRun?.startedAt ? Date.now() - staleRun.startedAt.getTime() : Infinity;
+    if (staleMs > STALE_RUNNING_MS) {
+      await prisma.$transaction([
+        prisma.aiRun.updateMany({
+          where: { id: staleRun!.id, status: "RUNNING" },
+          data: {
+            status: "FAILED",
+            completedAt: new Date(),
+            errorMessage: "后台任务中断（进程可能重启），已自动复位，可点击重试",
+          },
+        }),
+        prisma.aiTask.updateMany({
+          where: { id: overviewTask.id, status: "RUNNING" },
+          data: { status: "FAILED" },
+        }),
+      ]);
+      overviewTask.status = "FAILED";
+    }
+  }
   const overview = overviewTask ? buildOverviewView(overviewTask) : null;
 
   return (

@@ -12,7 +12,7 @@ import {
   siteOverviewCycleDays,
   siteOverviewIdempotencyKey,
 } from "@/lib/ai/site-insight";
-import { createAiTaskAction, executeAiTaskAction, type AiActionState } from "@/lib/actions/ai";
+import { createAiTaskAction, startAiTaskInBackground, type AiActionState } from "@/lib/actions/ai";
 
 export type SiteOverviewState = AiActionState;
 
@@ -47,8 +47,9 @@ export async function runSiteOverviewAction(): Promise<SiteOverviewState> {
         where: { id: existing.id, status: "FAILED" },
         data: { status: "QUEUED" },
       });
-    // QUEUED（含刚转回的 FAILED）由 executeAiTaskAction 原子抢占，防并发重复调用。
-    return executeAiTaskAction(existing.id);
+    // QUEUED（含刚转回的 FAILED）交给异步启动：立即返回 RUNNING，模型调用在后台执行，
+    // 避免同步长请求穿透 Cloudflare 等反代的 ~100s 硬限导致 524 / 连接池占满。
+    return startAiTaskInBackground(existing.id);
   }
 
   const built = await buildInputSnapshot();
@@ -59,7 +60,7 @@ export async function runSiteOverviewAction(): Promise<SiteOverviewState> {
     idempotencyKey,
   });
   if (!created.ok || !created.taskId) return { error: created.error ?? "任务创建失败" };
-  return executeAiTaskAction(created.taskId);
+  return startAiTaskInBackground(created.taskId);
 }
 
 /**
@@ -78,5 +79,5 @@ export async function refreshSiteOverviewAction(): Promise<SiteOverviewState> {
     idempotencyKey,
   });
   if (!created.ok || !created.taskId) return { error: created.error ?? "任务创建失败" };
-  return executeAiTaskAction(created.taskId);
+  return startAiTaskInBackground(created.taskId);
 }

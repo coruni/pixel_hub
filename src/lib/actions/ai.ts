@@ -7,7 +7,7 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
-import { adminOnly, audit, staff } from "@/lib/actions/_guards";
+import { adminOnly, audit, staff, type StaffUser } from "@/lib/actions/_guards";
 import { providerFromConfig } from "@/lib/ai/provider";
 import { getRuntimeConfig, aiModel as cfgAiModel } from "@/lib/runtime-config";
 import { buildRedactedInput } from "@/lib/ai/redact";
@@ -159,9 +159,16 @@ export async function createAiTaskAction(raw: z.input<typeof inputSchema>): Prom
   return { ok: true, taskId: task.id, status: task.status };
 }
 
-/** 执行一个排队任务：调用 provider、解析结构化输出、落建议与运行记录。 */
-export async function executeAiTaskAction(taskId: string): Promise<AiActionState> {
-  const me = await staff();
+/**
+ * 执行一个排队任务：调用 provider、解析结构化输出、落建议与运行记录（同步等待模型返回）。
+ * @param trustedId 后台启动（startAiTaskInBackground）传入的已鉴权用户 id —— 后台阶段脱离
+ *                  请求上下文，auth() 无法读取会话，故由调用方先行鉴权后直传；省略则正常鉴权。
+ */
+export async function executeAiTaskAction(
+  taskId: string,
+  trustedId?: string,
+): Promise<AiActionState> {
+  const me: StaffUser | null = trustedId ? { id: trustedId, role: "ADMIN" } : await staff();
   if (!me) return { error: "无权限" };
   const task = await prisma.aiTask.findUnique({ where: { id: taskId } });
   if (!task) return { error: "任务不存在" };
@@ -212,7 +219,15 @@ export async function executeAiTaskAction(taskId: string): Promise<AiActionState
       user: JSON.stringify({ kind, input: JSON.parse(task.inputJson) }),
       imageUrls,
     });
-    const output = parseStructuredOutput(contract.outputSchema as z.ZodTypeAny, result.content);
+    let output: unknown;
+    try {
+      output = parseStructuredOutput(contract.outputSchema as z.ZodTypeAny, result.content);
+    } catch (parseError) {
+      // 解析失败时把模型原始输出前 400 字符并入错误，供 errorMessage/审计定位结构漂移（如 summary 缺失）。
+      throw new Error(
+        `${parseError instanceof Error ? parseError.message : String(parseError)}\n--- 模型原始输出片段 ---\n${result.content.slice(0, 400)}`,
+      );
+    }
     const completedAt = new Date();
 
     // 建议、任务终态、运行终态同一事务提交，避免半成功状态。
@@ -235,7 +250,7 @@ export async function executeAiTaskAction(taskId: string): Promise<AiActionState
       });
     });
     await audit(me.id, "EXECUTE_AI_TASK", "AI_TASK", taskId);
-    revalidatePath("/admin/ai");
+    if (!trustedId) revalidatePath("/admin/ai"); // 后台启动脱离请求上下文，页面靠轮询自行刷新
     return { ok: true, taskId, status: "SUCCEEDED" };
   } catch (error) {
     const completedAt = new Date();
@@ -286,17 +301,50 @@ export async function executeAiTaskAction(taskId: string): Promise<AiActionState
       taskId,
       error instanceof Error ? error.message.slice(0, 500) : undefined,
     );
-    revalidatePath("/admin/ai");
-    // 超时归因为「稍后重试」而非「检查配置」：grok 等慢模型长输出曾稳定 30s 超时中止（已放宽至 120s）。
-    const timedOut =
+    if (!trustedId) revalidatePath("/admin/ai");
+    // 失败归类：5xx/504 = 上游网关问题（可稍后重试），超时/中止 = 生成超时，其余 = 检查配置。
+    const text = error instanceof Error ? error.message : "";
+    const upstream =
       error instanceof Error &&
-      (error.name === "TimeoutError" || /aborted|timed\s*out/i.test(error.message));
+      (error.name === "TimeoutError" ||
+        /aborted|timed\s*out/i.test(text) ||
+        /request failed \([45]\d\d\)|5\d\d|50[0-9]/.test(text));
+    const gateway = /request failed \((?:50[0-9]|52[0-9])\)/.test(text);
     let message: string;
     if (kind === "game.research") message = "游戏资料联网检索尚未实现";
-    else if (timedOut) message = "AI 生成超时，请稍后重试";
+    else if (gateway) message = "AI 服务上游暂不可用（网关超时），请稍后重试";
+    else if (upstream) message = "AI 生成超时，请稍后重试";
     else message = "AI 任务执行失败，请检查配置后重试";
     return { error: message };
   }
+}
+
+/**
+ * 「点击即返回」的异步启动：只负责把任务转入可执行态并触发后台执行，不等待模型返回。
+ * 长模型调用因此移出浏览器请求链路（规避 Cloudflare/反代 ~100s 硬限、以及同步长请求
+ * 占满 Prisma 连接池导致后续请求 524 的问题）；常驻进程（next start）会在请求结束后
+ * 继续把任务跑完并落库，前端通过轮询任务状态感知终态。悬挂任务由 admin 页面访问时兜底复位。
+ */
+export async function startAiTaskInBackground(taskId: string): Promise<AiActionState> {
+  const me = await staff();
+  if (!me) return { error: "无权限" };
+  const task = await prisma.aiTask.findUnique({
+    where: { id: taskId },
+    select: { id: true, status: true },
+  });
+  if (!task) return { error: "任务不存在" };
+  if (task.status === "SUCCEEDED") return { ok: true, taskId, status: "SUCCEEDED" };
+  if (task.status === "FAILED")
+    await prisma.aiTask.updateMany({
+      where: { id: taskId, status: "FAILED" },
+      data: { status: "QUEUED" },
+    });
+  if (task.status === "RUNNING") return { ok: true, taskId, status: "RUNNING" };
+  // 抢占（QUEUED→RUNNING）与完整执行都在 executeAiTaskAction 内做原子处理：
+  // 这里不 await —— 常驻进程会把它跑完；trustedId 让后台阶段跳过 auth()（脱离请求后无会话）。
+  void executeAiTaskAction(taskId, me.id);
+  revalidatePath("/admin/ai");
+  return { ok: true, taskId, status: "RUNNING" };
 }
 
 /** 失败任务回到排队态，并立即尝试重新执行。 */

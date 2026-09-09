@@ -2,6 +2,10 @@
 
 // /admin 概览顶部的「AI 运营建议」卡片：只读展示最近一条 SITE_OVERVIEW 结果（摘要 + 分条建议），
 // 提供「生成 / 重新生成」入口（见 src/lib/actions/site-overview.ts）。AI 只出建议，不写任何资源。
+// 生成采用异步后台执行（startAiTaskInBackground）：点击立即置 RUNNING，模型在服务端后台跑完落库，
+// 本卡片在 RUNNING 期间每 4s 自动刷新一次直至终态，避免同步长请求被 Cloudflare 等反代 ~100s 掐断。
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useAction } from "@/lib/hooks";
 import { runSiteOverviewAction, refreshSiteOverviewAction } from "@/lib/actions/site-overview";
 import { BTN_GHOST_SM, BTN_PRIMARY_SM } from "@/lib/ui/cls";
@@ -54,7 +58,15 @@ function statusNote(status: SiteOverviewView["status"]): string {
 
 export default function SiteOverviewCard({ view }: { view: SiteOverviewView | null }) {
   const { run, pending } = useAction();
+  const router = useRouter();
   const succeeded = view?.status === "SUCCEEDED";
+
+  // RUNNING（后台生成中）期间每 4s 刷新一次，直至任务到达终态；离开卡片或终态后停止。
+  useEffect(() => {
+    if (view?.status !== "RUNNING") return;
+    const timer = setInterval(() => router.refresh(), 4_000);
+    return () => clearInterval(timer);
+  }, [view?.status, router]);
 
   const invoke = (fn: () => Promise<{ ok?: boolean; error?: string }>) => async () => {
     const r = await fn();
