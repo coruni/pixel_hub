@@ -287,10 +287,15 @@ export async function executeAiTaskAction(taskId: string): Promise<AiActionState
       error instanceof Error ? error.message.slice(0, 500) : undefined,
     );
     revalidatePath("/admin/ai");
-    return {
-      error:
-        kind === "game.research" ? "游戏资料联网检索尚未实现" : "AI 任务执行失败，请检查配置后重试",
-    };
+    // 超时归因为「稍后重试」而非「检查配置」：grok 等慢模型长输出曾稳定 30s 超时中止（已放宽至 120s）。
+    const timedOut =
+      error instanceof Error &&
+      (error.name === "TimeoutError" || /aborted|timed\s*out/i.test(error.message));
+    let message: string;
+    if (kind === "game.research") message = "游戏资料联网检索尚未实现";
+    else if (timedOut) message = "AI 生成超时，请稍后重试";
+    else message = "AI 任务执行失败，请检查配置后重试";
+    return { error: message };
   }
 }
 

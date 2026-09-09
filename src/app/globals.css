@@ -107,11 +107,13 @@ html.dark {
   --color-amber-900: #fad58f;
 }
 
+/* 背景/前景色映射。字体不加 --font-sans/--font-mono 覆盖：
+   使用 Tailwind 默认系统栈，避免 next/font/google 构建期联网下载
+   （Geist 曾因此导致离线/受限网络下 build 失败）。font-mono 用于
+   后台代码与路径展示，系统等宽栈即可；正文由 body 的 Fusion Pixel 链接管。 */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
 }
 
 /* 色板映射：值统一走 var() 链，透明度修饰符（bg-brand-50/40 等）才能编译为

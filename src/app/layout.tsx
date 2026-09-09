@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
@@ -8,9 +7,6 @@ import PresencePing from "@/components/layout/PresencePing";
 import { auth } from "@/lib/auth";
 import { siteUrl } from "@/lib/site-url";
 import { getSeoConfig, jsonLd, resolveSiteName } from "@/lib/seo-config";
-
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export async function generateMetadata(): Promise<Metadata> {
   const seo = await getSeoConfig();
@@ -67,11 +63,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       })
     : null;
   return (
-    <html
-      lang="zh-CN"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-      suppressHydrationWarning
-    >
+    <html lang="zh-CN" className="h-full antialiased" suppressHydrationWarning>
       <body className="flex min-h-full flex-col bg-background text-neutral-900">
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
         {websiteLd && (

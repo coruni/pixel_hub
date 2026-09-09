@@ -38,10 +38,14 @@ export function createOpenAICompatibleProvider(config: ProviderConfig = {}) {
           ]
         : input.user;
 
+      // 站点建议 / 资源补全等长结构化输出（尤以慢模型为甚）30s 默认会误杀，
+      // 实测 grok-4.5 生成 6 领域建议曾稳定超时中止；默认放宽到 120s，
+      // 测试或特殊场景仍可用 timeoutMs 注入覆盖。
+      const timeoutMs = config.timeoutMs ?? 120_000;
       const response = await fetchImpl(endpoint, {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${config.apiKey}` },
-        signal: AbortSignal.timeout(config.timeoutMs ?? 30_000),
+        signal: AbortSignal.timeout(timeoutMs),
         body: JSON.stringify({
           model: config.model,
           messages: [

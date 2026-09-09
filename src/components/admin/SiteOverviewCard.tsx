@@ -104,7 +104,8 @@ export default function SiteOverviewCard({ view }: { view: SiteOverviewView | nu
 
       {view?.status === "FAILED" && (
         <p className="mt-3 border-l-2 border-red-500 bg-red-50 px-3 py-2 text-xs text-red-700">
-          上次生成失败，请检查 AI 配置后重试（已保留失败记录，不会重复调用）。
+          上次生成失败，可点击上方「重试生成」（已保留失败记录，不会重复调用）；若持续失败，请检查后台
+          AI 配置或网络连通性。
         </p>
       )}
 

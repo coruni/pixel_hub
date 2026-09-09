@@ -11,6 +11,11 @@ export const PROTECTED_PREFIXES = ["/upload", "/settings", "/notifications", "/a
 export const authConfig = {
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
+  // 站点经 CDN/反向代理前置：trustHost 让 Auth.js 从请求头（host / x-forwarded-proto /
+  // x-forwarded-host）动态推导 baseUrl——回调地址恒等于用户实际访问的公网域名，
+  // 无需在 .env 写死 AUTH_URL。登录与绑定共用 /api/auth/callback/github 一个回调
+  //（GitHub OAuth App 只能登记一个），redirect_uri 与登记值一致才不报 mismatch。
+  trustHost: true,
   providers: [],
   callbacks: {
     authorized({ auth, request }) {

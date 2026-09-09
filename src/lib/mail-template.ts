@@ -22,7 +22,11 @@ export type MailContent = {
 
 export function renderMailHtml(c: MailContent): string {
   const name = siteName();
-  const host = new URL(siteUrl()).host;
+  // 页眉 host 优先取主按钮链接的域名（调用方已按"当前请求"动态拼接，与 CDN 后用户访问域一致）；
+  // 验证码等无链接邮件回退 env 基址（纯装饰，不影响功能）。
+  const host = c.linkUrl
+    ? new URL(c.linkUrl).host
+    : new URL(siteUrl()).host;
   const esc = (s: string) =>
     s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   const paragraphs = c.lines

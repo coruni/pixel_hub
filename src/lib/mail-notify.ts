@@ -2,7 +2,8 @@ import { prisma } from "@/lib/db/prisma";
 import { sendMail } from "@/lib/mailer";
 import { renderMailHtml } from "@/lib/mail-template";
 import { rateLimit } from "@/lib/rate-limit";
-import { siteName, siteUrl } from "@/lib/site-url";
+import { siteName } from "@/lib/site-url";
+import { requestSiteUrl } from "@/lib/request-origin";
 import { getRuntimeConfig } from "@/lib/runtime-config";
 
 // 邮件通知通道：后台「站点配置」开启邮件通知（或旧 env MAIL_NOTIFY=1）且 SMTP 配置齐备时启用；
@@ -30,7 +31,8 @@ export async function notifyByEmail(
     if (!rateLimit(`mail:${userId}`, 5, 60 * 60_000)) return;
     const u = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
     if (!u?.email) return;
-    const link = linkPath ? `${siteUrl()}${linkPath}` : undefined;
+    // 通知链接用"当前请求"的公网域名（CDN/反代兼容），勿用 .env 静态域名
+    const link = linkPath ? `${await requestSiteUrl()}${linkPath}` : undefined;
     const text = `${body}${link ? `\n\n${link}` : ""}\n\n—— 来自 ${siteName()}（可在设置中关闭邮件提醒）`;
     await sendMail(
       u.email,
