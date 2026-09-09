@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Check, RotateCcw, X, ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
@@ -29,22 +29,41 @@ export default function AvatarCropper({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [uiScale, setUiScale] = useState(1);
 
-  // 拖拽 / 多指
-  const dragRef = useRef<{ sx: number; sy: number; pos: Pos } | null>(null);
-  const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
-  const pinchRef = useRef<{ startDist: number; startZoom: number; startPos: Pos } | null>(null);
+  // 最新值 ref 镜像 + 手势状态机（同 ImageViewer：pointer 回调只读 ref，避免 state 闭包陈旧）
+  const imgRef = useRef<HTMLImageElement | null>(null);
+  const zoomRef = useRef(1);
+  const posRef = useRef<Pos>({ x: 0, y: 0 });
+  const pointersRef = useRef<Map<number, Pos>>(new Map());
+  const kindRef = useRef<"idle" | "pan" | "pinch">("idle");
+  const lastPtRef = useRef<Pos>({ x: 0, y: 0 });
+  const pinchRef = useRef<{ dist: number; zoom: number; pos: Pos; cx: number; cy: number } | null>(null);
 
   // 视口完全被图覆盖时的最小缩放（cover）
-  const coverScale = img ? VIEW / Math.min(img.naturalWidth, img.naturalHeight) : 1;
+  function coverScaleOf(el: HTMLImageElement) {
+    return VIEW / Math.min(el.naturalWidth, el.naturalHeight);
+  }
+  const coverScale = img ? coverScaleOf(img) : 1;
   const scale = coverScale * zoom;
   const dw = img ? img.naturalWidth * scale : 0;
   const dh = img ? img.naturalHeight * scale : 0;
 
+  // ref 镜像跟随 state（图片加载 / 按钮 / 滑杆 / 手势任一路径都会同步）
   useEffect(() => {
-    // 计算 uiScale：让 VIEW 在窄屏内显示（左右 padding 由 modal 决定）
+    imgRef.current = img;
+  }, [img]);
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
+  useEffect(() => {
+    posRef.current = pos;
+  }, [pos]);
+
+  useLayoutEffect(() => {
+    // 计算 uiScale：让固定 VIEW 在窄屏内显示（左右 padding 由 modal 决定）。
+    // 用 layout effect 在绘制前收敛，避免首帧以全宽 288px 渲染撑破小屏 modal
     function update() {
       const width = containerRef.current?.parentElement?.clientWidth ?? window.innerWidth;
-      const maxWidth = Math.max(1, width - 32); // 留出大致的 modal padding
+      const maxWidth = Math.max(1, width - 40); // 卡片 p-5 左右 padding 共 40px
       setUiScale(Math.min(1, maxWidth / VIEW));
     }
     update();
@@ -75,25 +94,39 @@ export default function AvatarCropper({
     };
   }, []);
 
+  // 同时写 state 与 ref 镜像：transform 状态的唯一写入入口
+  function applyView(z: number, p: Pos) {
+    const np = clampPos(p, z);
+    zoomRef.current = z;
+    posRef.current = np;
+    setZoom(z);
+    setPos(np);
+  }
+
   function clampPos(p: Pos, z: number): Pos {
-    const s = coverScale * z;
-    const w = (img?.naturalWidth ?? 0) * s;
-    const h = (img?.naturalHeight ?? 0) * s;
+    const el = imgRef.current;
+    if (!el) return p;
+    const s = coverScaleOf(el) * z;
+    const w = el.naturalWidth * s;
+    const h = el.naturalHeight * s;
     return { x: Math.min(0, Math.max(VIEW - w, p.x)), y: Math.min(0, Math.max(VIEW - h, p.y)) };
   }
 
+  // 以裁剪视口内焦点 (focusX, focusY) 缩放：焦点处像素保持不动，画面围绕其放大/缩小
   function zoomTo(next: number, focusX = VIEW / 2, focusY = VIEW / 2) {
+    const el = imgRef.current;
+    if (!el) return;
     const z = Math.min(8, Math.max(1, next));
-    const ratio = z / zoom;
-    const cx = focusX;
-    const cy = focusY;
-    setPos((p) => clampPos({ x: cx - (cx - p.x) * ratio, y: cy - (cy - p.y) * ratio }, z));
-    setZoom(z);
+    const p = posRef.current;
+    const k = z / zoomRef.current;
+    applyView(z, { x: focusX - (focusX - p.x) * k, y: focusY - (focusY - p.y) * k });
   }
 
   function reset() {
-    setZoom(1);
-    setPos({ x: (VIEW - dw) / 2, y: (VIEW - dh) / 2 });
+    const el = imgRef.current;
+    if (!el) return;
+    const c = coverScaleOf(el);
+    applyView(1, { x: (VIEW - el.naturalWidth * c) / 2, y: (VIEW - el.naturalHeight * c) / 2 });
   }
 
   function confirm() {
@@ -142,91 +175,90 @@ export default function AvatarCropper({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [img, zoom, pos, busy]);
 
-  // pointer handlers：支持单指拖动、两指捏合缩放
-  useEffect(() => {
+  // ---- pointer 手势（参考 ImageViewer 实现：单指平移 + 双指捏合）----
+  // 状态存于 ref 镜像，pointer 事件经 JSX 绑定到裁剪框，值总是最新的，无 1 帧滞后
+
+  function clientToLocal(cx: number, cy: number): Pos {
+    // 页面坐标 → 裁剪框内逻辑坐标（÷ uiScale，UI 缩放只影响显示不影响构图）
     const el = containerRef.current;
-    if (!el) return;
+    if (!el) return { x: cx / uiScale, y: cy / uiScale };
+    const rect = el.getBoundingClientRect();
+    return { x: (cx - rect.left) / uiScale, y: (cy - rect.top) / uiScale };
+  }
 
-    function getClientPointers() {
-      return Array.from(pointersRef.current.values());
+  function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.pointerType === "mouse" && e.button !== 0) return; // 仅左键
+    const pid = e.pointerId;
+    pointersRef.current.set(pid, { x: e.clientX, y: e.clientY });
+    const pts = [...pointersRef.current.values()];
+
+    if (pts.length === 2) {
+      // 第二根手指落下 → 进入捏合。只记录起点，后续按起点锚定计算，避免累积误差
+      const [a, b] = pts;
+      pinchRef.current = {
+        dist: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)),
+        zoom: zoomRef.current,
+        pos: { ...posRef.current },
+        cx: (a.x + b.x) / 2,
+        cy: (a.y + b.y) / 2,
+      };
+      kindRef.current = "pinch";
+      return;
     }
 
-    function distance(a: { x: number; y: number }, b: { x: number; y: number }) {
-      const dx = a.x - b.x;
-      const dy = a.y - b.y;
-      return Math.hypot(dx, dy);
+    kindRef.current = "pan";
+    lastPtRef.current = { x: e.clientX, y: e.clientY };
+    // 鼠标/触控笔可能移出裁剪框，主动捕获；触摸有隐式捕获无需处理
+    if (e.pointerType !== "touch") e.currentTarget.setPointerCapture(pid);
+  }
+
+  function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    const pid = e.pointerId;
+    if (!pointersRef.current.has(pid)) return;
+    pointersRef.current.set(pid, { x: e.clientX, y: e.clientY });
+    const pts = [...pointersRef.current.values()];
+
+    if (kindRef.current === "pinch" && pts.length === 2) {
+      const [a, b] = pts;
+      const g = pinchRef.current;
+      if (!g) return;
+      const z = Math.min(8, Math.max(1, g.zoom * (Math.hypot(a.x - b.x, a.y - b.y) / g.dist)));
+      // 以捏合起始中心为锚缩放，中心再跟随两指中点平移（同 ImageViewer）
+      const f0 = clientToLocal(g.cx, g.cy);
+      const f1 = clientToLocal((a.x + b.x) / 2, (a.y + b.y) / 2);
+      const k = z / g.zoom;
+      applyView(z, { x: f1.x - k * (f0.x - g.pos.x), y: f1.y - k * (f0.y - g.pos.y) });
+      return;
     }
 
-    function clientToLocal(cx: number, cy: number) {
-      // 将页面坐标转为视口内的逻辑坐标（未缩放）
-      const rect = el.getBoundingClientRect();
-      const x = (cx - rect.left) / uiScale;
-      const y = (cy - rect.top) / uiScale;
-      return { x, y };
+    if (kindRef.current === "pan" && pts.length === 1) {
+      const cur = { x: e.clientX, y: e.clientY };
+      const dx = (cur.x - lastPtRef.current.x) / uiScale;
+      const dy = (cur.y - lastPtRef.current.y) / uiScale;
+      lastPtRef.current = cur;
+      const p = posRef.current;
+      applyView(zoomRef.current, { x: p.x + dx, y: p.y + dy });
     }
+  }
 
-    function onPointerDown(e: PointerEvent) {
-      (e.target as HTMLElement).setPointerCapture(e.pointerId);
-      pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-
-      if (pointersRef.current.size === 1) {
-        // 单指拖动
-        dragRef.current = { sx: e.clientX, sy: e.clientY, pos };
-      } else if (pointersRef.current.size === 2) {
-        // 开始捏合
-        const pts = getClientPointers();
-        const dist = distance(pts[0], pts[1]);
-        pinchRef.current = { startDist: dist, startZoom: zoom, startPos: pos };
-      }
+  function onPointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    pointersRef.current.delete(e.pointerId);
+    pinchRef.current = null;
+    if (pointersRef.current.size === 0) {
+      kindRef.current = "idle";
+      return;
     }
+    // 捏合中抬起一指 → 剩余单指继续平移
+    const [only] = [...pointersRef.current.values()];
+    lastPtRef.current = { x: only.x, y: only.y };
+    kindRef.current = "pan";
+  }
 
-    function onPointerMove(e: PointerEvent) {
-      if (!pointersRef.current.has(e.pointerId)) return;
-      pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  function onWheel(e: React.WheelEvent<HTMLDivElement>) {
+    e.stopPropagation();
+    zoomTo(zoomRef.current * (e.deltaY < 0 ? 1.15 : 1 / 1.15));
+  }
 
-      if (pointersRef.current.size === 1) {
-        const d = dragRef.current;
-        if (!d) return;
-        setPos((p) =>
-          clampPos({ x: d.pos.x + (e.clientX - d.sx), y: d.pos.y + (e.clientY - d.sy) }, zoom),
-        );
-      } else if (pointersRef.current.size === 2 && pinchRef.current) {
-        const pts = getClientPointers();
-        const newDist = distance(pts[0], pts[1]);
-        const ratio = newDist / pinchRef.current.startDist;
-        const nextZoom = Math.min(8, Math.max(1, pinchRef.current.startZoom * ratio));
-
-        // 以两指中点为缩放焦点，映射到逻辑坐标
-        const mX = (pts[0].x + pts[1].x) / 2;
-        const mY = (pts[0].y + pts[1].y) / 2;
-        const local = clientToLocal(mX, mY);
-        zoomTo(nextZoom, local.x, local.y);
-      }
-    }
-
-    function onPointerUp(e: PointerEvent) {
-      pointersRef.current.delete(e.pointerId);
-      pinchRef.current = null;
-      dragRef.current = null;
-      try {
-        (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-      } catch {
-        //
-      }
-    }
-
-    el.addEventListener("pointerdown", onPointerDown as any);
-    window.addEventListener("pointermove", onPointerMove as any);
-    window.addEventListener("pointerup", onPointerUp as any);
-    window.addEventListener("pointercancel", onPointerUp as any);
-
-    return () => {
-      el.removeEventListener("pointerdown", onPointerDown as any);
-      window.removeEventListener("pointermove", onPointerMove as any);
-      window.removeEventListener("pointerup", onPointerUp as any);
-      window.removeEventListener("pointercancel", onPointerUp as any);
-    };
-  }, [pos, zoom, uiScale, img]); // 依赖 pos/zoom/img/uiScale
 
   return (
     <div
@@ -251,12 +283,18 @@ export default function AvatarCropper({
           ref={containerRef}
           className="relative mx-auto touch-none select-none overflow-hidden border border-brand-600 bg-brand-50"
           style={{
-            width: VIEW,
-            height: VIEW,
+            // 外层容器占位跟随 uiScale 收缩（内层已 scale(uiScale)），
+            // 否则固定 288px 会把小屏卡片撑破、modal 横向溢出
+            width: VIEW * uiScale,
+            height: VIEW * uiScale,
             cursor: "grab",
-            // 外层容器高度根据 uiScale 保持布局不溢出
             transformOrigin: "top left",
           }}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          onWheel={onWheel}
         >
           <div
             style={{
