@@ -269,7 +269,7 @@ export default async function UserPage({
   );
 
   return (
-    <div className={`mx-auto max-w-7xl px-4 py-10 sm:px-6 ${profile.heroImageKey ? "sm:pt-0" : ""}`}>
+    <div className={`mx-auto max-w-7xl px-4 py-10 sm:px-6 ${profile.heroImageKey ? "pt-0" : "pt-10"}`}>
       {/* 头部：可选 hero 横幅图。移动端背景向下延伸覆盖到统计行底部，整张图用 mask 渐变：
           内容区域压暗保证文字可读、无字间隙露出图像、最底部融出到 body，无硬切分割线 */}
       {profile.heroImageKey ? (
