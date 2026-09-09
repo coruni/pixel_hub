@@ -24,8 +24,9 @@
   --md-heading: #171717;
   --md-muted: #737373;
   --md-marker: #a3a3a3;
-  --md-link: #0f172a;
-  --md-code-bg: #f4f4f5;
+  --md-link: #a84e31; /* 亮=品牌赤陶橙深阶（对齐暗色浅暖橙），不再用冷 slate 深蓝 */
+  --md-link-hover: #8a4129; /* 亮：hover 再深一档（brand-800） */
+  --md-code-bg: #f0e9dd; /* 亮=暖米（对齐暗色暖深棕语义），不再用冷 neutral 灰 */
   --md-border: #e5e5e5;
   /* 品牌主色：温暖橙（Claude 风赤陶橙）。用法同 Tailwind 色板：bg-brand-500 / text-brand-600 等 */
   --surface: #fffdf9; /* 卡片/面板暖白（比页面背景 #faf9f5 略亮一档） */
@@ -62,6 +63,7 @@ html.dark {
   --md-muted: #9c978f;
   --md-marker: #6e6961;
   --md-link: #f0c9b2;
+  --md-link-hover: #f7e2d4; /* 暗：hover 提亮至 brand-900 */
   --md-code-bg: #2d2925;
   --md-border: #3a3631;
 
@@ -222,23 +224,46 @@ summary {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+.md-body a:hover {
+  color: var(--md-link-hover); /* 亮加深 / 暗提亮，反馈可辨识 */
+}
 .md-body code {
   border-radius: 0;
   background: var(--md-code-bg);
   padding: 0.1rem 0.3rem;
   font-size: 0.85em;
+  color: var(--md-text-lg); /* 与代码块 pre 同级实色，亮色下深于正文、暗色下亮于正文 */
 }
 .md-body pre {
   overflow-x: auto;
   border-radius: 0;
-  background: #0a0a0a;
+  border: 1px solid var(--md-border); /* 像素语言：边框分隔，不靠黑底悬浮 */
+  background: var(--md-code-bg); /* 跟随明暗：亮=暖浅底，暗=暖深底 */
   padding: 0.6rem 0.75rem;
-  color: #e5e5e5;
+  color: var(--md-text-lg);
 }
 .md-body pre code {
   background: transparent;
   padding: 0;
   color: inherit;
+}
+.md-body table {
+  margin: 0.5rem 0;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95em;
+}
+.md-body th,
+.md-body td {
+  border: 1px solid var(--md-border);
+  padding: 0.3rem 0.55rem;
+  text-align: left;
+  vertical-align: top;
+}
+.md-body th {
+  background: var(--md-code-bg);
+  color: var(--md-heading);
+  font-weight: 600;
 }
 .md-body blockquote {
   margin: 0.4rem 0;
