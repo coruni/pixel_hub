@@ -107,31 +107,59 @@ export function ResourceEditForm({
 
   async function onFiles(fl: FileList | null) {
     if (!fl || fl.length === 0) return;
+    const maxCount =
+      resource.type === "ARTICLE" ? ARTICLE_MEDIA_MAX : limits.galleryImageMaxCount;
+    const remain = maxCount - files.length;
+    if (remain <= 0) {
+      setUploadMsg(`最多上传 ${maxCount} 张`);
+      return;
+    }
+    // Chevereto 上传接口一次请求仅接受单个文件：每个文件走独立请求，
+    // 用 Promise.allSettled 并行发出多个「单文件」请求并逐个收集成败。
+    const picks = Array.from(fl).slice(0, remain);
     setUploading(true);
     setUploadMsg(null);
-    const fd = new FormData();
-    for (const f of Array.from(fl)) fd.append("files", f);
     try {
-      const res = await fetch("/api/upload", { method: "POST", body: fd });
-      const data = await res.json();
-      if (!data.ok) {
-        setUploadMsg(data.error ?? "上传失败");
-        return;
+      const settled = await Promise.allSettled(
+        picks.map(async (f): Promise<{ ok: true; item: Uploaded } | { ok: false; error: string }> => {
+          const fd = new FormData();
+          fd.append("files", f);
+          try {
+            const res = await fetch(`/api/upload?max=${maxCount}`, { method: "POST", body: fd });
+            const data = (await res.json()) as {
+              ok?: boolean;
+              error?: string;
+              files?: Uploaded[];
+            };
+            const item = data.files?.[0];
+            if (res.ok && data.ok && item?.ok) return { ok: true, item };
+            console.warn(`[upload:client] 上传被拒 fileName=${f.name}`, { status: res.status, data });
+            return { ok: false, error: item?.error ?? data.error ?? "上传失败" };
+          } catch (err) {
+            console.warn(`[upload:client] 请求失败 fileName=${f.name}`, err);
+            return { ok: false, error: "网络错误，请重试" };
+          }
+        }),
+      );
+      const good: Uploaded[] = [];
+      const bad: { name: string; error?: string }[] = [];
+      for (let i = 0; i < settled.length; i += 1) {
+        const r = settled[i]!;
+        if (r.status === "rejected") {
+          bad.push({ name: picks[i]!.name, error: "网络错误，请重试" });
+        } else if (r.value.ok) {
+          good.push(r.value.item);
+        } else {
+          bad.push({ name: picks[i]!.name, error: r.value.error });
+        }
       }
-      const list = (data.files ?? []) as Uploaded[];
-      const good = list.filter((f) => f.ok);
-      const bad = list.filter((f) => !f.ok);
       if (good.length > 0) {
-        const maxCount =
-          resource.type === "ARTICLE" ? ARTICLE_MEDIA_MAX : limits.galleryImageMaxCount;
         const next = [...files, ...good].slice(0, maxCount);
         setFiles(next);
         if (!coverId && next.length > 0) setCoverId(next[0].id);
       }
       if (bad.length > 0)
         setUploadMsg(`${bad.map((b) => b.name).join("、")} 上传失败：${bad[0]?.error ?? "未知原因"}`);
-    } catch {
-      setUploadMsg("上传失败，请检查网络后重试");
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";

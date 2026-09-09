@@ -323,15 +323,24 @@ export async function addCommentAction(
   const commentMaxBytes = L.commentImageMaxMb * MIB;
   let saved: { key: string; width: number; height: number; size: number }[] = [];
   if (images.length > 0) {
-    try {
-      saved = (
-        await Promise.all(
-          images.slice(0, commentMaxCount).map((f) => saveCommentImage(f, commentMaxBytes)),
-        )
-      ).filter((x): x is { key: string; width: number; height: number; size: number } => !!x);
-    } catch (e) {
-      // 图片失败不阻断文字评论
-      console.error("[comment-image]", e);
+    // Chevereto 上传接口一次请求仅接受单个文件：每张图各自走一次独立上传请求，
+    // 用 Promise 并行发出多个「单文件」请求并逐个收集成败，互不阻断。
+    const pics = images.slice(0, commentMaxCount);
+    const settled = await Promise.allSettled(
+      pics.map((f) => saveCommentImage(f, commentMaxBytes)),
+    );
+    saved = settled
+      .filter(
+        (r): r is PromiseFulfilledResult<{ key: string; width: number; height: number; size: number }> =>
+          r.status === "fulfilled" && !!r.value,
+      )
+      .map((r) => r.value);
+    for (let i = 0; i < settled.length; i += 1) {
+      const r = settled[i]!;
+      if (r.status === "rejected") {
+        const reason = r.reason instanceof Error ? r.reason.message : String(r.reason);
+        console.error(`[comment-image] 失败 fileName=${pics[i]?.name ?? "?"}`, reason, r.reason);
+      }
     }
   }
 

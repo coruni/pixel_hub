@@ -30,8 +30,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "跨站请求被拒绝" }, { status: 403 });
   const session = await auth();
   if (!session?.user) return NextResponse.json({ ok: false, error: "请先登录" }, { status: 401 });
-  // 上传限流：每用户 30 次 / 小时（防滥用存储）
-  if (!rateLimit(`upload:${session.user.id}`, 30, 60 * 60_000))
+  // 上传限流：Chevereto 上传接口一次仅接受单文件，前端已改为逐张请求，
+  // 因此按「请求」计费会随图片张数倍增，配额按张放宽到 120 次/小时（防滥用存储）。
+  if (!rateLimit(`upload:${session.user.id}`, 120, 60 * 60_000))
     return NextResponse.json({ ok: false, error: "上传过于频繁，请稍后再试" }, { status: 429 });
 
   // 单张上限以后台 /admin/uploads 配置为准（缺失回退默认 20MB）
@@ -59,11 +60,13 @@ export async function POST(req: NextRequest) {
     const name = file.name || "image";
     try {
       if (buf.byteLength > maxBytes) {
+        console.warn(`[upload] 超大小被拒 userId=${session.user.id} fileName=${name} bytes=${buf.byteLength}`);
         results.push({ name, ok: false, error: `超过 ${L.galleryImageMaxMb}MB 限制` });
         continue;
       }
       const sniffed = sniff(buf);
       if (!sniffed) {
+        console.warn(`[upload] 非图片格式被拒 userId=${session.user.id} fileName=${name}`);
         results.push({ name, ok: false, error: "不支持的图片格式（仅 png/jpg/webp/gif/avif）" });
         continue;
       }
@@ -96,7 +99,8 @@ export async function POST(req: NextRequest) {
         placeholder: p.placeholder,
       });
     } catch (e) {
-      console.error("[upload]", e);
+      const reason = e instanceof Error ? e.message : String(e);
+      console.error(`[upload] 失败 userId=${session.user.id} fileName=${name}`, reason, e);
       results.push({ name, ok: false, error: "图片处理失败，请重试或更换图片" });
     }
   }

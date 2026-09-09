@@ -32,6 +32,16 @@ const MIME_BY_EXT: Record<string, string> = {
   avif: "image/avif",
 };
 
+/** 单阶段落盘并附带阶段上下文：失败时错误信息含「哪一步 + 底层原因」，便于日志快捷定位 */
+async function saveStage(stage: string, key: string, buf: Buffer): Promise<string> {
+  try {
+    return await saveFile(key, buf);
+  } catch (e) {
+    const reason = e instanceof Error ? e.message : String(e);
+    throw new Error(`图片保存失败（${stage}）：${reason}`);
+  }
+}
+
 export async function processImage(input: Buffer): Promise<ProcessedImage> {
   const base = makeKey("images", ".x"); // 仅借用唯一目录
   const dir = base.slice(0, base.lastIndexOf("/"));
@@ -46,7 +56,7 @@ export async function processImage(input: Buffer): Promise<ProcessedImage> {
 
   // 1) 原图逐字节保存（chevereto 驱动下 saveFile 返回远端 URL，落库即 URL）
   const origKey = `${dir}/original.${ext}`;
-  const storageKey = await saveFile(origKey, input);
+  const storageKey = await saveStage("原图", origKey, input);
   const size = input.byteLength;
 
   // 2) 大图
@@ -56,7 +66,7 @@ export async function processImage(input: Buffer): Promise<ProcessedImage> {
     .resize({ width: Math.min(width, 1600), withoutEnlargement: true })
     .webp({ quality: 82 })
     .toBuffer();
-  const bigUrl = await saveFile(bigKey, big);
+  const bigUrl = await saveStage("大图", bigKey, big);
 
   // 3) 缩略图
   const thumbKey = `${dir}/thumb.webp`;
@@ -65,7 +75,7 @@ export async function processImage(input: Buffer): Promise<ProcessedImage> {
     .resize({ width: Math.min(width, 480), withoutEnlargement: true })
     .webp({ quality: 74 })
     .toBuffer();
-  const thumbUrl = await saveFile(thumbKey, thumb);
+  const thumbUrl = await saveStage("缩略图", thumbKey, thumb);
 
   // 4) LQIP
   const placeholderBuf = await oriented
