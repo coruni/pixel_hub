@@ -47,7 +47,6 @@ model User {
   accusedReports Report[] @relation("ReportTargetUser") // 被举报记录
   passwordResets PasswordResetToken[]
   uploads        Media[]       @relation("Uploads")
-  aiTasks        AiTask[]      @relation("AiTaskCreator")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -464,111 +463,6 @@ enum ReportStatus {
   OPEN
   RESOLVED
   DISMISSED
-}
-
-// ---------- AI 建议与运行记录 ----------
-// AI 只产出任务/建议草稿，审核或既有业务流程显式采纳后才会影响内容；模型输出写库前已脱敏。
-model AiTask {
-  id             String       @id @default(cuid())
-  kind           AiTaskKind
-  status         AiTaskStatus @default(QUEUED)
-  inputJson      String       @db.Text // 任务输入快照（写入前已递归脱敏）
-  promptVersion  String // 本次任务的提示词版本，便于追溯结果由哪版模型约定产生
-  idempotencyKey String?      @unique // 幂等键：触发器/重复点击复用同一任务
-  createdById    String?
-  createdBy      User?        @relation("AiTaskCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  suggestions    AiSuggestion[]
-  sources        AiSource[]
-  runs           AiRun[]
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-
-  @@index([kind, status])
-  @@index([createdById])
-  @@index([createdAt])
-}
-
-model AiSuggestion {
-  id           String             @id @default(cuid())
-  taskId       String
-  task         AiTask             @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  status       AiSuggestionStatus @default(PENDING)
-  outputJson   String             @db.Text // 模型输出（已按任务类型 Zod 校验后序列化）
-  decisionJson String?            @db.Text // 逐字段接受/拒绝记录 {accepted[], rejected[]}
-  reviewedById String? // 处理人（不建强关系：人员删除不影响审计可追溯）
-  reviewedAt   DateTime?
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
-
-  @@index([taskId, status])
-}
-
-model AiSource {
-  id         String       @id @default(cuid())
-  taskId     String
-  task       AiTask       @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  kind       AiSourceKind @default(USER_INPUT)
-  title      String?
-  locator    String? // http(s) 地址或站内资源/标识（页面仅对 http(s) 渲染为外链）
-  excerpt    String?      @db.Text
-  trustLevel String? // 来源可信等级（research 适配器落地后由抓取方填充）
-  fetchedAt  DateTime?
-  createdAt  DateTime     @default(now())
-
-  @@index([taskId])
-}
-
-model AiRun {
-  id           String      @id @default(cuid())
-  taskId       String
-  task         AiTask      @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  provider     String // 执行用 provider 标识（当前固定 openai-compatible）
-  model        String // 执行用模型名
-  status       AiRunStatus @default(RUNNING)
-  startedAt    DateTime
-  completedAt  DateTime?
-  durationMs   Int? // 请求耗时（毫秒）
-  inputTokens  Int?
-  outputTokens Int?
-  totalTokens  Int?
-  errorMessage String?      @db.Text // 失败原因（保留服务端排查上下文，不直接展示给用户）
-  createdAt    DateTime     @default(now())
-
-  @@index([taskId, createdAt])
-  @@index([status, createdAt])
-}
-
-enum AiTaskKind {
-  RESOURCE_ENRICH // 缺简介补全
-  RESOURCE_REVIEW // 发布前内容审核
-  IMAGE_DESCRIBE // 图片描述与打标
-  GAME_RESEARCH // 游戏资料研究（首期无检索适配器，执行时明确失败）
-  SITE_OVERVIEW // 站点级周期运营建议（输入=最近 7 日访客浏览聚合快照，产出只读建议，不写资源）
-}
-
-enum AiTaskStatus {
-  QUEUED
-  RUNNING
-  SUCCEEDED
-  FAILED
-}
-
-enum AiSuggestionStatus {
-  PENDING // 待审核（含部分字段已处理、其余仍待决定）
-  PROCESSING // 正在应用到资源（条件抢占，防并发重复写入）
-  ACCEPTED
-  REJECTED
-}
-
-enum AiSourceKind {
-  USER_INPUT
-  IMPORTED
-}
-
-enum AiRunStatus {
-  RUNNING
-  SUCCEEDED
-  FAILED
 }
 
 // 站点访问统计（PV / IP）：每次页面浏览一行；ipHash 为加盐哈希不存明文 IP

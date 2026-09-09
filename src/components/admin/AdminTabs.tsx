@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Bot,
   ClipboardCheck,
   FileText,
   Flag,
@@ -27,7 +26,6 @@ const TAB_ICONS: Record<string, LucideIcon> = {
   "/admin": LayoutDashboard,
   "/admin/queue": ClipboardCheck,
   "/admin/content": FolderOpen,
-  "/admin/ai": Bot,
   "/admin/reports": Flag,
   "/admin/users": Users,
   "/admin/logs": ScrollText,

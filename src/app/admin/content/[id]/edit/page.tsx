@@ -9,7 +9,6 @@ import { getUploadLimits } from "@/lib/upload-limits";
 import { TYPE_LABEL } from "@/lib/display";
 import { ResourceEditForm } from "@/components/admin/ResourceEditForm";
 import { ContentActions } from "@/components/admin/buttons";
-import AiGenerateButton from "@/components/admin/AiGenerateButton";
 
 export const metadata: Metadata = { title: "编辑内容" };
 
@@ -58,7 +57,6 @@ export default async function EditResourcePage({ params }: { params: Promise<{ i
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <AiGenerateButton resourceId={resource.id} />
           <ContentActions resourceId={resource.id} status={resource.status} />
         </div>
       </div>

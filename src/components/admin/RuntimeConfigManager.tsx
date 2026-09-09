@@ -55,9 +55,6 @@ export default function RuntimeConfigManager({
     graphClientSecret: config.graphClientSecret,
     graphEndpoint: config.graphEndpoint,
     graphScope: config.graphScope,
-    aiBaseUrl: config.aiBaseUrl,
-    aiApiKey: config.aiApiKey,
-    aiModel: config.aiModel,
   });
 
   const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
@@ -86,7 +83,6 @@ export default function RuntimeConfigManager({
           { key: "storage", label: "存储" },
           { key: "mail", label: "邮件" },
           { key: "cloud", label: "云盘" },
-          { key: "ai", label: "AI" },
         ]}
         panels={{
           login: (
@@ -531,65 +527,6 @@ export default function RuntimeConfigManager({
               autoComplete="off"
               spellCheck={false}
               placeholder="默认 {endpoint}/.default"
-            />
-          </div>
-        </div>
-      </section>
-            </>
-          ),
-          ai: (
-            <>
-      {/* ---- 网站管家 AI ---- */}
-      <section className="border border-brand-200 bg-surface p-5">
-        <h3 className="text-sm font-semibold text-neutral-900">网站管家 AI</h3>
-        <p className="mt-1 text-xs leading-5 text-neutral-400">
-          OpenAI 兼容接口（/chat/completions），驱动内容补全、内容审核、图片描述与游戏资料任务；
-          三项齐全后网站管家即可运行（留空回退读取旧 .env）。
-        </p>
-        <div className="mt-4 space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label htmlFor="rc-ai-base" className={LABEL_STRONG}>
-                Base URL
-              </label>
-              <input
-                id="rc-ai-base"
-                value={form.aiBaseUrl}
-                onChange={(e) => set({ aiBaseUrl: e.target.value })}
-                className={INPUT}
-                autoComplete="off"
-                spellCheck={false}
-                placeholder="https://api.example.com/v1"
-              />
-            </div>
-            <div>
-              <label htmlFor="rc-ai-model" className={LABEL_STRONG}>
-                模型
-              </label>
-              <input
-                id="rc-ai-model"
-                value={form.aiModel}
-                onChange={(e) => set({ aiModel: e.target.value })}
-                className={INPUT}
-                autoComplete="off"
-                spellCheck={false}
-                placeholder="gpt-4o-mini / deepseek-chat …"
-              />
-            </div>
-          </div>
-          <div>
-            <label htmlFor="rc-ai-key" className={LABEL_STRONG}>
-              API Key
-            </label>
-            <input
-              id="rc-ai-key"
-              type="password"
-              value={form.aiApiKey}
-              onChange={(e) => set({ aiApiKey: e.target.value })}
-              className={INPUT}
-              autoComplete="off"
-              spellCheck={false}
-              placeholder="••••••••••••••••••••"
             />
           </div>
         </div>

@@ -41,10 +41,6 @@ export const runtimeConfigSchema = z.object({
   graphClientSecret: z.string().default(""),
   graphEndpoint: z.string().default(""), // 空 = https://graph.microsoft.com
   graphScope: z.string().default(""), // 空 = {endpoint}/.default
-  // ---- 网站管家 AI（OpenAI 兼容 /chat/completions）----
-  aiBaseUrl: z.string().default(""),
-  aiApiKey: z.string().default(""),
-  aiModel: z.string().default(""),
 });
 
 export type RuntimeConfig = z.infer<typeof runtimeConfigSchema>;
@@ -89,9 +85,6 @@ export function sanitizeRuntimeConfig(config: RuntimeConfig): RuntimeConfig {
     graphClientSecret: config.graphClientSecret.trim().slice(0, SECRET_MAX),
     graphEndpoint: normUrl(config.graphEndpoint).slice(0, SECRET_MAX),
     graphScope: config.graphScope.trim().slice(0, SECRET_MAX),
-    aiBaseUrl: normUrl(config.aiBaseUrl).slice(0, SECRET_MAX),
-    aiApiKey: config.aiApiKey.trim().slice(0, SECRET_MAX),
-    aiModel: config.aiModel.trim().slice(0, 100),
   };
 }
 
@@ -103,7 +96,6 @@ export function runtimeConfigIssues(c: RuntimeConfig): string[] {
     [c.s3Endpoint, "S3 Endpoint"],
     [c.s3PublicBase, "S3 公开访问基址"],
     [c.graphEndpoint, "Graph Endpoint"],
-    [c.aiBaseUrl, "AI Base URL"],
   ] as const;
   for (const [v, label] of fields) {
     if (v && !URL_RE.test(v)) issues.push(`${label} 不是合法的 http(s) 地址`);
@@ -187,18 +179,6 @@ export function graphEndpoint(c: RuntimeConfig): string {
 
 export function graphScope(c: RuntimeConfig): string {
   return c.graphScope || process.env.GRAPH_SCOPE || `${graphEndpoint(c)}/.default`;
-}
-
-export function aiBaseUrl(c: RuntimeConfig): string {
-  return c.aiBaseUrl || process.env.AI_PROVIDER_BASE_URL || "";
-}
-
-export function aiApiKey(c: RuntimeConfig): string {
-  return c.aiApiKey || process.env.AI_PROVIDER_API_KEY || "";
-}
-
-export function aiModel(c: RuntimeConfig): string {
-  return c.aiModel || process.env.AI_PROVIDER_MODEL || "";
 }
 
 /**

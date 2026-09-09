@@ -1,7 +1,6 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { after } from "next/server";
 import { cookies } from "next/headers";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
@@ -14,7 +13,6 @@ import { resourceTextFields } from "@/lib/resource-fields";
 import { applyResourceEdit, type ResourceEditState } from "@/lib/actions/_resource-edit";
 import { getUploadLimits } from "@/lib/upload-limits";
 import { ARTICLE_MEDIA_MAX } from "@/lib/upload-config";
-import { enqueueResourceAiTriggers } from "@/lib/ai/enqueue";
 
 export type ResourceActionState = {
   error?: string;
@@ -246,14 +244,6 @@ export async function createResourceAction(
     console.error("[createResource]", e);
     return { error: "发布失败，请稍后重试" };
   }
-
-  // AI 补全刻意 best-effort：响应结束后再入队（不调用模型、不写 Resource），
-  // provider/数据库/审计的任何失败都不能改变既有发布契约。
-  after(async () => {
-    await enqueueResourceAiTriggers(resource.id, user.id).catch((error) => {
-      console.error("[ai-trigger] enqueue failed", error instanceof Error ? error.message : error);
-    });
-  });
 
   if (status === "PUBLISHED") {
     revalidatePath("/", "layout");
