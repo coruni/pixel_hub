@@ -235,21 +235,51 @@ export default async function UserPage({
     </div>
   );
 
+  // 统计行：三格主数据（窄屏三等分占满一行，宽屏固定宽度左排）+ 侧挂累计数据。
+  // 有 hero 时随头部一起被背景覆盖（移动端背景向下延伸至本行底部）。
+  const statsRow = (
+    <div className="mt-6 flex flex-col gap-3 lg:flex-row lg:items-center">
+      <div className="flex w-full gap-3 lg:w-auto">
+        {[
+          { n: formatCount(pubCount), k: "发布" },
+          { n: formatCount(profile.followerCount), k: "粉丝" },
+          { n: formatCount(profile.followingCount), k: "关注" },
+        ].map((s) => (
+          <div
+            key={s.k}
+            className="min-w-0 flex-1 rounded-none border border-brand-200 bg-brand-50/40 py-3 text-center lg:w-28 lg:flex-none"
+          >
+            <div className="text-lg font-semibold tabular-nums text-brand-700">{s.n}</div>
+            <div className="mt-0.5 text-[11px] text-neutral-400">{s.k}</div>
+          </div>
+        ))}
+      </div>
+      <div className="flex min-w-0 flex-1 flex-wrap items-center justify-start gap-x-5 gap-y-1 text-xs text-neutral-400 lg:justify-end">
+        <span className="inline-flex items-center gap-1">
+          <Eye size={12} aria-hidden /> 累计浏览 {formatCount(agg._sum.viewCount ?? 0)}
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <MessageSquare size={12} aria-hidden /> {formatCount(commentCount)} 条评论
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <ThumbsUp size={12} aria-hidden /> {formatCount(agg._sum.likeCount ?? 0)} 次点赞
+        </span>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
-      {/* 头部：可选 hero 横幅图，背景与下方之间用 mask-image 渐变平滑过渡到 body 纹理，无硬切分割线 */}
+    <div className={`mx-auto max-w-7xl px-4 py-10 sm:px-6 ${profile.heroImageKey ? "sm:pt-0" : ""}`}>
+      {/* 头部：可选 hero 横幅图。移动端背景向下延伸覆盖到统计行底部，整张图用 mask 渐变：
+          内容区域压暗保证文字可读、无字间隙露出图像、最底部融出到 body，无硬切分割线 */}
       {profile.heroImageKey ? (
-        <section className="relative isolate -mx-4 px-4 pb-6 sm:-mx-6 sm:px-6 sm:pb-8">
+        <section className="relative isolate -mx-4 px-4 sm:-mx-6 sm:px-6">
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-48 bg-cover bg-center sm:h-64"
-            style={{
-              backgroundImage: `url(${publicUrl(profile.heroImageKey)})`,
-              maskImage: "linear-gradient(to bottom, black 50%, transparent 100%)",
-              WebkitMaskImage: "linear-gradient(to bottom, black 50%, transparent 100%)",
-            }}
+            className="hero-bg-mask pointer-events-none absolute inset-x-0 top-0 bottom-0 -z-10 bg-cover bg-center sm:bottom-auto sm:h-64"
+            style={{ backgroundImage: `url(${publicUrl(profile.heroImageKey)})` }}
           />
-          <div className="flex flex-wrap items-center gap-5 pt-2 sm:pt-3">
+          <div className="flex flex-wrap items-center gap-5 pb-6 pt-2 sm:pb-8 sm:pt-3">
             <Avatar
               name={profile.name}
               username={profile.username}
@@ -303,6 +333,7 @@ export default async function UserPage({
               )}
             </div>
           </div>
+          {statsRow}
         </section>
       ) : (
         <div className="flex flex-wrap items-center gap-5">
@@ -360,38 +391,8 @@ export default async function UserPage({
           </div>
         </div>
       )}
+      {!profile.heroImageKey && statsRow}
 
-      {/* 统计：三格主数据（窄屏三等分占满一行，宽屏固定宽度左排）+ 侧挂累计数据 */}
-      <div className="mt-6 flex flex-col gap-3 lg:flex-row lg:items-center">
-        <div className="flex w-full gap-3 lg:w-auto">
-          {[
-            { n: formatCount(pubCount), k: "发布" },
-            { n: formatCount(profile.followerCount), k: "粉丝" },
-            { n: formatCount(profile.followingCount), k: "关注" },
-          ].map((s) => (
-            <div
-              key={s.k}
-              className="min-w-0 flex-1 rounded-none border border-brand-200 bg-brand-50/40 py-3 text-center lg:w-28 lg:flex-none"
-            >
-              <div className="text-lg font-semibold tabular-nums text-brand-700">{s.n}</div>
-              <div className="mt-0.5 text-[11px] text-neutral-400">{s.k}</div>
-            </div>
-          ))}
-        </div>
-        <div className="flex min-w-0 flex-1 flex-wrap items-center justify-start gap-x-5 gap-y-1 text-xs text-neutral-400 lg:justify-end">
-          <span className="inline-flex items-center gap-1">
-            <Eye size={12} aria-hidden /> 累计浏览 {formatCount(agg._sum.viewCount ?? 0)}
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <MessageSquare size={12} aria-hidden /> {formatCount(commentCount)} 条评论
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <ThumbsUp size={12} aria-hidden /> {formatCount(agg._sum.likeCount ?? 0)} 次点赞
-          </span>
-        </div>
-      </div>
-
-      {/* Tabs（收藏/粉丝/关注按隐私开关，本人始终可见） */}
       <div className="mt-8 flex flex-wrap items-center gap-2">
         {TABS.filter(tabVisible).map((t) => (
           <Link key={t.key} href={tabHref(t.key)} className={chip(tab === t.key)}>
