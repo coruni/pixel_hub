@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { getCategories, getFeed, getTopTags, toFeedCard } from "@/lib/queries";
 import { enumParam, intParam, str, type SP } from "@/lib/search-params";
+import { FEED_PAGE_SIZE } from "@/lib/feed-paging";
 import ResourceGrid from "@/components/resource/ResourceGrid";
 import FeedPager from "@/components/feed/FeedPager";
 import FeedInfinite from "@/components/feed/FeedInfinite";
@@ -57,7 +58,7 @@ export default async function FeedBrowser({
       q: follow ? undefined : q,
       followOnlyOf: follow ? userId : undefined,
       page,
-      pageSize: 32,
+      pageSize: FEED_PAGE_SIZE,
     }),
     // 热门标签仅浏览页需要，其余页直接空数组
     showTags ? getTopTags() : Promise.resolve([] as Awaited<ReturnType<typeof getTopTags>>),

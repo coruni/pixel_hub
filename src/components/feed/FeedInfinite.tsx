@@ -3,11 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { loadBrowseFeedAction, type BrowseFeedParams } from "@/lib/actions/feedmore";
 import type { FeedCard } from "@/lib/queries";
+import { FEED_PAGE_SIZE } from "@/lib/feed-paging";
 import Loader from "@/components/Loader";
 import ResourceGrid from "@/components/resource/ResourceGrid";
 import { Button } from "@/components/ui/Button";
-
-const PAGE_SIZE = 30;
 
 type FeedFilters = Omit<BrowseFeedParams, "page" | "pageSize">;
 
@@ -36,6 +35,8 @@ export default function FeedInfinite({
   const busyRef = useRef(false);
   const doneRef = useRef(!initialHasMore);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  // 已渲染的 id 集合：追加前按 id 去重，防止 offset 分页在追页期间发生位移时重复出卡（重复 id 同时是重复 React key）
+  const seenRef = useRef(new Set(initial.map((i) => i.id)));
 
   async function loadNext() {
     if (busyRef.current || doneRef.current) return;
@@ -46,16 +47,19 @@ export default function FeedInfinite({
       const r = await loadBrowseFeedAction({
         ...params,
         page: pageRef.current + 1,
-        pageSize: PAGE_SIZE,
+        pageSize: FEED_PAGE_SIZE,
       });
       if (!r.ok) {
         setErr(r.error ?? "加载失败");
         return;
       }
-      if (r.items.length > 0) setItems((prev) => [...prev, ...r.items]);
+      // 去重后只追加新卡片；整页都是已渲染项说明 offset 已漂移（追页期间有增删），就此收尾而不是原地反复请求
+      const fresh = r.items.filter((i) => !seenRef.current.has(i.id));
+      for (const i of fresh) seenRef.current.add(i.id);
+      if (fresh.length > 0) setItems((prev) => [...prev, ...fresh]);
       pageRef.current += 1;
       setHasMore(r.hasMore);
-      if (!r.hasMore || r.items.length === 0) {
+      if (!r.hasMore || r.items.length === 0 || fresh.length === 0) {
         doneRef.current = true;
         setDone(true);
       }
