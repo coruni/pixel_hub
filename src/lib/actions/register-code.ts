@@ -19,12 +19,12 @@ export async function sendRegisterCodeAction(
   fd: FormData,
 ): Promise<SendCodeState> {
   const ip = clientIp(await headers());
-  if (!rateLimit(`regcode-ip:${ip}`, 10, 60 * 60_000))
+  if (!(await rateLimit(`regcode-ip:${ip}`, 10, 60 * 60_000)))
     return { error: "发送过于频繁，请 1 小时后再试" };
 
   const email = String(fd.get("email") ?? "").trim().toLowerCase();
   if (!EMAIL_RE.test(email)) return { error: "请先填写正确的邮箱地址" };
-  if (!rateLimit(`regcode-mail:${email}`, 1, 60_000))
+  if (!(await rateLimit(`regcode-mail:${email}`, 1, 60_000)))
     return { error: "验证码已发送，请 1 分钟后再试" };
 
   const u = await prisma.user.findUnique({ where: { email }, select: { id: true } });
@@ -32,7 +32,7 @@ export async function sendRegisterCodeAction(
 
   if (!(await smtpConfigured())) return { error: "站点未配置邮件服务，请联系管理员" };
 
-  const code = issueRegisterCode(email);
+  const code = await issueRegisterCode(email);
   const mail = await sendMail(
     email,
     `【${siteName()}】注册验证码`,

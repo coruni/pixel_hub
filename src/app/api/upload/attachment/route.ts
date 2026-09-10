@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ ok: false, error: "请先登录" }, { status: 401 });
   // 附件体积大（≤后台配置上限）：比图片更紧的限流，防存储滥用
-  if (!rateLimit(`attach:${session.user.id}`, 10, 60 * 60_000))
+  if (!(await rateLimit(`attach:${session.user.id}`, 10, 60 * 60_000)))
     return NextResponse.json({ ok: false, error: "上传过于频繁，请稍后再试" }, { status: 429 });
 
   const L = await getUploadLimits();

@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
   try {
     const user = (await auth())?.user;
     // 客户端约定 60s 一次；放宽到 20/min 防高频心跳刷写
-    if (user && rateLimit(`presence:${user.id}`, 20, 60_000))
+    if (user && (await rateLimit(`presence:${user.id}`, 20, 60_000)))
       await prisma.user.update({ where: { id: user.id }, data: { lastSeenAt: new Date() } });
   } catch {
     // 心跳失败静默

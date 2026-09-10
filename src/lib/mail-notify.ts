@@ -32,7 +32,7 @@ export async function notifyByEmail(
 ): Promise<void> {
   try {
     if (!(await emailNotifyEnabled())) return;
-    if (!rateLimit(`mail:${userId}`, 5, 60 * 60_000)) return;
+    if (!(await rateLimit(`mail:${userId}`, 5, 60 * 60_000))) return;
     const u = await prisma.user.findUnique({
       where: { id: userId },
       select: { email: true, emailNotifyComment: true, emailNotifyModeration: true },

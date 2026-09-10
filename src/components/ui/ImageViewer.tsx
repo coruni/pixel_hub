@@ -22,9 +22,11 @@ export type ViewerImage = {
 type Pt = { x: number; y: number };
 
 const dist = (a: Pt, b: Pt) => Math.hypot(a.x - b.x, a.y - b.y);
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+const clampZoom = (z: number) => Math.min(8, Math.max(0.2, z));
 
 /**
- * 通用图片查看器（lightbox）：滚轮/按钮缩放、90° 旋转、放大态拖动平移、多图切换。
+ * 通用图片查看器（lightbox）：滚轮/按钮缩放、90° 旋转、拖动平移、多图切换。
  * 移动端手势：双指捏合缩放（含双指中心跟随）、单指水平滑动切换上一张/下一张（放大态单指为平移）。
  * 受控组件：由父级决定打开与当前索引。
  */
@@ -60,15 +62,21 @@ export default function ImageViewer({
   useLayoutEffect(() => {
     zoomRef.current = 1;
     posRef.current = { x: 0, y: 0 };
+    rotRef.current = 0;
   }, [index]);
 
   const rootRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+  // 旋转角 ref 镜像：夹取位移时需要读最新角度
+  const rotRef = useRef(0);
   // 活动指针表与手势状态机
   const ptrsRef = useRef(new Map<number, Pt>());
   const kindRef = useRef<"idle" | "pan" | "pinch" | "swipe" | "ignored">("idle");
   const lastPtRef = useRef<Pt>({ x: 0, y: 0 });
   const pinchRef = useRef({ dist: 1, zoom: 1, pos: { x: 0, y: 0 }, cx: 0, cy: 0 });
   const swipeRef = useRef({ sx: 0, sy: 0, active: false });
+  // 平移起点与是否真正移动过：用于区分「拖动」与「单击关背景」
+  const panRef = useRef({ sx: 0, sy: 0, moved: false });
   const suppressClickRef = useRef(false);
 
   // 对话框打开时把焦点收进浮层（Esc/Tab 键盘操作以它为起点）
@@ -81,16 +89,55 @@ export default function ImageViewer({
   const hasPrev = index > 0;
   const hasNext = index < images.length - 1;
 
-  const clampZoom = (z: number) => Math.min(8, Math.max(0.2, z));
-  const setZoomBoth = useCallback((z: number) => {
-    zoomRef.current = z;
-    setZoom(z);
-  }, []);
   const setPosBoth = useCallback((p: Pt) => {
     posRef.current = p;
     setPos(p);
   }, []);
-  const zoomTo = useCallback((factor: number) => setZoomBoth(clampZoom(zoomRef.current * factor)), [setZoomBoth]);
+  // 平移边界：以图片原始布局框（offsetWidth/Height，不受 transform 影响）为基准，
+  // 放大时边界为溢出量的一半，缩小时为原框内可活动范围，100% 未旋转时为 0
+  const panBounds = useCallback((z: number, rot: number) => {
+    const el = imgRef.current;
+    const bw = el?.offsetWidth ?? 0;
+    const bh = el?.offsetHeight ?? 0;
+    if (!bw || !bh) return { maxX: 0, maxY: 0, known: false };
+    const rot90 = Math.round(rot / 90) % 2 !== 0;
+    const vw = z * (rot90 ? bh : bw); // 变换后的视觉宽高
+    const vh = z * (rot90 ? bw : bh);
+    return { maxX: Math.abs(vw - bw) / 2, maxY: Math.abs(vh - bh) / 2, known: true };
+  }, []);
+  const clampOffset = useCallback(
+    (p: Pt, z: number, rot: number): Pt => {
+      const { maxX, maxY } = panBounds(z, rot);
+      return { x: clamp(p.x, -maxX, maxX), y: clamp(p.y, -maxY, maxY) };
+    },
+    [panBounds],
+  );
+  // 是否有可平移空间：图片尚未测量时退回「非 100%」判定
+  const canPan = useCallback(() => {
+    const { maxX, maxY, known } = panBounds(zoomRef.current, rotRef.current);
+    return known ? maxX > 0.5 || maxY > 0.5 : zoomRef.current !== 1;
+  }, [panBounds]);
+  // 应用缩放：同步 ref/state，并按新缩放夹取已有位移（缩回时自动归位，不会停在偏移处）
+  const applyZoom = useCallback(
+    (z: number) => {
+      const next = clampZoom(z);
+      zoomRef.current = next;
+      setZoom(next);
+      setPosBoth(clampOffset(posRef.current, next, rotRef.current));
+    },
+    [clampOffset, setPosBoth],
+  );
+  const zoomTo = useCallback((factor: number) => applyZoom(zoomRef.current * factor), [applyZoom]);
+  // 旋转：同步 rotRef 并按新角度重新夹取位移（旋转后可视宽高互换）
+  const rotateBy = useCallback(
+    (delta: number) => {
+      const next = rotRef.current + delta;
+      rotRef.current = next;
+      setRotation(next);
+      setPosBoth(clampOffset(posRef.current, zoomRef.current, next));
+    },
+    [clampOffset, setPosBoth],
+  );
   const reset = useCallback(() => {
     zoomRef.current = 1;
     posRef.current = { x: 0, y: 0 };
@@ -124,7 +171,7 @@ export default function ImageViewer({
           break;
         case "r":
         case "R":
-          setRotation((r) => r + 90);
+          rotateBy(90);
           break;
         case "f":
         case "F":
@@ -134,7 +181,7 @@ export default function ImageViewer({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose, onIndexChange, index, images.length, zoomTo, reset]);
+  }, [onClose, onIndexChange, index, images.length, zoomTo, rotateBy, reset]);
 
   // 打开时锁定 body 滚动，避免穿透
   useEffect(() => {
@@ -151,7 +198,7 @@ export default function ImageViewer({
 
   const onWheel = (e: React.WheelEvent) => {
     e.stopPropagation();
-    setZoomBoth(clampZoom(zoomRef.current * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
+    applyZoom(zoomRef.current * (e.deltaY < 0 ? 1.15 : 1 / 1.15));
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
@@ -179,17 +226,19 @@ export default function ImageViewer({
       return;
     }
 
-    if (zoomRef.current > 1) {
-      // 放大态：单指/鼠标拖动平移
+    if (zoomRef.current > 1 || (e.pointerType !== "touch" && canPan())) {
+      // 有可平移空间即可拖动：放大态任意指针平移；未放大时鼠标/笔也能拖动
+      // （触摸在非放大态保留下面的滑动切图语义）
       kindRef.current = "pan";
       lastPtRef.current = p;
+      panRef.current = { sx: p.x, sy: p.y, moved: false };
       setGesturing(true);
       // 鼠标/笔离开元素后仍持续收到事件；触摸走隐式捕获即可
       if (e.pointerType !== "touch") (e.currentTarget as HTMLElement).setPointerCapture?.(pid);
       return;
     }
 
-    // 原始大小：鼠标不响应拖动（保持点按/滚轮语义）；触摸/笔允许滑动切图
+    // 无可平移空间（100% 未旋转）：鼠标不响应拖动（保持点按/滚轮语义）；触摸/笔允许滑动切图
     if (e.pointerType === "mouse") {
       kindRef.current = "ignored";
       return;
@@ -209,12 +258,15 @@ export default function ImageViewer({
     if (kindRef.current === "pinch" && pts.length === 2) {
       const [a, b] = pts;
       const g = pinchRef.current;
-      const ratio = dist(a, b) / g.dist;
-      setZoomBoth(clampZoom(g.zoom * ratio));
+      const nextZoom = clampZoom(g.zoom * (dist(a, b) / g.dist));
+      zoomRef.current = nextZoom;
+      setZoom(nextZoom);
       // 双指中心移动跟随平移
       const cx = (a.x + b.x) / 2;
       const cy = (a.y + b.y) / 2;
-      setPosBoth({ x: g.pos.x + (cx - g.cx), y: g.pos.y + (cy - g.cy) });
+      setPosBoth(
+        clampOffset({ x: g.pos.x + (cx - g.cx), y: g.pos.y + (cy - g.cy) }, nextZoom, rotRef.current),
+      );
       return;
     }
 
@@ -222,7 +274,10 @@ export default function ImageViewer({
       const dx = cur.x - lastPtRef.current.x;
       const dy = cur.y - lastPtRef.current.y;
       lastPtRef.current = cur;
-      setPosBoth({ x: posRef.current.x + dx, y: posRef.current.y + dy });
+      // 真正移动过才抑制随后的 click，避免“单击黑色背景关闭”被拖动逻辑吃掉
+      const pan = panRef.current;
+      if (!pan.moved && Math.hypot(cur.x - pan.sx, cur.y - pan.sy) > 3) pan.moved = true;
+      setPosBoth(clampOffset({ x: posRef.current.x + dx, y: posRef.current.y + dy }, zoomRef.current, rotRef.current));
       return;
     }
 
@@ -276,14 +331,22 @@ export default function ImageViewer({
       return;
     }
 
+    // 拖动结束：只有真正移动过才吞掉这次 click（未移动视为单击，仍可关闭）
+    if (kindRef.current === "pan" && panRef.current.moved) suppressClickRef.current = true;
+
     if (ptrsRef.current.size === 0) {
       endGesture();
       return;
     }
-    // 捏合中抬起一指 → 剩下单指转平移（若在放大态）
+    // 捏合中抬起一指 → 剩下单指转平移（有可平移空间时）
     const [only] = ptrsRef.current.values();
     lastPtRef.current = { x: only.x, y: only.y };
-    kindRef.current = zoomRef.current > 1 ? "pan" : "idle";
+    if (canPan()) {
+      kindRef.current = "pan";
+      panRef.current = { sx: only.x, sy: only.y, moved: false };
+    } else {
+      kindRef.current = "idle";
+    }
   };
 
   if (!current) return null;
@@ -330,7 +393,7 @@ export default function ImageViewer({
       >
         <Button
           type="button"
-          onClick={() => setRotation((r) => r - 90)}
+          onClick={() => rotateBy(-90)}
           className="grid h-9 w-9 place-items-center hover:bg-white/10"
           aria-label="左旋 90°"
           title="左旋 90°"
@@ -339,7 +402,7 @@ export default function ImageViewer({
         </Button>
         <Button
           type="button"
-          onClick={() => setRotation((r) => r + 90)}
+          onClick={() => rotateBy(90)}
           className="grid h-9 w-9 place-items-center hover:bg-white/10"
           aria-label="右旋 90°"
           title="右旋 90°"
@@ -412,6 +475,7 @@ export default function ImageViewer({
       )}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
+        ref={imgRef}
         src={current.url}
         alt="大图预览"
         width={current.width ?? undefined}
@@ -423,7 +487,7 @@ export default function ImageViewer({
         }`}
         style={{
           transform: `translate(${pos.x}px, ${pos.y}px) rotate(${rotation}deg) scale(${zoom})`,
-          cursor: zoom > 1 ? "grab" : "zoom-in",
+          cursor: zoom !== 1 ? "grab" : "zoom-in",
         }}
       />
     </div>

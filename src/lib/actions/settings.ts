@@ -260,7 +260,7 @@ export async function changePasswordAction(
     if (!ok) return { fieldErrors: { current: ["当前密码不正确"] } };
   }
   // OAuth 账号（未设密码）跳过当前密码校验即可设首个密码，因此加限流防会话被盗后恶意改密
-  if (!rateLimit(`pwchange:${user.id}`, 5, 10 * 60_000))
+  if (!(await rateLimit(`pwchange:${user.id}`, 5, 10 * 60_000)))
     return { error: "操作过于频繁，请稍后再试" };
   const passwordHash = await bcrypt.hash(parsed.data.next, 10);
   await prisma.user.update({

@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "跨站请求被拒绝" }, { status: 403 });
   const session = await auth();
   if (!session?.user) return NextResponse.json({ ok: false, error: "请先登录" }, { status: 401 });
-  if (!rateLimit(`attach-session:${session.user.id}`, 10, 60 * 60_000))
+  if (!(await rateLimit(`attach-session:${session.user.id}`, 10, 60 * 60_000)))
     return NextResponse.json({ ok: false, error: "上传过于频繁，请稍后再试" }, { status: 429 });
 
   const body = (await req.json().catch(() => null)) as {

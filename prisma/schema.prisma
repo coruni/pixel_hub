@@ -488,3 +488,23 @@ model Visit {
   @@index([day])
   @@index([day, ipHash])
 }
+
+// ---- 集中式限流命中（H2 修复：替代原内存 Map，跨 Vercel 多实例共享计数）----
+// 表由手工 SQL 迁移建立（见 prisma/migrations/0001_rate_limit_register_code.sql）；
+// 此处保留模型以防 `prisma db push` 误删。ts 为 TIMESTAMP(3)，写入/清理均走 DB 服务端 now()，无时区漂移。
+model RateLimitHit {
+  id String   @id @default(cuid())
+  key String
+  ts  DateTime @default(now())
+
+  @@index([key])
+  @@index([ts])
+}
+
+// ---- 注册邮箱验证码（H2/M2 修复：替代原内存 Map，多实例下签发/验证一致）----
+model RegisterCode {
+  email     String   @id
+  code      String
+  expiresAt DateTime
+  attempts  Int      @default(0)
+}

@@ -11,11 +11,11 @@ export async function POST(req: NextRequest) {
     if (!sameOrigin(req)) return new Response(null, { status: 204 });
     // 采集限流：每 IP 60 次 / 分钟（防刷量）
     if (
-      !rateLimit(
+      !(await rateLimit(
         `track:${req.headers.get("x-forwarded-for")?.split(",")[0] ?? "local"}`,
         60,
         60_000,
-      )
+      ))
     )
       return new Response(null, { status: 204 });
     const body = (await req.json().catch(() => null)) as { path?: unknown } | null;

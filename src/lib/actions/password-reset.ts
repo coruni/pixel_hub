@@ -29,7 +29,7 @@ export async function requestPasswordResetAction(
 ): Promise<ForgotState> {
   // 限流：每 IP 5 次 / 小时（防枚举与邮件轰炸）
   const ip = clientIp(await headers());
-  if (!rateLimit(`pwreset:${ip}`, 5, 60 * 60_000)) return { error: "请求过于频繁，请稍后再试" };
+  if (!(await rateLimit(`pwreset:${ip}`, 5, 60 * 60_000))) return { error: "请求过于频繁，请稍后再试" };
 
   const parsed = forgotFields.safeParse({ email: String(fd.get("email") ?? "") });
   if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };

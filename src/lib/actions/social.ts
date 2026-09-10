@@ -223,7 +223,7 @@ export async function toggleFollowAction(targetUserId: string): Promise<{ follow
   const user = await requiredUser();
   if (!user || user.id === targetUserId) return { following: false };
   // 关注切换会触发通知：限流防高频骚扰
-  if (!rateLimit(`follow:${user.id}`, 20, 60_000)) return { following: false };
+  if (!(await rateLimit(`follow:${user.id}`, 20, 60_000))) return { following: false };
   const existing = await prisma.follow.findUnique({
     where: { followerId_followingId: { followerId: user.id, followingId: targetUserId } },
     select: { followerId: true },
@@ -293,7 +293,7 @@ export async function addCommentAction(
   const user = await requiredUser();
   if (!user) return { error: "请先登录后再评论" };
   // 评论限流：每用户 10 条 / 分钟（防灌水）
-  if (!rateLimit(`comment:${user.id}`, 10, 60_000)) return { error: "评论太快了，休息一下再发" };
+  if (!(await rateLimit(`comment:${user.id}`, 10, 60_000))) return { error: "评论太快了，休息一下再发" };
   const parsed = commentSchema.safeParse({
     resourceId: fd.get("resourceId"),
     parentId: fd.get("parentId") || undefined,
@@ -428,7 +428,7 @@ export async function incrementDownloadAction(resourceId: string): Promise<{ ok:
     metaHasDownload(parseMeta(resource.type as "GAME" | "IMAGE" | "ARTICLE", resource.meta));
   if (!hasDl) return { ok: false };
   // 内存限流兜底 cookie 伪造：每 IP 60 次 / 分钟，超限静默不计数（下载本身不受影响）
-  if (!rateLimit(`dl:${clientIp(await headers())}`, 60, 60_000)) return { ok: true };
+  if (!(await rateLimit(`dl:${clientIp(await headers())}`, 60, 60_000))) return { ok: true };
   const ck = await cookies();
   const marker = ck.get("dl_done")?.value ?? "";
   if (!marker.includes(resourceId)) {
