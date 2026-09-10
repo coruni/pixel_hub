@@ -9,7 +9,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticEntries: MetadataRoute.Sitemap = [
     { url: `${base}/`, changeFrequency: "hourly", priority: 1 },
     { url: `${base}/browse`, changeFrequency: "hourly", priority: 0.8 },
-    { url: `${base}/search`, changeFrequency: "weekly", priority: 0.3 },
+    // 注意：/search 已并入 /browse 并由 next.config redirects 301 跳转，
+    // sitemap 不得收录会跳转的 URL（Bing 会报 "URL redirects" 并浪费抓取配额）
     { url: `${base}/rules`, changeFrequency: "yearly", priority: 0.2 },
   ];
 
