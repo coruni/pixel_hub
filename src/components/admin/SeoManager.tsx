@@ -1,12 +1,14 @@
 "use client";
 
-// SEO 配置表单：站长验证码 / OG 语言区域 / 默认描述 / 结构化数据开关。整体提交 + 乐观锁版本。
+// SEO 配置表单：站长验证码 / OG 语言区域 / 默认描述 / 结构化数据开关 / IndexNow 推送。整体提交 + 乐观锁版本。
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { updateSeoConfigAction } from "@/lib/actions/seo";
+import { Check, Copy, Send, Sparkles } from "lucide-react";
+import { pushIndexNowAction, updateSeoConfigAction } from "@/lib/actions/seo";
 import type { SeoConfig } from "@/lib/seo-config";
+import { isValidIndexNowKey, newIndexNowKey } from "@/lib/indexnow-key";
 import { SquareCheckbox } from "@/components/admin/SquareCheckbox";
-import { BTN_PRIMARY_SM, INPUT, LABEL_STRONG } from "@/lib/ui/cls";
+import { BTN_GHOST_SM, BTN_PRIMARY_SM, INPUT, LABEL_STRONG } from "@/lib/ui/cls";
 import { Button } from "@/components/ui/Button";
 
 const VERIFICATION_FIELDS: { key: keyof SeoConfig["verifications"]; label: string; hint: string }[] =
@@ -20,13 +22,18 @@ const VERIFICATION_FIELDS: { key: keyof SeoConfig["verifications"]; label: strin
 export default function SeoManager({
   config,
   version,
+  siteUrl,
 }: {
   config: SeoConfig;
   version: number;
+  /** 站点公开地址（由服务端注入）：用于展示密钥文件的完整可访问地址 */
+  siteUrl: string;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+  const [pushResult, setPushResult] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+  const [copied, setCopied] = useState(false);
   const [form, setForm] = useState({
     siteName: config.siteName,
     siteLogo: config.siteLogo,
@@ -41,33 +48,37 @@ export default function SeoManager({
     ogLocale: config.ogLocale,
     defaultDescription: config.defaultDescription,
     structuredData: config.structuredData,
+    indexnowEnabled: config.indexnow.enabled,
+    indexnowKey: config.indexnow.key,
   });
 
   const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
 
+  // 表单 → 落库载荷：整体提交，任何一项改动都随全量保存写回
+  const payload = () => ({
+    siteName: form.siteName,
+    siteLogo: form.siteLogo,
+    keywords: form.keywords,
+    footerText: form.footerText,
+    icp: form.icp,
+    contactEmail: form.contactEmail,
+    verifications: {
+      google: form.google,
+      bing: form.bing,
+      yandex: form.yandex,
+      baidu: form.baidu,
+    },
+    ogLocale: form.ogLocale,
+    defaultDescription: form.defaultDescription,
+    structuredData: form.structuredData,
+    indexnow: { enabled: form.indexnowEnabled, key: form.indexnowKey },
+  });
+
   const save = () =>
     start(async () => {
       setMessage(null);
-      const result = await updateSeoConfigAction(
-        {
-          siteName: form.siteName,
-          siteLogo: form.siteLogo,
-          keywords: form.keywords,
-          footerText: form.footerText,
-          icp: form.icp,
-          contactEmail: form.contactEmail,
-          verifications: {
-            google: form.google,
-            bing: form.bing,
-            yandex: form.yandex,
-            baidu: form.baidu,
-          },
-          ogLocale: form.ogLocale,
-          defaultDescription: form.defaultDescription,
-          structuredData: form.structuredData,
-        },
-        version,
-      );
+      setPushResult(null);
+      const result = await updateSeoConfigAction(payload(), version);
       if (result.ok) {
         setMessage({ kind: "ok", text: "已保存，前台立即生效" });
         router.refresh();
@@ -75,6 +86,35 @@ export default function SeoManager({
         setMessage({ kind: "error", text: result.error ?? "保存失败，请重试" });
       }
     });
+
+  // 立即推送：先落库当前表单再请求引擎，避免「密钥改了但没保存」导致校验失败
+  const push = () =>
+    start(async () => {
+      setMessage(null);
+      setPushResult(null);
+      const saved = await updateSeoConfigAction(payload(), version);
+      if (!saved.ok) {
+        setMessage({ kind: "error", text: saved.error ?? "保存失败，请重试" });
+        return;
+      }
+      setMessage({ kind: "ok", text: "已保存，前台立即生效" });
+      const result = await pushIndexNowAction();
+      setPushResult({ kind: result.ok ? "ok" : "error", text: result.message });
+      router.refresh();
+    });
+
+  const keyOk = isValidIndexNowKey(form.indexnowKey);
+  const keyFileUrl = `${siteUrl}/${form.indexnowKey.trim()}.txt`;
+
+  const copyKeyFileUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(keyFileUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // 剪贴板不可用（非 https / 浏览器限制）时地址已明文展示，无需额外处理
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -258,6 +298,123 @@ export default function SeoManager({
               </span>
             </span>
           </label>
+        </div>
+      </section>
+
+      <section className="border border-brand-200 bg-surface p-5">
+        <h3 className="text-sm font-semibold text-neutral-900">IndexNow 推送</h3>
+        <p className="mt-1 text-xs leading-5 text-neutral-400">
+          内容发布后主动告知 Bing / Yandex / Naver 等搜索引擎，缩短收录延迟；一次提交覆盖所有支持
+          IndexNow 协议的引擎。启用后新资源发布与审核通过会自动推送，也可在下方手动补推。
+        </p>
+
+        <div className="mt-4 space-y-4">
+          <label className="flex cursor-pointer items-start gap-2.5">
+            <SquareCheckbox
+              checked={form.indexnowEnabled}
+              onChange={(next) => set({ indexnowEnabled: next })}
+              ariaLabel="启用 IndexNow 推送"
+              className="mt-0.5"
+            />
+            <span>
+              <span className="block text-sm text-neutral-900">启用 IndexNow 推送</span>
+              <span className="mt-0.5 block text-xs text-neutral-400">
+                关闭后不再推送，密钥文件也不再对外提供；已经提交的 URL 不受影响。
+              </span>
+            </span>
+          </label>
+
+          <div>
+            <label htmlFor="seo-indexnow-key" className={LABEL_STRONG}>
+              IndexNow 密钥
+            </label>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input
+                id="seo-indexnow-key"
+                value={form.indexnowKey}
+                onChange={(e) => set({ indexnowKey: e.target.value })}
+                className={`${INPUT} font-mono`}
+                maxLength={128}
+                placeholder="8~128 位字母、数字或短横线"
+                autoComplete="off"
+                spellCheck={false}
+              />
+              <Button
+                type="button"
+                onClick={() => set({ indexnowKey: newIndexNowKey() })}
+                className={`${BTN_GHOST_SM} shrink-0 justify-center`}
+              >
+                <Sparkles size={13} aria-hidden />
+                生成密钥
+              </Button>
+            </div>
+            {form.indexnowKey.trim() === "" ? (
+              <p className="mt-1 text-[10px] leading-4 text-amber-700">
+                尚未填写密钥，启用后需要密钥才能推送。点「生成密钥」自动生成一个随机密钥。
+              </p>
+            ) : keyOk ? (
+              <p className="mt-1 text-[10px] leading-4 text-emerald-700">
+                密钥格式有效，保存后密钥文件即可被引擎抓取校验。
+              </p>
+            ) : (
+              <p className="mt-1 text-[10px] leading-4 text-amber-700">
+                密钥格式不符合规范：需 8~128 位，仅字母、数字与短横线，且不能有空格。
+              </p>
+            )}
+          </div>
+
+          <div>
+            <p className={LABEL_STRONG}>密钥文件地址</p>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <code className="min-w-0 flex-1 truncate rounded-none border border-brand-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-600">
+                {keyFileUrl}
+              </code>
+              <Button
+                type="button"
+                onClick={copyKeyFileUrl}
+                className={`${BTN_GHOST_SM} shrink-0 justify-center`}
+              >
+                {copied ? (
+                  <>
+                    <Check size={13} aria-hidden />
+                    已复制
+                  </>
+                ) : (
+                  <>
+                    <Copy size={13} aria-hidden />
+                    复制地址
+                  </>
+                )}
+              </Button>
+            </div>
+            <p className="mt-1 text-[10px] leading-4 text-neutral-400">
+              该地址由站内路由实时提供，内容即密钥本身，无需手动上传文件；更换密钥后旧地址立即失效。
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-2 border-t border-brand-200 pt-4 sm:flex-row sm:items-center sm:gap-3">
+            <Button
+              type="button"
+              onClick={push}
+              disabled={pending}
+              className={`${BTN_PRIMARY_SM} justify-center`}
+            >
+              <Send size={13} aria-hidden />
+              立即推送首页与最近内容
+            </Button>
+            {pushResult ? (
+              <span
+                className={`text-xs ${pushResult.kind === "ok" ? "text-emerald-700" : "text-red-600"}`}
+                role={pushResult.kind === "ok" ? "status" : "alert"}
+              >
+                {pushResult.text}
+              </span>
+            ) : (
+              <span className="text-xs text-neutral-400">
+                保存并推送首页、浏览页与最近发布的资源（用于首次验证密钥或补推存量）。
+              </span>
+            )}
+          </div>
         </div>
       </section>
 

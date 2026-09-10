@@ -50,9 +50,9 @@ export default async function AdminRuntimePage() {
           seo: (
             <>
               <p className="mb-4 text-xs leading-5 text-neutral-500">
-                站点信息、站长平台验证与结构化数据；保存后前台全站生效。
+                站点信息、站长平台验证、结构化数据与 IndexNow 推送；保存后前台全站生效。
               </p>
-              <SeoManager config={seo.config} version={seo.version} />
+              <SeoManager config={seo.config} version={seo.version} siteUrl={siteUrlOf()} />
             </>
           ),
         }}

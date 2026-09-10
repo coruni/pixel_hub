@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { queueIndexNowForResource } from "@/lib/indexnow";
 import { notifyByEmail } from "@/lib/mail-notify";
 import { adminOnly, audit, staff } from "@/lib/actions/_guards";
 
@@ -46,6 +47,7 @@ export async function approveResourceAction(
   });
   await audit(admin.id, "APPROVE", "RESOURCE", resourceId);
   await notifyMod(r.authorId, admin.id, resourceId, "你的内容已通过审核并上架 🎉");
+  queueIndexNowForResource(resourceId); // 上架即告知搜索引擎（未启用 IndexNow 时内部直接跳过）
   revalidatePath("/admin");
   revalidatePath("/admin/queue");
   revalidatePath("/", "layout");
@@ -112,6 +114,7 @@ export async function restoreResource(
   });
   if (r.count === 0) return { ok: false, error: "资源不存在" };
   await audit(admin.id, "RESTORE", "RESOURCE", resourceId);
+  queueIndexNowForResource(resourceId); // 恢复上架同样需要重新告知搜索引擎
   revalidatePath("/admin");
   revalidatePath("/admin/content");
   revalidatePath("/", "layout");
@@ -208,6 +211,7 @@ export async function handleReportBatchAction(input: {
           }),
         ]);
         await audit(admin.id, "RESTORE", "RESOURCE", res.id);
+        queueIndexNowForResource(res.id); // 举报复核通过恢复上架，同样推送一次
         revalidatePath(`/resources/${res.slug}`);
       }
     }

@@ -4,6 +4,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db/prisma";
 import { adminOnly, audit } from "@/lib/actions/_guards";
+import { submitIndexNow } from "@/lib/indexnow";
 import {
   SEO_KEY,
   seoConfigSchema,
@@ -43,4 +44,43 @@ export async function updateSeoConfigAction(
   revalidatePath("/admin/runtime");
   revalidatePath("/");
   return { ok: true };
+}
+
+// ---------- IndexNow 手动推送 ----------
+
+/** 单次手动推送的资源条数上限：首页/浏览页 + 最近发布，用于首次验证密钥与补推存量 */
+const PUSH_LIMIT = 200;
+
+export type IndexNowPushResult = { ok: boolean; message: string };
+
+/**
+ * 后台「立即推送」：把首页、浏览页与最近发布的资源提交给 IndexNow。
+ * 日常发布/审核通过已由 queueIndexNowForResource 自动推送，这里用于首次配置后验证密钥是否生效、以及补推存量内容。
+ */
+export async function pushIndexNowAction(): Promise<IndexNowPushResult> {
+  const admin = await adminOnly();
+  if (!admin) return { ok: false, message: "仅管理员可操作" };
+
+  const resources = await prisma.resource.findMany({
+    // 与 sitemap 同一收录口径：仅已发布、非 NSFW
+    where: { status: "PUBLISHED", nsfw: false },
+    orderBy: { publishedAt: "desc" },
+    take: PUSH_LIMIT,
+    select: { slug: true },
+  });
+  const urls = ["/", "/browse", ...resources.map((r) => `/resources/${r.slug}`)];
+  const result = await submitIndexNow(urls);
+  await audit(
+    admin.id,
+    "PUSH_INDEXNOW",
+    "SITE_SETTING",
+    SEO_KEY,
+    `${result.submitted} 个 URL${result.ok ? "" : `｜${result.error ?? result.status}`}`,
+  );
+
+  if (!result.ok) return { ok: false, message: result.error ?? "推送失败，请稍后重试" };
+  return {
+    ok: true,
+    message: `已提交 ${result.submitted} 个 URL${result.error ? `（${result.error}）` : ""}`,
+  };
 }

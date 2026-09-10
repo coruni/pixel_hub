@@ -36,6 +36,15 @@ export const seoConfigSchema = z.object({
   contactEmail: z.string().default(""),
   // 结构化数据（WebSite / Article / BreadcrumbList）总开关
   structuredData: z.boolean().default(true),
+  // IndexNow 即时收录推送（Bing / Yandex / Naver / Seznam 等共用同一套协议）；
+  // 启用后新内容发布即推送 URL，密钥匙文件由根级路由 /{key}.txt 提供
+  indexnow: z
+    .object({
+      enabled: z.boolean().default(false),
+      // 密钥：8~128 位字母数字与短横线（IndexNow 规范），空 = 未配置
+      key: z.string().default(""),
+    })
+    .default({ enabled: false, key: "" }),
 });
 
 export type SeoConfig = z.infer<typeof seoConfigSchema>;
@@ -63,6 +72,10 @@ export function sanitizeSeo(config: SeoConfig): SeoConfig {
     icp: config.icp.trim().slice(0, 60),
     contactEmail: config.contactEmail.trim().slice(0, 200),
     structuredData: config.structuredData === true,
+    indexnow: {
+      enabled: config.indexnow.enabled === true,
+      key: config.indexnow.key.trim().slice(0, 128),
+    },
   };
 }
 

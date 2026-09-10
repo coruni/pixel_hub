@@ -14,6 +14,7 @@ import { applyResourceEdit, type ResourceEditState } from "@/lib/actions/_resour
 import { getUploadLimits } from "@/lib/upload-limits";
 import { ARTICLE_MEDIA_MAX } from "@/lib/upload-config";
 import { syncResourceSearch } from "@/lib/search";
+import { queueIndexNowForResource } from "@/lib/indexnow";
 
 export type ResourceActionState = {
   error?: string;
@@ -250,6 +251,8 @@ export async function createResourceAction(
   await syncResourceSearch(resource.id);
 
   if (status === "PUBLISHED") {
+    // 免审直发的内容立即告知搜索引擎（after 在响应后执行，不拖慢跳转；未启用时内部跳过）
+    queueIndexNowForResource(resource.id);
     revalidatePath("/", "layout");
     redirect(`/resources/${slug}`);
   }

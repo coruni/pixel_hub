@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import MiniBadge from "@/components/ui/MiniBadge";
 import {
   CheckCircle2,
@@ -195,7 +196,7 @@ export function DriveManager({
       {!canCloud && (
         <div className="rounded-none border border-amber-300 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">
           尚未配置 Microsoft Graph 三件凭据：登记盘仅作占位，附件仍走 STORAGE_DRIVER（local/s3/chevereto）。
-          到 <a href="/admin/runtime" className="font-medium underline underline-offset-2">站点配置 → 运行配置</a>{" "}
+          到 <Link href="/admin/runtime" className="font-medium underline underline-offset-2">站点配置 → 运行配置</Link>{" "}
           的「云盘附件」中补全并保存即可启用，无需改 .env 重启。
         </div>
       )}
