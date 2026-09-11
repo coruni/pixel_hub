@@ -37,7 +37,10 @@ export default async function HomeRenderer({
           <HeroBlock
             key={s.id}
             title={s.title}
-            cfg={{ featuredIds: (cfg.featuredIds as string[]) ?? [] }}
+            cfg={{
+              featuredIds: (cfg.featuredIds as string[]) ?? [],
+              period: (cfg.period as "all" | "week" | "month") ?? "all",
+            }}
           />
         );
       case "categories":
@@ -64,6 +67,7 @@ export default async function HomeRenderer({
               display: (cfg.display as "card" | "list") ?? "card",
               paged: cfg.paged === true,
               ratio: (cfg.ratio as CardRatio) ?? "auto",
+              period: (cfg.period as "all" | "week" | "month") ?? "all",
             }}
           />
         );
@@ -76,6 +80,7 @@ export default async function HomeRenderer({
               featuredIds: (cfg.featuredIds as string[]) ?? [],
               display: (cfg.display as "card" | "list") ?? "card",
               ratio: (cfg.ratio as CardRatio) ?? "auto",
+              period: (cfg.period as "all" | "week" | "month") ?? "all",
             }}
           />
         );

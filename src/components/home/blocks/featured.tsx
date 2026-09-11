@@ -7,6 +7,7 @@ export type FeaturedBlockCfg = {
   featuredIds: string[];
   display: ContentDisplay;
   ratio: CardRatio;
+  period?: "all" | "week" | "month";
 };
 
 /** 专题板块：手动挑选的资源组成的网格（卡片网格/列表行）；未挑选时自动兜底近期热门 */
@@ -24,7 +25,13 @@ export default async function FeaturedBlock({
     const byId = new Map(r.items.map((i) => [i.id, i]));
     items = ids.flatMap((id) => (byId.get(id) ? [byId.get(id)!] : []));
   } else {
-    items = (await getFeed({ sort: "popular", pageSize: 8 })).items;
+    items = (
+      await getFeed({
+        sort: "popular",
+        pageSize: 8,
+        period: cfg.period && cfg.period !== "all" ? cfg.period : undefined,
+      })
+    ).items;
   }
   if (items.length === 0) return null;
 

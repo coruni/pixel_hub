@@ -80,6 +80,8 @@ export function homeKindLabel(kind: HomeSectionKind): string {
 // ---------- 各类板块的 config ----------
 const heroCfg = z.object({
   featuredIds: z.array(z.string()).max(8).default([]), // 手动挑选的资源 id；为空则自动展示近期热门
+  // 未挑选时的兜底热门时间窗口：all=累计全时间；week/month=仅近期发布
+  period: z.enum(["all", "week", "month"]).default("all"),
 });
 const categoriesCfg = z.object({
   slugs: z.array(z.string()).max(30).default([]), // 空 = 展示全部分类；否则仅展示所选分类
@@ -95,11 +97,15 @@ const listCfg = z.object({
   display: z.enum(["card", "list"]).default("card"),
   paged: z.boolean().default(false), // 允许「下一页 / 加载更多」
   ratio: ratioEnum, // 卡片封面比例；auto=默认 3:4
+  // 排序=最热/最多下载 时的时间窗口：all=累计全时间；week/month=仅近期发布
+  period: z.enum(["all", "week", "month"]).default("all"),
 });
 const featuredCfg = z.object({
   featuredIds: z.array(z.string()).max(24).default([]), // 专题挑选的资源 id；为空自动兜底近期热门
   display: z.enum(["card", "list"]).default("card"),
   ratio: ratioEnum,
+  // 未挑选时的兜底热门时间窗口：all=累计全时间；week/month=仅近期发布
+  period: z.enum(["all", "week", "month"]).default("all"),
 });
 const feedCfg = z.object({
   showTags: z.boolean().default(false), // 全站浏览顶部是否带热门标签行
@@ -149,7 +155,7 @@ export const homeConfigSchemas: Record<HomeSectionKind, z.ZodTypeAny> = {
 };
 
 export type HomeSectionConfig =
-  | { featuredIds: string[] } // hero
+  | { featuredIds: string[]; period: "all" | "week" | "month" } // hero
   | { slugs: string[] } // categories
   | {
       type: "ALL" | "IMAGE" | "GAME" | "ARTICLE";
@@ -160,8 +166,9 @@ export type HomeSectionConfig =
       display: "card" | "list";
       paged: boolean;
       ratio: CardRatio;
+      period: "all" | "week" | "month";
     } // list
-  | { featuredIds: string[]; display: "card" | "list"; ratio: CardRatio } // featured
+  | { featuredIds: string[]; display: "card" | "list"; ratio: CardRatio; period: "all" | "week" | "month" } // featured
   | { showTags: boolean } // feed
   | Record<string, never> // stats
   | { count: number } // creators
@@ -220,7 +227,7 @@ export type DefaultSectionSpec = {
 };
 
 export const DEFAULT_SECTIONS: DefaultSectionSpec[] = [
-  { kind: "hero", title: null, order: 10, enabled: true, config: { featuredIds: [] } },
+  { kind: "hero", title: null, order: 10, enabled: true, config: { featuredIds: [], period: "all" } },
   // 分类入口统一由侧栏「分类直达」承担，首页默认不再重复展示整块分类列表（可在后台按需开启）
   { kind: "categories", title: "按分类探索", order: 20, enabled: false, config: { slugs: [] } },
   { kind: "feed", title: null, order: 30, enabled: true, config: { showTags: false } },

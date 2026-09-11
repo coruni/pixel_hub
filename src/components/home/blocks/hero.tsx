@@ -33,7 +33,7 @@ export default async function HeroBlock({
   cfg,
 }: {
   title: string | null;
-  cfg: { featuredIds: string[] };
+  cfg: { featuredIds: string[]; period?: "all" | "week" | "month" };
 }) {
   const ids = cfg.featuredIds.slice(0, 8);
   let items: FeedItem[];
@@ -42,8 +42,14 @@ export default async function HeroBlock({
     const byId = new Map(r.items.map((i) => [i.id, i]));
     items = ids.flatMap((id) => (byId.get(id) ? [byId.get(id)!] : []));
   } else {
-    // 未手动挑选：自动展示近期最热，保证首页不空
-    items = (await getFeed({ sort: "popular", pageSize: 4 })).items;
+    // 未手动挑选：自动展示近期最热，保证首页不空（时间窗口可按板块配置）
+    items = (
+      await getFeed({
+        sort: "popular",
+        pageSize: 4,
+        period: cfg.period && cfg.period !== "all" ? cfg.period : undefined,
+      })
+    ).items;
   }
   if (items.length === 0) return null;
 

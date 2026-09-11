@@ -13,6 +13,8 @@ export type ListBlockCfg = {
   display: ContentDisplay;
   paged: boolean;
   ratio: CardRatio;
+  /** 排序=最热/最多下载 时的时间窗口 */
+  period?: "all" | "week" | "month";
 };
 
 /**
@@ -26,12 +28,14 @@ export default async function ListBlock({
   title: string | null;
   cfg: ListBlockCfg;
 }) {
+  const period = cfg.period && cfg.period !== "all" ? cfg.period : undefined;
   const { items } = await getFeed({
     type: cfg.type,
     sort: cfg.sort,
     pageSize: cfg.count,
     categorySlugs: cfg.categorySlugs,
     tagSlugs: cfg.tagSlugs,
+    period,
   });
   if (items.length === 0) return null;
 
@@ -49,6 +53,7 @@ export default async function ListBlock({
           pageSize={cfg.count}
           display={cfg.display}
           ratio={ratio}
+          period={period}
         />
       )}
     </BlockShell>

@@ -11,6 +11,8 @@ export type ListPageParams = {
   sort: "latest" | "popular" | "downloads";
   categorySlugs: string[];
   tagSlugs: string[];
+  /** 热度时间窗口（排序=最热/最多下载时生效）；缺省不限制 */
+  period?: "week" | "month";
 };
 
 // 公共 action：入参全部过 zod（防伪造调用塞超长数组/任意字符串打 DB）
@@ -21,6 +23,7 @@ const listPageSchema = z.object({
   sort: z.enum(["latest", "popular", "downloads"]),
   categorySlugs: z.array(z.string().max(80)).max(30),
   tagSlugs: z.array(z.string().max(80)).max(30),
+  period: z.enum(["week", "month"]).optional(),
 });
 
 /** 首页「内容板块」翻页：按与首屏一致的筛选取第 page 页（page ≥ 2），返回可序列化卡片 */
@@ -36,6 +39,7 @@ export async function loadListPageAction(
     sort: parsed.data.sort,
     categorySlugs: parsed.data.categorySlugs,
     tagSlugs: parsed.data.tagSlugs,
+    period: parsed.data.period,
     page,
     pageSize,
   });

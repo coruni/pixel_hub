@@ -74,13 +74,18 @@ const typeLabel: Record<string, string> = {
   GAME: "游戏",
   ARTICLE: "文章",
 };
+// 热门时间窗口摘要（all 不显示）
+const periodLabel: Record<string, string> = { week: "近7天", month: "近30天" };
 
 function cfgSummary(row: ManagerRow): string {
   const c = row.config as Record<string, unknown>;
   const n = (v: unknown) => (Array.isArray(v) ? v.length : 0);
   switch (row.kind) {
-    case "hero":
-      return n(c.featuredIds) ? `已挑选 ${n(c.featuredIds)} 个资源` : "未挑选 · 自动展示近期最热";
+    case "hero": {
+      const pl = periodLabel[String(c.period ?? "all")];
+      if (n(c.featuredIds)) return `已挑选 ${n(c.featuredIds)} 个资源`;
+      return pl ? `未挑选 · 自动展示${pl}最热` : "未挑选 · 自动展示近期最热";
+    }
     case "categories":
       return n(c.slugs) ? `已挑选 ${n(c.slugs)} 个分类` : "展示全部分类";
     case "list": {
@@ -93,12 +98,17 @@ function cfgSummary(row: ManagerRow): string {
       if (n(c.tagSlugs)) parts.push(`${n(c.tagSlugs)} 个标签`);
       parts.push(dispLabel[String(c.display ?? "card")] ?? "卡片");
       if (c.paged === true) parts.push("可翻页");
+      // 时间窗口仅对热门类排序有意义
+      const pl = periodLabel[String(c.period ?? "all")];
+      if (pl && (c.sort === "popular" || c.sort === "downloads")) parts.push(pl);
       return parts.join(" · ");
     }
-    case "featured":
-      return n(c.featuredIds)
-        ? `专题含 ${n(c.featuredIds)} 个资源（${dispLabel[String(c.display ?? "card")] ?? "卡片"}）`
-        : `未挑选 · 兜底热门（${dispLabel[String(c.display ?? "card")] ?? "卡片"}）`;
+    case "featured": {
+      const dl = dispLabel[String(c.display ?? "card")] ?? "卡片";
+      if (n(c.featuredIds)) return `专题含 ${n(c.featuredIds)} 个资源（${dl}）`;
+      const pl = periodLabel[String(c.period ?? "all")];
+      return pl ? `未挑选 · 兜底${pl}热门（${dl}）` : `未挑选 · 兜底热门（${dl}）`;
+    }
     case "feed":
       return c.showTags ? "全站浏览 + 顶部热门标签" : "全站浏览（纯净）";
     case "creators":

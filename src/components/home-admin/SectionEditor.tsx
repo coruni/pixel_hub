@@ -122,13 +122,23 @@ export default function SectionEditor({
   function buildConfig(): HomeSectionConfig {
     switch (kind) {
       case "hero":
-        return { featuredIds: picked.map((p) => p.id) };
+        return { featuredIds: picked.map((p) => p.id), period };
       case "categories":
         return { slugs: cats };
       case "list":
-        return { type, sort, count, categorySlugs: cats, tagSlugs: tagSel, display, paged, ratio };
+        return {
+          type,
+          sort,
+          count,
+          categorySlugs: cats,
+          tagSlugs: tagSel,
+          display,
+          paged,
+          ratio,
+          period,
+        };
       case "featured":
-        return { featuredIds: picked.map((p) => p.id), display, ratio };
+        return { featuredIds: picked.map((p) => p.id), display, ratio, period };
       case "feed":
         return { showTags };
       case "creators":
@@ -259,6 +269,24 @@ export default function SectionEditor({
                 <option value="popular">最热</option>
                 <option value="downloads">最多下载</option>
               </select>
+            </div>
+            <div>
+              <label className={field} htmlFor={`pr-${row.id}`}>
+                热度时间窗口
+              </label>
+              <select
+                id={`pr-${row.id}`}
+                value={period}
+                onChange={(e) => setPeriod(e.target.value as "all" | "week" | "month")}
+                className={input}
+              >
+                <option value="all">全部时间（累计热门）</option>
+                <option value="week">近 7 天</option>
+                <option value="month">近 30 天</option>
+              </select>
+              <p className="mt-1 text-[11px] text-neutral-400">
+                仅「最热 / 最多下载」排序时生效；限定为近期发布的内容。
+              </p>
             </div>
             <div>
               <label className={field} htmlFor={`n-${row.id}`}>
@@ -547,19 +575,39 @@ export default function SectionEditor({
         ) : null}
 
         {(kind === "hero" || kind === "featured") && (
-          <div className="sm:col-span-2">
-            <HeroPick
-              value={picked}
-              onChange={setPicked}
-              max={kind === "hero" ? 8 : 24}
-              placeholder={kind === "featured" ? "搜索已上架资源标题，组成专题…" : undefined}
-            />
-            <p className="mt-1 text-xs text-neutral-400">
-              {kind === "hero"
-                ? "挑选 1–8 个资源；不挑则自动展示近期最热，首图作主推、其余作副推。"
-                : "最多 24 个资源组成专题；不挑则自动兜底近期最热。"}
-            </p>
-          </div>
+          <>
+            <div className="sm:col-span-2">
+              <HeroPick
+                value={picked}
+                onChange={setPicked}
+                max={kind === "hero" ? 8 : 24}
+                placeholder={kind === "featured" ? "搜索已上架资源标题，组成专题…" : undefined}
+              />
+              <p className="mt-1 text-xs text-neutral-400">
+                {kind === "hero"
+                  ? "挑选 1–8 个资源；不挑则自动展示近期最热，首图作主推、其余作副推。"
+                  : "最多 24 个资源组成专题；不挑则自动兜底近期最热。"}
+              </p>
+            </div>
+            <div>
+              <label className={field} htmlFor={`pr-${row.id}`}>
+                兜底热门时间窗口
+              </label>
+              <select
+                id={`pr-${row.id}`}
+                value={period}
+                onChange={(e) => setPeriod(e.target.value as "all" | "week" | "month")}
+                className={input}
+              >
+                <option value="all">全部时间（累计热门）</option>
+                <option value="week">近 7 天</option>
+                <option value="month">近 30 天</option>
+              </select>
+              <p className="mt-1 text-[11px] text-neutral-400">
+                仅「未挑选资源」时生效，限定兜底热门为近期发布内容。
+              </p>
+            </div>
+          </>
         )}
 
         {kind === "stats" && (

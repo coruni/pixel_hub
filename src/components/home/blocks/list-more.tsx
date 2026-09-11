@@ -19,6 +19,7 @@ export default function ListMore({
   pageSize,
   display,
   ratio,
+  period,
 }: {
   type: "ALL" | ContentType;
   sort: Sort;
@@ -27,9 +28,11 @@ export default function ListMore({
   pageSize: number;
   display: ContentDisplay;
   ratio?: CardRatio | null;
+  /** 时间窗口：与首屏一致，保证后续页用同一筛选条件 */
+  period?: "week" | "month";
 }) {
   const { more, hasMore, done, err, pending, loadNext } = useLoadMore<Item>((page) =>
-    loadListPageAction({ page, pageSize, type, sort, categorySlugs, tagSlugs }),
+    loadListPageAction({ page, pageSize, type, sort, categorySlugs, tagSlugs, period }),
   );
 
   if (done) {
