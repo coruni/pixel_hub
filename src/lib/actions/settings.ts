@@ -10,6 +10,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { makeKey, saveFile, delFile } from "@/lib/storage";
 import { MIB } from "@/lib/upload-config";
 import { getUploadLimits } from "@/lib/upload-limits";
+import { compressWith, compressConfigOf, outputExt } from "@/lib/media/compress";
 
 export type SettingsActionState = {
   ok?: boolean;
@@ -122,15 +123,16 @@ export async function uploadAvatarAction(
   if (isGif && !canGif) return { error: "GIF 头像仅对受信用户开放" };
 
   try {
-    const key = makeKey("avatars", isGif ? ".gif" : ".webp");
-    // GIF：保留动图原样落盘（不过 sharp，避免动图被压成静帧）；其余：方形居中裁切 256px webp
+    const key = makeKey("avatars", isGif ? ".gif" : `.${outputExt(L.imageFormat)}`);
+    // GIF：保留动图原样落盘（不过 sharp，避免动图被压成静帧）；其余：方形居中裁切 256px 后按配置压缩
     const out = isGif
       ? buf
-      : await sharp(buf, { failOn: "none" })
-          .rotate()
-          .resize(256, 256, { fit: "cover", position: "attention" })
-          .webp({ quality: 85 })
-          .toBuffer();
+      : await compressWith(
+          sharp(buf, { failOn: "none" })
+            .rotate()
+            .resize(256, 256, { fit: "cover", position: "attention" }),
+          compressConfigOf(L),
+        ).toBuffer();
     const url = await saveFile(key, out);
 
     // 换头像后清理旧文件（本站存储的 key；chevereto 远端 URL 也尽力删）
@@ -165,7 +167,7 @@ export async function removeAvatarAction(_fd?: FormData): Promise<void> {
   revalidatePath("/settings");
 }
 
-// ---- 主页 hero 横幅：客户端裁剪为 1600×500 webp，服务端只过 sniff + 重打 + 落库 ----
+// ---- 主页 hero 横幅：客户端裁剪为 1600×500，服务端只过 sniff + 按后台配置重压 + 落库 ----
 
 export async function uploadHeroAction(
   _prev: SettingsActionState,
@@ -186,12 +188,13 @@ export async function uploadHeroAction(
   if (isGif) return { error: "横幅图不支持 GIF，请使用静态图" };
 
   try {
-    const out = await sharp(buf, { failOn: "none" })
-      .rotate()
-      .resize(1600, 500, { fit: "cover", position: "attention" })
-      .webp({ quality: 82 })
-      .toBuffer();
-    const key = makeKey("heroes", ".webp");
+    const out = await compressWith(
+      sharp(buf, { failOn: "none" })
+        .rotate()
+        .resize(1600, 500, { fit: "cover", position: "attention" }),
+      compressConfigOf(L),
+    ).toBuffer();
+    const key = makeKey("heroes", `.${outputExt(L.imageFormat)}`);
     const url = await saveFile(key, out);
 
     const row = await prisma.user.findUnique({

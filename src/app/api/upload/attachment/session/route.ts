@@ -1,14 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db/prisma";
 import { sameOrigin } from "@/lib/origin";
 import { rateLimit } from "@/lib/rate-limit";
 import {
   activeCloudDrive,
-  cloudRelKey,
+  cloudItemPathFor,
   createDriveUploadSession,
   createDriveUploadTicket,
   graphEnabled,
-  itemPathFor,
 } from "@/lib/storage/onedrive";
 import { MIB, attachmentExtsSample } from "@/lib/upload-config";
 import { getUploadLimits } from "@/lib/upload-limits";
@@ -57,6 +57,29 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     );
 
+  // 去重：同一用户已上传过同名同大小的附件 → 直接复用已完成记录，跳过整轮 Graph 上传
+  // （仅比对 name+size：浏览器直传场景服务端不接触字节，无法算内容 hash；同名同大小视为同一文件）
+  const dup = await prisma.media.findFirst({
+    where: {
+      kind: "ATTACHMENT",
+      uploaderId: session.user.id,
+      fileName: name,
+      size,
+      status: "READY",
+    },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, storageKey: true, fileName: true, size: true },
+  });
+  if (dup)
+    return NextResponse.json({
+      ok: true,
+      deduped: true,
+      id: dup.id,
+      url: dup.storageKey,
+      name: dup.fileName,
+      size: dup.size,
+    });
+
   const cfg = await getRuntimeConfig();
   const cloud = (await graphEnabled()) && attachmentCloudEnabled(cfg) ? await activeCloudDrive() : null;
   if (!cloud)
@@ -66,7 +89,8 @@ export async function POST(req: NextRequest) {
     );
 
   try {
-    const itemPath = itemPathFor(cloud, cloudRelKey(`.${ext}`));
+    // 落盘名 = 原名_uuid（原名供下载直接使用，uuid 防重复/并发覆盖）
+    const itemPath = cloudItemPathFor(cloud, name);
     const upload = await createDriveUploadSession(cloud, itemPath);
     const ticket = await createDriveUploadTicket({
       driveId: cloud.id,

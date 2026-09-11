@@ -19,7 +19,7 @@ export default async function AdminUploadsPage() {
       <div className="mb-4">
         <h2 className="text-lg font-medium text-neutral-900">上传限制</h2>
         <p className="mt-0.5 text-xs text-neutral-500">
-          体积上限与允许后缀，即时应用到所有上传入口。仅管理员可见。
+          体积与张数上限、允许后缀、图片压缩格式与质量，即时应用到所有上传入口。仅管理员可见。
         </p>
       </div>
       <UploadLimitsManager limits={limits} />

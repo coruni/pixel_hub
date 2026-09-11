@@ -3,8 +3,10 @@
 // 无新增运行时依赖：token 获取与全部 Graph 调用走全局 fetch。
 //
 // 引用语义：自描述站内路径 /od/{driveId}/{itemPath}
-//   itemPath 从驱动器根目录起算 = [rootPath/]YYYYMM/{uuid}.{ext}。
+//   itemPath 从驱动器根目录起算 = [rootPath/]YYYYMM/{原始文件名}_{uuid}.{ext}（原名供下载、uuid 防重复）。
 //   下载经 /od/[driveId]/[…key] 网关实时查 Graph 预鉴权下载 URL 后 307，不经本站转发大文件字节。
+//   注意：Graph 下载响应的 Content-Disposition 用的是**云盘存储名**，因此存储名必须保留原名，
+//   否则用户下载到的会是随机 uuid 名（本站 /api/dl 的 n 参数对 302 分支不起作用）。
 //   rootPath 只影响新上传落点；存量引用自带完整路径，改 rootPath / 切活跃均不影响旧链接。
 
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
@@ -73,7 +75,7 @@ export function validateRootPath(
   return { ok: true, rootPath: t };
 }
 
-/** YYYYMM/uuid.ext —— 月目录 + 随机名，与图片 makeKey 同风格 */
+/** YYYYMM/uuid.ext —— 月目录 + 随机名（用于探测等无原始文件名的场景） */
 export function cloudRelKey(ext: string): string {
   const now = new Date();
   const yyyymm = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -81,9 +83,65 @@ export function cloudRelKey(ext: string): string {
   return `${yyyymm}/${randomUUID()}${e}`;
 }
 
+/** OneDrive/SharePoint 保留名（带任意扩展名都非法，如 CON.txt） */
+const RESERVED_STEM = /^(?:con|prn|aux|nul|com[0-9]|lpt[0-9])$/i;
+
+/**
+ * 单段文件名安全化：在尽量保留原名（含中文/空格/括号，供下载时直接使用）的前提下，
+ * 规避 OneDrive/SharePoint 的全部硬性限制——
+ *   非法字符 " * : < > ? / \ | 与控制字符 → 替换 / 剔除；首尾点与空格 → 去掉；
+ *   保留名 / ~$ 与 _vti_ 前缀 / .lock 后缀 → 加前导下划线；
+ *   超长 → 截断主体但保留扩展名。
+ * 只处理「单段」，路径分隔由调用方保证（不会出现在这里）。
+ */
+export function sanitizeCloudName(raw: string, maxLen = 120): string {
+  const cleaned = (raw ?? "")
+    .replace(/[\\/:*?"<>|]/g, "_")
+    .replace(/[\u0000-\u001f\u007f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  // 只把「点 + 1~12 位字母数字结尾」当扩展名，避免把 "2024.07.01 素材" 误拆
+  const m = /^(.*)\.([A-Za-z0-9]{1,12})$/.exec(cleaned);
+  let stem = (m ? m[1] : cleaned).replace(/^[. ]+/, "").replace(/[. ]+$/g, "");
+  const ext = m ? `.${m[2]}` : "";
+  if (RESERVED_STEM.test(stem) || stem.startsWith("~$") || stem.startsWith("_vti_"))
+    stem = `_${stem}`;
+  if (ext.toLowerCase() === ".lock" && stem) stem = `${stem}_`;
+  if (!stem) stem = "file";
+
+  if (stem.length + ext.length > maxLen) {
+    stem = stem.slice(0, Math.max(1, maxLen - ext.length)).replace(/[. ]+$/g, "") || "file";
+  }
+  return `${stem}${ext}`;
+}
+
 /** itemPath：从驱动器根目录起算（可选 rootPath 前缀 + relKey） */
 export function itemPathFor(drive: { rootPath: string }, relKey: string): string {
   return drive.rootPath ? `${drive.rootPath}/${relKey}` : relKey;
+}
+
+/**
+ * 附件落盘路径：[rootPath/]YYYYMM/{安全原名}_{uuid}{ext}。
+ * 原名在前（云盘可读、302 下载即原名），uuid 后缀保证全局唯一 —— 因此无需探测重名，
+ * 也不存在并发覆盖；代价是下载名带一段 uuid（保真优先级高于简洁）。
+ * 截断只作用于原名主体，uuid 与扩展名完整保留。
+ */
+export function cloudItemPathFor(
+  drive: { rootPath: string },
+  rawName: string,
+  maxLen = 120,
+): string {
+  const now = new Date();
+  const yyyymm = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const safe = sanitizeCloudName(rawName, maxLen);
+  const m = /^(.*)\.([A-Za-z0-9]{1,12})$/.exec(safe);
+  const stem = m ? m[1] : safe;
+  const ext = m ? `.${m[2]}` : "";
+  const token = `_${randomUUID()}`;
+  const room = Math.max(1, maxLen - ext.length - token.length);
+  const base = stem.slice(0, room).replace(/[. ]+$/g, "") || "file";
+  return itemPathFor(drive, `${yyyymm}/${base}${token}${ext}`);
 }
 
 /** 构造自描述站内引用 /od/{driveId}/{itemPath}（下载按钮存的就是它） */

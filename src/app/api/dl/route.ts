@@ -10,8 +10,9 @@ import { getRuntimeConfig } from "@/lib/runtime-config";
 // 使浏览器以「原始文件名」保存，而不是存储 key（UUID）。解决「下载时文件名不是原名」的问题。
 //
 // 安全：只允许本站公开目录（/uploads、/seed）、/od 网关、以及 env 中登记的 S3 / chevereto 基址；
-// 其余目标一律 403，杜绝把本代理当 SSRF / 开放重定向跳板。OneDrive 走 302 到 Graph 预鉴权链接
-// （Graph 自身保留原名），其余目标由本站流式转发并强制中文/UTF-8 文件名。
+// 其余目标一律 403，杜绝把本代理当 SSRF / 开放重定向跳板。OneDrive 走 302 到 Graph 预鉴权链接，
+// 其 Content-Disposition 取自**云盘存储名**——故附件在落盘时就保留原始文件名（见 resolveCloudItemPath），
+// 使浏览器保存名即原名；本地/S3/chevereto 由本站流式转发并强制中文/UTF-8 文件名。
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -141,7 +142,7 @@ export async function GET(req: NextRequest) {
 
   if (!target) return new Response("forbidden", { status: 403 });
 
-  // OneDrive：直接 302 到 Graph 预鉴权下载链接（Graph 自带原始文件名）
+  // OneDrive：直接 302 到 Graph 预鉴权下载链接（存储名即原始文件名，故保存名正确）
   if (target.kind === "redirect") {
     return new Response(null, {
       status: 302,

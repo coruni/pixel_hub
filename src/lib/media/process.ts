@@ -1,12 +1,19 @@
-// 图片处理管线：由上传的原图生成 大图(webp) + 缩略图(webp) + LQIP 占位(data URI)。
+// 图片处理管线：由上传的原图生成 大图(压缩格式) + 缩略图(压缩格式) + LQIP 占位(data URI)。
 // 原图逐字节保留（storageKey，供原图下载/归档）。生产环境可将本模块改为异步队列消费。
+// 大图/缩略图的输出格式与质量取自后台上传限制配置（webp/jpg/png，见 media/compress.ts）。
 import sharp from "sharp";
 import { makeKey, saveFile, publicUrl } from "@/lib/storage";
+import {
+  compressWith,
+  outputExt,
+  thumbQuality,
+  type ImageCompressConfig,
+} from "@/lib/media/compress";
 
 export type ProcessedImage = {
   storageKey: string; // local/s3: 相对 key；chevereto: 远端完整 URL
-  bigKey: string | null; // 最长边 ≤1600 webp（灯箱）
-  thumbKey: string | null; // 最长边 ≤480 webp（卡片封面）
+  bigKey: string | null; // 最长边 ≤1600 压缩图（灯箱）
+  thumbKey: string | null; // 最长边 ≤480 压缩图（卡片封面）
   placeholder: string | null; // 16px PNG data URI（LQIP）
   width: number;
   height: number;
@@ -42,7 +49,10 @@ async function saveStage(stage: string, key: string, buf: Buffer): Promise<strin
   }
 }
 
-export async function processImage(input: Buffer): Promise<ProcessedImage> {
+export async function processImage(
+  input: Buffer,
+  cfg: ImageCompressConfig,
+): Promise<ProcessedImage> {
   const base = makeKey("images", ".x"); // 仅借用唯一目录
   const dir = base.slice(0, base.lastIndexOf("/"));
 
@@ -51,30 +61,30 @@ export async function processImage(input: Buffer): Promise<ProcessedImage> {
   const width = meta.width ?? 0;
   const height = meta.height ?? 0;
   const format = (meta.format ?? "png") as string;
-  const ext = EXT_BY_FORMAT[format] ?? "png";
-  const mime = MIME_BY_EXT[ext] ?? "image/png";
+  const origExt = EXT_BY_FORMAT[format] ?? "png";
+  const mime = MIME_BY_EXT[origExt] ?? "image/png";
+  // 压缩产物的扩展名随配置格式变化（存储驱动按 key 扩展名识别 content-type）
+  const outExt = outputExt(cfg.format);
 
   // 1) 原图逐字节保存（chevereto 驱动下 saveFile 返回远端 URL，落库即 URL）
-  const origKey = `${dir}/original.${ext}`;
+  const origKey = `${dir}/original.${origExt}`;
   const storageKey = await saveStage("原图", origKey, input);
   const size = input.byteLength;
 
   // 2) 大图
-  const bigKey = `${dir}/big.webp`;
-  const big = await oriented
-    .clone()
-    .resize({ width: Math.min(width, 1600), withoutEnlargement: true })
-    .webp({ quality: 82 })
-    .toBuffer();
+  const bigKey = `${dir}/big.${outExt}`;
+  const big = await compressWith(
+    oriented.clone().resize({ width: Math.min(width, 1600), withoutEnlargement: true }),
+    cfg,
+  ).toBuffer();
   const bigUrl = await saveStage("大图", bigKey, big);
 
-  // 3) 缩略图
-  const thumbKey = `${dir}/thumb.webp`;
-  const thumb = await oriented
-    .clone()
-    .resize({ width: Math.min(width, 480), withoutEnlargement: true })
-    .webp({ quality: 74 })
-    .toBuffer();
+  // 3) 缩略图（质量比主图降一档）
+  const thumbKey = `${dir}/thumb.${outExt}`;
+  const thumb = await compressWith(
+    oriented.clone().resize({ width: Math.min(width, 480), withoutEnlargement: true }),
+    { format: cfg.format, quality: thumbQuality(cfg.quality) },
+  ).toBuffer();
   const thumbUrl = await saveStage("缩略图", thumbKey, thumb);
 
   // 4) LQIP
@@ -95,7 +105,7 @@ export async function processImage(input: Buffer): Promise<ProcessedImage> {
     height,
     size,
     mime,
-    ext,
+    ext: origExt,
   };
 }
 

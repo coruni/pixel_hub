@@ -9,8 +9,11 @@ import {
   COUNT_RANGE,
   DEFAULT_UPLOAD_LIMITS,
   MB_RANGE,
+  QUALITY_RANGE,
   clampInt,
+  isImageFormat,
   normalizeExts,
+  type ImageOutputFormat,
 } from "@/lib/upload-config";
 import { readUploadLimitsDoc, writeUploadLimitsDoc } from "@/lib/upload-limits";
 import type { ActionResult } from "@/lib/hooks";
@@ -37,6 +40,10 @@ export type SaveUploadLimitsInput = {
   galleryImageMaxCount?: number;
   /** 评论附图：单条评论图片张数上限 */
   commentImageMaxCount?: number;
+  /** 图片压缩输出格式（webp/jpg/png，非法值忽略并保留现值） */
+  imageFormat?: ImageOutputFormat;
+  /** 图片压缩质量 1..100 */
+  imageQuality?: number;
 };
 
 export async function saveUploadLimitsAction(input: SaveUploadLimitsInput): Promise<ActionResult> {
@@ -98,6 +105,16 @@ export async function saveUploadLimitsAction(input: SaveUploadLimitsInput): Prom
     if (!r.ok) return { ok: false, error: r.error };
     l.attachmentExts = r.list;
   }
+
+  // 压缩：格式非法即忽略（保留现值），质量按 1..100 钳制
+  if (isImageFormat(input.imageFormat)) l.imageFormat = input.imageFormat;
+  if (typeof input.imageQuality === "number")
+    l.imageQuality = clampInt(
+      input.imageQuality,
+      QUALITY_RANGE.min,
+      QUALITY_RANGE.max,
+      l.imageQuality,
+    );
 
   if (!(await writeUploadLimitsDoc(doc))) return CONFLICT;
   await audit(admin.id, "EDIT_UPLOAD_LIMITS", "UPLOAD_LIMITS", undefined, JSON.stringify(input));

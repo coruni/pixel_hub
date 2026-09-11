@@ -7,6 +7,10 @@
 //   galleryImageMaxMb,      // 图集/原图单张 + 后台直传（1..100）
 //   commentImageMaxMb,      // 评论附图单张（1..100）
 //   avatarMaxMb,            // 头像（1..100）
+//   galleryImageMaxCount,   // 图集/原图张数上限
+//   commentImageMaxCount,   // 评论附图张数上限
+//   imageFormat,            // 服务端压缩输出格式 webp|jpg|png（webp/png 保留 alpha）
+//   imageQuality,           // 服务端压缩质量（1..100）
 // }
 //
 // 服务端各上传路由/action 每次请求读一次配置并**以此为准**强制执行；
@@ -33,6 +37,42 @@ export const MB_RANGE = {
 export const COUNT_RANGE = { min: 1, max: 60 } as const;
 /** 评论附图数量上限范围（张） */
 export const COMMENT_COUNT_RANGE = { min: 0, max: 20 } as const;
+
+/** 压缩输出格式：webp（默认，体积最优）/ jpg（兼容性最好，无透明）/ png（无损或调色板量化） */
+export const IMAGE_FORMATS = ["webp", "jpg", "png"] as const;
+export type ImageOutputFormat = (typeof IMAGE_FORMATS)[number];
+
+/** 压缩质量范围：webp/jpg 为有损档位；png 为调色板量化档位，100 = 无损 */
+export const QUALITY_RANGE = { min: 1, max: 100 } as const;
+
+export const DEFAULT_IMAGE_FORMAT: ImageOutputFormat = "webp";
+export const DEFAULT_IMAGE_QUALITY = 82;
+
+/**
+ * 输出格式 → 落盘扩展名 / MIME。
+ * 存储驱动（chevereto/local/onedrive）按 key 的扩展名识别 content-type，key 必须与实际字节一致。
+ */
+export const OUT_EXT_BY_FORMAT: Record<ImageOutputFormat, string> = {
+  webp: "webp",
+  jpg: "jpg",
+  png: "png",
+};
+export const OUT_MIME_BY_FORMAT: Record<ImageOutputFormat, string> = {
+  webp: "image/webp",
+  jpg: "image/jpeg",
+  png: "image/png",
+};
+
+/** 该格式是否带 alpha 透明通道（jpg 不支持，透明区域需先合成底色） */
+export const FORMAT_HAS_ALPHA: Record<ImageOutputFormat, boolean> = {
+  webp: true,
+  jpg: false,
+  png: true,
+};
+
+export function isImageFormat(v: unknown): v is ImageOutputFormat {
+  return typeof v === "string" && (IMAGE_FORMATS as readonly string[]).includes(v);
+}
 
 /**
  * 硬拒后缀：即使管理员手滑加入也不允许。被本站以可执行/脚本型 content-type 同源托管会有
@@ -88,6 +128,10 @@ export type UploadLimits = {
   galleryImageMaxCount: number;
   /** 评论附图：单条评论可附带的图片张数上限 */
   commentImageMaxCount: number;
+  /** 服务端压缩输出格式（webp / jpg / png） */
+  imageFormat: ImageOutputFormat;
+  /** 服务端压缩质量（1..100） */
+  imageQuality: number;
 };
 
 /** 文章媒体固定为 1 张封面，其余插图放正文（编辑器内上传），不做后台配置 */
@@ -134,6 +178,8 @@ export const DEFAULT_UPLOAD_LIMITS: UploadLimits = {
   avatarMaxMb: 5,
   galleryImageMaxCount: 12,
   commentImageMaxCount: 3,
+  imageFormat: DEFAULT_IMAGE_FORMAT,
+  imageQuality: DEFAULT_IMAGE_QUALITY,
 };
 
 // ---------- 数值 / 后缀校验（纯函数） ----------
@@ -203,6 +249,13 @@ export function parseUploadLimits(raw: unknown): UploadLimits {
       COMMENT_COUNT_RANGE.min,
       COMMENT_COUNT_RANGE.max,
       3,
+    ),
+    imageFormat: isImageFormat(o.imageFormat) ? o.imageFormat : DEFAULT_IMAGE_FORMAT,
+    imageQuality: clampInt(
+      o.imageQuality,
+      QUALITY_RANGE.min,
+      QUALITY_RANGE.max,
+      DEFAULT_IMAGE_QUALITY,
     ),
   };
 }

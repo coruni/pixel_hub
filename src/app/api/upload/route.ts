@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { processImage, publicUrl } from "@/lib/media/process";
+import { compressConfigOf } from "@/lib/media/compress";
 import { rateLimit } from "@/lib/rate-limit";
 import { sameOrigin } from "@/lib/origin";
 import { MIB } from "@/lib/upload-config";
@@ -70,7 +71,7 @@ export async function POST(req: NextRequest) {
         results.push({ name, ok: false, error: "不支持的图片格式（仅 png/jpg/webp/gif/avif）" });
         continue;
       }
-      const p = await processImage(buf);
+      const p = await processImage(buf, compressConfigOf(L));
       const media = await prisma.media.create({
         data: {
           kind: "GALLERY",

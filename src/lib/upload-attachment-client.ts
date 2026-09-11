@@ -9,6 +9,11 @@ type UploadSessionResponse = {
   ticket?: string;
   uploadUrl?: string;
   chunkSize?: number;
+  /** 命中重复上传（同用户同名同大小）：服务端直接给出已完成文件，无需再上传 */
+  deduped?: boolean;
+  url?: string;
+  name?: string;
+  size?: number;
 };
 
 const DEFAULT_CHUNK_SIZE = 10 * 1024 * 1024;
@@ -76,6 +81,15 @@ export async function uploadAttachment(
   });
   const session = (await responseJson(sessionRes)) as UploadSessionResponse;
   if (session.code === "NO_CLOUD") return postLegacyAttachment(file);
+  // 重复上传同一文件：服务端复用已完成的记录，直接返回，跳过整轮上传
+  if (session.ok === true && session.deduped === true && session.url) {
+    onProgress?.(100);
+    return {
+      url: session.url,
+      name: session.name || file.name,
+      size: session.size ?? file.size,
+    };
+  }
   if (!sessionRes.ok || session.ok !== true || !session.ticket || !session.uploadUrl)
     throw new Error(session.error || "创建 OneDrive 上传会话失败");
 

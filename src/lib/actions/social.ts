@@ -15,6 +15,13 @@ import { notifyByEmail } from "@/lib/mail-notify";
 import { audit } from "@/lib/actions/_guards";
 import { MIB } from "@/lib/upload-config";
 import { getUploadLimits } from "@/lib/upload-limits";
+import {
+  compressWith,
+  compressConfigOf,
+  outputExt,
+  outputMime,
+  type ImageCompressConfig,
+} from "@/lib/media/compress";
 
 async function requiredUser() {
   const s = await auth();
@@ -254,7 +261,8 @@ const commentSchema = z.object({
 });
 export type CommentActionState = { error?: string; ok?: boolean };
 
-// 评论附图：压缩为单张 webp（最长边 ≤1200）；张数上限与单张字节上限均取后台 /admin/uploads 配置
+// 评论附图：压缩为单张图片（格式/质量取后台 /admin/uploads 配置，最长边 ≤1200）；
+// 张数上限与单张字节上限同样取后台配置
 
 function sniffImage(buf: Buffer): boolean {
   if (buf.length < 12) return false;
@@ -271,19 +279,25 @@ function sniffImage(buf: Buffer): boolean {
 async function saveCommentImage(
   file: File,
   maxBytes: number,
-): Promise<{ key: string; width: number; height: number; size: number } | null> {
+  cfg: ImageCompressConfig,
+): Promise<{ key: string; width: number; height: number; size: number; mime: string } | null> {
   const buf = Buffer.from(await file.arrayBuffer());
   if (buf.byteLength > maxBytes)
     throw new Error(`单张图片不能超过 ${Math.round(maxBytes / MIB)}MB`);
   if (!sniffImage(buf)) throw new Error("不支持的图片格式");
-  const out = await sharp(buf, { failOn: "none" })
-    .rotate()
-    .resize({ width: 1200, withoutEnlargement: true })
-    .webp({ quality: 82 })
-    .toBuffer({ resolveWithObject: true });
-  const key = makeKey("comments", ".webp");
+  const out = await compressWith(
+    sharp(buf, { failOn: "none" }).rotate().resize({ width: 1200, withoutEnlargement: true }),
+    cfg,
+  ).toBuffer({ resolveWithObject: true });
+  const key = makeKey("comments", `.${outputExt(cfg.format)}`);
   const url = await saveFile(key, out.data);
-  return { key: url, width: out.info.width, height: out.info.height, size: out.data.byteLength };
+  return {
+    key: url,
+    width: out.info.width,
+    height: out.info.height,
+    size: out.data.byteLength,
+    mime: outputMime(cfg.format),
+  };
 }
 
 export async function addCommentAction(
@@ -322,18 +336,26 @@ export async function addCommentAction(
   if (images.length > commentMaxCount)
     return { error: `附图最多 ${commentMaxCount} 张` };
   const commentMaxBytes = L.commentImageMaxMb * MIB;
-  let saved: { key: string; width: number; height: number; size: number }[] = [];
+  const compressCfg = compressConfigOf(L);
+  let saved: { key: string; width: number; height: number; size: number; mime: string }[] = [];
   if (images.length > 0) {
     // Chevereto 上传接口一次请求仅接受单个文件：每张图各自走一次独立上传请求，
     // 用 Promise 并行发出多个「单文件」请求并逐个收集成败，互不阻断。
     const pics = images.slice(0, commentMaxCount);
     const settled = await Promise.allSettled(
-      pics.map((f) => saveCommentImage(f, commentMaxBytes)),
+      pics.map((f) => saveCommentImage(f, commentMaxBytes, compressCfg)),
     );
     saved = settled
       .filter(
-        (r): r is PromiseFulfilledResult<{ key: string; width: number; height: number; size: number }> =>
-          r.status === "fulfilled" && !!r.value,
+        (
+          r,
+        ): r is PromiseFulfilledResult<{
+          key: string;
+          width: number;
+          height: number;
+          size: number;
+          mime: string;
+        }> => r.status === "fulfilled" && !!r.value,
       )
       .map((r) => r.value);
     for (let i = 0; i < settled.length; i += 1) {
@@ -365,7 +387,7 @@ export async function addCommentAction(
           width: m.width,
           height: m.height,
           size: m.size,
-          mime: "image/webp",
+          mime: m.mime,
           status: "READY" as const,
           sort: i,
         })),

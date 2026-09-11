@@ -8,9 +8,18 @@ import { getCloudDrive, resolveDriveDownloadUrl } from "@/lib/storage/onedrive";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// itemPath 段安全：字母/数字/._-（构建时即受限，这里双保险防 .. 与注入）
-const SEG = /^[A-Za-z0-9._-]{1,120}$/;
+// itemPath 段安全：路径由服务端生成，这里双保险——非空、≤120 字符、非 . / ..、
+// 不含路径分隔与控制字符（保留原名后需放行中文/空格/括号等可读字符）。
 const DRIVE_ID = /^[A-Za-z0-9]{5,64}$/;
+function safeSeg(s: string): boolean {
+  return (
+    s.length > 0 &&
+    s.length <= 120 &&
+    s !== "." &&
+    s !== ".." &&
+    !/[\\/\u0000-\u001f\u007f]/.test(s)
+  );
+}
 
 export async function GET(
   _req: Request,
@@ -19,7 +28,7 @@ export async function GET(
   const { driveId, key } = await params;
   if (!DRIVE_ID.test(driveId ?? "") || !Array.isArray(key) || key.length === 0 || key.length > 24)
     return new NextResponse("bad request", { status: 400 });
-  if (!key.every((s) => SEG.test(s))) return new NextResponse("bad request", { status: 400 });
+  if (!key.every(safeSeg)) return new NextResponse("bad request", { status: 400 });
 
   let drive;
   try {

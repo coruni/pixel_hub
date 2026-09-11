@@ -7,9 +7,8 @@ import { rateLimit } from "@/lib/rate-limit";
 import { sameOrigin } from "@/lib/origin";
 import {
   activeCloudDrive,
-  cloudRelKey,
+  cloudItemPathFor,
   graphEnabled,
-  itemPathFor,
   makeCloudRef,
   recordDriveError,
   recordDriveOk,
@@ -79,6 +78,29 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // 去重：同一用户已上传过同名同大小的附件 → 直接复用已完成记录（与 session 路径一致）
+  const fileName = name.slice(0, 120);
+  const dup = await prisma.media.findFirst({
+    where: {
+      kind: "ATTACHMENT",
+      uploaderId: session.user.id,
+      fileName,
+      size: file.size,
+      status: "READY",
+    },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, storageKey: true, fileName: true, size: true },
+  });
+  if (dup)
+    return NextResponse.json({
+      ok: true,
+      deduped: true,
+      id: dup.id,
+      url: dup.storageKey,
+      name: dup.fileName,
+      size: dup.size,
+    });
+
   try {
     const buf = Buffer.from(await file.arrayBuffer());
 
@@ -87,7 +109,8 @@ export async function POST(req: NextRequest) {
     let url: string;
     try {
       if (cloud) {
-        const itemPath = itemPathFor(cloud, cloudRelKey(`.${ext}`));
+        // 落盘名 = 原名_uuid（原名供下载直接使用，uuid 防重复/并发覆盖）
+        const itemPath = cloudItemPathFor(cloud, name);
         await uploadDriveFile(cloud, itemPath, buf);
         url = makeCloudRef(cloud.id, itemPath);
         await recordDriveOk(cloud.id).catch(() => {});
@@ -107,7 +130,7 @@ export async function POST(req: NextRequest) {
         storageKey: url,
         size: buf.byteLength,
         mime: file.type || null,
-        fileName: name.slice(0, 120),
+        fileName,
         status: "READY",
       },
     });
