@@ -140,6 +140,7 @@ export default async function HomeRenderer({
               explorationRatio:
                 typeof cfg.explorationRatio === "number" ? cfg.explorationRatio : 0.3,
               minCategories: typeof cfg.minCategories === "number" ? cfg.minCategories : 0,
+              period: (cfg.period as "all" | "week" | "month") ?? "all",
             }}
           />
         );

@@ -11,6 +11,7 @@ export type RecommendBlockCfg = {
   categorySlugs: string[];
   explorationRatio?: number;
   minCategories?: number;
+  period?: "all" | "week" | "month";
 };
 
 /**
@@ -37,6 +38,7 @@ export default async function RecommendBlock({
     categorySlugs: cfg.categorySlugs,
     explorationRatio: cfg.explorationRatio,
     minCategories: cfg.minCategories,
+    period: cfg.period,
   });
   if (items.length === 0) return null;
 

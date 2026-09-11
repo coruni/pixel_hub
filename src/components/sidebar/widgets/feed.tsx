@@ -11,11 +11,13 @@ export async function renderHot(w: SidebarWidget) {
     sort: "latest" | "popular" | "downloads";
     count: number;
     display: "card" | "list";
+    period?: "all" | "week" | "month";
   };
   const { items } = await getFeed({
     type: cfg.type === "ALL" ? undefined : cfg.type,
     sort: cfg.sort,
     pageSize: cfg.count,
+    period: cfg.period && cfg.period !== "all" ? cfg.period : undefined,
   });
   if (items.length === 0) return null;
 
@@ -63,12 +65,14 @@ export async function renderRandom(w: SidebarWidget) {
 
 export async function renderAuthorWorks(w: SidebarWidget, detail?: DetailWidgetCtx) {
   if (!detail) return null;
-  const cfg = w.config as { count: number };
+  const cfg = w.config as { count: number; period?: "all" | "week" | "month" };
+  const period = cfg.period && cfg.period !== "all" ? cfg.period : undefined;
   // 多取 1 条抵掉当前资源自身
   const { items } = await getFeed({
     authorUsername: detail.authorUsername,
     sort: "popular",
     pageSize: cfg.count + 1,
+    period,
   });
   const list = items.filter((i) => i.id !== detail.id).slice(0, cfg.count);
   if (list.length === 0) return null;
@@ -89,7 +93,8 @@ export async function renderAuthorWorks(w: SidebarWidget, detail?: DetailWidgetC
 
 export async function renderSameCategory(w: SidebarWidget, detail?: DetailWidgetCtx) {
   if (!detail) return null;
-  const cfg = w.config as { count: number };
+  const cfg = w.config as { count: number; period?: "all" | "week" | "month" };
+  const period = cfg.period && cfg.period !== "all" ? cfg.period : undefined;
   const seen = new Set<string>([detail.id]);
   const out: FeedItem[] = [];
   const add = (items: typeof out) => {
@@ -106,6 +111,7 @@ export async function renderSameCategory(w: SidebarWidget, detail?: DetailWidget
       categorySlug: detail.categorySlug,
       sort: "popular",
       pageSize: cfg.count,
+      period,
     });
     add(items);
   }
@@ -115,6 +121,7 @@ export async function renderSameCategory(w: SidebarWidget, detail?: DetailWidget
       type: detail.type,
       sort: "popular",
       pageSize: cfg.count * 2,
+      period,
     });
     add(items);
   }

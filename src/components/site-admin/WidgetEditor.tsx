@@ -90,6 +90,10 @@ export default function WidgetEditor({
     widget.visibleOn === "pc" || widget.visibleOn === "mobile" ? widget.visibleOn : "all",
   );
   const [reqAuth, setReqAuth] = useState(widget.requireAuth === true);
+  // 热度时间窗口（仅热门类组件生效）
+  const [period, setPeriod] = useState<"all" | "week" | "month">(
+    cfg.period === "week" || cfg.period === "month" ? cfg.period : "all",
+  );
   // 广告位（共享编辑字段）
   const [ad, setAd] = useState(() => initAdConfig(cfg));
 
@@ -101,7 +105,7 @@ export default function WidgetEditor({
   function buildConfig(): SidebarWidgetConfig {
     switch (kind) {
       case "hot":
-        return { type, sort, count, display };
+        return { type, sort, count, display, period };
       case "categories":
         return { slugs: cats };
       case "tags":
@@ -117,9 +121,9 @@ export default function WidgetEditor({
       case "random":
         return { count };
       case "authorWorks":
-        return { count };
+        return { count, period };
       case "sameCategory":
-        return { count };
+        return { count, period };
       case "ad":
         return { ...ad, image: ad.image.trim(), link: ad.link.trim(), alt: ad.alt.trim() };
       case "notice":
@@ -238,6 +242,21 @@ export default function WidgetEditor({
                 <option value="popular">最热</option>
                 <option value="latest">最新</option>
                 <option value="downloads">最多下载</option>
+              </select>
+            </div>
+            <div>
+              <label className={LABEL_STRONG} htmlFor={id("period")}>
+                热度时间窗口
+              </label>
+              <select
+                id={id("period")}
+                value={period}
+                onChange={(e) => setPeriod(e.target.value as "all" | "week" | "month")}
+                className={INPUT}
+              >
+                <option value="all">全部时间（累计热门）</option>
+                <option value="week">近 7 天</option>
+                <option value="month">近 30 天</option>
               </select>
             </div>
             <div>
@@ -393,6 +412,21 @@ export default function WidgetEditor({
               onChange={(e) => setCount(Math.max(2, Math.min(8, Number(e.target.value) || 2)))}
               className={INPUT}
             />
+            <div className="mt-3">
+              <label className={LABEL_STRONG} htmlFor={id("period")}>
+                热度时间窗口
+              </label>
+              <select
+                id={id("period")}
+                value={period}
+                onChange={(e) => setPeriod(e.target.value as "all" | "week" | "month")}
+                className={INPUT}
+              >
+                <option value="all">全部时间（累计热门）</option>
+                <option value="week">近 7 天</option>
+                <option value="month">近 30 天</option>
+              </select>
+            </div>
             <p className="mt-1 text-[11px] text-neutral-400">
               仅详情页侧边栏生效（
               {kind === "authorWorks"

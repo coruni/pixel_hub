@@ -650,6 +650,8 @@ export type RecommendOpts = {
   explorationRatio?: number;
   /** 最终列表最少覆盖的不同分类数，0 = 自动 min(3, count) */
   minCategories?: number;
+  /** 热度时间窗口：all=累计全时间；week/month=仅统计近期发布资源（实现「近期热门」） */
+  period?: "all" | "week" | "month";
 };
 
 // 各信号基础权重：收藏 > 评论 > 点赞；关注创作者单独计权重
@@ -956,15 +958,21 @@ async function buildCandidatePool(
     where.category = { slug: { in: opts.categorySlugs } };
 
   const recentCut = new Date(Date.now() - 180 * DAY);
+  // 热度时间窗口：近期热门 → 收紧候选池发布时间下限（取窗口与 180 天新鲜池的更紧者）
+  const periodCut =
+    opts.period && opts.period !== "all"
+      ? new Date(Date.now() - (opts.period === "month" ? 30 : 7) * DAY)
+      : null;
+  const freshCut = periodCut && periodCut > recentCut ? periodCut : recentCut;
   const [quality, fresh] = await Promise.all([
     prisma.resource.findMany({
-      where,
+      where: periodCut ? { ...where, publishedAt: { gte: periodCut } } : where,
       orderBy: [{ likeCount: "desc" }, { publishedAt: "desc" }],
       take: 250,
       select: recSelect,
     }),
     prisma.resource.findMany({
-      where: { ...where, publishedAt: { gte: recentCut } },
+      where: { ...where, publishedAt: { gte: freshCut } },
       orderBy: [{ publishedAt: "desc" }, { likeCount: "desc" }],
       take: 250,
       select: recSelect,
@@ -1011,6 +1019,7 @@ async function popularFallback(opts: RecommendOpts, count: number): Promise<Feed
     sort: "popular",
     pageSize: count,
     categorySlugs: opts.categorySlugs,
+    period: opts.period && opts.period !== "all" ? opts.period : undefined,
   });
   return items.map(toFeedCard);
 }

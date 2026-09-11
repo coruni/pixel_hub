@@ -26,6 +26,27 @@ export function visibleOnClass(v?: string | null): string {
   return "";
 }
 
+// ---------- 热门排序时间窗口（限定候选/热门池为近期发布） ----------
+export type HotPeriod = "all" | "week" | "month";
+export const HOT_PERIOD_KEYS: HotPeriod[] = ["all", "week", "month"];
+export const HOT_PERIOD_LABELS: Record<HotPeriod, string> = {
+  all: "全部时间",
+  week: "近 7 天",
+  month: "近 30 天",
+};
+/** 时间窗口对应的天数；all 返回 null（不限制） */
+export function periodDays(p?: string | null): number | null {
+  if (p === "week") return 7;
+  if (p === "month") return 30;
+  return null;
+}
+/** 转 getFeed 的 period 参数：all 返回 undefined（不限制） */
+export function toFeedPeriod(p?: string | null): "week" | "month" | undefined {
+  if (p === "week") return "week";
+  if (p === "month") return "month";
+  return undefined;
+}
+
 // ---------- 详情页模板 ----------
 
 export type DetailTemplateId = "post" | "banner" | "twocol" | "article";
@@ -148,6 +169,8 @@ const hotCfg = z.object({
   sort: z.enum(["latest", "popular", "downloads"]).default("popular"),
   count: z.number().int().min(3).max(12).default(6),
   display: z.enum(["card", "list"]).default("list"),
+  // 热度时间窗口：all=累计全时间；week/month=仅统计近期发布的资源
+  period: z.enum(["all", "week", "month"]).default("all"),
 });
 const categoriesCfg = z.object({
   slugs: z.array(z.string()).max(30).default([]), // 空 = 展示全部分类；否则仅展示所选分类
@@ -196,9 +219,13 @@ const customCfg = z.object({
 });
 const authorWorksCfg = z.object({
   count: z.number().int().min(2).max(8).default(4),
+  // 热度时间窗口：仅统计近期发布的作品（all=累计全时间）
+  period: z.enum(["all", "week", "month"]).default("all"),
 });
 const sameCategoryCfg = z.object({
   count: z.number().int().min(2).max(8).default(4),
+  // 热度时间窗口：仅统计近期发布的同分类内容（all=累计全时间）
+  period: z.enum(["all", "week", "month"]).default("all"),
 });
 const adCfg = z.object({
   mode: z.enum(["image", "html"]).default("image"),
@@ -231,6 +258,7 @@ export type SidebarWidgetConfig =
       sort: "latest" | "popular" | "downloads";
       count: number;
       display: ContentDisplay;
+      period: HotPeriod;
     } // hot
   | { slugs: string[] } // categories
   | { count: number; slugs: string[] } // tags
@@ -241,7 +269,7 @@ export type SidebarWidgetConfig =
   | { count: number } // random
   | { items: { level: NoticeLevel; text: string }[] } // notice
   | { content: string; links: { label: string; href: string }[] } // custom
-  | { count: number } // authorWorks / sameCategory
+  | { count: number; period: HotPeriod } // authorWorks / sameCategory
   | {
       mode: "image" | "html";
       image: string;
@@ -521,7 +549,7 @@ export const DEFAULT_SIDEBAR_WIDGETS: SidebarWidget[] = [
     kind: "hot",
     title: "热门内容",
     enabled: true,
-    config: { type: "ALL", sort: "popular", count: 6, display: "list" },
+    config: { type: "ALL", sort: "popular", count: 6, display: "list", period: "all" },
   },
   {
     id: "sw-cats",
@@ -554,21 +582,21 @@ export const DEFAULT_DETAIL_WIDGETS: SidebarWidget[] = [
     kind: "authorWorks",
     title: null,
     enabled: true,
-    config: { count: 4 },
+    config: { count: 4, period: "all" },
   },
   {
     id: "sw-detail-same-category",
     kind: "sameCategory",
     title: null,
     enabled: true,
-    config: { count: 4 },
+    config: { count: 4, period: "all" },
   },
   {
     id: "sw-detail-hot",
     kind: "hot",
     title: "热门内容",
     enabled: true,
-    config: { type: "ALL", sort: "popular", count: 6, display: "list" },
+    config: { type: "ALL", sort: "popular", count: 6, display: "list", period: "all" },
   },
 ];
 

@@ -131,6 +131,8 @@ const recommendCfg = z.object({
   explorationRatio: z.number().min(0).max(0.6).default(0.3),
   // 最终列表最少覆盖的不同分类数；0 = 自动（min(3, count)），防止整页同质
   minCategories: z.number().int().min(0).max(12).default(0),
+  // 热度时间窗口：all=累计全时间热门；week/month=仅统计近期发布资源（实现「近期热门推荐」）
+  period: z.enum(["all", "week", "month"]).default("all"),
 });
 
 export const homeConfigSchemas: Record<HomeSectionKind, z.ZodTypeAny> = {
@@ -172,7 +174,7 @@ export type HomeSectionConfig =
       html: string;
       badge: boolean;
     } // ad
-  | { scope: "personal" | "all"; mode: "personalized" | "explore"; type: "ALL" | "IMAGE" | "GAME" | "ARTICLE"; count: number; categorySlugs: string[]; explorationRatio: number; minCategories: number }; // recommend
+  | { scope: "personal" | "all"; mode: "personalized" | "explore"; type: "ALL" | "IMAGE" | "GAME" | "ARTICLE"; count: number; categorySlugs: string[]; explorationRatio: number; minCategories: number; period: "all" | "week" | "month" }; // recommend
 
 // 后端传给编辑器的类型化 config
 export type EditableConfig<T extends HomeSectionKind> = z.infer<(typeof homeConfigSchemas)[T]>;

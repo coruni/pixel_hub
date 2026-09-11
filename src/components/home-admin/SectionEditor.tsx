@@ -106,6 +106,10 @@ export default function SectionEditor({
   const [minCategories, setMinCategories] = useState(
     typeof cfg.minCategories === "number" ? cfg.minCategories : 0,
   );
+  // 为你推荐：热度时间窗口（全部时间 / 近 7 天 / 近 30 天）
+  const [period, setPeriod] = useState<"all" | "week" | "month">(
+    cfg.period === "week" || cfg.period === "month" ? cfg.period : "all",
+  );
   // 广告位（共享编辑字段，草稿见 admin-shared/ad-config-fields）
   const [ad, setAd] = useState(() => initAdConfig(cfg));
   const [pending, start] = useTransition();
@@ -134,7 +138,7 @@ export default function SectionEditor({
       case "stats":
         return {};
       case "recommend":
-        return { scope, mode, type, count, categorySlugs: cats, explorationRatio, minCategories };
+        return { scope, mode, type, count, categorySlugs: cats, explorationRatio, minCategories, period };
       case "ad":
         return { ...ad, image: ad.image.trim(), link: ad.link.trim(), alt: ad.alt.trim() };
     }
@@ -423,6 +427,24 @@ export default function SectionEditor({
               />
               <p className="mt-1 text-[11px] text-neutral-400">
                 最终列表至少覆盖的不同分类数，进一步防止整页同质。
+              </p>
+            </div>
+            <div>
+              <label className={field} htmlFor={`pr-${row.id}`}>
+                热度时间窗口
+              </label>
+              <select
+                id={`pr-${row.id}`}
+                value={period}
+                onChange={(e) => setPeriod(e.target.value as "all" | "week" | "month")}
+                className={input}
+              >
+                <option value="all">全部时间（累计热门）</option>
+                <option value="week">近 7 天</option>
+                <option value="month">近 30 天</option>
+              </select>
+              <p className="mt-1 text-[11px] text-neutral-400">
+                限定候选/热门池为近期发布的内容，实现「近期热门推荐」。
               </p>
             </div>
           </>
