@@ -10,6 +10,7 @@ import AdConfigFields, { initAdConfig } from "@/components/admin-shared/ad-confi
 import ChipPicker from "@/components/ui/ChipPicker";
 import type { SiteCategories, SiteTags } from "./shared";
 import { Button } from "@/components/ui/Button";
+import { SquareCheckbox } from "../admin/SquareCheckbox";
 
 // 可编辑行（公告/链接）的稳定 key：模块级自增序号，行内增删改时保持 DOM 复用、避免输入焦点错位
 let rowKeySeq = 0;
@@ -84,6 +85,11 @@ export default function WidgetEditor({
   );
   const [msg, setMsg] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  // 可见性：设备端 + 是否仅登录
+  const [visOn, setVisOn] = useState<"all" | "pc" | "mobile">(
+    widget.visibleOn === "pc" || widget.visibleOn === "mobile" ? widget.visibleOn : "all",
+  );
+  const [reqAuth, setReqAuth] = useState(widget.requireAuth === true);
   // 广告位（共享编辑字段）
   const [ad, setAd] = useState(() => initAdConfig(cfg));
 
@@ -144,6 +150,8 @@ export default function WidgetEditor({
       const r = await updateSidebarWidgetAction({
         id: widget.id,
         title: title.trim() ? title.trim().slice(0, 80) : null,
+        visibleOn: visOn,
+        requireAuth: reqAuth,
         config: buildConfig(),
       });
       if (!r.ok) {
@@ -169,6 +177,34 @@ export default function WidgetEditor({
             placeholder={SIDEBAR_KIND_META[kind].defaultTitle ?? "标题…"}
             className={INPUT}
           />
+        </div>
+
+        {/* 可见性：设备端 + 登录要求 */}
+        <div className="sm:col-span-2 grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className={LABEL_STRONG} htmlFor={id("vo")}>
+              设备端可见
+            </label>
+            <select
+              id={id("vo")}
+              value={visOn}
+              onChange={(e) => setVisOn(e.target.value as "all" | "pc" | "mobile")}
+              className={INPUT}
+            >
+              <option value="all">全部设备</option>
+              <option value="pc">仅电脑端</option>
+              <option value="mobile">仅移动端</option>
+            </select>
+          </div>
+          <div>
+            <label className={`${LABEL_STRONG} flex items-center gap-2`}>
+              <SquareCheckbox checked={reqAuth} onChange={(next) => setReqAuth(next)} ariaLabel="仅登录用户可见" />
+              仅登录用户可见
+            </label>
+            <p className="mt-1 text-[11px] text-neutral-400">
+              开启后未登录访客看不到此组件；设备端限制用响应式类实现。
+            </p>
+          </div>
         </div>
 
         {kind === "hot" && (

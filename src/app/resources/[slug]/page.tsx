@@ -169,15 +169,15 @@ export default async function ResourcePage({ params }: PageProps) {
     theme.slots[area].some((w) => w.enabled);
   const topSlot =
     !isPreview && hasSlot("detailTop") ? (
-      <WidgetArea theme={theme} area="detailTop" detail={detailCtx} />
+      <WidgetArea theme={theme} area="detailTop" detail={detailCtx} authed={!!meId} />
     ) : null;
   const bottomSlot =
     !isPreview && hasSlot("detailBottom") ? (
-      <WidgetArea theme={theme} area="detailBottom" detail={detailCtx} />
+      <WidgetArea theme={theme} area="detailBottom" detail={detailCtx} authed={!!meId} />
     ) : null;
   const middleSlot =
     !isPreview && hasSlot("detailMiddle") ? (
-      <WidgetArea theme={theme} area="detailMiddle" detail={detailCtx} />
+      <WidgetArea theme={theme} area="detailMiddle" detail={detailCtx} authed={!!meId} />
     ) : null;
 
   const body =
@@ -198,7 +198,9 @@ export default async function ResourcePage({ params }: PageProps) {
     <SidebarLayout
       railWidth={theme.sidebar.width}
       rail={
-        showSidebar ? <SiteSidebar theme={theme} page="detail" detail={detailCtx} /> : undefined
+        showSidebar ? (
+          <SiteSidebar theme={theme} page="detail" detail={detailCtx} authed={!!meId} />
+        ) : undefined
       }
     >
       {detailLd && (

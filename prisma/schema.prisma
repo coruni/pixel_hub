@@ -371,14 +371,17 @@ model AuditLog {
 // ---------- 首页布局（WordPress 式板块引擎） ----------
 
 model HomeSection {
-  id        String   @id @default(cuid())
-  kind      String // hero | categories | feed | stats | creators | tags
-  title     String? // 板块标题（hero 作大标语）
-  order     Int      @default(0)
-  enabled   Boolean  @default(true)
-  config    String? // 板块配置 JSON 文本（zod 校验后序列化）
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  kind        String // hero | categories | feed | stats | creators | tags
+  title       String? // 板块标题（hero 作大标语）
+  order       Int      @default(0)
+  enabled     Boolean  @default(true)
+  // 可见性：设备端（all=不限 / pc=仅电脑端 / mobile=仅移动端）+ 是否仅登录可见
+  visibleOn   String   @default("all")
+  requireAuth Boolean  @default(false)
+  config      String? // 板块配置 JSON 文本（zod 校验后序列化）
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@index([order])
 }

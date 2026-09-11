@@ -4,6 +4,7 @@ import { isOnline } from "@/lib/online";
 import { auth } from "@/lib/auth";
 import { searchRuntime } from "@/lib/search";
 import { cache } from "react";
+import { unstable_noStore as noStore } from "next/cache";
 import type { Prisma, ResourceType } from "@prisma/client";
 
 export type FeedItem = {
@@ -641,6 +642,8 @@ export type RecommendOpts = {
   userId?: string;
   count?: number;
   scope?: RecommendScope;
+  /** personalized=画像精准推荐；explore=随机探索（每次刷新换一批，打破信息茧房） */
+  mode?: "personalized" | "explore";
   type?: ResourceType | "ALL";
   categorySlugs?: string[];
   /** 探索（打破信息茧房）槽位占比 0–0.6，默认 0.3 */
@@ -936,45 +939,17 @@ function diverseSelect(
   return picked.map((p) => toFeedCard(p.item));
 }
 
-export async function getRecommendations(opts: RecommendOpts): Promise<FeedCard[]> {
-  const count = Math.max(1, Math.min(48, opts.count ?? 12));
-  const personal = !!opts.userId && opts.scope !== "all";
-
-  if (!personal) {
-    const { items } = await getFeed({
-      type: opts.type,
-      sort: "popular",
-      pageSize: count,
-      categorySlugs: opts.categorySlugs,
-    });
-    return items.map(toFeedCard);
-  }
-
-  const userId = opts.userId!;
-  const profile = await buildRecProfile(userId);
-
-  // 无信号 → 回退热门（与游客一致），保证不空白
-  if (profile.signalCount === 0) {
-    const { items } = await getFeed({
-      type: opts.type,
-      sort: "popular",
-      pageSize: count,
-      categorySlugs: opts.categorySlugs,
-    });
-    return items.map(toFeedCard);
-  }
-
-  // 探索占比：弱画像 / 冷启动时更高，主动拓宽视野；强画像按配置收敛到精准
-  const cold = profile.signalCount < 3;
-  const explorationRatio = Math.min(0.7, clamp(opts.explorationRatio ?? 0.3, 0, 0.6) * (cold ? 1.4 : 1));
-  const minCategories = opts.minCategories && opts.minCategories > 0 ? opts.minCategories : 0;
-
-  // 候选池：质量池（已被验证的好内容）+ 新鲜池（近 180 天新内容）合并去重，
-  // 兼顾经典与新鲜，从根源降低「只看老内容」的茧房倾向。
+/** 候选池：质量池（高互动经典）+ 新鲜池（近 180 天），合并去重；排除指定用户已互动与其本人作品 */
+async function buildCandidatePool(
+  opts: RecommendOpts,
+  userId?: string,
+  excludeIds?: string[],
+): Promise<RecItem[]> {
+  const excl = excludeIds ?? [];
   const where: Prisma.ResourceWhereInput = {
     status: "PUBLISHED",
-    authorId: { not: userId },
-    id: profile.engagedIds.length ? { notIn: profile.engagedIds } : undefined,
+    authorId: userId ? { not: userId } : undefined,
+    id: excl.length ? { notIn: excl } : undefined,
   };
   if (opts.type && opts.type !== "ALL") where.type = opts.type;
   if (opts.categorySlugs && opts.categorySlugs.length > 0)
@@ -998,17 +973,79 @@ export async function getRecommendations(opts: RecommendOpts): Promise<FeedCard[
   const poolMap = new Map<string, RecRow>();
   for (const r of quality) poolMap.set(r.id, r);
   for (const r of fresh) poolMap.set(r.id, r);
-  if (poolMap.size === 0) {
-    const { items } = await getFeed({
-      type: opts.type,
-      sort: "popular",
-      pageSize: count,
-      categorySlugs: opts.categorySlugs,
-    });
-    return items.map(toFeedCard);
+  return [...poolMap.values()].map(toRecItem);
+}
+
+/** Fisher-Yates 原地洗牌（探索模式逐次刷新不同） */
+function shuffle<T>(arr: T[]): void {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}
+
+const EMPTY_PROFILE: RecProfile = {
+  tagW: new Map(),
+  catW: new Map(),
+  typeW: new Map(),
+  authorW: new Map(),
+  totalWeight: 0,
+  signalCount: 0,
+  engagedIds: [],
+};
+
+/** 探索模式：对候选按「质量+新颖度」取前 3×count，洗牌后抽 count，每次刷新结果不同 */
+function exploreSelect(candidates: RecItem[], count: number): FeedCard[] {
+  const scored = scoreCandidates(candidates, EMPTY_PROFILE, Date.now());
+  scored.sort((a, b) => b.quality + b.novelty - (a.quality + a.novelty));
+  const k = Math.min(scored.length, count * 3);
+  const top = scored.slice(0, k);
+  shuffle(top);
+  return top.slice(0, count).map((p) => toFeedCard(p.item));
+}
+
+/** 回退：全站热门（游客 / 无信号 / 探索池为空时兜底），保证不空白 */
+async function popularFallback(opts: RecommendOpts, count: number): Promise<FeedCard[]> {
+  const { items } = await getFeed({
+    type: opts.type,
+    sort: "popular",
+    pageSize: count,
+    categorySlugs: opts.categorySlugs,
+  });
+  return items.map(toFeedCard);
+}
+
+export async function getRecommendations(opts: RecommendOpts): Promise<FeedCard[]> {
+  const count = Math.max(1, Math.min(48, opts.count ?? 12));
+
+  // 探索模式：不依赖画像，基于质量+新颖度随机抽样，每次刷新换一批内容（打破信息茧房）
+  if (opts.mode === "explore") {
+    noStore(); // 确保逐次请求实时计算，不被静态/路由缓存冻结
+    const excludeIds = opts.userId ? (await buildRecProfile(opts.userId)).engagedIds : [];
+    const candidates = await buildCandidatePool(opts, opts.userId, excludeIds);
+    if (candidates.length === 0) return popularFallback(opts, count);
+    return exploreSelect(candidates, count);
   }
 
-  const candidates = [...poolMap.values()].map(toRecItem);
+  const personal = !!opts.userId && opts.scope !== "all";
+  if (!personal) return popularFallback(opts, count);
+
+  const userId = opts.userId!;
+  const profile = await buildRecProfile(userId);
+
+  // 无信号 → 回退热门（与游客一致），保证不空白
+  if (profile.signalCount === 0) return popularFallback(opts, count);
+
+  // 候选池：质量池（已被验证的好内容）+ 新鲜池（近 180 天新内容）合并去重，
+  // 兼顾经典与新鲜，从根源降低「只看老内容」的茧房倾向。
+  const candidates = await buildCandidatePool(opts, userId, profile.engagedIds);
+  if (candidates.length === 0) return popularFallback(opts, count);
+
+  // 探索占比：弱画像 / 冷启动时更高，主动拓宽视野；强画像按配置收敛到精准
+  const cold = profile.signalCount < 3;
+  const explorationRatio = Math.min(0.7, clamp(opts.explorationRatio ?? 0.3, 0, 0.6) * (cold ? 1.4 : 1));
+  const minCategories = opts.minCategories && opts.minCategories > 0 ? opts.minCategories : 0;
+
   const scored = scoreCandidates(candidates, profile, Date.now());
   return diverseSelect(scored, count, explorationRatio, minCategories);
 }

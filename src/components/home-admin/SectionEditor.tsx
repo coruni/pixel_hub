@@ -20,6 +20,10 @@ export type ManagerRow = {
   title: string | null;
   order: number;
   enabled: boolean;
+  /** 设备端可见性：all / pc / mobile */
+  visibleOn?: "all" | "pc" | "mobile";
+  /** 是否仅登录用户可见 */
+  requireAuth?: boolean;
   config: HomeSectionConfig;
 };
 
@@ -81,9 +85,18 @@ export default function SectionEditor({
     (CARD_RATIO_KEYS as string[]).includes(String(cfg.ratio)) ? (cfg.ratio as CardRatio) : "auto",
   );
   const [paged, setPaged] = useState(kind === "list" && cfg.paged === true);
+  // 可见性：设备端 + 是否仅登录
+  const [visOn, setVisOn] = useState<"all" | "pc" | "mobile">(
+    row.visibleOn === "pc" || row.visibleOn === "mobile" ? row.visibleOn : "all",
+  );
+  const [reqAuth, setReqAuth] = useState(row.requireAuth === true);
   // 为你推荐：个性化 / 全站热门
   const [scope, setScope] = useState<"personal" | "all">(
     cfg.scope === "all" ? "all" : "personal",
+  );
+  // 为你推荐：精准推荐 / 随机探索（每次刷新换一批）
+  const [mode, setMode] = useState<"personalized" | "explore">(
+    cfg.mode === "explore" ? "explore" : "personalized",
   );
   // 为你推荐：探索占比（打破信息茧房）
   const [explorationRatio, setExplorationRatio] = useState(
@@ -121,7 +134,7 @@ export default function SectionEditor({
       case "stats":
         return {};
       case "recommend":
-        return { scope, type, count, categorySlugs: cats, explorationRatio, minCategories };
+        return { scope, mode, type, count, categorySlugs: cats, explorationRatio, minCategories };
       case "ad":
         return { ...ad, image: ad.image.trim(), link: ad.link.trim(), alt: ad.alt.trim() };
     }
@@ -132,6 +145,8 @@ export default function SectionEditor({
       const r = await updateHomeSectionAction({
         id: row.id,
         title: title.trim() ? title.trim().slice(0, 80) : null,
+        visibleOn: visOn,
+        requireAuth: reqAuth,
         config: buildConfig(),
       });
       if (!r.ok) {
@@ -175,6 +190,34 @@ export default function SectionEditor({
             placeholder={HOME_KIND_META[kind].defaultTitle ?? "给这个板块起个标题…"}
             className={input}
           />
+        </div>
+
+        {/* 可见性：设备端 + 登录要求 */}
+        <div className="sm:col-span-2 grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className={field} htmlFor={`vo-${row.id}`}>
+              设备端可见
+            </label>
+            <select
+              id={`vo-${row.id}`}
+              value={visOn}
+              onChange={(e) => setVisOn(e.target.value as "all" | "pc" | "mobile")}
+              className={input}
+            >
+              <option value="all">全部设备</option>
+              <option value="pc">仅电脑端</option>
+              <option value="mobile">仅移动端</option>
+            </select>
+          </div>
+          <div>
+            <label className={`${field} flex items-center gap-2`}>
+              <SquareCheckbox checked={reqAuth} onChange={(next) => setReqAuth(next)} ariaLabel="仅登录用户可见" />
+              仅登录用户可见
+            </label>
+            <p className="mt-1 text-[11px] text-neutral-400">
+              开启后未登录访客看不到此板块；设备端限制用响应式类实现。
+            </p>
+          </div>
         </div>
 
         {(kind === "list" || kind === "recommend") && (
@@ -308,6 +351,23 @@ export default function SectionEditor({
               </select>
               <p className="mt-1 text-[11px] text-neutral-400">
                 登录用户走个性化；游客或无偏好信号时自动回退热门。
+              </p>
+            </div>
+            <div>
+              <label className={field} htmlFor={`md-${row.id}`}>
+                推荐模式
+              </label>
+              <select
+                id={`md-${row.id}`}
+                value={mode}
+                onChange={(e) => setMode(e.target.value as "personalized" | "explore")}
+                className={input}
+              >
+                <option value="personalized">精准推荐（画像排序）</option>
+                <option value="explore">随机探索（每次刷新换一批）</option>
+              </select>
+              <p className="mt-1 text-[11px] text-neutral-400">
+                随机探索不依赖画像，按质量+新颖度抽样并洗牌，每次刷新结果不同，用来破圈。
               </p>
             </div>
             <div>

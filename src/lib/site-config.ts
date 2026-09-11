@@ -11,6 +11,21 @@ import type { ContentDisplay, ContentType } from "./display";
 
 export const THEME_KEY = "theme";
 
+// ---------- 设备端可见性（服务端无法判断真实设备，用 Tailwind 响应式类实现） ----------
+export type VisibleOn = "all" | "pc" | "mobile";
+export const VISIBLE_ON_KEYS: VisibleOn[] = ["all", "pc", "mobile"];
+export const VISIBLE_ON_LABELS: Record<VisibleOn, string> = {
+  all: "全部设备",
+  pc: "仅电脑端",
+  mobile: "仅移动端",
+};
+/** 设备端可见性对应的响应式容器 class（服务端安全，无需 UA 嗅探） */
+export function visibleOnClass(v?: string | null): string {
+  if (v === "pc") return "hidden lg:block";
+  if (v === "mobile") return "block lg:hidden";
+  return "";
+}
+
 // ---------- 详情页模板 ----------
 
 export type DetailTemplateId = "post" | "banner" | "twocol" | "article";
@@ -236,11 +251,19 @@ export type SidebarWidgetConfig =
       badge: boolean;
     }; // ad
 
+export type SidebarWidgetTier = "primary" | "more";
+
 export type SidebarWidget = {
   id: string;
   kind: SidebarWidgetKind;
   title: string | null;
   enabled: boolean;
+  /** 层级：primary 常驻直出；more 收进侧栏底部「更多」折叠组，避免一栏过长 */
+  tier?: SidebarWidgetTier;
+  /** 设备端可见性：all=不限 / pc=仅电脑端 / mobile=仅移动端 */
+  visibleOn?: VisibleOn;
+  /** 是否仅登录用户可见 */
+  requireAuth?: boolean;
   config: SidebarWidgetConfig;
 };
 
@@ -277,7 +300,19 @@ function parseWidget(raw: unknown): SidebarWidget | null {
     typeof o.id === "string" && o.id ? (o.id as string) : `sw-${kind}-${(o._i as string) ?? ""}`;
   const title = typeof o.title === "string" && o.title.trim() ? o.title.trim().slice(0, 80) : null;
   const enabled = typeof o.enabled === "boolean" ? o.enabled : true;
-  return { id, kind, title, enabled, config: parseSidebarConfig(kind, o.config) };
+  const tier = o.tier === "more" ? "more" : "primary";
+  const visibleOn = o.visibleOn === "pc" || o.visibleOn === "mobile" ? o.visibleOn : "all";
+  const requireAuth = o.requireAuth === true;
+  return {
+    id,
+    kind,
+    title,
+    enabled,
+    tier,
+    visibleOn,
+    requireAuth,
+    config: parseSidebarConfig(kind, o.config),
+  };
 }
 
 export function parseNavItem(raw: unknown): NavItem | null {
@@ -500,6 +535,7 @@ export const DEFAULT_SIDEBAR_WIDGETS: SidebarWidget[] = [
     kind: "tags",
     title: "热门标签",
     enabled: true,
+    tier: "more",
     config: { count: 10, slugs: [] },
   },
   {

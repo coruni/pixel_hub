@@ -122,6 +122,8 @@ const adCfg = z.object({
 });
 const recommendCfg = z.object({
   scope: z.enum(["personal", "all"]).default("personal"), // personal=按登录用户偏好；all=全站热门
+  // 模式：personalized=画像精准推荐；explore=随机探索（每次刷新换一批高质量/新内容，打破信息茧房）
+  mode: z.enum(["personalized", "explore"]).default("personalized"),
   type: z.enum(["ALL", "IMAGE", "GAME", "ARTICLE"]).default("ALL"),
   count: z.number().int().min(1).max(48).default(12),
   categorySlugs: z.array(z.string()).max(30).default([]), // 空 = 不限
@@ -170,7 +172,7 @@ export type HomeSectionConfig =
       html: string;
       badge: boolean;
     } // ad
-  | { scope: "personal" | "all"; type: "ALL" | "IMAGE" | "GAME" | "ARTICLE"; count: number; categorySlugs: string[]; explorationRatio: number; minCategories: number }; // recommend
+  | { scope: "personal" | "all"; mode: "personalized" | "explore"; type: "ALL" | "IMAGE" | "GAME" | "ARTICLE"; count: number; categorySlugs: string[]; explorationRatio: number; minCategories: number }; // recommend
 
 // 后端传给编辑器的类型化 config
 export type EditableConfig<T extends HomeSectionKind> = z.infer<(typeof homeConfigSchemas)[T]>;
@@ -217,7 +219,8 @@ export type DefaultSectionSpec = {
 
 export const DEFAULT_SECTIONS: DefaultSectionSpec[] = [
   { kind: "hero", title: null, order: 10, enabled: true, config: { featuredIds: [] } },
-  { kind: "categories", title: "按分类探索", order: 20, enabled: true, config: { slugs: [] } },
+  // 分类入口统一由侧栏「分类直达」承担，首页默认不再重复展示整块分类列表（可在后台按需开启）
+  { kind: "categories", title: "按分类探索", order: 20, enabled: false, config: { slugs: [] } },
   { kind: "feed", title: null, order: 30, enabled: true, config: { showTags: false } },
   { kind: "tags", title: "热门标签", order: 40, enabled: false, config: { count: 12, slugs: [] } },
   { kind: "creators", title: "人气创作者", order: 50, enabled: false, config: { count: 6 } },

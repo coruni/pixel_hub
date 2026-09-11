@@ -27,7 +27,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     <SidebarLayout
       railWidth={theme.sidebar.width}
       // 侧栏列顶部与首屏横幅（hero 的 pt-8）对齐；移动端侧栏在内容下方不需要
-      rail={showSidebar ? <SiteSidebar theme={theme} page="home" /> : undefined}
+      rail={showSidebar ? <SiteSidebar theme={theme} page="home" authed={!!u} /> : undefined}
     >
       <HomeRenderer sections={sections} sp={sp} authed={!!u} userId={u?.id} />
     </SidebarLayout>

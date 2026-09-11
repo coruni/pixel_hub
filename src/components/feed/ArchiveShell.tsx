@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { auth } from "@/lib/auth";
 import { getTheme } from "@/lib/site";
 import { sidebarVisible } from "@/lib/site-config";
 import SiteSidebar, { WidgetArea } from "@/components/sidebar/SiteSidebar";
@@ -16,6 +17,7 @@ export default async function ArchiveShell({
   children: ReactNode;
 }) {
   const theme = await getTheme();
+  const u = (await auth())?.user;
   const showSidebar = sidebarVisible(theme, "archive");
   const hasSlot = (area: "archiveTop" | "archiveBottom") =>
     theme.slots[area].some((w) => w.enabled);
@@ -23,18 +25,18 @@ export default async function ArchiveShell({
   return (
     <SidebarLayout
       railWidth={theme.sidebar.width}
-      rail={showSidebar ? <SiteSidebar theme={theme} page="archive" /> : undefined}
+      rail={showSidebar ? <SiteSidebar theme={theme} page="archive" authed={!!u} /> : undefined}
     >
       {hasSlot("archiveTop") && (
         <div className="mx-auto max-w-7xl px-4 pt-6 sm:px-6">
-          <WidgetArea theme={theme} area="archiveTop" />
+          <WidgetArea theme={theme} area="archiveTop" authed={!!u} />
         </div>
       )}
       {heading}
       {children}
       {hasSlot("archiveBottom") && (
         <div className="mx-auto max-w-7xl px-4 pb-12 sm:px-6">
-          <WidgetArea theme={theme} area="archiveBottom" />
+          <WidgetArea theme={theme} area="archiveBottom" authed={!!u} />
         </div>
       )}
     </SidebarLayout>

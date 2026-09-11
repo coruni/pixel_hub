@@ -5,6 +5,7 @@ import type { ContentType } from "@/lib/display";
 
 export type RecommendBlockCfg = {
   scope: "personal" | "all";
+  mode?: "personalized" | "explore";
   type: "ALL" | ContentType;
   count: number;
   categorySlugs: string[];
@@ -31,6 +32,7 @@ export default async function RecommendBlock({
     userId: authed ? userId : undefined,
     count: cfg.count,
     scope: authed ? cfg.scope : "all",
+    mode: cfg.mode,
     type: cfg.type,
     categorySlugs: cfg.categorySlugs,
     explorationRatio: cfg.explorationRatio,
@@ -40,7 +42,11 @@ export default async function RecommendBlock({
 
   const heading =
     title ??
-    (authed && cfg.scope === "personal" ? "为你推荐" : "热门推荐");
+    (cfg.mode === "explore"
+      ? "为你发现"
+      : authed && cfg.scope === "personal"
+        ? "为你推荐"
+        : "热门推荐");
 
   return (
     <BlockShell title={heading}>

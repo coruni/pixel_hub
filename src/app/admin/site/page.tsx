@@ -70,6 +70,11 @@ export default async function AdminSitePage() {
     title: r.title,
     order: r.order,
     enabled: r.enabled,
+    visibleOn: (r.visibleOn === "pc" || r.visibleOn === "mobile" ? r.visibleOn : "all") as
+      | "all"
+      | "pc"
+      | "mobile",
+    requireAuth: r.requireAuth === true,
     config: parseSectionConfig(r.kind as HomeSectionKind, r.config),
   }));
 

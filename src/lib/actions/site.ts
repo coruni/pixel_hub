@@ -183,6 +183,10 @@ export type SidebarWidgetPatch = {
   id: string;
   title?: string | null;
   enabled?: boolean;
+  /** 设备端可见性：all / pc / mobile */
+  visibleOn?: "all" | "pc" | "mobile";
+  /** 是否仅登录用户可见 */
+  requireAuth?: boolean;
   config?: unknown;
 };
 
@@ -200,6 +204,10 @@ export async function updateSidebarWidgetAction(
 
   if (patch.title !== undefined) widget.title = cleanTitle(patch.title);
   if (patch.enabled !== undefined) widget.enabled = patch.enabled === true;
+  if (patch.visibleOn !== undefined) {
+    widget.visibleOn = patch.visibleOn === "pc" || patch.visibleOn === "mobile" ? patch.visibleOn : "all";
+  }
+  if (patch.requireAuth !== undefined) widget.requireAuth = patch.requireAuth === true;
   if (patch.config !== undefined) {
     const v = safeSidebarConfig(widget.kind, patch.config);
     if (!v.ok) return { ok: false, error: v.error };

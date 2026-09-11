@@ -29,10 +29,14 @@ export type HomePatch = {
   id: string;
   title?: string | null;
   enabled?: boolean;
+  /** 设备端可见性：all / pc / mobile */
+  visibleOn?: "all" | "pc" | "mobile";
+  /** 是否仅登录用户可见 */
+  requireAuth?: boolean;
   config?: unknown;
 };
 
-/** 保存板块（标题/开关/配置，字段可部分提交；config 仅当 kind 合法时按 schema 校验落库） */
+/** 保存板块（标题/开关/配置/可见性，字段可部分提交；config 仅当 kind 合法时按 schema 校验落库） */
 export async function updateHomeSectionAction(
   patch: HomePatch,
 ): Promise<{ ok: boolean; error?: string }> {
@@ -46,9 +50,19 @@ export async function updateHomeSectionAction(
     : null;
   if (!kind) return { ok: false, error: "板块类型异常" };
 
-  const data: { title?: string | null; enabled?: boolean; config?: string } = {};
+  const data: {
+    title?: string | null;
+    enabled?: boolean;
+    visibleOn?: string;
+    requireAuth?: boolean;
+    config?: string;
+  } = {};
   if (patch.title !== undefined) data.title = cleanTitle(patch.title);
   if (patch.enabled !== undefined) data.enabled = patch.enabled;
+  if (patch.visibleOn !== undefined) {
+    data.visibleOn = patch.visibleOn === "pc" || patch.visibleOn === "mobile" ? patch.visibleOn : "all";
+  }
+  if (patch.requireAuth !== undefined) data.requireAuth = patch.requireAuth === true;
   if (patch.config !== undefined) {
     const v = safeHomeConfig(kind, patch.config);
     if (!v.ok) return { ok: false, error: v.error };

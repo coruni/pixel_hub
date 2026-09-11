@@ -16,6 +16,10 @@ export type HomeSectionView = {
   title: string | null;
   order: number;
   enabled: boolean;
+  /** 设备端可见性：all=不限 / pc=仅电脑端 / mobile=仅移动端 */
+  visibleOn: "all" | "pc" | "mobile";
+  /** 是否仅登录用户可见 */
+  requireAuth: boolean;
   config: HomeSectionConfig;
 };
 
@@ -29,6 +33,8 @@ export async function getHomeSections(): Promise<HomeSectionView[]> {
       title: d.title,
       order: d.order,
       enabled: d.enabled,
+      visibleOn: "all",
+      requireAuth: false,
       config: d.config,
     }));
   }
@@ -42,6 +48,8 @@ export async function getHomeSections(): Promise<HomeSectionView[]> {
       title: r.title,
       order: r.order,
       enabled: r.enabled,
+      visibleOn: r.visibleOn === "pc" || r.visibleOn === "mobile" ? r.visibleOn : "all",
+      requireAuth: r.requireAuth === true,
       config: parseSectionConfig(r.kind as HomeSectionKind, r.config),
     };
   });
@@ -69,6 +77,8 @@ export function toView(r: {
   title: string | null;
   order: number;
   enabled: boolean;
+  visibleOn?: string | null;
+  requireAuth?: boolean | null;
   config: string | null;
 }): HomeSectionView {
   const kind = (HOME_SECTION_KINDS as string[]).includes(r.kind)
@@ -80,6 +90,8 @@ export function toView(r: {
     title: r.title,
     order: r.order,
     enabled: r.enabled,
+    visibleOn: r.visibleOn === "pc" || r.visibleOn === "mobile" ? r.visibleOn : "all",
+    requireAuth: r.requireAuth === true,
     config: parseSectionConfig(kind, r.config),
   };
 }
