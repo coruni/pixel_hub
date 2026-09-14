@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { ContentType } from "@/lib/display";
 
 /** 侧边栏组件容器样式（直角卡片） */
 export const widgetCls = "rounded-none border border-brand-200 bg-surface p-4";
@@ -6,7 +7,7 @@ export const widgetCls = "rounded-none border border-brand-200 bg-surface p-4";
 /** 详情页专用组件的取数上下文（当前资源） */
 export type DetailWidgetCtx = {
   id: string;
-  type: "GAME" | "IMAGE" | "ARTICLE";
+  type: ContentType;
   authorUsername: string;
   categorySlug: string | null;
 };

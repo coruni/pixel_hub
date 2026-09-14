@@ -1,6 +1,8 @@
 "use server";
 
 // 分类/标签管理（后台 taxonomy）：全部 ADMIN 守卫 + AuditLog（共享 _guards）。
+// 删除类动作单独立名（DELETE_CATEGORY / DELETE_TAG），不再混在 EDIT_* 里——
+// 否则日志页「编辑分类」同时混着新建/更新/删除，事后无法按动作筛出删除记录。
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db/prisma";
 import { slugify } from "@/lib/slug";
@@ -136,7 +138,7 @@ export async function deleteCategoryAction(input: { id: string }): Promise<Resul
     };
   }
   await prisma.category.delete({ where: { id: input.id } });
-  await audit(admin.id, "EDIT_CATEGORY", "CATEGORY", input.id, `删除分类 ${c.name}(${c.slug})`);
+  await audit(admin.id, "DELETE_CATEGORY", "CATEGORY", input.id, `删除分类 ${c.name}(${c.slug})`);
   revalidateAll();
   return { ok: true };
 }
@@ -182,7 +184,13 @@ export async function renameTagAction(input: {
         });
         await tx.tag.delete({ where: { id: t.id } });
       });
-      await audit(admin.id, "EDIT_TAG", "TAG", t.id, `合并标签 ${t.name} → ${rawName}`);
+      await audit(
+        admin.id,
+        "DELETE_TAG",
+        "TAG",
+        t.id,
+        `合并标签 ${t.name}(${t.count}) → ${rawName}，源标签已删除`,
+      );
       revalidateAll();
       return { ok: true };
     }
@@ -226,7 +234,7 @@ export async function deleteTagAction(input: { id: string }): Promise<Result> {
   const t = await prisma.tag.findUnique({ where: { id: input.id } });
   if (!t) return { ok: false, error: "标签不存在" };
   await prisma.tag.delete({ where: { id: input.id } }); // TagOnResource 级联删除
-  await audit(admin.id, "EDIT_TAG", "TAG", input.id, `删除标签 ${t.name}(${t.count})`);
+  await audit(admin.id, "DELETE_TAG", "TAG", input.id, `删除标签 ${t.name}(${t.count})`);
   revalidateAll();
   return { ok: true };
 }

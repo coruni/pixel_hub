@@ -5,6 +5,7 @@ import { Bot, CalendarDays, Download, Eye, Heart, Pencil, Star } from "lucide-re
 import type { ResourceDetail } from "@/lib/queries";
 import type { parseMeta } from "@/lib/meta";
 import { formatCount, timeAgo } from "@/lib/format";
+import { TYPE_LABEL } from "@/lib/display";
 import Comments from "@/components/social/Comments";
 import Avatar from "@/components/ui/Avatar";
 import UserHoverCard from "@/components/ui/UserHoverCard";
@@ -30,8 +31,8 @@ export type DetailCtx = {
   related?: import("@/lib/queries").FeedCard[];
 };
 
-export const typeLabel = (t: "GAME" | "IMAGE" | "ARTICLE") =>
-  t === "GAME" ? "游戏" : t === "ARTICLE" ? "文章" : "图片";
+/** 类型展示名：统一取 TYPE_LABEL，新增类型无需再改这里 */
+export const typeLabel = (t: string) => TYPE_LABEL[t] ?? t;
 
 const callbackPath = (slug: string) => `/resources/${slug}`;
 
@@ -244,6 +245,20 @@ export function TypeInfoCard({ ctx }: { ctx: DetailCtx }) {
               <KV k="平台" v={meta.platforms.join(" / ")} />
             )}
             {meta.lang && <KV k="语言" v={meta.lang} />}
+          </>
+        )}
+        {meta.kind === "MUSIC" && (
+          <>
+            {meta.artist && <KV k="艺术家" v={meta.artist} />}
+            {meta.album && <KV k="专辑" v={meta.album} />}
+          </>
+        )}
+        {meta.kind === "VIDEO" && meta.resolution && <KV k="画质" v={meta.resolution} />}
+        {(meta.kind === "MUSIC" || meta.kind === "VIDEO") && (
+          <>
+            {meta.duration && <KV k="时长" v={meta.duration} />}
+            {meta.provider && <KV k="来源平台" v={meta.provider} />}
+            <KV k="播放方式" v={meta.mode === "embed" ? "嵌入页" : "直链"} />
           </>
         )}
         {meta.kind === "IMAGE" && meta.isAiGenerated && (

@@ -12,6 +12,7 @@ import { prisma } from "@/lib/db/prisma";
 import { parseMeta, metaHasDownload } from "@/lib/meta";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
 import { notifyByEmail } from "@/lib/mail-notify";
+import { createNotification } from "@/lib/notify";
 import { audit } from "@/lib/actions/_guards";
 import { MIB } from "@/lib/upload-config";
 import { getUploadLimits } from "@/lib/upload-limits";
@@ -33,48 +34,59 @@ async function requiredUser() {
   return u;
 }
 
-async function notify(
-  userId: string,
-  actorId: string,
-  type: "LIKE" | "COMMENT" | "FOLLOW",
-  resourceId?: string,
-  commentId?: string,
-  message?: string,
-) {
-  if (!userId || userId === actorId) return;
-  await prisma.notification
-    .create({
-      data: {
-        userId,
-        actorId,
-        type,
-        resourceId,
-        commentId,
-        message: message ?? null,
-      },
-    })
-    .catch(() => undefined);
+/** 评论摘要：站内/邮件文案都带一段正文，收件人不用点进去才知道说了什么 */
+function excerptOf(s: string, max = 60): string {
+  const one = s.replace(/\s+/g, " ").trim();
+  return one.length > max ? `${one.slice(0, max)}…` : one;
+}
 
-  // 评论邮件提醒（点赞/关注仅站内，避免骚扰）；after() 在响应后执行，不丢任务也不拖慢 action
-  if (type === "COMMENT" && resourceId) {
-    after(async () => {
-      const [resource, actor] = await Promise.all([
-        prisma.resource.findUnique({
-          where: { id: resourceId },
-          select: { slug: true, title: true },
-        }),
-        prisma.user.findUnique({ where: { id: actorId }, select: { name: true, username: true } }),
-      ]);
-      if (!resource || !actor) return;
-      await notifyByEmail(
-        userId,
-        `${actor.name ?? actor.username} 评论了你的内容`,
-        `${actor.name ?? actor.username} 在《${resource.title}》下发表了新评论，快去看看吧。`,
-        `/resources/${resource.slug}#comment-${commentId ?? "comments"}`,
-        "comment",
-      );
-    });
-  }
+/**
+ * 评论 / 回复提醒（站内 + 邮件）。
+ * reply=true 表示「回复了你的评论」，false 表示「评论了你的内容」；
+ * email 仅在「同一次评论里该收件人还没被邮件通知过」时为 true，避免一次评论炸两封邮件。
+ */
+async function notifyComment(opts: {
+  toUserId: string;
+  actorId: string;
+  resourceId: string;
+  commentId: string;
+  excerpt: string;
+  reply: boolean;
+  email?: boolean;
+}): Promise<void> {
+  const { toUserId, actorId, resourceId, commentId, excerpt, reply } = opts;
+  if (!toUserId || toUserId === actorId) return; // 自己回复自己不提醒
+
+  const action = reply ? "回复了你的评论" : "评论了你的内容";
+  await createNotification({
+    userId: toUserId,
+    actorId,
+    type: "COMMENT",
+    resourceId,
+    commentId,
+    message: `${action}：${excerpt}`,
+  });
+
+  if (!opts.email) return;
+  // 邮件提醒：after() 在响应后执行，不丢任务也不拖慢 action
+  after(async () => {
+    const [resource, actor] = await Promise.all([
+      prisma.resource.findUnique({
+        where: { id: resourceId },
+        select: { slug: true, title: true },
+      }),
+      prisma.user.findUnique({ where: { id: actorId }, select: { name: true, username: true } }),
+    ]);
+    if (!resource || !actor) return;
+    const who = actor.name ?? actor.username;
+    await notifyByEmail(
+      toUserId,
+      `${who} ${action}`,
+      `${who} ${reply ? `回复了你在《${resource.title}》下的评论` : `在《${resource.title}》下发表了新评论`}：${excerpt}`,
+      `/resources/${resource.slug}#comment-${commentId}`,
+      "comment",
+    );
+  });
 }
 
 // ---------- 点赞 ----------
@@ -109,7 +121,14 @@ export async function toggleLikeAction(resourceId: string): Promise<{ liked: boo
       });
       return true;
     });
-    if (liked) await notify(resource.authorId, user.id, "LIKE", resourceId);
+    if (liked)
+      await createNotification({
+        userId: resource.authorId,
+        actorId: user.id,
+        type: "LIKE",
+        resourceId,
+        coalesce: true, // 取消赞再点不重复提醒；同批多个赞聚合成一条「X 等 N 人」
+      });
     return { liked };
   } catch (e) {
     // 并发双击：唯一键冲突 → 已是点赞态，幂等返回
@@ -249,7 +268,12 @@ export async function toggleFollowAction(targetUserId: string): Promise<{ follow
       return { following: true };
     throw e;
   }
-  await notify(targetUserId, user.id, "FOLLOW");
+  await createNotification({
+    userId: targetUserId,
+    actorId: user.id,
+    type: "FOLLOW",
+    coalesce: true, // 取关后再关注不重复刷屏
+  });
   return { following: true };
 }
 
@@ -321,11 +345,13 @@ export async function addCommentAction(
   });
   if (!resource) return { error: "资源不存在或已关闭评论" };
 
+  let parentAuthorId: string | null = null;
   if (parsed.data.parentId) {
     const parent = await prisma.comment.findFirst({
       where: { id: parsed.data.parentId, resourceId: resource.id, status: "PUBLIC" },
     });
     if (!parent) return { error: "回复的楼层不存在" };
+    parentAuthorId = parent.authorId;
   }
 
   // 附图（仅主楼，回复不带图）：先落盘，成功与否不阻断文字评论
@@ -400,7 +426,39 @@ export async function addCommentAction(
     return c;
   });
 
-  await notify(resource.authorId, user.id, "COMMENT", resource.id, comment.id);
+  const excerpt = excerptOf(parsed.data.content);
+  if (parentAuthorId && parentAuthorId !== resource.authorId) {
+    // 楼中楼：资源作者被回复人不是同一人 → 两人各收一条（作者：有人在我内容下评论；被回复人：有人回复我的评论）
+    await notifyComment({
+      toUserId: resource.authorId,
+      actorId: user.id,
+      resourceId: resource.id,
+      commentId: comment.id,
+      excerpt,
+      reply: false,
+      email: true,
+    });
+    await notifyComment({
+      toUserId: parentAuthorId,
+      actorId: user.id,
+      resourceId: resource.id,
+      commentId: comment.id,
+      excerpt,
+      reply: true,
+      email: true,
+    });
+  } else {
+    // 顶层评论；或「楼中楼里被回复的人恰好就是资源作者」——文案按回复处理更准确
+    await notifyComment({
+      toUserId: resource.authorId,
+      actorId: user.id,
+      resourceId: resource.id,
+      commentId: comment.id,
+      excerpt,
+      reply: !!parentAuthorId,
+      email: true,
+    });
+  }
   return { ok: true };
 }
 

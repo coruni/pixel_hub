@@ -11,19 +11,21 @@ import Link from "next/link";
 import MdEditor from "@/components/rte/MdEditor";
 import { BTN_GHOST_SM } from "@/lib/ui/cls";
 import { updateResourceAdminAction } from "@/lib/actions/admin-content";
-import type { ResourceEditState } from "@/lib/actions/_resource-edit";
+import type { ResourceEditState, EditableResourceType } from "@/lib/actions/_resource-edit";
 import type { ResourceMetaOutput } from "@/lib/meta";
-import { ARTICLE_MEDIA_MAX, type UploadLimits } from "@/lib/upload-config";
+import { ARTICLE_MEDIA_MAX, isSingleCoverType, type UploadLimits } from "@/lib/upload-config";
 import {
-  fieldErr,
+  PublishOptionGrid,
   SectionTitle,
+  STEP,
+  fieldErr,
   wizInput,
   wizLabel,
   type Uploaded,
 } from "@/components/upload/wizard-shared";
-import { SquareCheckbox } from "./SquareCheckbox";
 import MediaPicker from "@/components/upload/media-picker";
 import { ArticleSection, GameSection, ImageSection } from "@/components/upload/wizard-sections";
+import { AvSection } from "@/components/upload/av-section";
 import { Button } from "@/components/ui/Button";
 
 export type GalleryItem = {
@@ -39,7 +41,7 @@ export type EditableResource = {
   title: string;
   summary: string;
   description: string;
-  type: "GAME" | "IMAGE" | "ARTICLE";
+  type: EditableResourceType;
   categoryId: string;
   externalUrl: string;
   tags: string;
@@ -108,8 +110,9 @@ export function ResourceEditForm({
 
   async function onFiles(fl: FileList | null) {
     if (!fl || fl.length === 0) return;
-    const maxCount =
-      resource.type === "ARTICLE" ? ARTICLE_MEDIA_MAX : limits.galleryImageMaxCount;
+    const maxCount = isSingleCoverType(resource.type)
+      ? ARTICLE_MEDIA_MAX
+      : limits.galleryImageMaxCount;
     const remain = maxCount - files.length;
     if (remain <= 0) {
       setUploadMsg(`最多上传 ${maxCount} 张`);
@@ -181,7 +184,7 @@ export function ResourceEditForm({
 
       {/* 基础信息（与发布向导分节一致） */}
       <section className="mt-4 space-y-4 rounded-none border border-brand-200 bg-surface p-5">
-        <SectionTitle n={1}>基础信息</SectionTitle>
+        <SectionTitle n={STEP.BASIC}>基础信息</SectionTitle>
         <div>
           <label className={wizLabel} htmlFor="title">
             标题
@@ -287,17 +290,22 @@ export function ResourceEditForm({
       {resource.type === "ARTICLE" && resource.meta.kind === "ARTICLE" && (
         <ArticleSection initial={{ downloads: resource.meta.downloads }} fieldErrors={fe} limits={limits} />
       )}
+      {resource.type === "MUSIC" && resource.meta.kind === "MUSIC" && (
+        <AvSection avKind="audio" initial={resource.meta} fieldErrors={fe} limits={limits} />
+      )}
+      {resource.type === "VIDEO" && resource.meta.kind === "VIDEO" && (
+        <AvSection avKind="video" initial={resource.meta} fieldErrors={fe} limits={limits} />
+      )}
 
-      {/* 图片上传（与发布向导同一组件） */}
+      {/* 图片上传（与发布向导同一组件；文章/音乐/视频为单张封面） */}
       <MediaPicker
         files={files}
         coverId={coverId}
         uploading={uploading}
         isArticle={resource.type === "ARTICLE"}
+        singleCover={isSingleCoverType(resource.type)}
         maxMb={limits.galleryImageMaxMb}
-        maxCount={
-          resource.type === "ARTICLE" ? ARTICLE_MEDIA_MAX : limits.galleryImageMaxCount
-        }
+        maxCount={isSingleCoverType(resource.type) ? ARTICLE_MEDIA_MAX : limits.galleryImageMaxCount}
         uploadMsg={uploadMsg}
         fieldError={fe.mediaIds}
         onPick={onFiles}
@@ -306,25 +314,10 @@ export function ResourceEditForm({
         fileRef={fileRef}
       />
 
-      {/* 可见性与互动（与发布向导「发布选项」同款 section + SectionTitle 样式） */}
-      <section className="mt-4 flex flex-wrap gap-x-6 gap-y-2 rounded-none border border-brand-200 bg-surface p-5 text-sm text-neutral-700">
-        <SectionTitle n={4}>可见性与互动</SectionTitle>
-        <label className="flex items-center gap-2">
-          <SquareCheckbox name="nsfw" defaultChecked={resource.nsfw} ariaLabel="NSFW" />
-          NSFW（未登录与搜索引擎不可见）
-        </label>
-        <label className="flex items-center gap-2">
-          <SquareCheckbox name="loginRequired" defaultChecked={resource.loginRequired} ariaLabel="下载需登录" />
-          下载需登录
-        </label>
-        <label className="flex items-center gap-2">
-          <SquareCheckbox name="allowComments" defaultChecked={resource.allowComments} ariaLabel="允许评论" />
-          允许评论
-        </label>
-        <label className="flex items-center gap-2">
-          <SquareCheckbox name="isDownloadable" defaultChecked={resource.isDownloadable} ariaLabel="提供下载" />
-          提供下载
-        </label>
+      {/* 可见性与互动：与 /upload「发布选项」同款布局与文案（共用 PublishOptionGrid） */}
+      <section className="mt-4 rounded-none border border-brand-200 bg-surface p-5">
+        <SectionTitle n={STEP.OPTIONS}>可见性与互动</SectionTitle>
+        <PublishOptionGrid checkedOf={(name) => resource[name]} />
       </section>
 
       {/* 提交 */}

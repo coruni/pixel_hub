@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { X } from "lucide-react";
 import { HOME_KIND_META } from "@/lib/home-config";
 import { updateHomeSectionAction } from "@/lib/actions/home";
-import { CARD_RATIO_KEYS, CARD_RATIOS, DISPLAY_META, DISPLAY_OPTIONS } from "@/lib/display";
+import { CARD_RATIO_KEYS, CARD_RATIOS, DISPLAY_META, DISPLAY_OPTIONS, isContentType } from "@/lib/display";
 import type { CardRatio, ContentType } from "@/lib/display";
 import { INPUT, LABEL_STRONG } from "@/lib/ui/cls";
 import { SquareCheckbox } from "../admin/SquareCheckbox";
@@ -59,11 +59,7 @@ export default function SectionEditor({
   const [title, setTitle] = useState(row.title ?? "");
   const [picked, setPicked] = useState<HeroPickMeta[]>(picks);
   const [type, setType] = useState<TypeFilter>(
-    (cfg.type as TypeFilter) === "IMAGE" ||
-      (cfg.type as TypeFilter) === "GAME" ||
-      (cfg.type as TypeFilter) === "ARTICLE"
-      ? (cfg.type as TypeFilter)
-      : "ALL",
+    isContentType(cfg.type) ? (cfg.type as TypeFilter) : "ALL",
   );
   const [sort, setSort] = useState<SortKey>(
     (cfg.sort as SortKey) === "latest" || (cfg.sort as SortKey) === "downloads"
@@ -249,6 +245,8 @@ export default function SectionEditor({
               <option value="IMAGE">仅图片作品</option>
               <option value="GAME">仅游戏</option>
               <option value="ARTICLE">仅文章</option>
+              <option value="MUSIC">仅音乐</option>
+              <option value="VIDEO">仅视频</option>
             </select>
           </div>
         )}

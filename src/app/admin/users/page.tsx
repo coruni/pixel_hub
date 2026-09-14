@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Avatar from "@/components/ui/Avatar";
 import MiniBadge from "@/components/ui/MiniBadge";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db/prisma";
@@ -171,9 +172,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                 <tr key={u.id} className="hover:bg-neutral-50/60">
                   <td className="px-4 py-2.5">
                     <Link href={`/u/${u.username}`} className="flex items-center gap-2.5">
-                      <span className="grid h-8 w-8 place-items-center rounded-none bg-neutral-200 text-xs font-semibold text-neutral-700">
-                        {(u.name ?? u.username).slice(0, 1).toUpperCase()}
-                      </span>
+                      <Avatar name={u.name} username={u.username} avatarKey={u.avatarKey} size="sm" />
                       <span>
                         <span className="block font-medium text-neutral-900">
                           {u.name ?? u.username}

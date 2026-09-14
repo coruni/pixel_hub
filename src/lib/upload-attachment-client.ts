@@ -2,6 +2,9 @@
 
 export type AttachmentUploadResult = { url: string; name: string; size: number };
 
+/** 上传去向：附件 / 音频 / 视频。决定服务端的后缀白名单与云盘开关（均由后台配置驱动） */
+export type UploadKind = "attachment" | "music" | "video";
+
 type UploadSessionResponse = {
   ok: boolean;
   code?: string;
@@ -53,12 +56,16 @@ async function uploadChunk(
   }
 }
 
-async function postLegacyAttachment(file: File): Promise<AttachmentUploadResult> {
+async function postLegacyAttachment(
+  file: File,
+  kind: UploadKind,
+): Promise<AttachmentUploadResult> {
   const fd = new FormData();
   fd.set("file", file);
+  if (kind !== "attachment") fd.set("kind", kind);
   const res = await fetch("/api/upload/attachment", { method: "POST", body: fd });
   const data = await responseJson(res);
-  if (!res.ok || data.ok !== true) throw new Error((data.error as string) || "附件上传失败");
+  if (!res.ok || data.ok !== true) throw new Error((data.error as string) || "文件上传失败");
   return {
     url: data.url as string,
     name: (data.name as string) || file.name,
@@ -69,18 +76,20 @@ async function postLegacyAttachment(file: File): Promise<AttachmentUploadResult>
 /**
  * OneDrive 启用时浏览器直传 Graph，Vercel 只处理小 JSON 请求。
  * 没有活跃云盘时回退现有存储 API，保持本地/S3/Chevereto 行为不变。
+ * kind 决定服务端按附件还是音视频校验后缀与云盘开关（后台配置「音视频上传走云盘」决定走哪条路）。
  */
 export async function uploadAttachment(
   file: File,
   onProgress?: (percent: number) => void,
+  kind: UploadKind = "attachment",
 ): Promise<AttachmentUploadResult> {
   const sessionRes = await fetch("/api/upload/attachment/session", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name: file.name, size: file.size, mime: file.type }),
+    body: JSON.stringify({ name: file.name, size: file.size, mime: file.type, kind }),
   });
   const session = (await responseJson(sessionRes)) as UploadSessionResponse;
-  if (session.code === "NO_CLOUD") return postLegacyAttachment(file);
+  if (session.code === "NO_CLOUD") return postLegacyAttachment(file, kind);
   // 重复上传同一文件：服务端复用已完成的记录，直接返回，跳过整轮上传
   if (session.ok === true && session.deduped === true && session.url) {
     onProgress?.(100);

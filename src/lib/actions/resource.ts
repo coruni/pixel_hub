@@ -5,16 +5,19 @@ import { cookies } from "next/headers";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
-import { imageMetaSchema, gameMetaSchema, articleMetaSchema } from "@/lib/meta";
+import { imageMetaSchema, gameMetaSchema, articleMetaSchema, avMetaSchema } from "@/lib/meta";
 import { randomTail, uniqueSlug, slugify } from "@/lib/slug";
 import { translateToEnglish } from "@/lib/edge-translate";
 import { revalidatePath } from "next/cache";
 import { resourceTextFields } from "@/lib/resource-fields";
 import { applyResourceEdit, type ResourceEditState } from "@/lib/actions/_resource-edit";
 import { getUploadLimits } from "@/lib/upload-limits";
-import { ARTICLE_MEDIA_MAX } from "@/lib/upload-config";
+import { ARTICLE_MEDIA_MAX, isSingleCoverType } from "@/lib/upload-config";
+import { TYPE_LABEL } from "@/lib/display";
 import { syncResourceSearch } from "@/lib/search";
 import { queueIndexNowForResource } from "@/lib/indexnow";
+import { discardDraft } from "@/lib/draft-store";
+import { createNotification, notifyStaff } from "@/lib/notify";
 
 export type ResourceActionState = {
   error?: string;
@@ -34,7 +37,7 @@ async function activeUser() {
 }
 
 const commonFields = resourceTextFields.extend({
-  type: z.enum(["GAME", "IMAGE", "ARTICLE"]),
+  type: z.enum(["GAME", "IMAGE", "ARTICLE", "MUSIC", "VIDEO"]),
 });
 
 export async function createResourceAction(
@@ -88,6 +91,23 @@ export async function createResourceAction(
     const am = articleMetaSchema.safeParse({ license, downloads });
     if (!am.success) return { fieldErrors: am.error.flatten().fieldErrors };
     metaStr = JSON.stringify(am.data);
+  } else if (type === "MUSIC" || type === "VIDEO") {
+    // 音视频：来源（在线挂载 / 上传文件）+ 播放形态（直链 / 嵌入页），URL 与字段由 avMetaSchema 统一校验
+    const am = avMetaSchema.safeParse({
+      source: String(fd.get("avSource") ?? "mount") === "file" ? "file" : "mount",
+      mode: String(fd.get("avMode") ?? "direct") === "embed" ? "embed" : "direct",
+      url: String(fd.get("avUrl") ?? "").trim(),
+      provider: String(fd.get("avProvider") ?? "").trim() || undefined,
+      artist: String(fd.get("artist") ?? "").trim() || undefined,
+      album: String(fd.get("album") ?? "").trim() || undefined,
+      duration: String(fd.get("duration") ?? "").trim() || undefined,
+      resolution: String(fd.get("resolution") ?? "").trim() || undefined,
+      license,
+      note: String(fd.get("note") ?? "").trim() || undefined,
+      downloads,
+    });
+    if (!am.success) return { fieldErrors: am.error.flatten().fieldErrors };
+    metaStr = JSON.stringify(am.data);
   } else {
     const gm = gameMetaSchema.safeParse({
       version: String(fd.get("version") ?? "").trim() || undefined,
@@ -122,16 +142,21 @@ export async function createResourceAction(
   }
   const coverRaw = String(fd.get("coverId") ?? "").trim();
   const coverId = coverRaw || mediaIds[0] || "";
-  if (type !== "ARTICLE" && mediaIds.length === 0)
+  // 图集类（游戏 / 图片）必须有图；封面类（文章 / 音乐 / 视频）封面可选 —— 与向导「封面不标必填」一致
+  if (!isSingleCoverType(type) && mediaIds.length === 0)
     return { fieldErrors: { mediaIds: ["请至少上传一张图片"] } };
 
   // 图片数量上限：以 /admin/uploads 配置为准，发布入口（向导/API）与这里双重强制。
   const L = await getUploadLimits();
   if (type === "IMAGE" && mediaIds.length > L.galleryImageMaxCount)
     return { fieldErrors: { mediaIds: [`图片不能超过 ${L.galleryImageMaxCount} 张`] } };
-  if (type === "ARTICLE" && mediaIds.length > ARTICLE_MEDIA_MAX)
+  if (isSingleCoverType(type) && mediaIds.length > ARTICLE_MEDIA_MAX)
     return {
-      fieldErrors: { mediaIds: [`文章只需 ${ARTICLE_MEDIA_MAX} 张封面图，其余插图放正文里`] },
+      fieldErrors: {
+        mediaIds: [
+          `${TYPE_LABEL[type] ?? "该类型"}只需 ${ARTICLE_MEDIA_MAX} 张封面图，其余插图放正文里`,
+        ],
+      },
     };
 
   // D6：可信/管理员免审直发，否则进审核队列
@@ -250,12 +275,31 @@ export async function createResourceAction(
   // 全文索引同步（事务已提交后执行；内部已容错，失败不影响发布结果）
   await syncResourceSearch(resource.id);
 
+  // 草稿使命结束：发布已落库，立刻清掉对应草稿，免得草稿箱里留一份已发布内容的副本。
+  // 放在 redirect 之前，两条分支（免审直发 / 进审核队列）都会走到。
+  const draftId = String(fd.get("draftId") ?? "").trim();
+  if (draftId) await discardDraft(user.id, draftId.slice(0, 64));
+
   if (status === "PUBLISHED") {
     // 免审直发的内容立即告知搜索引擎（after 在响应后执行，不拖慢跳转；未启用时内部跳过）
     queueIndexNowForResource(resource.id);
     revalidatePath("/", "layout");
     redirect(`/resources/${slug}`);
   }
+  // 进入审核队列：作者收「已提交待审」回执，值班 staff 收「有待审投稿」提醒
+  // （两者都靠推送，否则作者只能干等、管理员只能靠手动刷队列页）
+  await createNotification({
+    userId: user.id,
+    type: "MODERATION",
+    resourceId: resource.id,
+    message: `《${title}》已提交成功，正在等待审核，结果出来后我们会通知你`,
+  });
+  await notifyStaff({
+    actorId: user.id,
+    type: "SYSTEM",
+    resourceId: resource.id,
+    message: `有新的投稿待审核：《${title}》`,
+  });
   return { ok: true, pending: true, resourceId: resource.id };
 }
 

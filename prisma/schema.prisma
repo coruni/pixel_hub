@@ -43,6 +43,12 @@ model User {
   showFollowing Boolean @default(true) // 关注列表默认公开（延续原行为）
   emailNotifyComment Boolean @default(true) // 评论/回复我的内容时邮件提醒（默认开启）
   emailNotifyModeration Boolean @default(true) // 投稿审核结果邮件提醒（默认开启）
+  // ---- 站内通知开关（默认全开）。账号安全类（SECURITY）不受开关控制，始终送达 ----
+  inAppNotifyLike Boolean @default(true) // 点赞
+  inAppNotifyComment Boolean @default(true) // 评论与回复
+  inAppNotifyFollow Boolean @default(true) // 关注
+  inAppNotifySystem Boolean @default(true) // 审核结果与系统公告
+  autoSaveDraft Boolean @default(true) // 发布向导：边写边自动存草稿（用户可在设置里关掉，改为手动保存）
 
   accounts       Account[]
   sessions       Session[]
@@ -59,6 +65,7 @@ model User {
   accusedReports Report[] @relation("ReportTargetUser") // 被举报记录
   passwordResets PasswordResetToken[]
   uploads        Media[]       @relation("Uploads")
+  drafts         ResourceDraft[] @relation("ResourceDrafts")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -180,6 +187,22 @@ model Resource {
   @@index([status, publishedAt(sort: Desc)])
   @@index([authorId])
   @@index([categoryId])
+}
+
+/// 发布向导草稿快照：只存「用户已填了什么」，不参与审核、不进前台查询、不计入任何统计。
+/// 独立建表而不是复用 Resource(status=DRAFT)：半成品拿不到必填字段、slug 唯一与聚合计数，
+/// 硬塞进去会污染资源表；独立表也让草稿可以随时整条丢弃，不影响已发布内容。
+model ResourceDraft {
+  id        String       @id @default(cuid())
+  ownerId   String
+  owner     User         @relation("ResourceDrafts", fields: [ownerId], references: [id], onDelete: Cascade)
+  type      ResourceType
+  title     String       @default("") // 列表展示用；空标题回落到「未命名草稿」
+  payload   String // 向导全量字段的 JSON 快照（结构见 src/lib/draft.ts）
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@index([ownerId, updatedAt(sort: Desc)])
 }
 
 model Media {
@@ -320,6 +343,8 @@ model Notification {
   resourceId String?
   commentId  String?
   message    String?
+  // 聚合计数：点赞在同一批未读里合并为一条，count>1 时前端显示「X 等 N 人赞了你」
+  count      Int              @default(1)
   readAt     DateTime?
   user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   // 触发者被删号 → actorId 置空（通知保留，显示为「系统」）
@@ -431,6 +456,8 @@ enum ResourceType {
   GAME
   IMAGE
   ARTICLE
+  MUSIC
+  VIDEO
 }
 
 enum ResourceStatus {
@@ -465,6 +492,7 @@ enum NotificationType {
   LIKE
   COMMENT
   MODERATION
+  SECURITY // 账号安全提醒（改密/换邮箱/封禁解封/角色变更）：不受站内开关控制
   SYSTEM
 }
 

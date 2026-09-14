@@ -137,6 +137,16 @@ export type UploadLimits = {
 /** 文章媒体固定为 1 张封面，其余插图放正文（编辑器内上传），不做后台配置 */
 export const ARTICLE_MEDIA_MAX = 1;
 
+/** 音乐 / 视频同样固定 1 张封面：卡片与详情页只需要一张主视觉，其余图放正文 */
+export const AV_COVER_MAX = 1;
+
+/** 只允许一张封面的类型（文章 / 音乐 / 视频）——发布与改稿共用同一判定，避免两处漂移 */
+export const SINGLE_COVER_TYPES: readonly string[] = ["ARTICLE", "MUSIC", "VIDEO"];
+
+export function isSingleCoverType(type: string): boolean {
+  return SINGLE_COVER_TYPES.includes(type);
+}
+
 /** 默认 = 今日各处硬编码值原样迁入（附件 200MB + 29 后缀；图集 20；评论图 5；头像 5） */
 export const DEFAULT_ATTACH_EXTS: readonly string[] = [
   "zip",

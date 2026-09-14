@@ -6,12 +6,12 @@ import { prisma } from "@/lib/db/prisma";
 import { queueIndexNowForResource } from "@/lib/indexnow";
 import { notifyByEmail } from "@/lib/mail-notify";
 import { adminOnly, audit, staff } from "@/lib/actions/_guards";
+import { createNotification, notifyAccountSecurity } from "@/lib/notify";
+import type { Prisma } from "@prisma/client";
 
 async function notifyMod(userId: string, actorId: string, resourceId: string, message: string) {
   if (!userId || userId === actorId) return;
-  await prisma.notification
-    .create({ data: { userId, actorId, type: "MODERATION", resourceId, message } })
-    .catch(() => undefined);
+  await createNotification({ userId, actorId, type: "MODERATION", resourceId, message });
 
   // 审核结果邮件提醒：after() 在响应后继续执行（不丢任务，也不拖慢 action）
   after(async () => {
@@ -27,6 +27,20 @@ async function notifyMod(userId: string, actorId: string, resourceId: string, me
       "moderation",
     );
   });
+}
+
+/**
+ * 账号安全 / 权限变动提醒：站内 SECURITY + 邮件，两者都不受用户开关与限额影响
+ * （通知本身的构造见 lib/notify.ts 的 notifyAccountSecurity）。
+ */
+
+/** 「审核与系统」类站内提醒（无需邮件）：如给举报人的处理回执 */
+async function notifyFeedback(
+  userId: string,
+  message: string,
+  resourceId?: string | null,
+): Promise<void> {
+  await createNotification({ userId, type: "MODERATION", resourceId: resourceId ?? null, message });
 }
 
 // ---------- 审核队列 ----------
@@ -113,7 +127,13 @@ export async function restoreResource(
     data: { status: "PUBLISHED", publishedAt: new Date(), rejectReason: null },
   });
   if (r.count === 0) return { ok: false, error: "资源不存在" };
+  const res = await prisma.resource.findUnique({
+    where: { id: resourceId },
+    select: { title: true, authorId: true },
+  });
   await audit(admin.id, "RESTORE", "RESOURCE", resourceId);
+  // 恢复上架必须告知作者：否则他会以为内容还处在下架状态，重复投稿或来问
+  if (res) await notifyMod(res.authorId, admin.id, resourceId, "你的内容已恢复上架 🎉");
   queueIndexNowForResource(resourceId); // 恢复上架同样需要重新告知搜索引擎
   revalidatePath("/admin");
   revalidatePath("/admin/content");
@@ -140,16 +160,20 @@ export async function handleReportBatchAction(input: {
   const targetId = input.resourceId ?? input.commentId ?? input.userId ?? "";
   if (!targetId || targetId === "?") return { ok: false, error: "缺少举报目标" };
 
+  const where: Prisma.ReportWhereInput = {
+    type: input.type,
+    status: "OPEN",
+    ...(input.type === "RESOURCE"
+      ? { targetResourceId: targetId }
+      : input.type === "COMMENT"
+        ? { targetCommentId: targetId }
+        : { targetUserId: targetId }),
+  };
+  // 举报人必须在关闭之前取：关闭后这批记录就不再是 OPEN，查不到回执对象了
+  const reportRows = await prisma.report.findMany({ where, select: { reporterId: true } });
+
   const closed = await prisma.report.updateMany({
-    where: {
-      type: input.type,
-      status: "OPEN",
-      ...(input.type === "RESOURCE"
-        ? { targetResourceId: targetId }
-        : input.type === "COMMENT"
-          ? { targetCommentId: targetId }
-          : { targetUserId: targetId }),
-    },
+    where,
     data: {
       status: input.decision === "confirm" ? "RESOLVED" : "DISMISSED",
       handledBy: admin.id,
@@ -164,6 +188,20 @@ export async function handleReportBatchAction(input: {
     targetId,
   );
 
+  // 处理回执：举报最怕石沉大海，无论成立与否都给举报人一个结论（操作者自己举报自己不算）
+  const reporterIds = [
+    ...new Set(
+      reportRows.map((r) => r.reporterId).filter((x): x is string => !!x && x !== admin.id),
+    ),
+  ];
+  const verdict =
+    input.decision === "confirm" ? "经核查确认违规，已处理" : "经核查未发现违规，本次不予处理";
+  await Promise.all(
+    reporterIds.map((uid) =>
+      notifyFeedback(uid, `你举报的内容${verdict}。感谢你帮助维护社区秩序。`),
+    ),
+  );
+
   if (input.type === "RESOURCE" && input.resourceId) {
     const res = await prisma.resource.findUnique({
       where: { id: input.resourceId },
@@ -173,18 +211,19 @@ export async function handleReportBatchAction(input: {
     if (res && res.status !== "REMOVED") {
       if (input.decision === "confirm") {
         // 下架 + 通知同事务：状态与提醒不会出现一边成功一边失败
-        await prisma.$transaction([
-          prisma.resource.update({ where: { id: res.id }, data: { status: "REMOVED" } }),
-          prisma.notification.create({
-            data: {
+        await prisma.$transaction(async (tx) => {
+          await tx.resource.update({ where: { id: res.id }, data: { status: "REMOVED" } });
+          await createNotification(
+            {
               userId: res.authorId,
               actorId: admin.id,
               type: "MODERATION",
               resourceId: res.id,
               message: `你的内容「${res.title}」因举报被确认违规，已下架。如有疑问请联系管理员`,
             },
-          }),
-        ]);
+            tx,
+          );
+        });
         await audit(admin.id, "REMOVE_RESOURCE", "RESOURCE", res.id, res.title);
         await notifyByEmail(
           res.authorId,
@@ -195,21 +234,22 @@ export async function handleReportBatchAction(input: {
         ).catch(() => undefined);
         revalidatePath(`/resources/${res.slug}`);
       } else if (res.status === "PENDING") {
-        await prisma.$transaction([
-          prisma.resource.update({
+        await prisma.$transaction(async (tx) => {
+          await tx.resource.update({
             where: { id: res.id },
             data: { status: "PUBLISHED", publishedAt: new Date(), rejectReason: null },
-          }),
-          prisma.notification.create({
-            data: {
+          });
+          await createNotification(
+            {
               userId: res.authorId,
               actorId: admin.id,
               type: "MODERATION",
               resourceId: res.id,
               message: `你的内容「${res.title}」经核查无违规，已恢复上架`,
             },
-          }),
-        ]);
+            tx,
+          );
+        });
         await audit(admin.id, "RESTORE", "RESOURCE", res.id);
         queueIndexNowForResource(res.id); // 举报复核通过恢复上架，同样推送一次
         revalidatePath(`/resources/${res.slug}`);
@@ -225,6 +265,13 @@ export async function handleReportBatchAction(input: {
 }
 
 // ---------- 用户管理（仅 ADMIN） ----------
+
+const ROLE_LABEL: Record<"USER" | "MODERATOR" | "ADMIN", string> = {
+  USER: "普通用户",
+  MODERATOR: "版主",
+  ADMIN: "管理员",
+};
+
 export async function setUserTrusted(
   userId: string,
   trusted: boolean,
@@ -235,6 +282,14 @@ export async function setUserTrusted(
   const r = await prisma.user.updateMany({ where: { id: userId }, data: { trusted } });
   if (r.count === 0) return { ok: false, error: "用户不存在" };
   await audit(admin.id, trusted ? "TRUST" : "UNTRUST", "USER", userId);
+  // 免审是直接影响投稿体验的权限，必须让本人知情（否则投稿「没进队列」会被当成 bug）
+  await notifyAccountSecurity(
+    userId,
+    trusted ? "你已获得免审资格" : "你的免审资格已被取消",
+    trusted
+      ? "管理员已为你开通免审资格：之后发布的投稿会直接上架，不再经过审核队列。请继续遵守社区规范。"
+      : "管理员已取消你的免审资格：之后发布的投稿会先进入审核队列，通过后才会公开。",
+  );
   revalidatePath("/admin/users");
   revalidatePath("/", "layout");
   return { ok: true };
@@ -250,6 +305,13 @@ export async function setUserRole(
   const r = await prisma.user.updateMany({ where: { id: userId }, data: { role } });
   if (r.count === 0) return { ok: false, error: "用户不存在" };
   await audit(admin.id, "SET_ROLE", "USER", userId, role);
+  const label = ROLE_LABEL[role];
+  // 提权/降权是最高危的账号变动：站内 + 邮件双通道告知本人
+  await notifyAccountSecurity(
+    userId,
+    "你的账号权限有变更",
+    `管理员已将你的账号角色变更为「${label}」。如非本人预期，请立即联系站点管理员。`,
+  );
   revalidatePath("/admin/users");
   return { ok: true };
 }
@@ -275,6 +337,15 @@ export async function setUserBanned(
     "USER",
     userId,
     banned ? reason || undefined : undefined,
+  );
+  // 封禁原因此前只落库、用户看不到：被封的人只会一脸茫然地反复尝试登录
+  const why = banned ? (reason?.slice(0, 200) ?? "").trim() : "";
+  await notifyAccountSecurity(
+    userId,
+    banned ? "你的账号已被封禁" : "你的账号封禁已解除",
+    banned
+      ? `你的账号已被管理员封禁${why ? `。原因：${why}` : ""}。如有疑问请联系站点管理员。`
+      : "管理员已解除对你账号的封禁，现在可以正常登录与使用站内功能了。",
   );
   revalidatePath("/admin/users");
   return { ok: true };

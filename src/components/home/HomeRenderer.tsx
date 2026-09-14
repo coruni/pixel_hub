@@ -1,6 +1,6 @@
 import { Fragment, type ReactNode } from "react";
 import type { HomeSectionView } from "@/lib/home";
-import type { CardRatio } from "@/lib/display";
+import type { CardRatio, ContentTypeFilter } from "@/lib/display";
 import type { SP } from "@/lib/search-params";
 import { visibleOnClass } from "@/lib/site-config";
 import HeroBlock from "./blocks/hero";
@@ -59,7 +59,7 @@ export default async function HomeRenderer({
             key={s.id}
             title={s.title}
             cfg={{
-              type: (cfg.type as "ALL" | "IMAGE" | "GAME" | "ARTICLE") ?? "ALL",
+              type: (cfg.type as ContentTypeFilter) ?? "ALL",
               sort: (cfg.sort as "latest" | "popular" | "downloads") ?? "latest",
               count: typeof cfg.count === "number" ? cfg.count : 12,
               categorySlugs: (cfg.categorySlugs as string[]) ?? [],
@@ -139,7 +139,7 @@ export default async function HomeRenderer({
             cfg={{
               scope: (cfg.scope as "personal" | "all") ?? "personal",
               mode: (cfg.mode as "personalized" | "explore") ?? "personalized",
-              type: (cfg.type as "ALL" | "IMAGE" | "GAME" | "ARTICLE") ?? "ALL",
+              type: (cfg.type as ContentTypeFilter) ?? "ALL",
               count: typeof cfg.count === "number" ? cfg.count : 12,
               categorySlugs: (cfg.categorySlugs as string[]) ?? [],
               explorationRatio:

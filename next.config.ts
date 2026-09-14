@@ -4,6 +4,45 @@ import type { NextConfig } from "next";
 // 宽松档 CSP：保留 'unsafe-inline' 以兼容 themeInitScript / JSON-LD 内联脚本，
 // 不破坏现有页面；frame-ancestors / object-src / base-uri 已挡住主要注入面。
 // 后续演进：内联脚本迁移到 nonce 后，将 script-src 收紧为 'self' 'nonce-xxx' 并移除 unsafe-inline。
+//
+// dev 额外放行 'unsafe-eval'：React 开发版（含 Turbopack HMR 调试栈还原）依赖 eval()，
+// CSP 不含 unsafe-eval 时 React 会在客户端报错并**跳过水合**，表现为整个站点不可交互（点不动）。
+// 生产构建不使用 eval，故仅在非 production 下追加，正式环境策略不变。
+const isDev = process.env.NODE_ENV !== "production";
+
+// 跨站加载白名单（音视频挂载 / 嵌入页 / 云盘直传）。
+//
+// media-src 与 frame-src 必须显式声明，否则回落到 default-src 'self'：
+//   - 挂载在线的 mp3/mp4 → "Loading media … violates default-src 'self'"（播不了）
+//   - B站 / 网易云 / YouTube 等嵌入页 → "Framing … violates default-src 'self'"（白屏）
+// 本站允许作者挂载任意在线音视频与嵌入播放页（见 src/lib/av.ts 的 mount/embed 两形态），
+// 因此这两个指令与既有的 img-src 取同一口径：放行任意 https 源，只挡 http 明文与非 https://data: 之类。
+//
+// blob: 供本地预览：发布向导读取本地文件时长/分辨率（av-probe 的 objectURL 会挂到
+// <audio>/<video> 上）、头像与封面的裁剪预览。CSP 的 'self' 不匹配 blob: scheme，必须显式写。
+const MEDIA_SRC = ["'self'", "https:", "blob:"];
+const FRAME_SRC = ["'self'", "https:"];
+const IMG_SRC = ["'self'", "data:", "blob:", "https:"];
+
+// OneDrive 附件/音视频由浏览器直传 Graph（分片 PUT 预授权地址），不经过本站，
+// 因此 connect-src 必须放行这些域，否则大文件上传在 fetch 阶段就被 CSP 拦掉。
+// 后台「站点配置」里 graphEndpoint 可改（世纪互联等主权云走 sharepoint.cn / chinacloudapi.cn），
+// 故按域而非单主机放行；其他自建云端可加 CSP_CONNECT_EXTRA（空格分隔的源）追加。
+const CLOUD_UPLOAD_ORIGINS = [
+  "https://graph.microsoft.com",
+  "https://*.sharepoint.com",
+  "https://*.sharepoint.cn",
+  "https://*.1drv.com",
+  "https://*.livefilestore.com",
+  "https://api.onedrive.com",
+  "https://*.chinacloudapi.cn",
+];
+
+const extraConnect = (process.env.CSP_CONNECT_EXTRA ?? "")
+  .trim()
+  .split(/\s+/)
+  .filter(Boolean);
+
 const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },
@@ -23,10 +62,13 @@ const securityHeaders = [
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'",
+      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: https:",
+      `img-src ${IMG_SRC.join(" ")}`,
+      `media-src ${MEDIA_SRC.join(" ")}`,
+      `frame-src ${FRAME_SRC.join(" ")}`,
       "font-src 'self' data:",
+      `connect-src ${["'self'", ...CLOUD_UPLOAD_ORIGINS, ...extraConnect].join(" ")}`,
       "frame-ancestors 'self'",
       "object-src 'none'",
       "base-uri 'self'",

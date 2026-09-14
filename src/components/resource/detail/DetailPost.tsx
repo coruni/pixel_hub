@@ -4,6 +4,7 @@ import { Bot, CalendarDays, Download, Eye } from "lucide-react";
 import { formatCount, timeAgo } from "@/lib/format";
 import Gallery from "@/components/resource/Gallery";
 import { DownloadPanel } from "./download-panel";
+import { AvPlayerBlock } from "./av-player";
 import {
   ActionBar,
   AuthorIdentity,
@@ -61,6 +62,13 @@ function MetaChips({ ctx }: { ctx: DetailCtx }) {
     if (meta.lang) chips.push({ node: meta.lang, cls: "bg-neutral-100 text-neutral-600" });
     if (meta.note) chips.push({ node: meta.note, cls: "bg-neutral-100 text-neutral-600" });
   }
+  if (meta.kind === "MUSIC" || meta.kind === "VIDEO") {
+    if (meta.artist) chips.push({ node: meta.artist, cls: "bg-neutral-100 text-neutral-600" });
+    if (meta.album) chips.push({ node: `专辑 · ${meta.album}`, cls: "bg-neutral-100 text-neutral-600" });
+    if (meta.resolution) chips.push({ node: meta.resolution, cls: "bg-neutral-100 text-neutral-600" });
+    if (meta.duration) chips.push({ node: meta.duration, cls: "bg-neutral-100 text-neutral-600" });
+    if (meta.note) chips.push({ node: meta.note, cls: "bg-neutral-100 text-neutral-600" });
+  }
   if (chips.length === 0 && detail.tags.length === 0) return null;
   return (
     <div className="flex flex-wrap items-center gap-1.5">
@@ -97,6 +105,9 @@ export default function DetailPost({
     <div className="mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-6">
       {/* 展厅：直接以作品开场 */}
       <Gallery media={detail.gallery} />
+
+      {/* 音视频播放（MUSIC/VIDEO；其余类型返回 null） */}
+      <AvPlayerBlock ctx={ctx} />
 
       {/* 图包/整套下载（IMAGE 单条；其余类型返回 null） */}
       <DownloadPanel ctx={ctx} />

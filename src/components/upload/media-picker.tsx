@@ -1,7 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
-import { SectionTitle, type Uploaded } from "./wizard-shared";
+import { SectionTitle, STEP, type Uploaded } from "./wizard-shared";
 import { Button } from "@/components/ui/Button";
 
 /** 预览图/插图选择：上传、设封面、移除（最多 maxCount 张，默认 12）；单张上限由宿主配置传入 */
@@ -10,6 +10,7 @@ export default function MediaPicker({
   coverId,
   uploading,
   isArticle,
+  singleCover,
   maxMb,
   maxCount = 12,
   uploadMsg,
@@ -23,6 +24,8 @@ export default function MediaPicker({
   coverId: string;
   uploading: boolean;
   isArticle: boolean;
+  /** 只允许一张封面的类型（文章 / 音乐 / 视频）：标题与必填标记不同 */
+  singleCover?: boolean;
   maxMb: number;
   maxCount?: number;
   uploadMsg: string | null;
@@ -33,18 +36,19 @@ export default function MediaPicker({
   fileRef: React.RefObject<HTMLInputElement | null>;
 }) {
   const okCount = files.filter((f) => f.ok).length;
+  const oneShot = singleCover ?? isArticle;
   return (
     <section className="mt-4 rounded-none border border-brand-200 bg-surface p-5">
       <SectionTitle
-        n={3}
+        n={STEP.MEDIA}
         tail={
           <span className="font-normal tabular-nums text-neutral-400">
             {okCount}/{maxCount}
           </span>
         }
       >
-        {isArticle ? "封面" : "预览图"}
-        {!isArticle && <span className="text-red-500">*</span>}
+        {oneShot ? "封面" : "预览图"}
+        {!oneShot && <span className="text-red-500">*</span>}
       </SectionTitle>
       <div className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-4">
         {files.map((f) => (

@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { rateLimit } from "@/lib/rate-limit";
 import { REASONS, REPORT_AUTO_HIDE_AT } from "@/lib/report-options";
+import { createNotification, notifyStaff } from "@/lib/notify";
 
 export async function reportResourceAction(
   resourceId: string,
@@ -46,26 +47,35 @@ export async function reportResourceAction(
     },
   });
 
+  // 治理侧提醒：不主动刷后台就漏掉的举报，必须推给值班的版主/管理员
+  await notifyStaff({
+    actorId: user.id,
+    type: "SYSTEM",
+    resourceId,
+    message: `有新的举报待处理：${clean} ——「${resource.title}」`,
+  });
+
   // 达阈值 → 自动转 PENDING 待人工复查，并通知作者
   const openCount = await prisma.report.count({
     where: { targetResourceId: resourceId, status: "OPEN" },
   });
   if (resource.status === "PUBLISHED" && openCount >= REPORT_AUTO_HIDE_AT) {
     // 暂挂 + 通知作者同事务
-    await prisma.$transaction([
-      prisma.resource.update({
+    await prisma.$transaction(async (tx) => {
+      await tx.resource.update({
         where: { id: resourceId },
         data: { status: "PENDING", rejectReason: null },
-      }),
-      prisma.notification.create({
-        data: {
+      });
+      await createNotification(
+        {
           userId: resource.authorId,
           type: "MODERATION",
           resourceId,
           message: `你的内容「${resource.title}」因收到 ${openCount} 条举报已转为待人工复查，核查通过后将自动恢复上架。`,
         },
-      }),
-    ]);
+        tx,
+      );
+    });
     revalidatePath("/", "layout");
     revalidatePath(`/resources/${resource.slug}`);
     revalidatePath("/admin/reports");

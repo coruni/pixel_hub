@@ -165,7 +165,7 @@ export const safeUrlSchema = (max: number) =>
     .refine((v) => !v || /^(https?:\/\/|\/)/i.test(v), "仅允许 http(s):// 或站内 / 路径");
 
 const hotCfg = z.object({
-  type: z.enum(["ALL", "IMAGE", "GAME", "ARTICLE"]).default("ALL"),
+  type: z.enum(["ALL", "IMAGE", "GAME", "ARTICLE", "MUSIC", "VIDEO"]).default("ALL"),
   sort: z.enum(["latest", "popular", "downloads"]).default("popular"),
   count: z.number().int().min(3).max(12).default(6),
   display: z.enum(["card", "list"]).default("list"),
@@ -743,6 +743,12 @@ export function parseTheme(raw: unknown): Theme {
               : {}),
             ...(typeof byTypeRaw.ARTICLE === "string"
               ? { ARTICLE: pickTemplate(byTypeRaw.ARTICLE, defaultTpl) }
+              : {}),
+            ...(typeof byTypeRaw.MUSIC === "string"
+              ? { MUSIC: pickTemplate(byTypeRaw.MUSIC, defaultTpl) }
+              : {}),
+            ...(typeof byTypeRaw.VIDEO === "string"
+              ? { VIDEO: pickTemplate(byTypeRaw.VIDEO, defaultTpl) }
               : {}),
           }
         : { ...DEFAULT_THEME.detailTemplate.byType },

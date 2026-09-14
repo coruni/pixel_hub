@@ -3,6 +3,7 @@
 import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
+import { NAV_CONTROL_H } from "@/lib/ui/cls";
 
 /**
  * 站内搜索框（全文检索）：提交跳 /search?q=…
@@ -45,7 +46,7 @@ export default function SearchBox({
           placeholder={placeholder}
           autoComplete="off"
           spellCheck={false}
-          className="w-full rounded-none border border-brand-200 bg-surface py-2 pl-3 pr-10 text-sm text-neutral-900 outline-none transition placeholder:text-neutral-400 focus:border-brand-500"
+          className={`${NAV_CONTROL_H} w-full rounded-none border border-brand-200 bg-surface pl-3 pr-10 text-sm text-neutral-900 outline-none transition placeholder:text-neutral-400 focus:border-brand-500`}
         />
         <button
           type="submit"

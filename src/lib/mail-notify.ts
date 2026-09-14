@@ -8,7 +8,7 @@ import { getRuntimeConfig } from "@/lib/runtime-config";
 
 // 邮件通知通道：后台「站点配置」开启邮件通知（或旧 env MAIL_NOTIFY=1）且 SMTP 配置齐备时启用；
 // 每用户每小时最多 5 封（防轰炸），失败静默（邮件是尽力而为的副通道，不阻断主流程）。
-// 只在「值得打扰」的场景调用：评论回复、审核结果；点赞/关注仅站内通知。
+// 只在「值得打扰」的场景调用：评论回复、审核结果、账号安全告警；点赞/关注仅站内通知。
 
 export async function emailNotifyEnabled(): Promise<boolean> {
   const c = await getRuntimeConfig();
@@ -20,9 +20,10 @@ export async function emailNotifyEnabled(): Promise<boolean> {
   return !!(host && user && pass);
 }
 
-export type EmailNotifyKind = "comment" | "moderation";
+export type EmailNotifyKind = "comment" | "moderation" | "security";
 
-// kind 决定按用户哪个开关过滤（设置-通知里对应两类邮件提醒，均默认开启）
+// kind 决定按用户哪个开关过滤（设置-通知里对应两类邮件提醒，均默认开启）；
+// security 不参与过滤：账号安全告警必须送达，否则账号被盗时用户毫无察觉。
 export async function notifyByEmail(
   userId: string,
   subject: string,
@@ -39,7 +40,11 @@ export async function notifyByEmail(
     });
     if (!u?.email) return;
     const optedIn =
-      kind === "moderation" ? u.emailNotifyModeration !== false : u.emailNotifyComment !== false;
+      kind === "security"
+        ? true
+        : kind === "moderation"
+          ? u.emailNotifyModeration !== false
+          : u.emailNotifyComment !== false;
     if (!optedIn) return; // 用户可在设置中按类型关闭邮件提醒
     // 通知链接用"当前请求"的公网域名（CDN/反代兼容），勿用 .env 静态域名
     const link = linkPath ? `${await requestSiteUrl()}${linkPath}` : undefined;
@@ -58,5 +63,33 @@ export async function notifyByEmail(
     );
   } catch {
     // 邮件失败不影响站内通知
+  }
+}
+
+/**
+ * 安全告警邮件：直接发给指定地址，忽略用户开关与频率限制。
+ * 用途是「换邮箱前给旧邮箱留一条痕迹」——新邮箱生效后，旧邮箱是唯一还能通知到本人的通道，
+ * 因此必须绕过一切可被攻击者利用的开关（关掉提醒 / 刷限流）。
+ */
+export async function notifySecurityEmail(
+  to: string,
+  subject: string,
+  body: string,
+): Promise<void> {
+  try {
+    if (!to) return;
+    if (!(await emailNotifyEnabled())) return;
+    await sendMail(
+      to,
+      `【${siteName()}】${subject}`,
+      body,
+      renderMailHtml({
+        title: subject,
+        lines: [body],
+        note: `这是一封账号安全提醒，与你是否开启邮件通知无关。—— 来自 ${siteName()}`,
+      }),
+    );
+  } catch {
+    // 安全邮件同样不让失败阻断主流程（用户已完成的修改不应因 SMTP 故障回滚）
   }
 }

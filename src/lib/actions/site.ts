@@ -23,7 +23,7 @@ import {
   type Theme,
   type WidgetAreaKey,
 } from "@/lib/site-config";
-import type { ContentType } from "@/lib/display";
+import { isContentType, type ContentType } from "@/lib/display";
 
 function themeRevalidate() {
   // 前台动态页每次请求现读 DB；这里刷新路由缓存与后台自身
@@ -254,12 +254,7 @@ export async function setDetailTemplateAction(patch: {
 }): Promise<{ ok: boolean; error?: string }> {
   const admin = await adminOnly();
   if (!admin) return { ok: false, error: "仅管理员可操作" };
-  if (
-    patch.scope !== "default" &&
-    patch.scope !== "IMAGE" &&
-    patch.scope !== "GAME" &&
-    patch.scope !== "ARTICLE"
-  )
+  if (patch.scope !== "default" && !isContentType(patch.scope))
     return { ok: false, error: "作用域不合法" };
   if (patch.value !== "" && !(DETAIL_TEMPLATE_IDS as readonly string[]).includes(patch.value))
     return { ok: false, error: "模板不合法" };

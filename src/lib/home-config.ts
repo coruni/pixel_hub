@@ -1,7 +1,7 @@
 // 首页板块引擎 —— 纯数据/校验层（不依赖 server，可被前后端与 seed 共用）。
 // 板块类型目录、每类 config 的 zod 校验、默认布局。
 import { z } from "zod";
-import type { CardRatio } from "./display";
+import type { CardRatio, ContentTypeFilter } from "./display";
 import { safeUrlSchema } from "./site-config";
 
 export type HomeSectionKind =
@@ -88,8 +88,11 @@ const categoriesCfg = z.object({
 });
 const ratioEnum = z.enum(["auto", "1:1", "4:3", "3:2", "16:9", "3:4"]).default("auto");
 
+/** 内容类型筛选（含「全部」）：与 display.CONTENT_TYPES 同源，新增类型只改一处 */
+const typeFilterEnum = z.enum(["ALL", "IMAGE", "GAME", "ARTICLE", "MUSIC", "VIDEO"]).default("ALL");
+
 const listCfg = z.object({
-  type: z.enum(["ALL", "IMAGE", "GAME", "ARTICLE"]).default("ALL"),
+  type: typeFilterEnum,
   sort: z.enum(["latest", "popular", "downloads"]).default("latest"),
   count: z.number().int().min(1).max(48).default(12),
   categorySlugs: z.array(z.string()).max(30).default([]), // 空 = 不限
@@ -130,7 +133,7 @@ const recommendCfg = z.object({
   scope: z.enum(["personal", "all"]).default("personal"), // personal=按登录用户偏好；all=全站热门
   // 模式：personalized=画像精准推荐；explore=随机探索（每次刷新换一批高质量/新内容，打破信息茧房）
   mode: z.enum(["personalized", "explore"]).default("personalized"),
-  type: z.enum(["ALL", "IMAGE", "GAME", "ARTICLE"]).default("ALL"),
+  type: typeFilterEnum,
   count: z.number().int().min(1).max(48).default(12),
   categorySlugs: z.array(z.string()).max(30).default([]), // 空 = 不限
   // 探索占比：用于打破信息茧房，将一部分槽位留给用户「没怎么接触过」的优质/新内容（0–0.6，默认 0.3）
@@ -158,7 +161,7 @@ export type HomeSectionConfig =
   | { featuredIds: string[]; period: "all" | "week" | "month" } // hero
   | { slugs: string[] } // categories
   | {
-      type: "ALL" | "IMAGE" | "GAME" | "ARTICLE";
+      type: ContentTypeFilter;
       sort: "latest" | "popular" | "downloads";
       count: number;
       categorySlugs: string[];
@@ -181,7 +184,7 @@ export type HomeSectionConfig =
       html: string;
       badge: boolean;
     } // ad
-  | { scope: "personal" | "all"; mode: "personalized" | "explore"; type: "ALL" | "IMAGE" | "GAME" | "ARTICLE"; count: number; categorySlugs: string[]; explorationRatio: number; minCategories: number; period: "all" | "week" | "month" }; // recommend
+  | { scope: "personal" | "all"; mode: "personalized" | "explore"; type: ContentTypeFilter; count: number; categorySlugs: string[]; explorationRatio: number; minCategories: number; period: "all" | "week" | "month" }; // recommend
 
 // 后端传给编辑器的类型化 config
 export type EditableConfig<T extends HomeSectionKind> = z.infer<(typeof homeConfigSchemas)[T]>;

@@ -20,6 +20,15 @@ export const INPUT_FILTER =
 export const BTN_FILTER =
   "rounded-none border border-brand-200 bg-surface px-3 py-1.5 text-xs text-neutral-700 transition hover:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-400";
 
+/**
+ * 顶部导航行内控件的统一高度：搜索框输入、主题切换、汉堡按钮、头像菜单、注册。
+ * 这些控件在 64px 高的导航条里并排，各自 py-* 算出来的高度并不相等（32/34/38/40），
+ * 统一改成显式高度后基线才对齐——新增导航控件请一并取这个常量。
+ */
+export const NAV_CONTROL_H = "h-9";
+/** 顶部导航方形图标控件（需与 NAV_CONTROL_H 同高，宽度取 9 保持正方形） */
+export const NAV_ICON_BTN = `grid ${NAV_CONTROL_H} w-9 place-items-center`;
+
 /** 主按钮（小尺寸，后台操作） */
 export const BTN_PRIMARY_SM =
   "inline-flex items-center gap-1 rounded-none border border-brand-600 bg-brand-500 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-brand-600 focus-visible:ring-2 focus-visible:ring-brand-400 disabled:opacity-50";

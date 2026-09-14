@@ -9,7 +9,7 @@ import {
   type UploadLimits,
 } from "@/lib/upload-config";
 import { uploadAttachment } from "@/lib/upload-attachment-client";
-import { fieldErr, wizInput, wizLabel, SectionTitle } from "./wizard-shared";
+import { fieldErr, wizInput, wizLabel, SectionTitle, STEP } from "./wizard-shared";
 import { SquareCheckbox } from "../admin/SquareCheckbox";
 import { Button } from "@/components/ui/Button";
 
@@ -57,7 +57,7 @@ export function GameSection({
 
   return (
     <section className="mt-4 space-y-4 rounded-none border border-brand-200 bg-surface p-5">
-      <SectionTitle n={2}>游戏信息</SectionTitle>
+      <SectionTitle n={STEP.TYPE}>游戏信息</SectionTitle>
       <div>
         <label className={wizLabel} htmlFor="externalUrl">
           下载外链 *
@@ -434,7 +434,7 @@ export function ImageSection({
 
   return (
     <section className="mt-4 space-y-4 rounded-none border border-brand-200 bg-surface p-5">
-      <SectionTitle n={2} tail={<span className="font-normal text-neutral-400">D2 声明</span>}>
+      <SectionTitle n={STEP.TYPE} tail={<span className="font-normal text-neutral-400">D2 声明</span>}>
         图片信息
       </SectionTitle>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -487,7 +487,7 @@ export function ArticleSection({
   return (
     <section className="mt-4 space-y-4 rounded-none border border-brand-200 bg-surface p-5">
       <SectionTitle
-        n={2}
+        n={STEP.TYPE}
         tail={<span className="font-normal text-neutral-400">文末清单 · 可选</span>}
       >
         附件下载

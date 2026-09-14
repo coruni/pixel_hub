@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import Gallery from "@/components/resource/Gallery";
 import { DownloadPanel } from "./download-panel";
+import { AvPlayerBlock } from "./av-player";
 import {
   ActionBar,
   AuthorStrip,
@@ -65,6 +66,9 @@ export default function DetailTwocol({
           <TypeInfoCard ctx={ctx} />
         </aside>
       </div>
+
+      {/* 音视频播放（MUSIC/VIDEO；其余类型返回 null） */}
+      <AvPlayerBlock ctx={ctx} />
 
       {/* IMAGE/ARTICLE 下载（面板对无关类型返回 null） */}
       <DownloadPanel ctx={ctx} />

@@ -25,7 +25,7 @@ const statusLabel: Record<string, { text: string; cls: string }> = {
 };
 
 const STATUSES = ["PUBLISHED", "PENDING", "REJECTED", "REMOVED", "DRAFT"] as const;
-const TYPES = ["GAME", "IMAGE", "ARTICLE"] as const;
+const TYPES = ["GAME", "IMAGE", "ARTICLE", "MUSIC", "VIDEO"] as const;
 
 export default async function ContentPage({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = await searchParams;

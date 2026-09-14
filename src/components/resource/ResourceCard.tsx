@@ -1,10 +1,12 @@
 import Link from "next/link";
 import {
   Download,
+  Film,
   Gamepad2,
   Heart,
   Image as ImageIcon,
   MessageSquare,
+  Music,
   Newspaper,
   Star,
 } from "lucide-react";
@@ -12,6 +14,15 @@ import type { FeedCard } from "@/lib/queries";
 import { formatCount } from "@/lib/format";
 import { CARD_DEFAULT_ASPECT, CARD_RATIOS, TYPE_LABEL, type CardRatio } from "@/lib/display";
 import CoverPlaceholder from "./CoverPlaceholder";
+
+/** 类型 → 角标图标/配色；新增类型只改这一张表 */
+const TYPE_BADGE = {
+  GAME: { Icon: Gamepad2, cls: "text-emerald-300" },
+  ARTICLE: { Icon: Newspaper, cls: "text-sky-300" },
+  MUSIC: { Icon: Music, cls: "text-brand-300" },
+  VIDEO: { Icon: Film, cls: "text-red-300" },
+  IMAGE: { Icon: ImageIcon, cls: "text-amber-300" },
+} as const;
 
 /**
  * 统一资源卡（信息全覆盖图，无图下白条）：
@@ -57,15 +68,16 @@ export default function ResourceCard({
         )}
       </div>
 
-      {/* 左上角类型徽标（GAME 绿 / IMAGE 琥珀 / ARTICLE 天蓝，与首页 hero 徽标同风格） */}
-      <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-none border border-brand-600 bg-stone-900/85 px-1.5 py-0.5 text-[10px] font-medium text-white">
-        {item.type === "GAME" ? (
-          <Gamepad2 size={11} className="text-emerald-300" aria-hidden />
-        ) : item.type === "ARTICLE" ? (
-          <Newspaper size={11} className="text-sky-300" aria-hidden />
-        ) : (
-          <ImageIcon size={11} className="text-amber-300" aria-hidden />
-        )}
+      {/* 左上角类型徽标（图标可辨：游戏 / 文章 / 音乐 / 视频 / 图片，与首页 hero 徽标同风格） */}
+      <span
+        title={TYPE_LABEL[item.type] ?? item.type}
+        className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-none border border-brand-600 bg-stone-900/85 px-1.5 py-0.5 text-[10px] font-medium text-white"
+      >
+        {(() => {
+          const { Icon, cls } = TYPE_BADGE[item.type] ?? TYPE_BADGE.IMAGE;
+          return <Icon size={11} className={cls} aria-hidden />;
+        })()}
+        <span className="sr-only">{TYPE_LABEL[item.type] ?? item.type}</span>
       </span>
 
       {/* 底部渐变 + 全覆盖信息。遮罩用固定 px 高度（非 %）：卡片统一比例后信息带等高，px 版不随比例变化 */}

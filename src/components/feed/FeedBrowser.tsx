@@ -28,7 +28,12 @@ export default async function FeedBrowser({
   infinite,
 }: Props) {
   const sp = searchParams;
-  const type = enumParam(sp, "type", ["ALL", "GAME", "IMAGE", "ARTICLE"] as const, "ALL");
+  const type = enumParam(
+    sp,
+    "type",
+    ["ALL", "GAME", "IMAGE", "ARTICLE", "MUSIC", "VIDEO"] as const,
+    "ALL",
+  );
   const cat = str(sp, "cat");
   const tag = str(sp, "tag");
   const sort = enumParam(sp, "sort", ["latest", "popular", "downloads"] as const, "latest");
@@ -168,6 +173,8 @@ export default async function FeedBrowser({
           { key: "IMAGE", label: "图片" },
           { key: "GAME", label: "游戏" },
           { key: "ARTICLE", label: "文章" },
+          { key: "MUSIC", label: "音乐" },
+          { key: "VIDEO", label: "视频" },
         ].map((t) => (
           <Link
             key={t.key}

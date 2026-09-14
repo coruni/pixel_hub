@@ -3,58 +3,22 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
-import { timeAgo } from "@/lib/format";
+import { formatCount, timeAgo } from "@/lib/format";
 import { intParam, str, type SP } from "@/lib/search-params";
 import { ADMIN_PAGE_SIZE, STABLE_NEWEST, adminQuery } from "@/lib/admin/paging";
 import { TableFooter } from "@/components/admin/DataTable";
-import type { Prisma } from "@prisma/client";
+import ClearLogsButton from "@/components/admin/logs-clear";
 import { BTN_FILTER, INPUT_FILTER } from "@/lib/ui/cls";
 import { Button } from "@/components/ui/Button";
+// 动作标签与筛选语义与「清空日志」action 共用一份（见 src/lib/admin/logs.ts）
+import { DELETE_FILTER, LOG_ACTION_LABELS, LOG_ACTIONS, logWhere } from "@/lib/admin/logs";
 
 export const metadata: Metadata = { title: "操作日志" };
 
-// 高权限动作中文标签（覆盖全站 audit 调用过的 action；未列出的回退原值）
-const ACTION_LABELS: Record<string, string> = {
-  APPROVE: "通过审核",
-  REJECT: "打回",
-  REMOVE_RESOURCE: "下架内容",
-  RESTORE: "恢复上架",
-  REPORT_RESOLVE: "处置举报",
-  REPORT_DISMISS: "驳回举报",
-  TRUST: "设为免审",
-  UNTRUST: "取消免审",
-  SET_ROLE: "修改角色",
-  BAN: "封禁",
-  UNBAN: "解封",
-  EDIT_CATEGORY: "编辑分类",
-  EDIT_TAG: "编辑标签",
-  UPDATE_RESOURCE: "修改内容",
-  DELETE_MEDIA: "删除媒体",
-  DELETE_MEDIA_BULK: "批量删除媒体",
-  SET_ACTIVE_DRIVE: "切换活跃云盘",
-  EDIT_CLOUD_DRIVE: "编辑云盘",
-  DELETE_CLOUD_DRIVE: "删除云盘",
-  TEST_CLOUD_DRIVE: "测试云盘连通",
-  ADD_HOME: "新建首页板块",
-  REMOVE_HOME: "删除首页板块",
-  REORDER_HOME: "调整首页顺序",
-  EDIT_THEME_SIDEBAR: "编辑侧栏",
-  EDIT_THEME_WIDGET: "编辑组件",
-  REMOVE_THEME_WIDGET: "删除组件",
-  REORDER_THEME_WIDGET: "调整组件顺序",
-  EDIT_THEME_NAV: "编辑导航",
-  EDIT_SEO: "编辑 SEO 配置",
-  PUSH_INDEXNOW: "推送 IndexNow",
-  EDIT_UPLOAD_LIMITS: "编辑上传限制",
-  RESET_UPLOAD_LIMITS: "重置上传限制",
-  DELETE_COMMENT: "删除评论",
-};
-
-const ACTIONS = Object.keys(ACTION_LABELS);
-
 export default async function LogsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const session = await auth();
-  if (session?.user?.role !== "ADMIN" && session?.user?.role !== "MODERATOR") redirect("/");
+  const role = session?.user?.role;
+  if (role !== "ADMIN" && role !== "MODERATOR") redirect("/");
 
   const sp = await searchParams;
   const action = str(sp, "action") ?? "";
@@ -62,10 +26,7 @@ export default async function LogsPage({ searchParams }: { searchParams: Promise
   const page = intParam(sp, "page", 1);
   const pageSize = Math.min(100, intParam(sp, "size", ADMIN_PAGE_SIZE));
 
-  const where: Prisma.AuditLogWhereInput = {
-    ...(ACTIONS.includes(action) ? { action } : {}),
-    ...(adminId ? { adminId } : {}),
-  };
+  const where = logWhere(action, adminId);
 
   const [rows, total, operatorIds] = await Promise.all([
     prisma.auditLog.findMany({
@@ -98,8 +59,19 @@ export default async function LogsPage({ searchParams }: { searchParams: Promise
 
   return (
     <div>
-      <div className="mb-4">
-        <h2 className="text-lg font-medium text-neutral-900">操作日志</h2>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-lg font-medium text-neutral-900">
+          操作日志（{formatCount(total)}）
+        </h2>
+        {/* 清空日志：仅管理员；范围＝当前筛选命中（未筛选时才是全部） */}
+        {role === "ADMIN" && (
+          <ClearLogsButton
+            action={action}
+            adminId={adminId}
+            matched={total}
+            href={`/admin/logs${adminQuery(base)}`}
+          />
+        )}
       </div>
 
       <form method="get" className="mb-4 flex flex-wrap items-center gap-2">
@@ -108,9 +80,10 @@ export default async function LogsPage({ searchParams }: { searchParams: Promise
         </label>
         <select id="log-action" name="action" defaultValue={action} className={INPUT_FILTER}>
           <option value="">全部动作</option>
-          {ACTIONS.map((a) => (
+          <option value={DELETE_FILTER}>删除类操作（全部）</option>
+          {LOG_ACTIONS.map((a) => (
             <option key={a} value={a}>
-              {ACTION_LABELS[a] ?? a}
+              {LOG_ACTION_LABELS[a] ?? a}
             </option>
           ))}
         </select>
@@ -167,7 +140,7 @@ export default async function LogsPage({ searchParams }: { searchParams: Promise
                     </td>
                     <td className="px-4 py-2.5">
                       <span className="rounded-none bg-neutral-100 px-1.5 py-0.5 text-[11px] text-neutral-600">
-                        {ACTION_LABELS[r.action] ?? r.action}
+                        {LOG_ACTION_LABELS[r.action] ?? r.action}
                       </span>
                     </td>
                     <td className="px-4 py-2.5 text-xs text-neutral-400">

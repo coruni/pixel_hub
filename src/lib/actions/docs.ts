@@ -48,7 +48,13 @@ export async function resetDocAction(page: unknown): Promise<DocSaveResult> {
 
   // 删除自定义行 = 回退内置默认（读取层对空/缺失自动回退）
   await prisma.siteSetting.deleteMany({ where: { key: DOC_PAGES[page].key } });
-  await audit(admin.id, "EDIT_DOC_PAGE", "SITE_SETTING", DOC_PAGES[page].key);
+  await audit(
+    admin.id,
+    "RESET_DOC_PAGE",
+    "SITE_SETTING",
+    DOC_PAGES[page].key,
+    `${DOC_PAGES[page].label} 恢复内置默认（已删除自定义内容）`,
+  );
   revalidateDocPages();
   return { ok: true };
 }

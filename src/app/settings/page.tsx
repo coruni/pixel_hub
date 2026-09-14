@@ -11,9 +11,12 @@ import PrivacyForm from "@/components/auth/privacy-form";
 import AvatarForm from "@/components/auth/avatar-form";
 import HeroForm from "@/components/auth/HeroForm";
 import NotificationsForm from "@/components/auth/NotificationsForm";
+import PublishForm from "@/components/auth/PublishForm";
+import DraftsPanel from "@/components/auth/DraftsPanel";
 import { EmailForm, PasswordForm } from "@/components/auth/security-forms";
 import SettingsTabs from "@/components/auth/SettingsTabs";
 import { startGitHubBindAction, unbindGitHubAction } from "@/lib/actions/connections";
+import { countDrafts } from "@/lib/draft-store";
 import { getRuntimeConfig, githubClientId, githubClientSecret } from "@/lib/runtime-config";
 import { Button } from "@/components/ui/Button";
 
@@ -58,10 +61,14 @@ export default async function SettingsPage({
 
   const me = session.user;
   const profile = await getProfile(me.username, me.id);
-  const githubAccount = await prisma.account.findFirst({
-    where: { userId: me.id, provider: "github" },
-    select: { providerAccountId: true },
-  });
+  const [githubAccount, draftPref, draftCount] = await Promise.all([
+    prisma.account.findFirst({
+      where: { userId: me.id, provider: "github" },
+      select: { providerAccountId: true },
+    }),
+    prisma.user.findUnique({ where: { id: me.id }, select: { autoSaveDraft: true } }),
+    countDrafts(me.id),
+  ]);
   const githubEnabled = Boolean(githubClientId(runtimeCfg) && githubClientSecret(runtimeCfg));
   const joined = profile
     ? new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "long", day: "numeric" }).format(
@@ -76,7 +83,7 @@ export default async function SettingsPage({
     ...(joined ? [{ k: "加入时间", v: joined }] : []),
   ];
 
-  // 4 个 panel：资料 / 安全 / 第三方 / 账号（头像独立在 tab 外常驻）
+  // 5 个 panel：资料 / 通知 / 发布 / 安全 / 第三方 / 账号（头像独立在 tab 外常驻）
   const tabs = [
     {
       key: "profile",
@@ -117,12 +124,39 @@ export default async function SettingsPage({
       panel: (
         <section className={sectionCls}>
           <h2 className={sectionTitle}>通知设置</h2>
-          <p className={sectionHint}>控制重要动态的提醒方式（评论回复、审核结果等）</p>
+          <p className={sectionHint}>选择要接收的动态与提醒方式（审核结果、评论回复、点赞关注等）</p>
           <NotificationsForm
             emailNotifyComment={profile?.emailNotifyComment ?? true}
             emailNotifyModeration={profile?.emailNotifyModeration ?? true}
+            inAppNotifyLike={profile?.inAppNotifyLike ?? true}
+            inAppNotifyComment={profile?.inAppNotifyComment ?? true}
+            inAppNotifyFollow={profile?.inAppNotifyFollow ?? true}
+            inAppNotifySystem={profile?.inAppNotifySystem ?? true}
           />
         </section>
+      ),
+    },
+    {
+      key: "publish",
+      label: "发布",
+      panel: (
+        <>
+          <section className={sectionCls}>
+            <h2 className={sectionTitle}>发布偏好</h2>
+            <p className={sectionHint}>控制发布内容时草稿的留存方式</p>
+            <PublishForm
+              autoSaveDraft={draftPref?.autoSaveDraft ?? true}
+              draftCount={draftCount}
+            />
+          </section>
+
+          {/* 草稿箱：与开关同屏，省掉独立页面与菜单里的第二个入口 */}
+          <section id="drafts" className={sectionCls}>
+            <h2 className={sectionTitle}>草稿箱</h2>
+            <p className={sectionHint}>写东西时自动留存的半成品，可继续编辑或删除</p>
+            <DraftsPanel userId={me.id} />
+          </section>
+        </>
       ),
     },
     {

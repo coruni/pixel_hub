@@ -7,7 +7,7 @@ import { getFeed, toFeedCard, type FeedCard } from "@/lib/queries";
 export type ListPageParams = {
   page: number;
   pageSize: number;
-  type: "ALL" | "IMAGE" | "GAME" | "ARTICLE";
+  type: "ALL" | "IMAGE" | "GAME" | "ARTICLE" | "MUSIC" | "VIDEO";
   sort: "latest" | "popular" | "downloads";
   categorySlugs: string[];
   tagSlugs: string[];
@@ -19,7 +19,7 @@ export type ListPageParams = {
 const listPageSchema = z.object({
   page: z.number().int().min(2).max(1000),
   pageSize: z.number().int().min(1).max(48),
-  type: z.enum(["ALL", "IMAGE", "GAME", "ARTICLE"]),
+  type: z.enum(["ALL", "IMAGE", "GAME", "ARTICLE", "MUSIC", "VIDEO"]),
   sort: z.enum(["latest", "popular", "downloads"]),
   categorySlugs: z.array(z.string().max(80)).max(30),
   tagSlugs: z.array(z.string().max(80)).max(30),
@@ -50,7 +50,7 @@ export async function loadListPageAction(
 
 /** 浏览页 FeedBrowser 的完整筛选集（与首屏 getFeed 同一套入参），供无限滚动追加后续页 */
 export type BrowseFeedParams = {
-  type: "ALL" | "IMAGE" | "GAME" | "ARTICLE";
+  type: "ALL" | "IMAGE" | "GAME" | "ARTICLE" | "MUSIC" | "VIDEO";
   sort: "latest" | "popular" | "downloads";
   period: "all" | "day" | "week" | "month";
   categorySlug?: string;
@@ -63,7 +63,7 @@ export type BrowseFeedParams = {
 };
 
 const browseFeedSchema = z.object({
-  type: z.enum(["ALL", "IMAGE", "GAME", "ARTICLE"]),
+  type: z.enum(["ALL", "IMAGE", "GAME", "ARTICLE", "MUSIC", "VIDEO"]),
   sort: z.enum(["latest", "popular", "downloads"]),
   period: z.enum(["all", "day", "week", "month"]),
   categorySlug: z.string().max(80).optional(),

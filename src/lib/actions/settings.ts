@@ -11,6 +11,7 @@ import { makeKey, saveFile, delFile } from "@/lib/storage";
 import { MIB } from "@/lib/upload-config";
 import { getUploadLimits } from "@/lib/upload-limits";
 import { compressWith, compressConfigOf, outputExt } from "@/lib/media/compress";
+import { notifyAccountSecurity } from "@/lib/notify";
 
 export type SettingsActionState = {
   ok?: boolean;
@@ -69,7 +70,8 @@ export async function updatePrivacyAction(
   return { ok: true };
 }
 
-// ---- 邮件通知开关：评论回复 / 审核结果 分别控制（均默认开启） ----
+// ---- 通知开关：邮件（评论回复 / 审核结果）+ 站内（点赞 / 评论 / 关注 / 审核与系统） ----
+// 账号安全提醒（SECURITY）刻意不在开关列表里：改密、换邮箱、封禁等必须送达，用户关不掉。
 
 export async function updateEmailNotifyAction(
   _prev: SettingsActionState,
@@ -80,9 +82,20 @@ export async function updateEmailNotifyAction(
 
   const emailNotifyComment = fd.get("emailNotifyComment") === "on";
   const emailNotifyModeration = fd.get("emailNotifyModeration") === "on";
+  const inAppNotifyLike = fd.get("inAppNotifyLike") === "on";
+  const inAppNotifyComment = fd.get("inAppNotifyComment") === "on";
+  const inAppNotifyFollow = fd.get("inAppNotifyFollow") === "on";
+  const inAppNotifySystem = fd.get("inAppNotifySystem") === "on";
   await prisma.user.update({
     where: { id: user.id },
-    data: { emailNotifyComment, emailNotifyModeration },
+    data: {
+      emailNotifyComment,
+      emailNotifyModeration,
+      inAppNotifyLike,
+      inAppNotifyComment,
+      inAppNotifyFollow,
+      inAppNotifySystem,
+    },
   });
   revalidatePath("/settings");
   return { ok: true };
@@ -270,6 +283,12 @@ export async function changePasswordAction(
     where: { id: user.id },
     data: { passwordHash },
   });
+  // 改密是「账号被盗」最典型的第一步：站内 + 邮件双通道提醒，用户关不掉
+  await notifyAccountSecurity(
+    user.id,
+    "你的登录密码已被修改",
+    "你的账号登录密码刚刚被修改。如果这不是你本人的操作，请立即联系站点管理员。",
+  );
   return { ok: true };
 }
 
@@ -307,6 +326,13 @@ export async function changeEmailAction(
   if (taken) return { fieldErrors: { email: ["该邮箱已被其他账号使用"] } };
 
   await prisma.user.update({ where: { id: user.id }, data: { email: parsed.data.email } });
+  // 安全提醒发往「旧邮箱」：新邮箱已经生效，旧邮箱是本人还能看到的最后通道
+  await notifyAccountSecurity(
+    user.id,
+    "你的登录邮箱已被修改",
+    `你的账号登录邮箱已从 ${row.email} 变更为 ${parsed.data.email}。如果这不是你本人的操作，请立即联系站点管理员。`,
+    row.email,
+  );
   revalidatePath("/settings");
   return { ok: true };
 }

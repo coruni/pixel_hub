@@ -66,39 +66,102 @@ export const articleMetaSchema = z.object({
 });
 export type ArticleMeta = z.infer<typeof articleMetaSchema>;
 
+// MUSIC / VIDEO：音视频来源（在线挂载 / 上传文件）与播放形态（直链 / 嵌入页）。
+// 只描述「从哪来、怎么播」，下载清单沿用 downloads（与 IMAGE/ARTICLE 同源）。
+export const AV_SOURCES = ["mount", "file"] as const;
+export const AV_MODES = ["direct", "embed"] as const;
+
+export const avMetaSchema = z
+  .object({
+    source: z.enum(AV_SOURCES).default("mount"),
+    mode: z.enum(AV_MODES).default("direct"),
+    url: z.string().trim().max(2000).default(""),
+    provider: z.string().trim().max(60).optional(), // 挂载平台名，如 B站 / 网易云
+    artist: z.string().trim().max(80).optional(), // 音乐：艺术家
+    album: z.string().trim().max(80).optional(), // 音乐：专辑
+    duration: z.string().trim().max(20).optional(), // 时长，如 3:42
+    resolution: z.string().trim().max(20).optional(), // 视频：分辨率，如 1080p
+    license: z.string().max(40).default(""),
+    note: z.string().trim().max(300).optional(),
+    downloads: z.array(articleItemSchema).max(20).default([]),
+  })
+  .superRefine((d, cx) => {
+    if (!d.url)
+      cx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["url"],
+        message: d.source === "file" ? "请上传音频/视频文件" : "请填写在线音频/视频地址",
+      });
+    else if (!urlLike(d.url))
+      cx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["url"],
+        message: "地址需为 http(s):// 外链或站内文件路径",
+      });
+    else if (d.source === "mount" && !/^https?:\/\/.+/i.test(d.url))
+      cx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["url"],
+        message: "在线挂载需填写 http(s):// 开头的外部地址",
+      });
+    else if (d.mode === "embed" && !/^https?:\/\/.+/i.test(d.url))
+      cx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["url"],
+        message: "嵌入页挂载需填写 http(s):// 开头的页面地址",
+      });
+  });
+export type AvMeta = z.infer<typeof avMetaSchema>;
+
+/** 空/坏数据兜底：不填来源就不算坏，详情页据此提示「未提供播放来源」 */
+export const AV_META_FALLBACK: AvMeta = {
+  source: "mount",
+  mode: "direct",
+  url: "",
+  license: "",
+  downloads: [],
+};
+
+export type ResourceMetaKind = "GAME" | "IMAGE" | "ARTICLE" | "MUSIC" | "VIDEO";
+
 export type ResourceMetaOutput =
   | ({ kind: "IMAGE" } & ImageMeta)
   | ({ kind: "GAME" } & GameMeta)
-  | ({ kind: "ARTICLE" } & ArticleMeta);
+  | ({ kind: "ARTICLE" } & ArticleMeta)
+  | ({ kind: "MUSIC" } & AvMeta)
+  | ({ kind: "VIDEO" } & AvMeta);
 
-export function parseMeta(
-  kind: "GAME" | "IMAGE" | "ARTICLE",
-  raw: string | null,
-): ResourceMetaOutput {
+/** 音视频 meta 的窄化类型（详情页播放器 / 下载面板共用） */
+export type AvResourceMeta = Extract<ResourceMetaOutput, { kind: "MUSIC" | "VIDEO" }>;
+
+export function isAvMeta(m: ResourceMetaOutput): m is AvResourceMeta {
+  return m.kind === "MUSIC" || m.kind === "VIDEO";
+}
+
+function parseJsonObject(raw: string | null): unknown {
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
+export function parseMeta(kind: ResourceMetaKind, raw: string | null): ResourceMetaOutput {
   if (kind === "GAME") {
-    const parsed = z.unknown().safeParse(raw);
-    let obj: unknown = {};
-    if (parsed.success && raw) {
-      try {
-        obj = JSON.parse(raw);
-      } catch {
-        obj = {};
-      }
-    }
-    const r = gameMetaSchema.safeParse(obj);
+    const r = gameMetaSchema.safeParse(parseJsonObject(raw));
     return { kind: "GAME", ...(r.success ? r.data : gameMetaSchema.parse({})) };
   }
-  let obj: unknown = {};
-  if (raw) {
-    try {
-      obj = JSON.parse(raw);
-    } catch {
-      obj = {};
-    }
-  }
+  const obj = parseJsonObject(raw);
   if (kind === "ARTICLE") {
     const r = articleMetaSchema.safeParse(obj);
     return { kind: "ARTICLE", ...(r.success ? r.data : articleMetaSchema.parse({})) };
+  }
+  // 音视频共用同一套 schema：source/mode/url + 各自的补充字段
+  if (kind === "MUSIC" || kind === "VIDEO") {
+    const r = avMetaSchema.safeParse(obj);
+    const data = r.success ? r.data : AV_META_FALLBACK;
+    return kind === "MUSIC" ? { kind: "MUSIC", ...data } : { kind: "VIDEO", ...data };
   }
   const r = imageMetaSchema.safeParse(obj);
   return { kind: "IMAGE", ...(r.success ? r.data : imageMetaSchema.parse({})) };
@@ -108,6 +171,7 @@ export function parseMeta(
 export function metaHasDownload(m: ResourceMetaOutput): boolean {
   if (m.kind === "IMAGE")
     return m.downloads.length > 0 || (m.download.mode !== "none" && !!m.download.url);
-  if (m.kind === "ARTICLE") return m.downloads.length > 0;
+  if (m.kind === "ARTICLE" || m.kind === "MUSIC" || m.kind === "VIDEO")
+    return m.downloads.length > 0;
   return false;
 }

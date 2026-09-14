@@ -3,27 +3,34 @@ import {
   ArrowUpRight,
   Download,
   Heart,
+  Film,
   Image as ImageIcon,
   Gamepad2,
+  Music,
   Newspaper,
 } from "lucide-react";
 import { getFeed, type FeedItem } from "@/lib/queries";
 import { formatCount } from "@/lib/format";
+import { TYPE_LABEL } from "@/lib/display";
 import SectionTitle from "@/components/home/SectionTitle";
 
 const frame = "mx-auto max-w-7xl px-4 sm:px-6";
 
-function TypeBadge({ type }: { type: "GAME" | "IMAGE" | "ARTICLE" }) {
+/** 类型角标：图标 + 中文名，新增类型只需在映射表里加一项 */
+const TYPE_ICON = {
+  GAME: { Icon: Gamepad2, cls: "text-emerald-300" },
+  ARTICLE: { Icon: Newspaper, cls: "text-sky-300" },
+  MUSIC: { Icon: Music, cls: "text-brand-300" },
+  VIDEO: { Icon: Film, cls: "text-red-300" },
+  IMAGE: { Icon: ImageIcon, cls: "text-amber-300" },
+} as const;
+
+function TypeBadge({ type }: { type: string }) {
+  const { Icon, cls } = TYPE_ICON[type as keyof typeof TYPE_ICON] ?? TYPE_ICON.IMAGE;
   return (
     <span className="inline-flex items-center gap-1 rounded-none border border-brand-600 bg-stone-900/85 px-2 py-1 text-[10px] font-medium text-white">
-      {type === "GAME" ? (
-        <Gamepad2 size={11} className="text-emerald-300" aria-hidden />
-      ) : type === "ARTICLE" ? (
-        <Newspaper size={11} className="text-sky-300" aria-hidden />
-      ) : (
-        <ImageIcon size={11} className="text-amber-300" aria-hidden />
-      )}
-      {type === "GAME" ? "游戏" : type === "ARTICLE" ? "文章" : "图片"}
+      <Icon size={11} className={cls} aria-hidden />
+      {TYPE_LABEL[type] ?? "资源"}
     </span>
   );
 }

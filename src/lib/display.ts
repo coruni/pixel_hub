@@ -1,6 +1,6 @@
 // 共享的展示目录：内容显示形态（卡片网格/列表行）与内容大类，供首页板块、侧边栏 widget、归档等共用。
 export type ContentDisplay = "card" | "list";
-export type ContentType = "IMAGE" | "GAME" | "ARTICLE";
+export type ContentType = "IMAGE" | "GAME" | "ARTICLE" | "MUSIC" | "VIDEO";
 
 export const DISPLAY_ORDER: ContentDisplay[] = ["card", "list"];
 
@@ -20,7 +20,17 @@ export const TYPE_LABEL: Record<string, string> = {
   GAME: "游戏",
   IMAGE: "图片作品",
   ARTICLE: "文章",
+  MUSIC: "音乐",
+  VIDEO: "视频",
 };
+
+/** 类型筛选器统一顺序（首页板块 / 侧栏 widget / 后台内容页 / 前台浏览共用） */
+export const CONTENT_TYPES: ContentType[] = ["IMAGE", "GAME", "ARTICLE", "MUSIC", "VIDEO"];
+
+/** 运行时收窄：配置里存的是未知值，用于把历史/脏数据收敛到合法类型 */
+export function isContentType(v: unknown): v is ContentType {
+  return typeof v === "string" && (CONTENT_TYPES as readonly string[]).includes(v);
+}
 
 export type ContentTypeFilter = ContentType | "ALL";
 

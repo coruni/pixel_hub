@@ -7,7 +7,9 @@ import { prisma } from "@/lib/db/prisma";
 import { publicUrl } from "@/lib/storage";
 import { getTheme } from "@/lib/site";
 import { getCategories } from "@/lib/queries";
+import { getUnreadNotificationCount } from "@/lib/notify";
 import type { NavItem } from "@/lib/site-config";
+import { NAV_CONTROL_H } from "@/lib/ui/cls";
 import UserMenu from "./UserMenu";
 import NavCategoriesMenu from "./NavCategoriesMenu";
 import ThemeToggle from "./ThemeToggle";
@@ -54,9 +56,13 @@ export default async function Navbar() {
   }
 
   // 头像取库内最新值（JWT 里不带，避免换头像后过期）；传给 client 前解析成 URL
-  const me = u
-    ? await prisma.user.findUnique({ where: { id: u.id }, select: { avatarKey: true } })
-    : null;
+  // 未读数与头像并行取：导航栏每个页面都要渲染，多一次 count 换掉角标「必须刷新才更新」
+  const [me, unread] = u
+    ? await Promise.all([
+        prisma.user.findUnique({ where: { id: u.id }, select: { avatarKey: true } }),
+        getUnreadNotificationCount(u.id),
+      ])
+    : [null, 0];
   const avatarKey = me?.avatarKey ? publicUrl(me.avatarKey) : null;
 
   return (
@@ -100,6 +106,7 @@ export default async function Navbar() {
           />
           {u ? (
             <UserMenu
+              unread={unread}
               user={{
                 name: u.name ?? null,
                 username: u.username ?? "",
@@ -110,12 +117,15 @@ export default async function Navbar() {
             />
           ) : (
             <>
-              <Link href="/login" className="text-sm text-neutral-600 hover:text-neutral-900">
+              <Link
+                href="/login"
+                className={`${NAV_CONTROL_H} inline-flex items-center text-sm text-neutral-600 hover:text-neutral-900`}
+              >
                 登录
               </Link>
               <Link
                 href="/register"
-                className="rounded-none border border-brand-600 bg-brand-500 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-brand-600"
+                className={`${NAV_CONTROL_H} inline-flex items-center rounded-none border border-brand-600 bg-brand-500 px-4 text-sm font-medium text-white transition hover:bg-brand-600`}
               >
                 注册
               </Link>

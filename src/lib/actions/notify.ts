@@ -15,6 +15,18 @@ export async function markAllNotificationsReadAction(): Promise<{ ok: boolean }>
   return { ok: true };
 }
 
+/** 标记单条已读：点击通知卡片时调用（只影响本人的通知） */
+export async function markNotificationReadAction(id: string): Promise<{ ok: boolean }> {
+  const user = (await auth())?.user;
+  if (!user) return { ok: false };
+  await prisma.notification.updateMany({
+    where: { id, userId: user.id, readAt: null },
+    data: { readAt: new Date() },
+  });
+  revalidatePath("/notifications");
+  return { ok: true };
+}
+
 /** 删除单条通知 */
 export async function deleteNotificationAction(id: string): Promise<{ ok: boolean }> {
   const user = (await auth())?.user;

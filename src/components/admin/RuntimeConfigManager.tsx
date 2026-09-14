@@ -43,6 +43,7 @@ export default function RuntimeConfigManager({
     s3PublicBase: config.s3PublicBase,
     s3AclPrivate: config.s3AclPrivate,
     attachmentCloud: config.attachmentCloud,
+    avCloud: config.avCloud,
     smtpHost: config.smtpHost,
     smtpPort: config.smtpPort,
     smtpUser: config.smtpUser,
@@ -183,6 +184,26 @@ export default function RuntimeConfigManager({
               <span className="mt-0.5 block text-xs text-neutral-400">
                 勾选后附件经 Microsoft Graph 分片直传活跃云盘（需已配置云盘凭据与活跃盘）；
                 不勾则走上方所选存储驱动。存储驱动为 Chevereto 时默认勾选（大附件分片上传更稳）。
+              </span>
+            </span>
+          </label>
+
+          <label className="flex cursor-pointer items-start gap-2.5">
+            <SquareCheckbox
+              checked={
+                form.avCloud === "on" ||
+                (form.avCloud === "auto" && form.storageDriver === "chevereto")
+              }
+              onChange={(next) => set({ avCloud: next ? "on" : "off" })}
+              ariaLabel="音视频上传走云盘"
+              className="mt-0.5"
+            />
+            <span>
+              <span className="block text-sm text-neutral-900">音视频上传走云盘（OneDrive）</span>
+              <span className="mt-0.5 block text-xs text-neutral-400">
+                仅作用于「音乐 / 视频」资源的上传来源文件（在线挂载不受影响）。
+                勾选后经 Graph 分片直传活跃云盘（支持超大文件与断点续传）；不勾则走上方所选存储驱动。
+                未配置 Graph 凭据或没有活跃盘时自动回退存储驱动，不会阻断发布。
               </span>
             </span>
           </label>

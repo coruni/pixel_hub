@@ -191,6 +191,15 @@ export function CategoryManager({ rows }: { rows: CategoryRow[] }) {
           >
             {pending ? "创建中…" : (<><Plus size={13} /> 新建分类</>)}
           </Button>
+          {/* 批量删除：与标签管理同一位置——工具条最右侧（ml-auto 顶开），不再放在表格下方 */}
+          <Button
+            type="button"
+            disabled={pending || selected.size === 0}
+            onClick={batchDelete}
+            className={`${BTN_DANGER_SM} ml-auto`}
+          >
+            {pending ? "删除中…" : (<><Trash2 size={12} /> 批量删除{selected.size > 0 ? `（${selected.size}）` : ""}</>)}
+          </Button>
         </div>
 
       {/* 分类表格 */}
@@ -360,17 +369,6 @@ export function CategoryManager({ rows }: { rows: CategoryRow[] }) {
             {rows.length === 0 && <EmptyRow colSpan={7}>还没有分类</EmptyRow>}
           </tbody>
         </table>
-      </div>
-
-      <div className="flex items-center justify-end">
-        <Button
-          type="button"
-          disabled={pending || selected.size === 0}
-          onClick={batchDelete}
-          className={BTN_DANGER_SM}
-        >
-          {pending ? "删除中…" : (<><Trash2 size={12} /> 批量删除{selected.size > 0 ? `（${selected.size}）` : ""}</>)}
-        </Button>
       </div>
     </div>
   );

@@ -1,9 +1,22 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { Bell, Heart, MessageSquare, ShieldAlert, UserPlus, type LucideIcon } from "lucide-react";
+import {
+  Bell,
+  Heart,
+  MessageSquare,
+  ShieldAlert,
+  ShieldCheck,
+  UserPlus,
+  type LucideIcon,
+} from "lucide-react";
 import { auth } from "@/lib/auth";
-import { getNotifications, type NotificationRow } from "@/lib/queries";
+import {
+  getNotifications,
+  NOTIFICATION_PAGE_SIZE,
+  type NotificationFilter,
+  type NotificationRow,
+} from "@/lib/queries";
 import { timeAgo } from "@/lib/format";
 import { markAllNotificationsReadAction } from "@/lib/actions/notify";
 import { NotificationDelete, NotificationsClearAll } from "@/components/social/notify-actions";
@@ -12,13 +25,17 @@ import { Button } from "@/components/ui/Button";
 
 export const metadata: Metadata = { title: "通知", robots: { index: false } };
 
+// 「系统」页含审核结果 + 系统公告；「安全」页只放账号安全变动（这类通知不可关闭）
 const FILTERS = [
   { key: "", label: "全部", icon: Bell },
   { key: "LIKE", label: "赞", icon: Heart },
   { key: "COMMENT", label: "评论", icon: MessageSquare },
   { key: "FOLLOW", label: "关注", icon: UserPlus },
   { key: "SYSTEM", label: "系统", icon: ShieldAlert },
+  { key: "SECURITY", label: "安全", icon: ShieldCheck },
 ] as const;
+
+const FILTER_KEYS = FILTERS.map((f) => f.key).filter((k): k is NotificationFilter => k !== "");
 
 function describe(n: NotificationRow): {
   icon: LucideIcon;
@@ -27,20 +44,26 @@ function describe(n: NotificationRow): {
   color: string;
 } {
   const who = n.actor ? (n.actor.name ?? `@${n.actor.username}`) : "系统";
+  const title = n.resource ? `「${n.resource.title}」` : "";
   switch (n.type) {
     case "FOLLOW":
       return { icon: UserPlus, text: `${who} 关注了你`, color: "text-neutral-800" };
     case "LIKE":
       return {
         icon: Heart,
-        text: `${who} 赞了你的内容${n.resource ? `「${n.resource.title}」` : ""}`,
+        // count > 1 = 同一批未读里的多个赞已聚合，避免几十条「XX 赞了你」刷屏
+        text:
+          n.count > 1
+            ? `${who} 等 ${n.count} 人赞了你的内容${title}`
+            : `${who} 赞了你的内容${title}`,
         color: "text-neutral-800",
         href: n.resource ? `/resources/${n.resource.slug}` : undefined,
       };
     case "COMMENT":
       return {
         icon: MessageSquare,
-        text: `${who} 评论了你的内容${n.resource ? `「${n.resource.title}」` : ""}`,
+        // message 里带了评论摘要（「评论了你的内容：xxx」/「回复了你的评论：xxx」）
+        text: n.message ? `${who} ${n.message}` : `${who} 评论了你的内容${title}`,
         color: "text-neutral-800",
         // 定位到触发通知的那条评论（含楼中楼）；评论已删/无 commentId 时退到评论区顶部
         href: n.resource
@@ -56,6 +79,13 @@ function describe(n: NotificationRow): {
         color: "text-amber-700",
         href: n.resource ? `/resources/${n.resource.slug}` : undefined,
       };
+    case "SECURITY":
+      return {
+        icon: ShieldCheck,
+        text: n.message ?? "你的账号有安全变动",
+        color: "text-red-600",
+        href: "/settings?tab=security",
+      };
     default:
       return { icon: Bell, text: n.message ?? "系统通知", color: "text-neutral-800" };
   }
@@ -64,15 +94,27 @@ function describe(n: NotificationRow): {
 export default async function NotificationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ type?: string }>;
+  searchParams: Promise<{ type?: string; page?: string }>;
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login?callbackUrl=/notifications");
-  const { type } = await searchParams;
-  const filter = FILTERS.some((f) => f.key === type && f.key !== "")
-    ? (type as "LIKE" | "COMMENT" | "FOLLOW" | "SYSTEM")
-    : undefined;
-  const { rows, unread } = await getNotifications(session.user.id, filter);
+  const { type, page: pageRaw } = await searchParams;
+  const filter = FILTER_KEYS.find((k) => k === type);
+  const { rows, unread, total, page, hasMore } = await getNotifications(
+    session.user.id,
+    filter,
+    Number(pageRaw) || 1,
+  );
+  const pages = Math.max(1, Math.ceil(total / NOTIFICATION_PAGE_SIZE));
+
+  // 翻页链接保留当前筛选条件
+  const pageHref = (p: number) => {
+    const sp = new URLSearchParams();
+    if (filter) sp.set("type", filter);
+    if (p > 1) sp.set("page", String(p));
+    const s = sp.toString();
+    return s ? `/notifications?${s}` : "/notifications";
+  };
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
@@ -157,6 +199,8 @@ export default async function NotificationsPage({
               {d.href ? (
                 <NotificationCardLink
                   href={d.href}
+                  id={n.id}
+                  read={!!n.readAt}
                   className={`block cursor-pointer rounded-none px-3 py-3 transition hover:bg-neutral-100 ${n.readAt ? "opacity-60" : "bg-surface"}`}
                 >
                   {inner}
@@ -175,6 +219,29 @@ export default async function NotificationsPage({
           <li className="py-20 text-center text-sm text-neutral-400">还没有通知</li>
         )}
       </ul>
+
+      {/* 分页：通知会越攒越多，只给第一页等于让老通知永远看不到 */}
+      {pages > 1 && (
+        <nav className="mt-6 flex items-center justify-between gap-3 border-t border-brand-100 pt-4 text-xs">
+          {page > 1 ? (
+            <Link href={pageHref(page - 1)} className="text-neutral-600 hover:text-neutral-900">
+              ← 上一页
+            </Link>
+          ) : (
+            <span className="text-neutral-300">← 上一页</span>
+          )}
+          <span className="text-neutral-400">
+            第 {page} / {pages} 页 · 共 {total} 条
+          </span>
+          {hasMore ? (
+            <Link href={pageHref(page + 1)} className="text-neutral-600 hover:text-neutral-900">
+              下一页 →
+            </Link>
+          ) : (
+            <span className="text-neutral-300">下一页 →</span>
+          )}
+        </nav>
+      )}
     </div>
   );
 }

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import Gallery from "@/components/resource/Gallery";
 import CollapsibleAside from "./CollapsibleAside";
 import { DownloadPanel } from "./download-panel";
+import { AvPlayerBlock } from "./av-player";
 import {
   ActionBar,
   AuthorStrip,
@@ -66,6 +67,9 @@ export default function DetailBanner({
           )}
         </div>
       </div>
+
+      {/* 音视频播放（MUSIC/VIDEO；其余类型返回 null） */}
+      <AvPlayerBlock ctx={ctx} />
 
       {/* IMAGE/ARTICLE 下载（横幅覆盖按钮仅 GAME externalUrl；面板对 GAME 返回 null） */}
       <DownloadPanel ctx={ctx} />

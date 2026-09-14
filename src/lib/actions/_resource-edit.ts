@@ -2,10 +2,14 @@
 // 本文件不加 "use server"——仅作为模块被各 action 内部调用。
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
-import { articleMetaSchema, gameMetaSchema, imageMetaSchema } from "@/lib/meta";
+import { articleMetaSchema, avMetaSchema, gameMetaSchema, imageMetaSchema } from "@/lib/meta";
 import { randomTail, slugify } from "@/lib/slug";
 import { MAX_TAGS, resourceTextFields } from "@/lib/resource-fields";
-import { ARTICLE_MEDIA_MAX } from "@/lib/upload-config";
+import { ARTICLE_MEDIA_MAX, isSingleCoverType } from "@/lib/upload-config";
+import { TYPE_LABEL } from "@/lib/display";
+
+/** 资源类型（与 Prisma ResourceType 一致）；改稿按类型决定 meta 形状 */
+export type EditableResourceType = "GAME" | "IMAGE" | "ARTICLE" | "MUSIC" | "VIDEO";
 
 export type ResourceEditState = {
   ok?: boolean;
@@ -43,7 +47,7 @@ function readDownloads(fd: FormData): { value: unknown[]; error?: string } {
 export async function applyResourceEdit(
   tx: Prisma.TransactionClient,
   id: string,
-  type: "GAME" | "IMAGE" | "ARTICLE",
+  type: EditableResourceType,
   fd: FormData,
   actorId: string,
 ): Promise<{ fieldErrors?: Record<string, string[]> }> {
@@ -86,6 +90,25 @@ export async function applyResourceEdit(
     const { value: downloads, error } = readDownloads(fd);
     if (error) return { fieldErrors: { downloads: [error] } };
     const parsed = articleMetaSchema.safeParse({ license, downloads });
+    if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
+    metaStr = JSON.stringify(parsed.data);
+  } else if (type === "MUSIC" || type === "VIDEO") {
+    // 音视频改稿：与发布侧同一套 schema（source/mode/url + 类型补充字段 + 下载清单）
+    const { value: downloads, error } = readDownloads(fd);
+    if (error) return { fieldErrors: { downloads: [error] } };
+    const parsed = avMetaSchema.safeParse({
+      source: str(fd, "avSource") === "file" ? "file" : "mount",
+      mode: str(fd, "avMode") === "embed" ? "embed" : "direct",
+      url: str(fd, "avUrl"),
+      provider: str(fd, "avProvider") || undefined,
+      artist: str(fd, "artist") || undefined,
+      album: str(fd, "album") || undefined,
+      duration: str(fd, "duration") || undefined,
+      resolution: str(fd, "resolution") || undefined,
+      license,
+      note: str(fd, "note") || undefined,
+      downloads,
+    });
     if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
     metaStr = JSON.stringify(parsed.data);
   } else {
@@ -175,12 +198,18 @@ export async function applyResourceEdit(
   }
   const coverRaw = String(fd.get("coverId") ?? "").trim();
 
-  // 非文章类型至少保留一张图（与发布一致）；文章固定一张封面，其余插图放正文
-  if (type !== "ARTICLE" && mediaIds.length === 0)
+  // 图集类（游戏 / 图片）必须留至少一张预览图；封面类（文章 / 音乐 / 视频）允许删空 ——
+  // 封面是可选项（向导对这三类不标必填），删空后前台按无封面占位渲染（queries 里 cover 为 null）。
+  // 若把封面类也要求非空，就会出现「封面删不掉」：点 X 移除后保存被这里挡回。
+  if (!isSingleCoverType(type) && mediaIds.length === 0)
     return { fieldErrors: { mediaIds: ["请至少保留一张图片"] } };
-  if (type === "ARTICLE" && mediaIds.length > ARTICLE_MEDIA_MAX)
+  if (isSingleCoverType(type) && mediaIds.length > ARTICLE_MEDIA_MAX)
     return {
-      fieldErrors: { mediaIds: [`文章只需 ${ARTICLE_MEDIA_MAX} 张封面图，其余插图放正文里`] },
+      fieldErrors: {
+        mediaIds: [
+          `${TYPE_LABEL[type] ?? "该类型"}只需 ${ARTICLE_MEDIA_MAX} 张封面图，其余插图放正文里`,
+        ],
+      },
     };
 
   const existingMedia = await tx.media.findMany({

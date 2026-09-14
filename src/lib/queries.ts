@@ -12,7 +12,7 @@ export type FeedItem = {
   slug: string;
   title: string;
   summary: string | null;
-  type: "GAME" | "IMAGE" | "ARTICLE";
+  type: "GAME" | "IMAGE" | "ARTICLE" | "MUSIC" | "VIDEO";
   publishedAt: Date | null;
   createdAt: Date;
   likeCount: number;
@@ -39,7 +39,7 @@ export type FeedCard = {
   slug: string;
   title: string;
   summary: string | null;
-  type: "GAME" | "IMAGE" | "ARTICLE";
+  type: "GAME" | "IMAGE" | "ARTICLE" | "MUSIC" | "VIDEO";
   likeCount: number;
   viewCount: number;
   favoriteCount: number;
@@ -1080,6 +1080,11 @@ export type UserProfile = {
   // 邮件通知开关（仅设置页使用，公开主页不展示）
   emailNotifyComment: boolean;
   emailNotifyModeration: boolean;
+  // 站内通知开关（仅设置页使用）
+  inAppNotifyLike: boolean;
+  inAppNotifyComment: boolean;
+  inAppNotifyFollow: boolean;
+  inAppNotifySystem: boolean;
   isViewer: boolean;
   following: boolean;
   online: boolean;
@@ -1106,6 +1111,10 @@ export const getProfile = cache(
         showFollowing: true,
         emailNotifyComment: true,
         emailNotifyModeration: true,
+        inAppNotifyLike: true,
+        inAppNotifyComment: true,
+        inAppNotifyFollow: true,
+        inAppNotifySystem: true,
         _count: { select: { resources: true, followers: true, following: true } },
       },
     });
@@ -1136,6 +1145,10 @@ export const getProfile = cache(
       showFollowing: user.showFollowing,
       emailNotifyComment: user.emailNotifyComment,
       emailNotifyModeration: user.emailNotifyModeration,
+      inAppNotifyLike: user.inAppNotifyLike,
+      inAppNotifyComment: user.inAppNotifyComment,
+      inAppNotifyFollow: user.inAppNotifyFollow,
+      inAppNotifySystem: user.inAppNotifySystem,
       isViewer,
       following,
       online: isOnline(user.lastSeenAt),
@@ -1200,35 +1213,54 @@ export type NotificationRow = {
   readAt: Date | null;
   createdAt: Date;
   message: string | null;
+  /** 点赞聚合人数：>1 时文案显示「X 等 N 人赞了你」 */
+  count: number;
   resource: { slug: string; title: string } | null;
   actor: { username: string; name: string | null } | null;
   commentId: string | null;
 };
 
-export async function getNotifications(
-  userId: string,
-  filter?: "LIKE" | "COMMENT" | "FOLLOW" | "SYSTEM",
-): Promise<{ rows: NotificationRow[]; unread: number }> {
-  // 「系统」筛选含 MODERATION + SYSTEM 两类
-  const where: Prisma.NotificationWhereInput = {
+export type NotificationFilter = "LIKE" | "COMMENT" | "FOLLOW" | "SYSTEM" | "SECURITY";
+
+/** 每页条数：通知可能成千上万条，只取第一页会让老通知永远看不到 */
+export const NOTIFICATION_PAGE_SIZE = 20;
+
+/** 通知列表 where：页面筛选与未读数共用，避免两处范围漂移 */
+function notificationWhere(userId: string, filter?: NotificationFilter): Prisma.NotificationWhereInput {
+  return {
     userId,
     ...(filter === "SYSTEM"
-      ? { type: { in: ["MODERATION", "SYSTEM"] } }
+      ? { type: { in: ["MODERATION", "SYSTEM"] } } // 「系统」页含审核结果 + 系统公告
       : filter
         ? { type: filter }
         : {}),
   };
+}
+
+export async function getNotifications(
+  userId: string,
+  filter?: NotificationFilter,
+  pageRaw = 1,
+): Promise<{ rows: NotificationRow[]; unread: number; total: number; page: number; hasMore: boolean }> {
+  const where = notificationWhere(userId, filter);
+  const total = await prisma.notification.count({ where });
+  const pages = Math.max(1, Math.ceil(total / NOTIFICATION_PAGE_SIZE));
+  // 页码兜底：筛选切换后旧页码可能越界，clamp 到最后一页而不是给空列表
+  const page = Math.min(Math.max(1, Math.floor(pageRaw) || 1), pages);
+
   const [rows, unread] = await Promise.all([
     prisma.notification.findMany({
       where,
       orderBy: { createdAt: "desc" },
-      take: 50,
+      skip: (page - 1) * NOTIFICATION_PAGE_SIZE,
+      take: NOTIFICATION_PAGE_SIZE,
       select: {
         id: true,
         type: true,
         readAt: true,
         createdAt: true,
         message: true,
+        count: true,
         resourceId: true,
         actorId: true,
         commentId: true,
@@ -1264,11 +1296,15 @@ export async function getNotifications(
       readAt: r.readAt,
       createdAt: r.createdAt,
       message: r.message,
+      count: r.count,
       resource: r.resourceId ? (resMap.get(r.resourceId) ?? null) : null,
       actor: r.actorId ? (actorMap.get(r.actorId) ?? null) : null,
       commentId: r.commentId,
     })),
     unread,
+    total,
+    page,
+    hasMore: page * NOTIFICATION_PAGE_SIZE < total,
   };
 }
 

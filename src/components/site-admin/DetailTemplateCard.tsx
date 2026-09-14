@@ -13,11 +13,13 @@ import type { RunFn } from "./shared";
 
 /** 详情页模板：全局默认 + 分类型覆盖；选择即保存 */
 export default function DetailTemplateCard({ theme, run }: { theme: Theme; run: RunFn }) {
-  const rows: { scope: "default" | "IMAGE" | "GAME" | "ARTICLE"; label: string }[] = [
+  const rows: { scope: "default" | ContentType; label: string }[] = [
     { scope: "default", label: "全局默认" },
     { scope: "IMAGE", label: "图片作品覆盖" },
     { scope: "GAME", label: "游戏覆盖" },
     { scope: "ARTICLE", label: "文章覆盖" },
+    { scope: "MUSIC", label: "音乐覆盖" },
+    { scope: "VIDEO", label: "视频覆盖" },
   ];
   const val = (scope: string): DetailTemplateId | "" =>
     scope === "default"

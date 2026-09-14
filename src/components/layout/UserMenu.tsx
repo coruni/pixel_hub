@@ -2,10 +2,19 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, LayoutDashboard, LogOut, Bell, Settings, Upload, User } from "lucide-react";
+import {
+  ChevronDown,
+  LayoutDashboard,
+  LogOut,
+  Bell,
+  Settings,
+  Upload,
+  User,
+} from "lucide-react";
 import { logoutAction } from "@/lib/actions";
 import Avatar from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
+import { NAV_CONTROL_H } from "@/lib/ui/cls";
 
 export type MenuUser = {
   name: string | null;
@@ -15,10 +24,38 @@ export type MenuUser = {
   avatarKey?: string | null;
 };
 
-/** 顶部导航右侧的用户菜单：头像 + 下拉（个人主页/通知/设置/发布/管理/退出） */
-export default function UserMenu({ user }: { user: MenuUser }) {
+/** 顶部导航右侧的用户菜单：头像 + 下拉（个人主页/通知/设置/发布/管理/退出）。草稿箱已并入账户设置。 */
+export default function UserMenu({ user, unread = 0 }: { user: MenuUser; unread?: number }) {
   const [open, setOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(unread);
   const boxRef = useRef<HTMLDivElement>(null);
+
+  // 未读角标：初值来自服务端（导航时已是最新），之后每 60s（页面可见时）自动校正一次，
+  // 让角标不至于「必须刷新页面才更新」——通知本来就是越及时越有用。
+  useEffect(() => {
+    let alive = true;
+    const tick = async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const res = await fetch("/api/notifications/unread", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = (await res.json()) as { unread?: number };
+        if (alive && typeof data.unread === "number") setUnreadCount(data.unread);
+      } catch {
+        // 角标拉取失败静默：等下一次心跳，不影响任何主流程
+      }
+    };
+    const timer = window.setInterval(tick, 60_000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void tick();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -45,9 +82,20 @@ export default function UserMenu({ user }: { user: MenuUser }) {
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="flex items-center gap-1.5 rounded-none py-1 pl-1 pr-2 text-sm text-neutral-700 transition hover:bg-brand-50"
+        className={`${NAV_CONTROL_H} flex items-center gap-1.5 rounded-none pl-1 pr-2 text-sm text-neutral-700 transition hover:bg-brand-50`}
       >
-        <Avatar name={user.name} username={user.username} avatarKey={user.avatarKey} size="sm" />
+        <span className="relative">
+          <Avatar name={user.name} username={user.username} avatarKey={user.avatarKey} size="sm" />
+          {/* 未读角标：头像右上角，直角方块与站点像素语言一致 */}
+          {unreadCount > 0 && (
+            <span
+              aria-label={`${unreadCount} 条未读通知`}
+              className="absolute -right-1.5 -top-1.5 grid h-4 min-w-4 place-items-center rounded-none bg-red-500 px-0.5 text-[9px] font-semibold leading-none text-white"
+            >
+              {unreadCount > 99 ? "99+" : unreadCount}
+            </span>
+          )}
+        </span>
         <span className="hidden max-w-[8rem] truncate sm:block">{user.name ?? user.username}</span>
         <ChevronDown
           size={14}
@@ -87,6 +135,11 @@ export default function UserMenu({ user }: { user: MenuUser }) {
             </Link>
             <Link href="/notifications" className={itemCls} onClick={() => setOpen(false)}>
               <Bell size={15} className="text-neutral-400" aria-hidden /> 我的通知
+              {unreadCount > 0 && (
+                <span className="ml-auto rounded-none bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
             </Link>
             <Link href="/settings" className={itemCls} onClick={() => setOpen(false)}>
               <Settings size={15} className="text-neutral-400" aria-hidden /> 账号设置

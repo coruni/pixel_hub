@@ -2,6 +2,7 @@
 
 import { Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { NAV_ICON_BTN } from "@/lib/ui/cls";
 
 // 明暗切换：class 策略（<html class="dark">），记忆在 localStorage("theme")。
 // 首帧由 layout 内联脚本设置；图标用 dark: 变体跟随 <html> class 渲染，
@@ -21,7 +22,7 @@ export default function ThemeToggle() {
       onClick={toggle}
       aria-label="切换明暗模式"
       title="切换明暗模式"
-      className="grid h-8 w-8 place-items-center rounded-none border border-brand-200 bg-surface text-neutral-600 transition hover:border-brand-500 hover:text-neutral-900"
+      className={`${NAV_ICON_BTN} rounded-none border border-brand-200 bg-surface text-neutral-600 transition hover:border-brand-500 hover:text-neutral-900`}
     >
       <Sun size={15} className="hidden dark:inline" aria-hidden />
       <Moon size={15} className="dark:hidden" aria-hidden />

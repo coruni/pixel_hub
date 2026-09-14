@@ -6,6 +6,7 @@ import { LayoutGrid, Menu, X } from "lucide-react";
 import { NAV_ICON_MAP } from "@/lib/nav-icons";
 import type { NavCategory } from "./NavCategoriesMenu";
 import { Button } from "@/components/ui/Button";
+import { NAV_ICON_BTN } from "@/lib/ui/cls";
 import SearchBox from "./SearchBox";
 
 export type MobileNavItem = {
@@ -52,7 +53,7 @@ export default function MobileNav({
         onClick={() => setOpen((v) => !v)}
         aria-label="打开导航菜单"
         aria-expanded={open}
-        className="grid h-8 w-8 place-items-center rounded-none border border-brand-200 bg-surface text-neutral-700 transition hover:border-brand-500"
+        className={`${NAV_ICON_BTN} rounded-none border border-brand-200 bg-surface text-neutral-700 transition hover:border-brand-500`}
       >
         {open ? <X size={16} /> : <Menu size={16} />}
       </Button>

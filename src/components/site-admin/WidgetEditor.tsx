@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Plus, Trash2 } from "lucide-react";
-import type { ContentType } from "@/lib/display";
+import { isContentType, type ContentType } from "@/lib/display";
 import { INPUT, INPUT_SM, LABEL_STRONG } from "@/lib/ui/cls";
 import { SIDEBAR_KIND_META, type SidebarWidget, type SidebarWidgetConfig } from "@/lib/site-config";
 import { updateSidebarWidgetAction } from "@/lib/actions/site";
@@ -32,7 +32,7 @@ export default function WidgetEditor({
   const id = (k: string) => `${k}-${widget.id}`;
   const [title, setTitle] = useState(widget.title ?? "");
   const [type, setType] = useState<"ALL" | ContentType>(
-    cfg.type === "IMAGE" || cfg.type === "GAME" || cfg.type === "ARTICLE" ? cfg.type : "ALL",
+    isContentType(cfg.type) ? cfg.type : "ALL",
   );
   const [sort, setSort] = useState<"latest" | "popular" | "downloads">(
     cfg.sort === "latest" || cfg.sort === "downloads" ? cfg.sort : "popular",
@@ -227,6 +227,8 @@ export default function WidgetEditor({
                 <option value="IMAGE">图片作品</option>
                 <option value="GAME">游戏</option>
                 <option value="ARTICLE">文章</option>
+                <option value="MUSIC">音乐</option>
+                <option value="VIDEO">视频</option>
               </select>
             </div>
             <div>
