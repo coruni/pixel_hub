@@ -101,7 +101,6 @@ export default function UploadWizard({
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const [catId, setCatId] = useState(d?.categoryId ?? "");
   const [description, setDescription] = useState(d?.description ?? "");
 
   const [state, formAction, pending] = useActionState<ResourceActionState, FormData>(
@@ -135,7 +134,6 @@ export default function UploadWizard({
 
   function applyType(t: WizardType) {
     setType(t);
-    if (!categories.some((c) => c.id === catId)) setCatId("");
   }
 
   const persist = useCallback(
@@ -175,14 +173,15 @@ export default function UploadWizard({
     [draftId],
   );
 
-  // 受控 state（媒体、封面、正文、分类）与表单事件都作为「改过了」的信号；停止输入后写一次
+  // 受控 state（媒体、封面、正文）与表单事件都作为「改过了」的信号；停止输入后写一次
   useEffect(() => {
     if (!type || !autoSave) return;
     const timer = setTimeout(() => {
       void persist(false);
     }, DRAFT_AUTOSAVE_DELAY);
     return () => clearTimeout(timer);
-  }, [formTick, files, coverId, description, catId, autoSave, type, persist]);
+    // 分类是非受控字段，改动由 form 级 onChange/formTick 捕获，无需单独依赖
+  }, [formTick, files, coverId, description, autoSave, type, persist]);
 
   // 兜底周期：手别停时防抖计时器永远等不到「停手」，这里按点存一次（内容没变时 persist 内部会跳过）
   useEffect(() => {
@@ -453,16 +452,22 @@ export default function UploadWizard({
             <label className={wizLabel} htmlFor="categoryId">
               分类
             </label>
+            {/* 非受控：选中的值由浏览器持有，重渲染/重挂载都不会把它打回占位符 */}
             <select
               id="categoryId"
               name="categoryId"
-              value={catId}
-              onChange={(e) => setCatId(e.target.value)}
-              className={wizInput}
+              defaultValue={d?.categoryId ?? ""}
+              className={`${wizInput} text-neutral-900 dark:text-neutral-100`}
             >
-              <option value="">选择分类…</option>
+              <option value="" className="text-neutral-500 dark:text-neutral-400">
+                选择分类…
+              </option>
               {categories.map((c) => (
-                <option key={c.id} value={c.id}>
+                <option
+                  key={c.id}
+                  value={c.id}
+                  className="bg-surface text-neutral-900 dark:text-neutral-100"
+                >
                   {c.name}
                 </option>
               ))}
