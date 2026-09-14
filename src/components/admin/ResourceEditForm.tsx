@@ -14,6 +14,7 @@ import { updateResourceAdminAction } from "@/lib/actions/admin-content";
 import type { ResourceEditState, EditableResourceType } from "@/lib/actions/_resource-edit";
 import type { ResourceMetaOutput } from "@/lib/meta";
 import { ARTICLE_MEDIA_MAX, isSingleCoverType, type UploadLimits } from "@/lib/upload-config";
+import { uploadImageFiles } from "@/lib/upload-image-client";
 import {
   PublishOptionGrid,
   SectionTitle,
@@ -118,45 +119,14 @@ export function ResourceEditForm({
       setUploadMsg(`最多上传 ${maxCount} 张`);
       return;
     }
-    // Chevereto 上传接口一次请求仅接受单个文件：每个文件走独立请求，
-    // 用 Promise.allSettled 并行发出多个「单文件」请求并逐个收集成败。
+    // 每个文件走独立请求：服务端 /api/upload 一次只接收一个源文件。
+    // 并发上限、单请求超时、退避重试，以及「非 JSON 响应（如反代 524 的空体）如何解释」，
+    // 统一收敛在 lib/upload-image-client，与发布向导共用同一份策略。
     const picks = Array.from(fl).slice(0, remain);
     setUploading(true);
     setUploadMsg(null);
     try {
-      const settled = await Promise.allSettled(
-        picks.map(async (f): Promise<{ ok: true; item: Uploaded } | { ok: false; error: string }> => {
-          const fd = new FormData();
-          fd.append("files", f);
-          try {
-            const res = await fetch(`/api/upload?max=${maxCount}`, { method: "POST", body: fd });
-            const data = (await res.json()) as {
-              ok?: boolean;
-              error?: string;
-              files?: Uploaded[];
-            };
-            const item = data.files?.[0];
-            if (res.ok && data.ok && item?.ok) return { ok: true, item };
-            console.warn(`[upload:client] 上传被拒 fileName=${f.name}`, { status: res.status, data });
-            return { ok: false, error: item?.error ?? data.error ?? "上传失败" };
-          } catch (err) {
-            console.warn(`[upload:client] 请求失败 fileName=${f.name}`, err);
-            return { ok: false, error: "网络错误，请重试" };
-          }
-        }),
-      );
-      const good: Uploaded[] = [];
-      const bad: { name: string; error?: string }[] = [];
-      for (let i = 0; i < settled.length; i += 1) {
-        const r = settled[i]!;
-        if (r.status === "rejected") {
-          bad.push({ name: picks[i]!.name, error: "网络错误，请重试" });
-        } else if (r.value.ok) {
-          good.push(r.value.item);
-        } else {
-          bad.push({ name: picks[i]!.name, error: r.value.error });
-        }
-      }
+      const { good, bad } = await uploadImageFiles(picks, maxCount);
       if (good.length > 0) {
         const next = [...files, ...good].slice(0, maxCount);
         setFiles(next);
