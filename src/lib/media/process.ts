@@ -57,8 +57,11 @@ export async function processImage(
   input: Buffer,
   cfg: ImageCompressConfig,
 ): Promise<ProcessedImage> {
-  const base = makeKey("images", ".x"); // 仅借用唯一目录
-  const dir = base.slice(0, base.lastIndexOf("/"));
+  // makeKey 把 uuid 放在**文件名**上（`<dir>/<yyyymm>/<uuid><ext>`），所以这里必须把整串当目录用。
+  // 原先 `slice(0, lastIndexOf("/"))` 会把 uuid 切掉、退化成 `images/<yyyymm>`：同一自然月的所有上传
+  // 都写同一组 `original./big./thumb.`，而 local 与 s3 驱动都是「按 key 原样覆盖写」，
+  // 于是第二张图会静默盖掉第一张（chevereto 只是因为远端给重名文件自动加了哈希后缀才看不出来）。
+  const dir = makeKey("images", "");
 
   const oriented = sharp(input, { failOn: "none" }).rotate();
   const meta = await oriented.metadata();
