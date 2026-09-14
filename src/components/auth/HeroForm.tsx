@@ -11,10 +11,11 @@ import { Button } from "@/components/ui/Button";
 // 与 AvatarForm 同款交互：原始文件进裁剪器，裁剪产物经 DataTransfer 注入隐藏提交 input。
 export default function HeroForm({
   heroImageKey,
-  heroMaxMb = 20,
+  heroMaxMb,
 }: {
   heroImageKey: string | null;
-  heroMaxMb?: number;
+  /** 单张上限（MB）：由后台「上传限制 · 主页横幅」下发，组件内不再兜默认值以免与后台漂移 */
+  heroMaxMb: number;
 }) {
   const [state, formAction, pending] = useActionState<SettingsActionState, FormData>(
     uploadHeroAction,

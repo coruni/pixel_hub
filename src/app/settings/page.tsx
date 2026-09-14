@@ -93,7 +93,10 @@ export default async function SettingsPage({
           <section className={sectionCls}>
             <h2 className={sectionTitle}>主页横幅</h2>
             <p className={sectionHint}>展示在公开主页头部，未设置则按原版头部显示</p>
-            <HeroForm heroImageKey={profile?.heroImageKey ?? null} />
+            <HeroForm
+              heroImageKey={profile?.heroImageKey ?? null}
+              heroMaxMb={limits.heroImageMaxMb}
+            />
           </section>
 
           <section className={sectionCls}>

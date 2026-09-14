@@ -1,7 +1,7 @@
 "use client";
 
-// 后台「上传限制」编辑：附件单文件上限 + 允许后缀 + 三档图片单张上限（图集/评论图/头像）
-// + 图片压缩（输出格式 webp/jpg/png 与质量，webp/png 保留 alpha）。
+// 后台「上传限制」编辑：附件单文件上限 + 允许后缀 + 四档图片单张上限（图集/评论图/头像/主页横幅）
+// + 图片数量上限（图集张数无上界，评论图 0..20）+ 图片压缩（输出格式 webp/jpg/png 与质量，webp/png 保留 alpha）。
 // 纯客户端表单，保存走 saveUploadLimitsAction；数值服务端 clamp、后缀 normalizeExts 权威校验，
 // 前端只是组织入参并在服务端 refresh 后把最新配置同步回本地草稿（渲染期派生，见下方 prev 对比）。
 import { useState } from "react";
@@ -11,6 +11,7 @@ import {
   Image as ImageIcon,
   MessageCircle,
   Minimize2,
+  PanelTop,
   RotateCcw,
   Save,
   ShieldCheck,
@@ -35,7 +36,12 @@ import { Button } from "@/components/ui/Button";
 
 /** 数值字段规约：key / label / 范围（提交时服务端还会 clamp，这里仅辅助输入） */
 const NUM_FIELDS: {
-  key: "attachmentMaxMb" | "galleryImageMaxMb" | "commentImageMaxMb" | "avatarMaxMb";
+  key:
+    | "attachmentMaxMb"
+    | "galleryImageMaxMb"
+    | "commentImageMaxMb"
+    | "avatarMaxMb"
+    | "heroImageMaxMb";
   label: string;
   min: number;
   max: number;
@@ -69,22 +75,28 @@ const NUM_FIELDS: {
     max: 100,
     hint: "设置页上传头像的单张上限（裁剪产物通常远小于此）。",
   },
+  {
+    key: "heroImageMaxMb",
+    label: "主页横幅（MB）",
+    min: 1,
+    max: 100,
+    hint: "个人主页顶部 16:5 横幅（导出 1600×500）的单张上限。横幅比头像宽得多，建议单独放宽。",
+  },
 ];
 
-/** 图片数量限制字段：key / label / 范围（张） */
+/** 图片数量限制字段：key / label / 范围（张）；**省略 max = 无上界**（图集张数已去掉 60 张天花板） */
 const COUNT_FIELDS: {
   key: "galleryImageMaxCount" | "commentImageMaxCount";
   label: string;
   min: number;
-  max: number;
+  max?: number;
   hint: string;
 }[] = [
   {
     key: "galleryImageMaxCount",
     label: "图集 / 原图 张数上限",
     min: COUNT_RANGE.min,
-    max: COUNT_RANGE.max,
-    hint: "单个【图片】资源可上传的预览图张数（含首图）。超出后上传入口禁用。",
+    hint: "单个【图片】资源可上传的预览图张数（含首图）。超出后上传入口禁用。已去掉 60 张上限，按实际批量填写（站内限流 120 次/小时/账号）。",
   },
   {
     key: "commentImageMaxCount",
@@ -100,6 +112,7 @@ const OVERVIEW_FIELDS = [
   { key: "galleryImageMaxMb", label: "图集 / 原图", note: "单张上限", Icon: ImageIcon },
   { key: "commentImageMaxMb", label: "评论附图", note: "单张上限", Icon: MessageCircle },
   { key: "avatarMaxMb", label: "头像", note: "单张上限", Icon: UserRound },
+  { key: "heroImageMaxMb", label: "主页横幅", note: "单张上限", Icon: PanelTop },
 ] as const;
 
 const IMAGE_FIELDS = NUM_FIELDS.filter((field) => field.key !== "attachmentMaxMb");
@@ -128,6 +141,7 @@ type Draft = {
   galleryImageMaxMb: string;
   commentImageMaxMb: string;
   avatarMaxMb: string;
+  heroImageMaxMb: string;
   galleryImageMaxCount: string;
   commentImageMaxCount: string;
   imageFormat: ImageOutputFormat;
@@ -140,6 +154,7 @@ const toDraft = (l: UploadLimits): Draft => ({
   galleryImageMaxMb: String(l.galleryImageMaxMb),
   commentImageMaxMb: String(l.commentImageMaxMb),
   avatarMaxMb: String(l.avatarMaxMb),
+  heroImageMaxMb: String(l.heroImageMaxMb),
   galleryImageMaxCount: String(l.galleryImageMaxCount),
   commentImageMaxCount: String(l.commentImageMaxCount),
   imageFormat: l.imageFormat,
@@ -167,6 +182,7 @@ export default function UploadLimitsManager({ limits }: { limits: UploadLimits }
         galleryImageMaxMb: Number(draft.galleryImageMaxMb),
         commentImageMaxMb: Number(draft.commentImageMaxMb),
         avatarMaxMb: Number(draft.avatarMaxMb),
+        heroImageMaxMb: Number(draft.heroImageMaxMb),
         galleryImageMaxCount: Number(draft.galleryImageMaxCount),
         commentImageMaxCount: Number(draft.commentImageMaxCount),
         imageFormat: draft.imageFormat,
@@ -179,7 +195,7 @@ export default function UploadLimitsManager({ limits }: { limits: UploadLimits }
     void confirmDialog({
       title: "恢复默认上传限制",
       message:
-        "将附件与图片上传限制恢复为站点默认值（200MB + 内置后缀 / 20 / 5 / 5），图片压缩恢复为 webp + 质量 82，确定？",
+        "将附件与图片上传限制恢复为站点默认值（附件 200MB + 内置后缀；图集/原图 20MB、评论附图 5MB、头像 5MB、主页横幅 20MB），图片压缩恢复为 webp + 质量 82，确定？",
       confirmLabel: "恢复默认",
       danger: true,
     }).then((ok) => {
@@ -195,7 +211,7 @@ export default function UploadLimitsManager({ limits }: { limits: UploadLimits }
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
         {OVERVIEW_FIELDS.map(({ key, label, note, Icon }) => (
           <div
             key={key}
@@ -225,7 +241,7 @@ export default function UploadLimitsManager({ limits }: { limits: UploadLimits }
               <div>
                 <h2 className="text-sm font-semibold text-neutral-900">图片上传限制</h2>
                 <p className="mt-1 text-xs leading-5 text-neutral-500">
-                  控制图集、评论附图和头像的单张原图大小，服务端会在上传时统一校验。
+                  控制图集、评论附图、头像与主页横幅的单张原图大小，服务端会在上传时统一校验。
                 </p>
               </div>
             </div>
@@ -289,7 +305,7 @@ export default function UploadLimitsManager({ limits }: { limits: UploadLimits }
                       {f.label}
                     </label>
                     <span className="rounded-none bg-neutral-100 px-1.5 py-0.5 text-[10px] text-neutral-400">
-                      {f.min}–{f.max} 张
+                      {f.max === undefined ? `≥ ${f.min} 张` : `${f.min}–${f.max} 张`}
                     </span>
                   </div>
                   <p className="mt-1 text-[11px] leading-4 text-neutral-400">{f.hint}</p>

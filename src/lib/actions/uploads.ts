@@ -11,6 +11,7 @@ import {
   MB_RANGE,
   QUALITY_RANGE,
   clampInt,
+  clampIntMin,
   isImageFormat,
   normalizeExts,
   type ImageOutputFormat,
@@ -36,7 +37,9 @@ export type SaveUploadLimitsInput = {
   commentImageMaxMb?: number;
   /** 头像（MB） */
   avatarMaxMb?: number;
-  /** 图集/原图：单个资源图片张数上限 */
+  /** 主页横幅（MB，个人主页 hero） */
+  heroImageMaxMb?: number;
+  /** 图集/原图：单个资源图片张数上限（已去掉上界，仅保留 ≥1） */
   galleryImageMaxCount?: number;
   /** 评论附图：单条评论图片张数上限 */
   commentImageMaxCount?: number;
@@ -82,13 +85,19 @@ export async function saveUploadLimitsAction(input: SaveUploadLimitsInput): Prom
       MB_RANGE.image.max,
       l.avatarMaxMb,
     );
+  if (typeof input.heroImageMaxMb === "number")
+    l.heroImageMaxMb = clampInt(
+      input.heroImageMaxMb,
+      MB_RANGE.image.min,
+      MB_RANGE.image.max,
+      l.heroImageMaxMb,
+    );
 
-  // 数量上限：range 内整数钳制（评论图允许 0，表示禁止附图）
+  // 数量上限：图集张数只钳下界（已无上界），评论图允许 0（表示禁止附图）
   if (typeof input.galleryImageMaxCount === "number")
-    l.galleryImageMaxCount = clampInt(
+    l.galleryImageMaxCount = clampIntMin(
       input.galleryImageMaxCount,
       COUNT_RANGE.min,
-      COUNT_RANGE.max,
       l.galleryImageMaxCount,
     );
   if (typeof input.commentImageMaxCount === "number")

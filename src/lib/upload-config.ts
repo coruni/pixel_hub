@@ -7,7 +7,8 @@
 //   galleryImageMaxMb,      // 图集/原图单张 + 后台直传（1..100）
 //   commentImageMaxMb,      // 评论附图单张（1..100）
 //   avatarMaxMb,            // 头像（1..100）
-//   galleryImageMaxCount,   // 图集/原图张数上限
+//   heroImageMaxMb,         // 主页横幅单张（1..100）
+//   galleryImageMaxCount,   // 图集/原图张数上限（只设下界 1，上不封顶）
 //   commentImageMaxCount,   // 评论附图张数上限
 //   imageFormat,            // 服务端压缩输出格式 webp|jpg|png（webp/png 保留 alpha）
 //   imageQuality,           // 服务端压缩质量（1..100）
@@ -33,9 +34,13 @@ export const MB_RANGE = {
   image: { min: 1, max: 100 },
 } as const;
 
-/** 单批次/单资源图片数量上限范围（张）。图集/文章插图共用此档位；评论图单独更窄的默认 */
-export const COUNT_RANGE = { min: 1, max: 60 } as const;
-/** 评论附图数量上限范围（张） */
+/**
+ * 单批次/单资源图片数量上限（张）：图集 / 文章插图共用此档位。
+ * 只设下界、**不设上界**——原先 `max: 60` 的硬编码天花板会让后台无法配置更大的批量，
+ * 已去掉（站点是管理员自己的，张数由其按需决定；真被滥用由上传限流兜底）。
+ */
+export const COUNT_RANGE = { min: 1 } as const;
+/** 评论附图数量上限范围（张）：单条评论附图，保留 0..20 的窄档位（0 = 禁止附图） */
 export const COMMENT_COUNT_RANGE = { min: 0, max: 20 } as const;
 
 /** 压缩输出格式：webp（默认，体积最优）/ jpg（兼容性最好，无透明）/ png（无损或调色板量化） */
@@ -124,7 +129,9 @@ export type UploadLimits = {
   galleryImageMaxMb: number;
   commentImageMaxMb: number;
   avatarMaxMb: number;
-  /** 图集 / 原图：单个资源可上传的图片张数上限（IMAGE 类型预览图） */
+  /** 主页横幅（个人主页 hero，16:5 裁剪为 1600×500）：单张上限 */
+  heroImageMaxMb: number;
+  /** 图集 / 原图：单个资源可上传的图片张数上限（IMAGE 类型预览图）；只设下界，无上界 */
   galleryImageMaxCount: number;
   /** 评论附图：单条评论可附带的图片张数上限 */
   commentImageMaxCount: number;
@@ -147,7 +154,7 @@ export function isSingleCoverType(type: string): boolean {
   return SINGLE_COVER_TYPES.includes(type);
 }
 
-/** 默认 = 今日各处硬编码值原样迁入（附件 200MB + 29 后缀；图集 20；评论图 5；头像 5） */
+/** 默认 = 今日各处硬编码值原样迁入（附件 200MB + 29 后缀；图集 20；评论图 5；头像 5；主页横幅 20） */
 export const DEFAULT_ATTACH_EXTS: readonly string[] = [
   "zip",
   "rar",
@@ -186,6 +193,7 @@ export const DEFAULT_UPLOAD_LIMITS: UploadLimits = {
   galleryImageMaxMb: 20,
   commentImageMaxMb: 5,
   avatarMaxMb: 5,
+  heroImageMaxMb: 20,
   galleryImageMaxCount: 12,
   commentImageMaxCount: 3,
   imageFormat: DEFAULT_IMAGE_FORMAT,
@@ -197,6 +205,15 @@ export const DEFAULT_UPLOAD_LIMITS: UploadLimits = {
 export function clampInt(n: unknown, min: number, max: number, dflt: number): number {
   if (typeof n !== "number" || !Number.isFinite(n)) return dflt;
   return Math.min(max, Math.max(min, Math.round(n)));
+}
+
+/**
+ * 只保留下界的整数钳制：给**已去掉上界**的字段用（当前只有图集张数上限）。
+ * 用 clampInt 会重新引入天花板，故单列一个函数把「无上界」这件事写在类型/命名上。
+ */
+export function clampIntMin(n: unknown, min: number, dflt: number): number {
+  if (typeof n !== "number" || !Number.isFinite(n)) return dflt;
+  return Math.max(min, Math.round(n));
 }
 
 /** 宽松清洗（读库兜底用）：逐 token 去点小写去重，非法/命中 DENY 一律剔除；返回 [] 表示全废 */
@@ -248,12 +265,15 @@ export function parseUploadLimits(raw: unknown): UploadLimits {
     galleryImageMaxMb: clampInt(o.galleryImageMaxMb, MB_RANGE.image.min, MB_RANGE.image.max, 20),
     commentImageMaxMb: clampInt(o.commentImageMaxMb, MB_RANGE.image.min, MB_RANGE.image.max, 5),
     avatarMaxMb: clampInt(o.avatarMaxMb, MB_RANGE.image.min, MB_RANGE.image.max, 5),
-    galleryImageMaxCount: clampInt(
-      o.galleryImageMaxCount,
-      COUNT_RANGE.min,
-      COUNT_RANGE.max,
-      12,
+    // 横幅：缺失回退站点默认（与改造前 avatarMaxMb × 4 的实际效果一致，避免老配置行为跳变）
+    heroImageMaxMb: clampInt(
+      o.heroImageMaxMb,
+      MB_RANGE.image.min,
+      MB_RANGE.image.max,
+      DEFAULT_UPLOAD_LIMITS.heroImageMaxMb,
     ),
+    // 图集张数：只钳下界，大值原样保留（原先的 max 60 天花板已去掉）
+    galleryImageMaxCount: clampIntMin(o.galleryImageMaxCount, COUNT_RANGE.min, 12),
     commentImageMaxCount: clampInt(
       o.commentImageMaxCount,
       COMMENT_COUNT_RANGE.min,

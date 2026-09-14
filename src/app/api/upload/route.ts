@@ -40,12 +40,13 @@ export async function POST(req: NextRequest) {
   const L = await getUploadLimits();
   const maxBytes = L.galleryImageMaxMb * MIB;
 
-  // 单次上传张数上限：优先取客户端（向导按类型传入）的 max 参数，并钳制在合法范围，
-  // 缺失/越界时回退后台 galleryImageMaxCount；这是上传入口的安全网，最终上限由发布 action 强制。
+  // 单次上传张数上限：客户端（向导按类型传入，如 ARTICLE 固定 1 张）只允许**收窄**，
+  // 取 min(客户端值, 后台 galleryImageMaxCount)，避免客户端把上限放大；
+  // 缺失/非法一律回退后台配置。后台图集张数已去掉 60 张天花板，这里不再有硬编码上界。
   const maxParam = Number(req.nextUrl.searchParams.get("max"));
   const MAX_FILES =
-    Number.isFinite(maxParam) && maxParam >= COUNT_RANGE.min && maxParam <= COUNT_RANGE.max
-      ? Math.floor(maxParam)
+    Number.isFinite(maxParam) && maxParam >= COUNT_RANGE.min
+      ? Math.min(Math.floor(maxParam), L.galleryImageMaxCount)
       : L.galleryImageMaxCount;
 
   const form = await req.formData();

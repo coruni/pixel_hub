@@ -190,11 +190,13 @@ export async function uploadHeroAction(
   if (!user) return { error: "请先登录" };
 
   const L = await getUploadLimits();
-  const maxBytes = L.avatarMaxMb * MIB * 4; // 横幅比头像更宽，限额放宽到 4 倍
+  // 横幅独立档位（后台「上传限制 · 主页横幅单张」）。原先借用 avatarMaxMb × 4 放大，
+  // 两处配置会漂移（改头像上限会连带改横幅上限），现已拆成独立字段。
+  const maxBytes = L.heroImageMaxMb * MIB;
   const file = fd.get("hero");
   if (!(file instanceof File) || file.size === 0) return { error: "请选择图片文件" };
   const buf = Buffer.from(await file.arrayBuffer());
-  if (buf.byteLength > maxBytes) return { error: `横幅图不能超过 ${(maxBytes / MIB).toFixed(0)}MB` };
+  if (buf.byteLength > maxBytes) return { error: `横幅图不能超过 ${L.heroImageMaxMb}MB` };
   if (!sniffImage(buf)) return { error: "不支持的图片格式（仅 png/jpg/webp/gif）" };
 
   const isGif = buf.length >= 6 && buf.subarray(0, 6).toString("latin1").startsWith("GIF8");
