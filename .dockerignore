@@ -1,0 +1,24 @@
+# 依赖与构建产物：由各阶段重新生成 / 从上一阶段拷贝，不能带进构建上下文
+node_modules
+.next
+
+# 源码控制
+.git
+.gitignore
+
+# 密钥：.env 含 DATABASE_URL 等，绝不能进镜像（运行时用 --env-file 注入）
+.env
+.env.*
+!.env.example
+
+# 日志与本地缓存
+npm-debug.log*
+yarn-error.log*
+*.tsbuildinfo
+
+# Docker 自身与编辑器
+Dockerfile
+.dockerignore
+.editorconfig
+.vscode
+.idea
