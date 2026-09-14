@@ -24,20 +24,24 @@ export default function Avatar({
   online?: boolean;
 }) {
   const label = (name ?? username).slice(0, 1).toUpperCase();
+  // 角标锁在头像方框的右下内角：不外扩就不会溢出行高，越小档位（xs/sm）越明显。
   const badge = online && (
     <span
       aria-label="在线"
-      className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 border-2 border-surface bg-emerald-500"
+      className="absolute bottom-0 right-0 h-2.5 w-2.5 border-2 border-surface bg-emerald-500"
     />
   );
+  // 关键：外层方框显式给尺寸。父级 flex 默认 align-items:stretch，
+  // 若此处高度为 auto 就会被拉到整行高度，absolute 角标随之掉到行底（表现为绿点脱离头像）。
+  // 显式尺寸后 cross-size 非 auto，stretch 不再生效。
   if (avatarKey) {
     return (
-      <span className="relative inline-block shrink-0">
+      <span className={`relative inline-block shrink-0 rounded-none ${SIZES[size]}`}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={publicUrl(avatarKey)}
           alt={name ?? username}
-          className={`shrink-0 rounded-none border border-brand-600 object-cover ${SIZES[size]}`}
+          className="block h-full w-full border border-brand-600 object-cover"
         />
         {badge}
       </span>

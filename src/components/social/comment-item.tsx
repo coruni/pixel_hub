@@ -192,11 +192,7 @@ function ReplyItem({
   onNavigate: (commentId: string, fallbackRootId: string) => void;
 }) {
   return (
-    <li
-      id={`comment-${rp.id}`}
-      data-comment-id={rp.id}
-      className="scroll-mt-24 rounded-none bg-neutral-100/70 p-3"
-    >
+    <li id={`comment-${rp.id}`} data-comment-id={rp.id} className="scroll-mt-24 p-3">
       <div className="flex items-center gap-2">
         <UserHoverCard user={rp.author}>
           <Link

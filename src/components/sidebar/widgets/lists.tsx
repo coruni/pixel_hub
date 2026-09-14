@@ -120,7 +120,7 @@ export async function renderComments(w: SidebarWidget) {
     <WidgetShell title={widgetTitle(w)}>
       <ul className="space-y-2.5">
         {rows.map((c) => (
-          <li key={c.id} className="flex gap-2">
+          <li key={c.id} className="flex items-start gap-2">
             <Avatar
               name={c.author.name}
               username={c.author.username}
