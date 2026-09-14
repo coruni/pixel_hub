@@ -3,6 +3,7 @@
 import { X } from "lucide-react";
 import { SectionTitle, STEP, type Uploaded } from "./wizard-shared";
 import { Button } from "@/components/ui/Button";
+import { useFileDrop } from "@/lib/hooks/use-file-drop";
 
 /** 预览图/插图选择：上传、设封面、移除（最多 maxCount 张，默认 12）；单张上限由宿主配置传入 */
 export default function MediaPicker({
@@ -37,6 +38,13 @@ export default function MediaPicker({
 }) {
   const okCount = files.filter((f) => f.ok).length;
   const oneShot = singleCover ?? isArticle;
+  const full = files.length >= maxCount;
+  // 整块缩略图网格都是投放区：不必对准虚线格，拖到已有缩略图上同样算数。
+  // 掉落的文件直接交给 onPick —— 与 <input type="file"> 是同一条上传链路，调用方无需感知拖拽。
+  const { dragging, dropProps } = useFileDrop({
+    onFiles: onPick,
+    disabled: uploading || full,
+  });
   return (
     <section className="mt-4 rounded-none border border-brand-200 bg-surface p-5">
       <SectionTitle
@@ -50,7 +58,12 @@ export default function MediaPicker({
         {oneShot ? "封面" : "预览图"}
         {!oneShot && <span className="text-red-500">*</span>}
       </SectionTitle>
-      <div className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-4">
+      <div
+        {...dropProps}
+        className={`mt-3 grid grid-cols-3 gap-3 transition-colors sm:grid-cols-4 ${
+          dragging ? "bg-brand-50 ring-2 ring-brand-400" : ""
+        }`}
+      >
         {files.map((f) => (
           <div
             key={f.id}
@@ -86,11 +99,23 @@ export default function MediaPicker({
             </Button>
           </div>
         ))}
-        <label className="grid aspect-square w-full cursor-pointer place-items-center rounded-none border-2 border-dashed border-brand-300 bg-brand-50/40 text-center text-brand-700 transition hover:border-brand-500 hover:bg-brand-50">
+        <label
+          className={`grid aspect-square w-full cursor-pointer place-items-center rounded-none border-2 border-dashed text-center transition ${
+            dragging
+              ? "border-brand-600 bg-brand-100 text-brand-700"
+              : "border-brand-300 bg-brand-50/40 text-brand-700 hover:border-brand-500 hover:bg-brand-50"
+          }`}
+        >
           <span className="px-2 text-xs">
-            {uploading ? "处理中…" : files.length >= maxCount ? "已达上限" : "＋ 上传图片"}
+            {dragging
+              ? "松开即可上传"
+              : uploading
+                ? "处理中…"
+                : full
+                  ? "已达上限"
+                  : "＋ 上传图片"}
             <span className="mt-0.5 block font-normal text-[10px] opacity-70">
-              png/jpg/webp ≤{maxMb}MB
+              拖入/点击 · png/jpg/webp ≤{maxMb}MB
             </span>
           </span>
           <input
@@ -98,7 +123,7 @@ export default function MediaPicker({
             type="file"
             accept="image/*"
             multiple={maxCount > 1}
-            disabled={uploading || files.length >= maxCount}
+            disabled={uploading || full}
             onChange={(e) => onPick(e.target.files)}
             className="hidden"
           />
