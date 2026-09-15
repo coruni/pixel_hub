@@ -67,16 +67,17 @@ export default async function Navbar() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-brand-200 bg-surface">
-      <div className="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4 sm:px-6">
+      {/* 窄屏收缩策略：logo 可截断不折行、右侧控件不压扁、间距压缩，320px 仍单行 */}
+      <div className="mx-auto flex h-16 max-w-7xl items-center gap-2 px-4 sm:gap-6 sm:px-6">
         <Link
           href="/"
-          className="flex items-center gap-2 text-lg font-semibold tracking-tight text-neutral-900"
+          className="flex min-w-0 items-center gap-2 text-base font-semibold tracking-tight text-neutral-900 sm:text-lg"
         >
-          <span className="grid h-8 w-8 place-items-center overflow-hidden rounded-none border border-brand-600 bg-surface">
+          <span className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-none border border-brand-600 bg-surface">
             {/* eslint-disable-next-line @next/next/no-img-element -- 站点徽标来自后台配置/静态 svg，不走 next/image */}
             <img src={seo.siteLogo || siteLogo()} alt={name} className="h-full w-full object-contain" />
           </span>
-          <span>{name}</span>
+          <span className="truncate">{name}</span>
         </Link>
 
         {(items.length > 0 || catMenu) && (
@@ -88,7 +89,7 @@ export default async function Navbar() {
           </nav>
         )}
 
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
           {/* 站内搜索（全文检索）：≥sm 行内显示；窄屏在汉堡抽屉顶部提供 */}
           <SearchBox className="hidden w-40 sm:block lg:w-52" placeholder="搜索资源…" />
           <ThemeToggle />
@@ -119,13 +120,13 @@ export default async function Navbar() {
             <>
               <Link
                 href="/login"
-                className={`${NAV_CONTROL_H} inline-flex items-center text-sm text-neutral-600 hover:text-neutral-900`}
+                className={`${NAV_CONTROL_H} inline-flex items-center whitespace-nowrap text-sm text-neutral-600 hover:text-neutral-900`}
               >
                 登录
               </Link>
               <Link
                 href="/register"
-                className={`${NAV_CONTROL_H} inline-flex items-center rounded-none border border-brand-600 bg-brand-500 px-4 text-sm font-medium text-white transition hover:bg-brand-600`}
+                className={`${NAV_CONTROL_H} inline-flex items-center whitespace-nowrap rounded-none border border-brand-600 bg-brand-500 px-3 text-sm font-medium text-white transition hover:bg-brand-600 sm:px-4`}
               >
                 注册
               </Link>
