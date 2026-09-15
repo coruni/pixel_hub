@@ -142,7 +142,6 @@ export async function applyResourceEdit(
       nsfw: on(fd, "nsfw"),
       loginRequired: on(fd, "loginRequired"),
       allowComments: on(fd, "allowComments"),
-      isDownloadable: on(fd, "isDownloadable"),
     },
   });
 

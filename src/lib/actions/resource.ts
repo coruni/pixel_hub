@@ -203,7 +203,6 @@ export async function createResourceAction(
           loginRequired: fd.get("loginRequired") === "on",
           allowComments: fd.get("allowComments") !== "off",
           nsfw: fd.get("nsfw") === "on",
-          isDownloadable: fd.get("isDownloadable") === "on",
           publishedAt: status === "PUBLISHED" ? new Date() : null,
         },
       });

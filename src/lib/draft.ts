@@ -82,7 +82,6 @@ export const draftPayloadSchema = z.object({
   nsfw: flag,
   loginRequired: flag,
   allowComments: flag,
-  isDownloadable: flag,
 });
 export type DraftPayload = z.infer<typeof draftPayloadSchema>;
 
@@ -231,7 +230,6 @@ export function collectDraft(
     nsfw: on("nsfw"),
     loginRequired: on("loginRequired"),
     allowComments: on("allowComments"),
-    isDownloadable: on("isDownloadable"),
   };
 }
 
