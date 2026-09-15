@@ -1,4 +1,4 @@
-// IMAGE / ARTICLE 下载面板 —— 按 meta 分发，独立于 GAME 的 externalUrl/版本表流程。
+// 统一下载面板 —— IMAGE/ARTICLE 按 meta 分发，GAME 走 externalUrl 外链；版本历史由 VersionSection 单独渲染。
 // 服务端决定渲染什么（null = 无下载）；真正的下载/登录墙由客户端 MetaDownloadButton 处理。
 import { Download, ExternalLink, FileText } from "lucide-react";
 import { formatCount } from "@/lib/format";
@@ -132,8 +132,37 @@ function ArticleAttachmentsCard({ ctx }: { ctx: DetailCtx }) {
   );
 }
 
+/** GAME：externalUrl 外链主下载（作者外链，原样打开；版本历史走 VersionSection） */
+function GameExternalCard({ ctx }: { ctx: DetailCtx }) {
+  const { detail, authed } = ctx;
+  if (!detail.externalUrl) return null;
+  const version = ctx.meta.kind === "GAME" ? ctx.meta.version : undefined;
+  return (
+    <section className="mt-6 rounded-none border border-brand-200 bg-surface p-5">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+        <div className="min-w-0">
+          <p className="flex items-center gap-1.5 text-xs text-neutral-400">
+            <ExternalLink size={13} aria-hidden /> 游戏下载（外链）
+          </p>
+          {version && <p className="mt-1 truncate text-sm text-neutral-700">版本 {version}</p>}
+          <p className="mt-0.5 text-xs text-neutral-400">已下载 {formatCount(detail.downloadCount)} 次</p>
+        </div>
+        <MetaDownloadButton
+          resourceId={detail.id}
+          url={detail.externalUrl}
+          kind="link"
+          label="前往下载（外链）"
+          loginRequired={detail.loginRequired}
+          authed={authed}
+          callbackPath={`/resources/${detail.slug}`}
+        />
+      </div>
+    </section>
+  );
+}
+
 export function DownloadPanel({ ctx }: { ctx: DetailCtx }) {
-  const { meta } = ctx;
+  const { meta, detail } = ctx;
   // IMAGE：多附件图包/整套优先（新）；旧单 download 回退兼容
   if (meta.kind === "IMAGE") {
     if (meta.downloads.length > 0) return <ImageDownloadsCard ctx={ctx} list={meta.downloads} />;
@@ -143,6 +172,7 @@ export function DownloadPanel({ ctx }: { ctx: DetailCtx }) {
   }
   // ARTICLE 附件清单
   if (meta.kind === "ARTICLE") return <ArticleAttachmentsCard ctx={ctx} />;
-  // GAME 走 externalUrl DownloadButton / VersionSection，这里不渲染
+  // GAME：externalUrl 外链主下载；版本历史另行渲染（VersionSection）
+  if (meta.kind === "GAME" && detail.externalUrl) return <GameExternalCard ctx={ctx} />;
   return null;
 }

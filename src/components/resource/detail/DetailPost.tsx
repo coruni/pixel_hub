@@ -109,7 +109,7 @@ export default function DetailPost({
       {/* 音视频播放（MUSIC/VIDEO；其余类型返回 null） */}
       <AvPlayerBlock ctx={ctx} />
 
-      {/* 图包/整套下载（IMAGE 单条；其余类型返回 null） */}
+      {/* 统一下载面板（IMAGE/ARTICLE/GAME externalUrl；无关类型返回 null） */}
       <DownloadPanel ctx={ctx} />
 
       {/* 展签 */}

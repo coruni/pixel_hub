@@ -70,7 +70,7 @@ export default function DetailTwocol({
       {/* 音视频播放（MUSIC/VIDEO；其余类型返回 null） */}
       <AvPlayerBlock ctx={ctx} />
 
-      {/* IMAGE/ARTICLE 下载（面板对无关类型返回 null） */}
+      {/* 统一下载面板（IMAGE/ARTICLE/GAME externalUrl；无关类型返回 null） */}
       <DownloadPanel ctx={ctx} />
 
       {/* 描述与评论横跨整条内容宽度 */}

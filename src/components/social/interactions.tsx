@@ -180,49 +180,8 @@ export function FollowButton({
   );
 }
 
-export function DownloadButton({
-  resourceId,
-  externalUrl,
-  loginRequired,
-  authed,
-  callbackPath = `/resources/${resourceId}`,
-}: {
-  resourceId: string;
-  externalUrl: string;
-  loginRequired: boolean;
-  authed: boolean;
-  callbackPath?: string;
-}) {
-  const [pending, start] = useTransition();
-  if (loginRequired && !authed) {
-    return (
-      <a
-        href={`/login?callbackUrl=${encodeURIComponent(callbackPath)}`}
-        className="inline-flex items-center gap-1.5 rounded-none border border-emerald-600 bg-emerald-600 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-500"
-      >
-        <Download size={15} aria-hidden /> 登录后下载
-      </a>
-    );
-  }
-  return (
-    <Button
-      type="button"
-      disabled={pending}
-      onClick={() =>
-        start(async () => {
-          await incrementDownloadAction(resourceId);
-          window.open(externalUrl, "_blank", "noopener");
-        })
-      }
-      className="inline-flex items-center gap-1.5 rounded-none border border-emerald-600 bg-emerald-600 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-60"
-    >
-      <Download size={15} aria-hidden /> 下载（外链）
-    </Button>
-  );
-}
-
-/** meta 驱动的下载按钮（IMAGE 整包 / ARTICLE 附件行）：非 GAME externalUrl 路径。
- *  登录墙与计数语义与 DownloadButton 一致（loginRequired && !authed → 登录链接）。 */
+/** 统一下载按钮（IMAGE 整包 / ARTICLE 附件行 / GAME externalUrl 外链）。
+ *  登录墙与计数语义统一（loginRequired && !authed → 登录链接）。 */
 export function MetaDownloadButton({
   resourceId,
   url,

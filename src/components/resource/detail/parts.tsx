@@ -1,5 +1,5 @@
 // 详情页共享部件 —— 纯服务端展示片段，三种模板（post/banner/twocol）复用同一套数据。
-// 组件均为 server component；内部按钮（关注/点赞/下载/评论）为客户端交互组件。
+// 组件均为 server component；内部按钮（关注/点赞/收藏/举报）为客户端交互组件。
 import Link from "next/link";
 import { Bot, CalendarDays, Download, Eye, Heart, Pencil, Star } from "lucide-react";
 import type { ResourceDetail } from "@/lib/queries";
