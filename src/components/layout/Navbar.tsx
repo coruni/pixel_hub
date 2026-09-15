@@ -71,7 +71,7 @@ export default async function Navbar() {
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-2 px-4 sm:gap-6 sm:px-6">
         <Link
           href="/"
-          className="flex min-w-0 items-center gap-2 text-base font-semibold tracking-tight text-neutral-900 sm:text-lg"
+          className="flex min-w-0 items-center gap-2 text-base font-semibold tracking-tight text-neutral-900 max-[359px]:text-sm sm:text-lg"
         >
           <span className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-none border border-brand-600 bg-surface">
             {/* eslint-disable-next-line @next/next/no-img-element -- 站点徽标来自后台配置/静态 svg，不走 next/image */}
