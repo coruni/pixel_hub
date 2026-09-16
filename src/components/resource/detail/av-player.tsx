@@ -100,7 +100,7 @@ export function AvPlayerBlock({ ctx }: { ctx: DetailCtx }) {
             url={meta.url}
             name={fileName}
             kind="file"
-            label={isAudio ? "下载音频" : "下载视频"}
+            label="下载"
             loginRequired={detail.loginRequired}
             authed={authed}
             callbackPath={`/resources/${detail.slug}`}

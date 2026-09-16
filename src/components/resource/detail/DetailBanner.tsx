@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { typeBadge } from "@/lib/type-icons";
 import Gallery from "@/components/resource/Gallery";
 import CollapsibleAside from "./CollapsibleAside";
 import { DownloadPanel } from "./download-panel";
@@ -27,6 +28,8 @@ export default function DetailBanner({
 }) {
   const { detail } = ctx;
   const cover = detail.gallery[0];
+  // 类型用图标徽标表示（不重复文字），分类仍用可点击的文字徽标
+  const { Icon: TypeIcon, cls: typeCls } = typeBadge(detail.type);
 
   return (
     <div className="mx-auto max-w-6xl px-4 pt-8 pb-6 sm:px-6">
@@ -47,13 +50,18 @@ export default function DetailBanner({
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,.6)_0%,rgba(0,0,0,.92)_55%, transparent_100%)]" />
         <div className="absolute inset-x-0 bottom-0 p-5 sm:p-6">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-none border border-brand-600 bg-stone-900/85 px-2.5 py-0.5 text-[11px] font-medium text-white">
-              {typeLabel(detail.type)}
+            {/* 类型：图标徽标（悬停/读屏提供类型名），与分类文字徽标同高 */}
+            <span
+              title={typeLabel(detail.type)}
+              className="grid h-[22px] w-[22px] place-items-center rounded-none border border-brand-600 bg-stone-900/85"
+            >
+              <TypeIcon size={13} className={typeCls} aria-hidden />
+              <span className="sr-only">{typeLabel(detail.type)}</span>
             </span>
             {detail.category && (
               <Link
                 href={`/browse?cat=${detail.category.slug}`}
-                className="rounded-none border border-brand-600 bg-stone-900/85 px-2.5 py-0.5 text-[11px] font-medium text-white hover:bg-brand-600"
+                className="inline-flex h-[22px] items-center rounded-none border border-brand-600 bg-stone-900/85 px-2.5 text-[11px] font-medium text-white hover:bg-brand-600"
               >
                 {detail.category.name}
               </Link>
@@ -70,9 +78,6 @@ export default function DetailBanner({
 
       {/* 音视频播放（MUSIC/VIDEO；其余类型返回 null） */}
       <AvPlayerBlock ctx={ctx} />
-
-      {/* 统一下载面板（IMAGE/ARTICLE/GAME externalUrl；无关类型返回 null） */}
-      <DownloadPanel ctx={ctx} />
 
       <div className="relative">
         <CollapsibleAside
@@ -95,6 +100,8 @@ export default function DetailBanner({
       {/* 描述与评论横跨整条内容宽度（不局限于窄主列） */}
       <div className="mt-6 space-y-5">
         <VersionSection ctx={ctx} />
+        {/* 统一下载面板：贴近描述上方（IMAGE/ARTICLE/GAME externalUrl；无关类型返回 null） */}
+        <DownloadPanel ctx={ctx} />
         <DescriptionBlock ctx={ctx} />
         {middleSlot}
         <CommentBlock ctx={ctx} />
