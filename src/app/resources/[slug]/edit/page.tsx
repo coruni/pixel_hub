@@ -69,7 +69,6 @@ export default async function EditOwnResourcePage({
           nsfw: resource.nsfw,
           loginRequired: resource.loginRequired,
           allowComments: resource.allowComments,
-          isDownloadable: resource.isDownloadable,
           meta,
           gallery: (resource.media ?? []).map((m) => ({
             id: m.id,

@@ -24,7 +24,6 @@ export const PUBLISH_OPTIONS = [
   { name: "nsfw", label: "NSFW", hint: "未登录与搜索引擎不可见" },
   { name: "loginRequired", label: "下载需登录", hint: "游客看不到下载入口" },
   { name: "allowComments", label: "允许评论", hint: "关闭后详情页不再接收评论" },
-  { name: "isDownloadable", label: "提供下载", hint: "关闭则只展示、不提供下载" },
 ] as const;
 
 export type PublishOptionName = (typeof PUBLISH_OPTIONS)[number]["name"];

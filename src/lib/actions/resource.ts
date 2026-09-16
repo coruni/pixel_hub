@@ -58,8 +58,8 @@ export async function createResourceAction(
   });
   if (!common.success) return { fieldErrors: common.error.flatten().fieldErrors };
   const { type, title, summary, description, categoryId, externalUrl } = common.data;
-  // 外链下载语义仅属于 GAME（版本表/externalUrl 驱动 DownloadButton）；IMAGE/ARTICLE 的下载走 meta，
-  // 这里把 externalUrl 对二者钉死为空，防伪造表单触发版本创建或外链下载按钮。
+  // 外链下载语义仅属于 GAME（externalUrl 驱动下载面板外链入口）；IMAGE/ARTICLE 的下载走 meta，
+  // 这里把 externalUrl 对二者钉死为空，防伪造表单触发版本创建或外链下载。
   const effectiveUrl = type === "GAME" ? externalUrl : "";
 
   // —— 类型化 meta ——
@@ -203,7 +203,6 @@ export async function createResourceAction(
           loginRequired: fd.get("loginRequired") === "on",
           allowComments: fd.get("allowComments") !== "off",
           nsfw: fd.get("nsfw") === "on",
-          isDownloadable: fd.get("isDownloadable") === "on",
           publishedAt: status === "PUBLISHED" ? new Date() : null,
         },
       });

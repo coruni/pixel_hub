@@ -71,7 +71,7 @@ export default function DetailBanner({
       {/* 音视频播放（MUSIC/VIDEO；其余类型返回 null） */}
       <AvPlayerBlock ctx={ctx} />
 
-      {/* IMAGE/ARTICLE 下载（横幅覆盖按钮仅 GAME externalUrl；面板对 GAME 返回 null） */}
+      {/* 统一下载面板（IMAGE/ARTICLE/GAME externalUrl；无关类型返回 null） */}
       <DownloadPanel ctx={ctx} />
 
       <div className="relative">

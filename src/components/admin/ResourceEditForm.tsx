@@ -49,7 +49,6 @@ export type EditableResource = {
   nsfw: boolean;
   loginRequired: boolean;
   allowComments: boolean;
-  isDownloadable: boolean;
   meta: ResourceMetaOutput;
   gallery: GalleryItem[];
   coverMediaId: string;

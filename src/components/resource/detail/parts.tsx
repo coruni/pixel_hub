@@ -1,5 +1,5 @@
 // 详情页共享部件 —— 纯服务端展示片段，三种模板（post/banner/twocol）复用同一套数据。
-// 组件均为 server component；内部按钮（关注/点赞/下载/评论）为客户端交互组件。
+// 组件均为 server component；内部按钮（关注/点赞/收藏/举报）为客户端交互组件。
 import Link from "next/link";
 import { Bot, CalendarDays, Download, Eye, Heart, Pencil, Star } from "lucide-react";
 import type { ResourceDetail } from "@/lib/queries";
@@ -10,12 +10,7 @@ import Comments from "@/components/social/Comments";
 import Avatar from "@/components/ui/Avatar";
 import UserHoverCard from "@/components/ui/UserHoverCard";
 import Markdown from "@/components/rte/Markdown";
-import {
-  DownloadButton,
-  FavoriteButton,
-  LikeButton,
-  FollowButton,
-} from "@/components/social/interactions";
+import { FavoriteButton, LikeButton, FollowButton } from "@/components/social/interactions";
 import ReportButton from "@/components/social/ReportButton";
 import { VersionDownloadButton, VersionForm } from "@/components/resource/version";
 import { getUploadLimits } from "@/lib/upload-limits";
@@ -118,22 +113,13 @@ export function AuthorStrip({ ctx }: { ctx: DetailCtx }) {
   );
 }
 
-/** 主操作：下载 / 点赞 / 收藏 / 举报（未登录给登录入口） */
+/** 主操作：点赞 / 收藏 / 举报（未登录给登录入口）；下载统一走附件面板 */
 export function ActionBar({ ctx }: { ctx: DetailCtx }) {
   const { detail, meId, authed, isAuthor, isStaff } = ctx;
   const path = callbackPath(detail.slug);
   return (
     <div>
       <div className="flex flex-wrap items-stretch gap-2">
-        {detail.externalUrl && (
-          <DownloadButton
-            resourceId={detail.id}
-            externalUrl={detail.externalUrl}
-            loginRequired={detail.loginRequired}
-            authed={authed}
-            callbackPath={path}
-          />
-        )}
         {authed ? (
           <>
             <LikeButton
@@ -175,9 +161,6 @@ export function ActionBar({ ctx }: { ctx: DetailCtx }) {
           </Link>
         )}
       </div>
-      {detail.loginRequired && !authed && (
-        <p className="mt-1.5 text-xs text-neutral-400">该资源需登录后获取下载地址。</p>
-      )}
       {!isStaff && !detail.allowComments && !isAuthor && (
         <p className="mt-1.5 text-xs text-neutral-400">作者已关闭评论。</p>
       )}
