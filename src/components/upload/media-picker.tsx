@@ -4,6 +4,7 @@ import { X } from "lucide-react";
 import { SectionTitle, STEP, type Uploaded } from "./wizard-shared";
 import { Button } from "@/components/ui/Button";
 import { useFileDrop } from "@/lib/hooks/use-file-drop";
+import { useFilePaste } from "@/lib/hooks/use-file-paste";
 
 /** 预览图/插图选择：上传、设封面、移除（最多 maxCount 张，默认 12）；单张上限由宿主配置传入 */
 export default function MediaPicker({
@@ -45,6 +46,13 @@ export default function MediaPicker({
     onFiles: onPick,
     disabled: uploading || full,
   });
+  // Ctrl+V：在这块区域内粘贴截图/复制的图片即上传，同样直送 onPick。
+  // 单张封面且已有图时关掉——再粘一张只会被 onFiles 静默丢弃，不如不接管。
+  const { pasteProps } = useFilePaste({
+    onFiles: onPick,
+    disabled: uploading || full,
+    enabled: !(oneShot && files.length > 0),
+  });
   return (
     <section className="mt-4 rounded-none border border-brand-200 bg-surface p-5">
       <SectionTitle
@@ -60,7 +68,9 @@ export default function MediaPicker({
       </SectionTitle>
       <div
         {...dropProps}
-        className={`mt-3 grid grid-cols-3 gap-3 transition-colors sm:grid-cols-4 ${
+        {...pasteProps}
+        tabIndex={-1}
+        className={`mt-3 grid grid-cols-3 gap-3 outline-none transition-colors sm:grid-cols-4 ${
           dragging ? "bg-brand-50 ring-2 ring-brand-400" : ""
         }`}
       >
@@ -115,7 +125,7 @@ export default function MediaPicker({
                   ? "已达上限"
                   : "＋ 上传图片"}
             <span className="mt-0.5 block font-normal text-[10px] opacity-70">
-              拖入/点击 · png/jpg/webp ≤{maxMb}MB
+              拖入/点击/粘贴 · png/jpg/webp ≤{maxMb}MB
             </span>
           </span>
           <input
