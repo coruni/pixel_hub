@@ -6,6 +6,7 @@ import { Keyboard } from "swiper/modules";
 import type { Swiper as SwiperClass } from "swiper";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import ImageViewer from "@/components/ui/ImageViewer";
+import { Button } from "@/components/ui/Button";
 import "swiper/css";
 
 export type GalleryMedia = {
@@ -151,5 +152,3 @@ export default function Gallery({ media }: { media: GalleryMedia[] }) {
     </div>
   );
 }
-
-import { Button } from "@/components/ui/Button";

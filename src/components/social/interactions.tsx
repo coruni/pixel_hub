@@ -10,6 +10,7 @@ import {
   setFavoriteCollectionAction,
 } from "@/lib/actions/social";
 import { Button } from "@/components/ui/Button";
+import { useDownloadBump } from "@/components/resource/detail/download-count";
 
 const baseBtn =
   "inline-flex items-center gap-1.5 rounded-none border px-3.5 py-2 text-sm transition disabled:opacity-60";
@@ -216,6 +217,9 @@ export function MetaDownloadButton({
     setPrevCount(count);
     setN(count ?? 0);
   }
+  // 详情页下载清单把「已下载 N 次」放在区块头（DownloadCountScope），
+  // 点任意一行都要让那里跟着 +1 —— 按钮自身在 <li> 里，够不到区块头。
+  const bump = useDownloadBump();
   const [pending, start] = useTransition();
   const path = callbackPath ?? `/resources/${resourceId}`;
   const showCount = count !== undefined;
@@ -244,6 +248,7 @@ export function MetaDownloadButton({
         start(async () => {
           await incrementDownloadAction(resourceId);
           if (showCount) setN((x) => x + 1);
+          bump?.();
           window.open(dlHref, "_blank", "noopener");
         })
       }
