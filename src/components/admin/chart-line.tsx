@@ -94,9 +94,7 @@ export function LineArea({
         className="mt-1 h-4 truncate text-[11px] leading-4 text-neutral-500"
         aria-live="polite"
       >
-        {idx === null ? (
-          <span className="text-neutral-400">悬停或聚焦后用 ←/→ 查看逐日数值</span>
-        ) : (
+        {idx !== null && (
           <span className="tabular-nums">
             <span className="text-neutral-400">{labels[idx]}</span>
             {lines.map((l) => (

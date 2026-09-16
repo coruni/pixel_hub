@@ -378,6 +378,18 @@ summary {
   background: transparent;
 }
 
+/* 隐藏滚动条但保留滚动能力（横向 tab 条等）。
+   必须写成无层的普通 class：Tailwind 用中括号任意值生成的工具类会落在 @layer utilities，
+   而上面那条 `* { scrollbar-width: thin }` 是无层规则——层叠层序里无层优先于分层，
+   落在分层里的声明会被静默压掉。 */
+.scrollbar-none {
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 /* ---------- Milkdown Crepe（/upload 所见即所得编辑器）----------
    主题色全部映射到站点 token，明暗自动跟随（token 在 html.dark 下重定义）。
    frame-dark.css 未引入——它把暗色变量无条件写在 .milkdown 上，会压掉浅色。 */

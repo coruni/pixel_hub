@@ -42,18 +42,17 @@ export default function PublishForm({
         <span className="min-w-0">
           <span className="block text-sm text-neutral-800">自动保存草稿</span>
           <span className="mt-0.5 block text-xs leading-5 text-neutral-400">
-            开启后编辑内容时每 30 秒自动留存一次草稿（停手时立刻存），误删或中断也能接着写；
-            关闭则只在点「保存草稿」或按 Ctrl+S 时留档。发布向导里不再提供这个开关。
+            开启后编辑内容时每 30 秒自动留存一次草稿；关闭则只在点「保存草稿」或按 Ctrl+S 时留档。
           </span>
         </span>
       </label>
 
-      {saved && <p className="text-sm text-emerald-600">✓ 已保存</p>}
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {saved && <p className="text-xs text-emerald-600">✓ 已保存</p>}
+      {error && <p className="text-xs text-red-500">{error}</p>}
 
-      <p className="text-xs text-neutral-400">
+      {/* <p className="text-xs text-neutral-400">
         当前有 {draftCount} 条草稿，可在下方「草稿箱」里继续编辑或删除。
-      </p>
+      </p> */}
     </div>
   );
 }

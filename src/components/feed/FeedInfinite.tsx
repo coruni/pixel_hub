@@ -114,12 +114,12 @@ export default function FeedInfinite({
           </div>
         )
       ) : (
-        <div ref={sentinelRef} className="mt-6 flex items-center justify-center" aria-live="polite">
-          {pending ? (
-            <Loader label="加载中…" />
-          ) : (
-            <span className="text-xs text-neutral-300">向下滚动加载更多</span>
-          )}
+        <div
+          ref={sentinelRef}
+          className="mt-6 flex h-8 items-center justify-center"
+          aria-live="polite"
+        >
+          {pending && <Loader label="加载中…" />}
         </div>
       )}
     </div>

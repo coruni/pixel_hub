@@ -130,11 +130,6 @@ export default function AvatarForm({
             </Button>
           )}
         </div>
-        {cropped && (
-          <p className="mt-2 text-xs text-neutral-400">
-            {cropped.type === "image/gif" ? "GIF 原图待上传" : "已裁剪 256×256"}，点「保存」上传
-          </p>
-        )}
       </form>
 
       {file && <AvatarCropper file={file} onCancel={() => setFile(null)} onConfirm={onConfirm} />}

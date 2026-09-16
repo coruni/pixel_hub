@@ -285,9 +285,8 @@ export default function UploadWizard({
         </p>
 
         <section className="mt-6 rounded-none border border-brand-200 bg-surface">
-          <div className="flex items-center justify-between gap-3 border-b border-brand-100 px-4 py-3">
+          <div className="border-b border-brand-100 px-4 py-3">
             <SectionTitle n={MODE_STEP}>选择发布类型</SectionTitle>
-            <span className="shrink-0 text-[11px] text-neutral-400">点卡片直接进入填写</span>
           </div>
 
           <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">

@@ -111,13 +111,9 @@ export default function HeroForm({
         )}
         {state.ok && <span className="text-sm text-emerald-600">✓ 已更新</span>}
         {state.error && <span className="text-sm text-red-500">{state.error}</span>}
-        {cropped && (
-          <span className="text-xs text-neutral-400">已裁剪 1600×500，点「保存」上传</span>
-        )}
       </form>
       <p className="text-xs leading-5 text-neutral-400">
         比例 16:5（导出 1600×500 webp），建议尺寸 ≥ 1600×500，最大 {heroMaxMb}MB。
-        横幅仅在你的公开主页展示，未设置则头部按原版显示。
       </p>
 
       {file && <HeroCropper file={file} onCancel={() => setFile(null)} onConfirm={onConfirm} />}

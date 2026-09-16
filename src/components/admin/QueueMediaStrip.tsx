@@ -31,7 +31,6 @@ export function QueueMediaStrip({ media }: { media: QueueMediaItem[] }) {
             key={m.id}
             type="button"
             onClick={() => setIndex(i)}
-            title="点击查看原图"
             className="group relative block h-20 w-28 shrink-0 cursor-zoom-in overflow-hidden rounded-none border border-brand-200 bg-neutral-100 p-0 text-left transition hover:border-brand-500"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
