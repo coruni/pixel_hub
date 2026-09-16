@@ -1,16 +1,24 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { ChevronDown } from "lucide-react";
 import type { CardRatio, ContentDisplay, ContentType } from "@/lib/display";
 import { loadListPageAction } from "@/lib/actions/feedmore";
 import { useLoadMore } from "@/lib/hooks";
 import ResourceGrid from "@/components/resource/ResourceGrid";
+import Loader from "@/components/Loader";
 import { Button } from "@/components/ui/Button";
 
 type Sort = "latest" | "popular" | "downloads";
 type Item = Awaited<ReturnType<typeof loadListPageAction>>["items"][number];
 
-/** 首页 list 板块的「下一页 / 加载更多」：按板块相同筛选取后续页并追加渲染 */
+/** 追加方式：button=点按钮取下一页；infinite=滚近底部自动取（与 /browse 的无限滚动同一套手感） */
+export type LoadMoreMode = "button" | "infinite";
+
+const btnCls =
+  "inline-flex items-center gap-1.5 rounded-none border border-brand-200 bg-surface px-5 py-2 text-sm text-neutral-700 transition hover:border-brand-400 hover:text-brand-700 disabled:opacity-50";
+
+/** 首页 list 板块的后续页：按板块相同筛选取下一页并追加渲染 */
 export default function ListMore({
   type,
   sort,
@@ -20,6 +28,7 @@ export default function ListMore({
   display,
   ratio,
   period,
+  mode = "button",
 }: {
   type: "ALL" | ContentType;
   sort: Sort;
@@ -30,10 +39,32 @@ export default function ListMore({
   ratio?: CardRatio | null;
   /** 时间窗口：与首屏一致，保证后续页用同一筛选条件 */
   period?: "week" | "month";
+  mode?: LoadMoreMode;
 }) {
   const { more, hasMore, done, err, pending, loadNext } = useLoadMore<Item>((page) =>
     loadListPageAction({ page, pageSize, type, sort, categorySlugs, tagSlugs, period }),
   );
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const infinite = mode === "infinite";
+
+  // 无限滚动：滚近底部（提前约一屏）自动取下一页，跟 /browse 的 FeedInfinite 同一套写法。
+  // 依赖里带 more.length：每追加一页就重挂观察器，observe() 会立刻回调一次——内容不足一屏时
+  // 继续往下补，而不是等用户再滚一下（追加区还在视口内时交集状态不变，老观察器不会再触发）。
+  // 重复触发由 useLoadMore 的在飞闩挡掉；page 由 hook 内的 ref 持有，闭包不会取到旧页。
+  useEffect(() => {
+    if (!infinite) return;
+    const el = sentinelRef.current;
+    if (!el || done || !hasMore || err) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) loadNext();
+      },
+      { rootMargin: "600px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [infinite, hasMore, done, err, more.length]);
 
   if (done) {
     return (
@@ -51,17 +82,31 @@ export default function ListMore({
         </div>
       )}
       {err && <p className="mt-2 text-center text-xs text-red-500">{err}</p>}
-      {hasMore && (
+
+      {hasMore && !infinite && (
         <div className="mt-5 flex justify-center">
-          <Button
-            type="button"
-            disabled={pending}
-            onClick={loadNext}
-            className="inline-flex items-center gap-1.5 rounded-none border border-brand-200 bg-surface px-5 py-2 text-sm text-neutral-700 transition hover:border-brand-400 hover:text-brand-700 disabled:opacity-50"
-          >
+          <Button type="button" disabled={pending} onClick={loadNext} className={btnCls}>
             {pending ? "加载中…" : more.length > 0 ? "下一页" : "加载更多"}
             <ChevronDown size={14} aria-hidden />
           </Button>
+        </div>
+      )}
+
+      {hasMore && infinite && (
+        <div
+          ref={sentinelRef}
+          className="flex min-h-8 items-center justify-center pt-5"
+          aria-live="polite"
+        >
+          {pending ? (
+            <Loader label="加载中…" />
+          ) : (
+            err && (
+              <Button type="button" onClick={loadNext} className={btnCls}>
+                重试
+              </Button>
+            )
+          )}
         </div>
       )}
     </div>

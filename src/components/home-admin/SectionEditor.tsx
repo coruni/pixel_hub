@@ -81,6 +81,10 @@ export default function SectionEditor({
     (CARD_RATIO_KEYS as string[]).includes(String(cfg.ratio)) ? (cfg.ratio as CardRatio) : "auto",
   );
   const [paged, setPaged] = useState(kind === "list" && cfg.paged === true);
+  // 追加方式：仅在 paged=true（开启了加载更多）时生效；存量数据没有该键，回落 button
+  const [loadMode, setLoadMode] = useState<"button" | "infinite">(
+    cfg.loadMode === "infinite" ? "infinite" : "button",
+  );
   // 可见性：设备端 + 是否仅登录
   const [visOn, setVisOn] = useState<"all" | "pc" | "mobile">(
     row.visibleOn === "pc" || row.visibleOn === "mobile" ? row.visibleOn : "all",
@@ -130,6 +134,7 @@ export default function SectionEditor({
           tagSlugs: tagSel,
           display,
           paged,
+          loadMode,
           ratio,
           period,
         };
@@ -300,7 +305,7 @@ export default function SectionEditor({
                 className={input}
               />
               <p className="mt-1 text-[11px] text-neutral-400">
-                首屏数量；开启翻页后即每页条数
+                首屏数量；开启加载更多后即每页条数
               </p>
             </div>
           </>
@@ -308,12 +313,25 @@ export default function SectionEditor({
 
         {kind === "list" && (
           <div className="sm:col-span-2">
-            <label className={`${field} flex items-center gap-2`}>
-              <SquareCheckbox checked={paged} onChange={(next) => setPaged(next)} ariaLabel="允许翻页" />
-              允许「下一页」翻页（点按钮按相同条件加载后续页）
+            <label className={field} htmlFor={`lm-${row.id}`}>
+              加载更多
             </label>
-            <p className="text-[11px] text-neutral-400">
-              关闭时仅显示首屏；内容多建议开启。
+            <select
+              id={`lm-${row.id}`}
+              value={paged ? loadMode : "none"}
+              onChange={(e) => {
+                const v = e.target.value;
+                setPaged(v !== "none");
+                if (v !== "none") setLoadMode(v as "button" | "infinite");
+              }}
+              className={input}
+            >
+              <option value="none">关闭（只显示首屏）</option>
+              <option value="button">点击加载更多（点按钮取下一页）</option>
+              <option value="infinite">无限滚动（滚近底部自动加载）</option>
+            </select>
+            <p className="mt-1 text-[11px] text-neutral-400">
+              两种方式都用同一套筛选条件取后续页；无限滚动手感与 /browse 一致。
             </p>
           </div>
         )}

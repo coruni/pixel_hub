@@ -41,7 +41,7 @@ export const HOME_KIND_META: Record<
   },
   list: {
     label: "内容流板块",
-    desc: "自选条件的内容列表：类型/排序/数量/分类标签多选，卡片·列表",
+    desc: "自选条件的内容列表：类型/排序/数量/分类标签多选，卡片·列表，可点击或无限加载",
     defaultTitle: "精选内容",
   },
   featured: {
@@ -98,7 +98,10 @@ const listCfg = z.object({
   categorySlugs: z.array(z.string()).max(30).default([]), // 空 = 不限
   tagSlugs: z.array(z.string()).max(30).default([]), // 空 = 不限；否则任一命中
   display: z.enum(["card", "list"]).default("card"),
-  paged: z.boolean().default(false), // 允许「下一页 / 加载更多」
+  paged: z.boolean().default(false), // 是否允许追加加载后续页
+  // 追加方式：button=点「加载更多 / 下一页」按钮；infinite=滚近底部自动取下一页。
+  // 仅在 paged=true 时生效；存量数据没有这个键，默认回落 button（与旧行为一致）。
+  loadMode: z.enum(["button", "infinite"]).default("button"),
   ratio: ratioEnum, // 卡片封面比例；auto=默认 3:4
   // 排序=最热/最多下载 时的时间窗口：all=累计全时间；week/month=仅近期发布
   period: z.enum(["all", "week", "month"]).default("all"),
@@ -168,6 +171,7 @@ export type HomeSectionConfig =
       tagSlugs: string[];
       display: "card" | "list";
       paged: boolean;
+      loadMode: "button" | "infinite";
       ratio: CardRatio;
       period: "all" | "week" | "month";
     } // list

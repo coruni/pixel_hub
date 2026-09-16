@@ -25,3 +25,9 @@
 - 与全局无层规则冲突时（典型：`* { scrollbar-width: thin }`），Tailwind 的任意值写法（中括号）会被静默压掉。解法：在 `globals.css` 补一个无层普通 class（现有 `.scrollbar-none`），不要指望 JSX 里的任意值类。
 - 另外：`globals.css` 的注释里也不要写出中括号类名原样（Tailwind 会扫描注释当候选类，凭空生成一条无用规则）。
 - 横向滚动 + 下划线 tab：`overflow-x-auto` 会把 overflow-y 算成 auto 并裁掉自身溢出，所以 `-mb-px` 必须挂在滚动容器上，挂按钮上会被裁掉 1px。
+
+## 首页板块「加载更多」（home-config 的 list 类型）
+- `list` 板块（label「内容流板块」）追加方式 = `paged`（开关）+ `loadMode: "button" | "infinite"`（默认 button）；后台 `/admin/site` 里是一个三选下拉。
+- **别把 `paged` 合并成单字段**：存量 `HomeSection.config` JSON 里只有 `paged`，保留它才能零迁移兼容（新键有 default 兜底）。
+- `useLoadMore`（`src/lib/hooks/use-load-more.ts`）里 page / done 用 ref、并发用 ref 闩——无限滚动把 `loadNext` 交给常驻的 IntersectionObserver 闭包，用 state 会取到旧页并追加重复卡片。动这个 hook 时不要退回 state。
+- 无限滚动哨兵观察器的 effect 依赖要带 `more.length`，否则内容不足一屏时不会自动继续补页。

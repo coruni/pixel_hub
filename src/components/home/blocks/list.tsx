@@ -12,6 +12,8 @@ export type ListBlockCfg = {
   tagSlugs: string[];
   display: ContentDisplay;
   paged: boolean;
+  /** 追加方式：button=点按钮；infinite=滚近底部自动取。仅 paged=true 时生效 */
+  loadMode?: "button" | "infinite";
   ratio: CardRatio;
   /** 排序=最热/最多下载 时的时间窗口 */
   period?: "all" | "week" | "month";
@@ -54,6 +56,7 @@ export default async function ListBlock({
           display={cfg.display}
           ratio={ratio}
           period={period}
+          mode={cfg.loadMode ?? "button"}
         />
       )}
     </BlockShell>

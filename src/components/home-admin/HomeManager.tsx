@@ -97,7 +97,8 @@ function cfgSummary(row: ManagerRow): string {
       if (n(c.categorySlugs)) parts.push(`${n(c.categorySlugs)} 个分类`);
       if (n(c.tagSlugs)) parts.push(`${n(c.tagSlugs)} 个标签`);
       parts.push(dispLabel[String(c.display ?? "card")] ?? "卡片");
-      if (c.paged === true) parts.push("可翻页");
+      if (c.paged === true)
+        parts.push(c.loadMode === "infinite" ? "无限滚动" : "点击加载更多");
       // 时间窗口仅对热门类排序有意义
       const pl = periodLabel[String(c.period ?? "all")];
       if (pl && (c.sort === "popular" || c.sort === "downloads")) parts.push(pl);

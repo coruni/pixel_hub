@@ -66,6 +66,7 @@ export default async function HomeRenderer({
               tagSlugs: (cfg.tagSlugs as string[]) ?? [],
               display: (cfg.display as "card" | "list") ?? "card",
               paged: cfg.paged === true,
+              loadMode: cfg.loadMode === "infinite" ? "infinite" : "button",
               ratio: (cfg.ratio as CardRatio) ?? "auto",
               period: (cfg.period as "all" | "week" | "month") ?? "all",
             }}
