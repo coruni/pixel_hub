@@ -46,11 +46,9 @@ export function AvPlayerBlock({ ctx }: { ctx: DetailCtx }) {
               <Clock size={12} aria-hidden /> {meta.duration}
             </span>
           )}
-          {meta.provider && <KV k="来源" v={meta.provider} />}
           {isAudio && meta.artist && (
             <span className="inline-flex items-center gap-1 text-xs text-neutral-400">
               <User size={12} aria-hidden /> {meta.artist}
-              {meta.album ? ` · ${meta.album}` : ""}
             </span>
           )}
           {!isAudio && meta.resolution && <KV k="画质" v={meta.resolution} />}

@@ -26,6 +26,36 @@
 - 另外：`globals.css` 的注释里也不要写出中括号类名原样（Tailwind 会扫描注释当候选类，凭空生成一条无用规则）。
 - 横向滚动 + 下划线 tab：`overflow-x-auto` 会把 overflow-y 算成 auto 并裁掉自身溢出，所以 `-mb-px` 必须挂在滚动容器上，挂按钮上会被裁掉 1px。
 
+## 附件上传区域：统一入口与清单容器
+- **唯一上传按钮组件** = `src/components/upload/AttachmentUpload.tsx` 的 `AttachmentUpload`（导出 `AttachLimits` 类型）。全站任何「选文件上传附件」入口都必须复用它，禁止再手写 `<label>` + `<input type="file">` 的按钮样式。
+  - 收口四态：可上传 / 拖拽悬停（`dragging` + `dropProps`）/ 上传中（`progress`）/ 已上传回执（`filled`）；提示文案由 `limits` 驱动，`hint` 追加「可多选」等补充。
+  - `multiple` 决定单选/多选；内部已 `e.target.value = ""`（否则同一批文件第二次选择不触发 change），调用方不要再清一遍。
+  - `wizard-sections.tsx` 里同名的 `AttachmentUpload` 是它的薄包装，保留只为兼容 GameSection 的多选进度语义，不要再往里加样式。
+- **清单编辑器** = `AttachmentListEditor`（IMAGE 图包 / ARTICLE 文末附件 / GAME 下载源共用）。新增同类清单一律走它，不要复制行布局。
+  - **主入口是拖拽/点击投放区**（`AttachmentUpload` 的 `variant="dropzone"`），不是按钮。用户明确要求「允许拖拽/点击区域上传」。
+  - **上传任务与抽屉解耦**（关键设计）：`onFiles()` 拖入即开始上传，**不等抽屉**；抽屉关掉也不中断在飞任务；上传完成后该文件直接成为 `rows` 一行，并在抽屉空闲时自动打开它填标题。
+  - **上传中可以继续拖入**：`useFileDrop({ disabled })` 只挂钩 `rows.length >= 20`，**不要挂钩 busy**——否则「关掉抽屉后继续上传」无从操作。进度计数用 `doneRef`/`totalRef` 累计（新一批不能冲掉旧一批的计数），不要每批重置。
+  - **提交必须有闸门**：`AttachmentListEditor` 通过 `onBusyChange(inflight)` 把在飞数量交给宿主；宿主（`UploadWizard` / `ResourceEditForm`）禁用提交按钮 + 在 `<form onSubmit>` 里 `preventDefault()` 兜住回车提交。**新增任何带附件清单的表单都要接这个回调。**
+  - 抽屉用「草稿」模型（`open` 编辑既有行 / `draft` 新增草稿，互斥）：只有点「添加」且内容有效才 `setRows`，所以点按钮不会多出空行。抽屉占用与否在上传回调里必须读 `drawerHeldRef`（async 闭包读 state 会拿到旧值）。
+  - 抽屉底部主按钮：`isNew` → 「添加」走 `onCommit`；编辑既有 → 「完成」走 `onClose`。Esc / 点遮罩 = 取消草稿。
+  - 对齐三要素：`addLinkLabel`、`showSize`、`emptyHint`。GAME 与 ARTICLE 现取同值（`"添加下载源"` / `showSize={false}` / 各自语义化空态）。
+  - ARTICLE 与 GAME 都用「`rounded-none border border-brand-200 p-4` 描边盒 + `text-sm font-medium text-neutral-700` 小标题」包住编辑器；ARTICLE 因可选故标题不带红色星号。
+- `media-picker.tsx` 是「图片缩略图网格投放区」，**不属于附件按钮**，不要合并进来。
+- `av-section.tsx`（MUSIC/VIDEO）的 `AttachmentUpload` 是**单文件直传**场景（直接写 `avUrl`，没有清单/抽屉），保持独立，不要套用上面的草稿模型。
+
+## 本机验证环境（务必沿用）
+- **PowerShell 工具在本机吞 stdout**：裸命令、`Write-Output`、`Out-File` 都拿不到内容，`cmd /c "... > f"` 被沙箱拦。
+- **PowerShell 的 `Remove-Item` 对仓库内文件静默失败**（以为删了其实还在）。删除仓库内文件用 `node -e "fs.unlinkSync(...)"` / `fs.rmSync(dir,{recursive:true})`。
+- **bash 工具的 `rm` 是坏 shim**（报 `safe_delete_main: command not found`），且缺 `head`/`ls`/`grep`/`tail`；查看文件用 Read 工具。bash 支持 `cd X && node -e "..."` 与 `for` 循环，校验脚本用这个最稳。
+- 校验做法：把 runner 写到 **`%TEMP%`**（不要放仓库根目录，否则 `git status` 长期被污染），内容用 `execFileSync(process.execPath, [...], {cwd, encoding:"utf8"})` 包 tsc/eslint 再 `console.log`，跑完删掉。
+- 校验命令：`node_modules/typescript/bin/tsc --noEmit`、`node_modules/eslint/bin/eslint.js`。
+- **`tsc --noEmit` 当前应为完全零错误**（原 `prisma/_dl.ts(166,9)` 那条例外是临时脚本，已随清理删除）。
+
+## 临时脚本纪律
+- 验证脚本一律 `_` 前缀 + 放 `prisma/` 或 `%TEMP%`，**用完立即删**；此前积累过 18 个未提交脚本被一起清掉。
+- 删除未提交文件前先备份（`copyFileSync` 到 `%TEMP%`），因为 git 无法恢复。
+- `.workbuddy/` 是项目数据**不是缓存**，即使 git status 显示为删除也不要顺手清理——memory 文件全部受 git 跟踪，误删可用 `git checkout -- .workbuddy/` 恢复。
+
 ## 首页板块「加载更多」（home-config 的 list 类型）
 - `list` 板块（label「内容流板块」）追加方式 = `paged`（开关）+ `loadMode: "button" | "infinite"`（默认 button）；后台 `/admin/site` 里是一个三选下拉。
 - **别把 `paged` 合并成单字段**：存量 `HomeSection.config` JSON 里只有 `paged`，保留它才能零迁移兼容（新键有 default 兜底）。

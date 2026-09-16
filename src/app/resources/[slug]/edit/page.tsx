@@ -30,6 +30,7 @@ export default async function EditOwnResourcePage({
           orderBy: { sort: "asc" },
           select: { id: true, fileName: true, thumbKey: true, bigKey: true, storageKey: true },
         },
+        versions: { orderBy: { createdAt: "asc" }, select: { version: true, url: true } },
       },
     }),
     prisma.category.findMany({
@@ -77,6 +78,7 @@ export default async function EditOwnResourcePage({
             bigUrl: m.bigKey ? publicUrl(m.bigKey) : publicUrl(m.storageKey),
           })),
           coverMediaId: resource.coverMediaId ?? "",
+          versions: resource.versions,
         }}
         categories={categories}
         action={updateResourceOwnerAction}

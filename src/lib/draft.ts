@@ -73,10 +73,8 @@ export const draftPayloadSchema = z.object({
   avSource: text(16),
   avUrl: text(2000),
   avMode: text(16),
-  avProvider: text(120),
   duration: text(40),
   artist: text(160),
-  album: text(160),
   resolution: text(40),
   // —— 发布选项 ——
   nsfw: flag,
@@ -118,10 +116,8 @@ export function draftHasContent(p: DraftPayload): boolean {
     p.note,
     p.changelog,
     p.avUrl,
-    p.avProvider,
     p.duration,
     p.artist,
-    p.album,
     p.resolution,
   ];
   if (texts.some((t) => t.trim() !== "")) return true;
@@ -222,10 +218,8 @@ export function collectDraft(
     avSource: str("avSource"),
     avUrl: str("avUrl"),
     avMode: str("avMode"),
-    avProvider: str("avProvider"),
     duration: str("duration"),
     artist: str("artist"),
-    album: str("album"),
     resolution: str("resolution"),
     nsfw: on("nsfw"),
     loginRequired: on("loginRequired"),

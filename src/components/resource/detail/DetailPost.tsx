@@ -37,7 +37,7 @@ function MetaChips({ ctx }: { ctx: DetailCtx }) {
   }
   if (meta.kind === "IMAGE" && meta.original)
     chips.push({ node: "✓ 原创声明", cls: "bg-emerald-50 text-emerald-700" });
-  if (meta.license)
+  if ("license" in meta && meta.license)
     chips.push({
       node: `授权 · ${meta.license}`,
       cls: "bg-neutral-100 text-neutral-600",
@@ -64,10 +64,8 @@ function MetaChips({ ctx }: { ctx: DetailCtx }) {
   }
   if (meta.kind === "MUSIC" || meta.kind === "VIDEO") {
     if (meta.artist) chips.push({ node: meta.artist, cls: "bg-neutral-100 text-neutral-600" });
-    if (meta.album) chips.push({ node: `专辑 · ${meta.album}`, cls: "bg-neutral-100 text-neutral-600" });
     if (meta.resolution) chips.push({ node: meta.resolution, cls: "bg-neutral-100 text-neutral-600" });
     if (meta.duration) chips.push({ node: meta.duration, cls: "bg-neutral-100 text-neutral-600" });
-    if (meta.note) chips.push({ node: meta.note, cls: "bg-neutral-100 text-neutral-600" });
   }
   if (chips.length === 0 && detail.tags.length === 0) return null;
   return (

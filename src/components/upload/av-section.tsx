@@ -13,7 +13,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link2, Trash2, UploadCloud } from "lucide-react";
 import {
-  avAcceptAttr,
   avExtsSample,
   avMountPlaceholder,
   avClassFor,
@@ -26,13 +25,14 @@ import { probeFile, probeSummary, probeUrl, type AvProbe } from "@/lib/av-probe"
 import { mbText, type UploadLimits } from "@/lib/upload-config";
 import { uploadAttachment } from "@/lib/upload-attachment-client";
 import { fieldErr, wizInput, wizLabel, SectionTitle, STEP } from "./wizard-shared";
+import { AttachmentUpload } from "./AttachmentUpload";
 import { Button } from "@/components/ui/Button";
 
 const btnBase =
   "inline-flex items-center justify-center gap-1.5 rounded-none border px-3 py-2 text-sm transition";
 
 /** 可自动抓取的字段 */
-type FieldKey = "provider" | "duration" | "artist" | "album" | "resolution" | "license" | "note";
+type FieldKey = "duration" | "artist" | "resolution";
 
 function formatBytes(n: number): string {
   if (!Number.isFinite(n) || n < 0) return "";
@@ -55,15 +55,12 @@ export function AvSection({
   initial,
   fieldErrors,
   limits,
-  showChangelog = false,
 }: {
   avKind: AvKind;
   /** audio=音乐 / video=视频 */
   initial?: AvSectionInitial;
   fieldErrors?: Record<string, string[]>;
   limits: UploadLimits;
-  /** 仅发布时创建版本记录需要更新日志；改稿不复用版本，故默认隐藏 */
-  showChangelog?: boolean;
 }) {
   const [source, setSource] = useState<AvSource>(initial?.source ?? "mount");
   const [mode, setMode] = useState<AvMode>(initial?.mode ?? "direct");
@@ -74,13 +71,9 @@ export function AvSection({
   const [progress, setProgress] = useState<number | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<FieldKey, string>>({
-    provider: initial?.provider ?? "",
     duration: initial?.duration ?? "",
     artist: initial?.artist ?? "",
-    album: initial?.album ?? "",
     resolution: initial?.resolution ?? "",
-    license: initial?.license ?? "",
-    note: initial?.note ?? "",
   });
 
   const isAudio = avKind === "audio";
@@ -103,7 +96,7 @@ export function AvSection({
     const cur = fieldsRef.current;
     const auto = autoRef.current;
     const applied: AvProbe = {};
-    const put = (k: "duration" | "artist" | "album" | "resolution", v?: string) => {
+    const put = (k: "duration" | "artist" | "resolution", v?: string) => {
       if (!v) return;
       if (cur[k] && auto[k] !== cur[k]) return; // 用户手改过 → 不覆盖
       applied[k] = v;
@@ -111,7 +104,6 @@ export function AvSection({
     };
     put("duration", p.duration);
     put("artist", p.artist);
-    put("album", p.album);
     put("resolution", p.resolution);
     if (Object.keys(applied).length > 0) {
       const next = { ...cur, ...applied };
@@ -273,21 +265,15 @@ export function AvSection({
         {fieldErr(fieldErrors?.avUrl)}
 
         {source === "file" && (
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-none border border-brand-200 bg-surface px-3 py-1.5 text-xs text-neutral-600 hover:border-brand-500 hover:text-neutral-900">
-              <UploadCloud size={14} aria-hidden />
-              {uploading ? (progress == null ? "上传中…" : `上传中 ${progress}%`) : `选择${label}文件`}
-              <input
-                type="file"
-                hidden
-                disabled={uploading}
-                accept={avAcceptAttr(avKind)}
-                onChange={(e) => onFile(e.target.files?.[0] ?? null)}
-              />
-            </label>
-            <span className="text-xs text-neutral-400">
-              支持 {acceptedExts}，单文件 {mbText(limits.attachmentMaxMb)}
-            </span>
+          <div className="mt-2">
+            <AttachmentUpload
+              onFiles={(fl) => onFile(fl[0] ?? null)}
+              limits={limits}
+              uploading={uploading}
+              progress={progress == null ? null : { done: progress, total: 100 }}
+              label={`选择${label}文件`}
+              hint={`仅 ${acceptedExts}`}
+            />
           </div>
         )}
         {msg && <p className="mt-1.5 text-xs text-amber-600">{msg}</p>}
@@ -328,22 +314,6 @@ export function AvSection({
 
       {/* ---- 类型补充字段（自动抓取，可手改） ---- */}
       <div className="grid gap-4 sm:grid-cols-2">
-        {source === "mount" && (
-          <div>
-            <label className={wizLabel} htmlFor="avProvider">
-              来源平台（可选）
-            </label>
-            <input
-              id="avProvider"
-              name="avProvider"
-              value={fields.provider}
-              onChange={(e) => setField("provider", e.target.value)}
-              maxLength={60}
-              placeholder={isAudio ? "网易云 / 网易播客 / 自建站…" : "B站 / YouTube / 自建站…"}
-              className={wizInput}
-            />
-          </div>
-        )}
         <div>
           <label className={wizLabel} htmlFor="duration">
             时长（自动读取）
@@ -358,38 +328,21 @@ export function AvSection({
             className={wizInput}
           />
         </div>
-        {isAudio ? (
-          <>
-            <div>
-              <label className={wizLabel} htmlFor="artist">
-                艺术家（自动读取）
-              </label>
-              <input
-                id="artist"
-                name="artist"
-                value={fields.artist}
-                onChange={(e) => setField("artist", e.target.value)}
-                maxLength={80}
-                placeholder="作曲 / 演奏者"
-                className={wizInput}
-              />
-            </div>
-            <div>
-              <label className={wizLabel} htmlFor="album">
-                专辑（自动读取）
-              </label>
-              <input
-                id="album"
-                name="album"
-                value={fields.album}
-                onChange={(e) => setField("album", e.target.value)}
-                maxLength={80}
-                placeholder="所属专辑 / 合集"
-                className={wizInput}
-              />
-            </div>
-          </>
-        ) : (
+        <div>
+          <label className={wizLabel} htmlFor="artist">
+            艺术家（自动读取）
+          </label>
+          <input
+            id="artist"
+            name="artist"
+            value={fields.artist}
+            onChange={(e) => setField("artist", e.target.value)}
+            maxLength={80}
+            placeholder="作曲 / 演奏者"
+            className={wizInput}
+          />
+        </div>
+        {!isAudio && (
           <div>
             <label className={wizLabel} htmlFor="resolution">
               分辨率（自动读取）
@@ -405,50 +358,7 @@ export function AvSection({
             />
           </div>
         )}
-        <div>
-          <label className={wizLabel} htmlFor="av-license">
-            授权（可选）
-          </label>
-          <input
-            id="av-license"
-            name="license"
-            value={fields.license}
-            onChange={(e) => setField("license", e.target.value)}
-            maxLength={40}
-            placeholder="免费 / 商业 / 待授权…"
-            className={wizInput}
-          />
-        </div>
       </div>
-      <div>
-        <label className={wizLabel} htmlFor="av-note">
-          说明（可选）
-        </label>
-        <input
-          id="av-note"
-          name="note"
-          value={fields.note}
-          onChange={(e) => setField("note", e.target.value)}
-          maxLength={300}
-          placeholder="如：仅供学习交流，版权归原作者所有"
-          className={wizInput}
-        />
-      </div>
-      {showChangelog && (
-        <div>
-          <label className={wizLabel} htmlFor="changelog">
-            更新日志
-          </label>
-          <textarea
-            id="changelog"
-            name="changelog"
-            rows={3}
-            maxLength={2000}
-            placeholder="这一版有什么变化…"
-            className={wizInput}
-          />
-        </div>
-      )}
     </section>
   );
 }

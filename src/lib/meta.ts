@@ -48,14 +48,18 @@ export const imageMetaSchema = z.object({
 });
 export type ImageMeta = z.infer<typeof imageMetaSchema>;
 
-// GAME：版本/大小/平台/语言/授权（D1）
+// GAME：版本/平台/语言 + 下载源清单（D1）。
+// size / license / note 已从发布页移除，schema 仍保留字段以兼容存量数据（读取时按缺省忽略）。
 export const gameMetaSchema = z.object({
   version: z.string().max(40).optional(),
   size: z.string().max(40).optional(),
   platforms: z.array(z.string().max(20)).optional(),
   lang: z.string().max(40).optional(),
   license: z.string().max(40).default(""),
+  /** @deprecated 发布/改稿表单已移除「说明」输入，仅存量数据回读 */
   note: z.string().max(300).optional(),
+  // 下载源：仅 link（作者外链 / 站内附件路径），一个源对应一条版本记录
+  downloads: z.array(articleItemSchema).max(20).default([]),
 });
 export type GameMeta = z.infer<typeof gameMetaSchema>;
 
@@ -76,13 +80,9 @@ export const avMetaSchema = z
     source: z.enum(AV_SOURCES).default("mount"),
     mode: z.enum(AV_MODES).default("direct"),
     url: z.string().trim().max(2000).default(""),
-    provider: z.string().trim().max(60).optional(), // 挂载平台名，如 B站 / 网易云
-    artist: z.string().trim().max(80).optional(), // 音乐：艺术家
-    album: z.string().trim().max(80).optional(), // 音乐：专辑
+    artist: z.string().trim().max(80).optional(), // 音乐：艺术家（自动读取）
     duration: z.string().trim().max(20).optional(), // 时长，如 3:42
     resolution: z.string().trim().max(20).optional(), // 视频：分辨率，如 1080p
-    license: z.string().max(40).default(""),
-    note: z.string().trim().max(300).optional(),
     downloads: z.array(articleItemSchema).max(20).default([]),
   })
   .superRefine((d, cx) => {
@@ -118,7 +118,6 @@ export const AV_META_FALLBACK: AvMeta = {
   source: "mount",
   mode: "direct",
   url: "",
-  license: "",
   downloads: [],
 };
 

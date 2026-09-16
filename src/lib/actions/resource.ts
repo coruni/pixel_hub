@@ -9,7 +9,7 @@ import { imageMetaSchema, gameMetaSchema, articleMetaSchema, avMetaSchema } from
 import { randomTail, uniqueSlug, slugify } from "@/lib/slug";
 import { translateToEnglish } from "@/lib/edge-translate";
 import { revalidatePath } from "next/cache";
-import { resourceTextFields } from "@/lib/resource-fields";
+import { resourceTextFields, urlLike } from "@/lib/resource-fields";
 import { applyResourceEdit, type ResourceEditState } from "@/lib/actions/_resource-edit";
 import { getUploadLimits } from "@/lib/upload-limits";
 import { ARTICLE_MEDIA_MAX, isSingleCoverType } from "@/lib/upload-config";
@@ -40,6 +40,27 @@ const commonFields = resourceTextFields.extend({
   type: z.enum(["GAME", "IMAGE", "ARTICLE", "MUSIC", "VIDEO"]),
 });
 
+/** 从下载源清单里解析出 GAME 的主下载地址（取首条有效 url）。
+ *  发布页已移除独立的「下载外链」输入，resource.externalUrl 改为由清单推导，
+ *  这样详情页主下载、版本记录首条、下载计数守卫、/api/dl 代理都不必改。 */
+function externalUrlFromDownloads(fd: FormData): string {
+  let list: unknown[] = [];
+  try {
+    const parsed = JSON.parse(String(fd.get("downloads") ?? "[]"));
+    list = Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return "";
+  }
+  for (const d of list) {
+    if (!d || typeof d !== "object") continue;
+    const url = String((d as { url?: unknown }).url ?? "").trim();
+    if (url && urlLike(url)) return url;
+  }
+  // 兜底：老表单/外部 API 仍可只传 externalUrl
+  const legacy = String(fd.get("externalUrl") ?? "").trim();
+  return urlLike(legacy) ? legacy : "";
+}
+
 export async function createResourceAction(
   _prev: ResourceActionState,
   fd: FormData,
@@ -57,22 +78,22 @@ export async function createResourceAction(
     externalUrl: fd.get("externalUrl") ?? "",
   });
   if (!common.success) return { fieldErrors: common.error.flatten().fieldErrors };
-  const { type, title, summary, description, categoryId, externalUrl } = common.data;
-  // 外链下载语义仅属于 GAME（externalUrl 驱动下载面板外链入口）；IMAGE/ARTICLE 的下载走 meta，
-  // 这里把 externalUrl 对二者钉死为空，防伪造表单触发版本创建或外链下载。
-  const effectiveUrl = type === "GAME" ? externalUrl : "";
+  const { type, title, summary, description, categoryId } = common.data;
+  // 外链下载语义仅属于 GAME（externalUrl 驱动详情页主下载入口与版本表）；IMAGE/ARTICLE 的下载走 meta。
+  // 发布页已移除「下载外链」输入，GAME 的外链改由下面的下载源清单首条推导（见 gameSources）。
+  const effectiveUrl = type === "GAME" ? externalUrlFromDownloads(fd) : "";
 
   // —— 类型化 meta ——
   const license = String(fd.get("license") ?? "").trim();
 
-  // 附件清单：IMAGE 多附件图包 / ARTICLE 文末清单，同源 downloads JSON（各分节受控序列化）
-  let downloads: unknown = [];
+  // 附件清单：IMAGE 多附件图包 / ARTICLE 文末清单 / GAME 下载源，同源 downloads JSON（各分节受控序列化）
+  let downloads: unknown[] = [];
   try {
-    downloads = JSON.parse(String(fd.get("downloads") ?? "[]"));
+    const parsed = JSON.parse(String(fd.get("downloads") ?? "[]"));
+    downloads = Array.isArray(parsed) ? parsed : [];
   } catch {
     downloads = [];
   }
-  if (!Array.isArray(downloads)) downloads = [];
 
   let metaStr: string;
   if (type === "IMAGE") {
@@ -97,13 +118,9 @@ export async function createResourceAction(
       source: String(fd.get("avSource") ?? "mount") === "file" ? "file" : "mount",
       mode: String(fd.get("avMode") ?? "direct") === "embed" ? "embed" : "direct",
       url: String(fd.get("avUrl") ?? "").trim(),
-      provider: String(fd.get("avProvider") ?? "").trim() || undefined,
       artist: String(fd.get("artist") ?? "").trim() || undefined,
-      album: String(fd.get("album") ?? "").trim() || undefined,
       duration: String(fd.get("duration") ?? "").trim() || undefined,
       resolution: String(fd.get("resolution") ?? "").trim() || undefined,
-      license,
-      note: String(fd.get("note") ?? "").trim() || undefined,
       downloads,
     });
     if (!am.success) return { fieldErrors: am.error.flatten().fieldErrors };
@@ -111,7 +128,6 @@ export async function createResourceAction(
   } else {
     const gm = gameMetaSchema.safeParse({
       version: String(fd.get("version") ?? "").trim() || undefined,
-      size: String(fd.get("size") ?? "").trim() || undefined,
       platforms:
         String(fd.get("platforms") ?? "")
           .split(/[,，、\s]+/)
@@ -119,16 +135,22 @@ export async function createResourceAction(
           .filter(Boolean)
           .slice(0, 8) || undefined,
       lang: String(fd.get("lang") ?? "").trim() || undefined,
-      license,
-      note: String(fd.get("note") ?? "").trim() || undefined,
+      downloads,
     });
     if (!gm.success) return { fieldErrors: gm.error.flatten().fieldErrors };
     metaStr = JSON.stringify(gm.data);
   }
 
-  // GAME 必填外链；文章可以无图（正文即内容）
-  if (type === "GAME" && !externalUrl)
-    return { fieldErrors: { externalUrl: ["游戏资源需填写网盘/外链地址"] } };
+  // GAME 必填下载源（清单里至少一条有效 url）；文章可以无图（正文即内容）
+  const gameSources =
+    type === "GAME"
+      ? downloads
+          .filter((d): d is Record<string, unknown> => !!d && typeof d === "object")
+          .map((d) => String(d.url ?? "").trim())
+          .filter((u) => !!u && urlLike(u))
+      : [];
+  if (type === "GAME" && gameSources.length === 0)
+    return { fieldErrors: { downloads: ["请至少添加一条有效的下载地址（http(s):// 或站内附件路径）"] } };
 
   // —— 媒体认领 ——
   let mediaIds: string[] = [];
@@ -243,8 +265,17 @@ export async function createResourceAction(
       if (finalCover)
         await tx.resource.update({ where: { id: r.id }, data: { coverMediaId: finalCover } });
 
-      // 有下载地址的资源落首个版本记录（仅 GAME，版本号取 meta.version，缺省 1.0）
+      // 下载源落版本记录（GAME）：一个下载源一条版本，详情页「版本历史」逐条下载。
+      // 清单为空时兜底 externalUrl 一条，保证「有下载外链就有可下载项」。
+      const sources: { name: string; url: string }[] = [];
       if (effectiveUrl) {
+        for (const d of downloads) {
+          if (!d || typeof d !== "object") continue;
+          const url = String((d as { url?: unknown }).url ?? "").trim();
+          if (!url) continue;
+          sources.push({ name: String((d as { name?: unknown }).name ?? "").trim() || url, url });
+        }
+        if (sources.length === 0) sources.push({ name: effectiveUrl, url: effectiveUrl });
         const ver =
           type === "GAME"
             ? (() => {
@@ -255,14 +286,16 @@ export async function createResourceAction(
                 }
               })()
             : "1.0";
-        await tx.resourceVersion.create({
-          data: {
-            resourceId: r.id,
-            version: ver,
-            changelog: String(fd.get("changelog") ?? "").trim() || null,
-            url: effectiveUrl,
-          },
-        });
+        for (const s of sources) {
+          await tx.resourceVersion.create({
+            data: {
+              resourceId: r.id,
+              version: ver,
+              changelog: String(fd.get("changelog") ?? "").trim() || null,
+              url: s.url,
+            },
+          });
+        }
       }
       return r;
     });

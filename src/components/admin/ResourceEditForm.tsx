@@ -14,7 +14,7 @@ import { updateResourceAdminAction } from "@/lib/actions/admin-content";
 import type { ResourceEditState, EditableResourceType } from "@/lib/actions/_resource-edit";
 import type { ResourceMetaOutput } from "@/lib/meta";
 import { ARTICLE_MEDIA_MAX, isSingleCoverType, type UploadLimits } from "@/lib/upload-config";
-import { uploadImageFiles } from "@/lib/upload-image-client";
+import { uploadImageFiles, type UploadProgress } from "@/lib/upload-image-client";
 import {
   PublishOptionGrid,
   SectionTitle,
@@ -52,6 +52,8 @@ export type EditableResource = {
   meta: ResourceMetaOutput;
   gallery: GalleryItem[];
   coverMediaId: string;
+  /** 已有版本记录（GAME 的下载源清单从这个表回填） */
+  versions: { version: string; url: string | null }[];
 };
 
 export function ResourceEditForm({
@@ -89,6 +91,10 @@ export function ResourceEditForm({
   const [description, setDescription] = useState(resource.description);
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState<string | null>(null);
+  /** 附件清单里在飞的上传任务数：>0 时禁止保存，等上传落地再提交 */
+  const [attachBusy, setAttachBusy] = useState(0);
+  /** 图片批量上传进度：显示「第 n / 共 m」与整体百分比 */
+  const [progress, setProgress] = useState<UploadProgress | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const ids = files.filter((f) => f.ok).map((f) => f.id);
@@ -124,8 +130,11 @@ export function ResourceEditForm({
     const picks = Array.from(fl).slice(0, remain);
     setUploading(true);
     setUploadMsg(null);
+    setProgress({ done: 0, total: picks.length, index: 0, name: picks[0]?.name ?? "" });
     try {
-      const { good, bad } = await uploadImageFiles(picks, maxCount);
+      const { good, bad } = await uploadImageFiles(picks, maxCount, {
+        onProgress: setProgress,
+      });
       if (good.length > 0) {
         const next = [...files, ...good].slice(0, maxCount);
         setFiles(next);
@@ -135,6 +144,7 @@ export function ResourceEditForm({
         setUploadMsg(`${bad.map((b) => b.name).join("、")} 上传失败：${bad[0]?.error ?? "未知原因"}`);
     } finally {
       setUploading(false);
+      setProgress(null);
       if (fileRef.current) fileRef.current.value = "";
     }
   }
@@ -146,7 +156,16 @@ export function ResourceEditForm({
   }
 
   return (
-    <form action={formAction}>
+    <form
+      action={formAction}
+      // 附件还在上传就拦下这次保存：不能把半截清单写进库
+      onSubmit={(e) => {
+        if (attachBusy > 0) {
+          e.preventDefault();
+          setUploadMsg("附件正在上传，请等上传完成后再保存");
+        }
+      }}
+    >
       <input type="hidden" name="id" value={resource.id} />
       <input type="hidden" name="mediaIds" value={JSON.stringify(ids)} />
       <input type="hidden" name="coverId" value={coverId} />
@@ -232,17 +251,13 @@ export function ResourceEditForm({
       {/* 按类型渲染对应分节（与发布向导同一套组件，保证字段/样式/交互一致） */}
       {resource.type === "GAME" && resource.meta.kind === "GAME" && (
         <GameSection
-          initial={{
-            externalUrl: resource.externalUrl,
-            version: resource.meta.version,
-            size: resource.meta.size,
-            platforms: resource.meta.platforms?.join(","),
-            lang: resource.meta.lang,
-            license: resource.meta.license,
-            note: resource.meta.note,
-          }}
+          downloads={resource.versions.map((v) => ({
+            name: v.url || `v${v.version}`,
+            url: v.url ?? "",
+          }))}
           fieldErrors={fe}
           limits={limits}
+          onBusyChange={setAttachBusy}
         />
       )}
       {resource.type === "IMAGE" && resource.meta.kind === "IMAGE" && (
@@ -254,10 +269,16 @@ export function ResourceEditForm({
           }}
           fieldErrors={fe}
           limits={limits}
+          onBusyChange={setAttachBusy}
         />
       )}
       {resource.type === "ARTICLE" && resource.meta.kind === "ARTICLE" && (
-        <ArticleSection initial={{ downloads: resource.meta.downloads }} fieldErrors={fe} limits={limits} />
+        <ArticleSection
+          initial={{ downloads: resource.meta.downloads }}
+          fieldErrors={fe}
+          limits={limits}
+          onBusyChange={setAttachBusy}
+        />
       )}
       {resource.type === "MUSIC" && resource.meta.kind === "MUSIC" && (
         <AvSection avKind="audio" initial={resource.meta} fieldErrors={fe} limits={limits} />
@@ -276,6 +297,7 @@ export function ResourceEditForm({
         maxMb={limits.galleryImageMaxMb}
         maxCount={isSingleCoverType(resource.type) ? ARTICLE_MEDIA_MAX : limits.galleryImageMaxCount}
         uploadMsg={uploadMsg}
+        progress={progress}
         fieldError={fe.mediaIds}
         onPick={onFiles}
         onRemove={remove}
@@ -293,11 +315,14 @@ export function ResourceEditForm({
       <div className="mt-6 flex flex-wrap items-center gap-4">
         <Button
           type="submit"
-          disabled={pending || uploading}
+          disabled={pending || uploading || attachBusy > 0}
           className="rounded-none border border-brand-600 bg-brand-500 px-8 py-2 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-50"
         >
-          {pending ? "保存中…" : "保存修改"}
+          {pending ? "保存中…" : attachBusy > 0 ? "等待附件上传…" : "保存修改"}
         </Button>
+        {attachBusy > 0 && (
+          <span className="text-sm text-amber-600">附件上传中，完成后才能保存</span>
+        )}
         <Link href={backHref} className={BTN_GHOST_SM}>
           {backLabel}
         </Link>

@@ -1,23 +1,16 @@
 "use client";
 
 import { useActionState, useState, useTransition } from "react";
-import { Download, Plus, UploadCloud } from "lucide-react";
+import { Download, Plus } from "lucide-react";
 import {
   addVersionAction,
   bumpVersionDownloadAction,
   type ResourceActionState,
 } from "@/lib/actions/resource";
-import {
-  attachmentAcceptAttr,
-  attachmentExtsSample,
-  mbText,
-  type UploadLimits,
-} from "@/lib/upload-config";
 import { INPUT } from "@/lib/ui/cls";
 import { uploadAttachment } from "@/lib/upload-attachment-client";
+import { AttachmentUpload, type AttachLimits } from "@/components/upload/AttachmentUpload";
 import { Button } from "@/components/ui/Button";
-
-type AttachLimits = Pick<UploadLimits, "attachmentMaxMb" | "attachmentExts">;
 
 /** 单个版本的下载：新窗口打开地址 + 计数（会话去重） */
 export function VersionDownloadButton({
@@ -121,25 +114,12 @@ export function VersionForm({ resourceId, limits }: { resourceId: string; limits
               )}
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-none border border-brand-200 bg-surface px-3 py-1.5 text-xs text-neutral-600 hover:border-brand-500 hover:text-neutral-900">
-              <UploadCloud size={13} aria-hidden />
-              {attUploading ? "上传中…" : "上传文件"}
-              <input
-                type="file"
-                hidden
-                disabled={attUploading}
-                accept={attachmentAcceptAttr(limits.attachmentExts)}
-                onChange={(e) => onAttachment(e.target.files?.[0] ?? null)}
-              />
-            </label>
-            {url.startsWith("/") && (
-              <span className="text-xs text-emerald-600">✓ 已上传站内附件</span>
-            )}
-            <span className="text-xs text-neutral-400">
-              {`支持 ${attachmentExtsSample(limits.attachmentExts, 6)} 格式，单文件 ${mbText(limits.attachmentMaxMb)}`}
-            </span>
-          </div>
+          <AttachmentUpload
+            onFiles={(fl) => onAttachment(fl[0] ?? null)}
+            limits={limits}
+            uploading={attUploading}
+            filled={url.startsWith("/")}
+          />
           <div>
             <label className="mb-1 block text-xs text-neutral-500" htmlFor="v-changelog">
               更新日志

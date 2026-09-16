@@ -132,35 +132,53 @@ function ArticleAttachmentsCard({ ctx }: { ctx: DetailCtx }) {
   );
 }
 
-/** GAME：externalUrl 外链主下载（作者外链，原样打开；版本历史走 VersionSection）
- *  样式对齐图包下载清单：同款标题行 + 徽标行 + 小号下载按钮 */
+/** GAME：作者填写的下载源清单（externalUrl 为必填主源，meta.downloads 追加其余）；
+ *  样式对齐图包下载清单：同款标题行 + 徽标行 + 小号下载按钮。
+ *  版本历史由 VersionSection 单独渲染，两者各自可达、互不替代。 */
 function GameExternalCard({ ctx }: { ctx: DetailCtx }) {
   const { detail, authed } = ctx;
   if (!detail.externalUrl) return null;
   const version = ctx.meta.kind === "GAME" ? ctx.meta.version : undefined;
+  const versionText = version ? `版本 ${version}` : "游戏本体";
+  // 主源用 externalUrl（必填、未被删除保护），其余清单项按 url 去重后追加
+  const extra =
+    ctx.meta.kind === "GAME"
+      ? ctx.meta.downloads.filter((d) => d.url && d.url !== detail.externalUrl)
+      : [];
+  const rows = [
+    { name: versionText, url: detail.externalUrl },
+    ...extra.map((d) => ({ name: d.name || versionText, url: d.url })),
+  ];
   return (
     <section className="mt-6 rounded-none border border-brand-200 bg-surface p-5">
-      <h2 className="text-sm font-semibold text-neutral-400">游戏下载</h2>
+      <h2 className="text-sm font-semibold text-neutral-400">
+        游戏下载{rows.length > 1 ? `（${rows.length}）` : ""}
+      </h2>
       <ul className="mt-3 divide-y divide-neutral-100">
-        <li className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3 first:pt-0 last:pb-0">
-          <DlBadge kind="link" />
-          <span className="min-w-0 flex-1 truncate text-sm text-neutral-800">
-            {version ? `版本 ${version}` : "游戏本体"}
-          </span>
-          <span className="shrink-0 text-xs text-neutral-400">
-            已下载 {formatCount(detail.downloadCount)} 次
-          </span>
-          <MetaDownloadButton
-            resourceId={detail.id}
-            url={detail.externalUrl}
-            kind="link"
-            label="下载"
-            small
-            loginRequired={detail.loginRequired}
-            authed={authed}
-            callbackPath={`/resources/${detail.slug}`}
-          />
-        </li>
+        {rows.map((r, i) => (
+          <li
+            key={i}
+            className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3 first:pt-0 last:pb-0"
+          >
+            <DlBadge kind="link" />
+            <span className="min-w-0 flex-1 truncate text-sm text-neutral-800">{r.name}</span>
+            {i === 0 && (
+              <span className="shrink-0 text-xs text-neutral-400">
+                已下载 {formatCount(detail.downloadCount)} 次
+              </span>
+            )}
+            <MetaDownloadButton
+              resourceId={detail.id}
+              url={r.url}
+              kind="link"
+              label="下载"
+              small
+              loginRequired={detail.loginRequired}
+              authed={authed}
+              callbackPath={`/resources/${detail.slug}`}
+            />
+          </li>
+        ))}
       </ul>
     </section>
   );

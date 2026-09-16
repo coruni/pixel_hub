@@ -5,6 +5,7 @@ import { SectionTitle, STEP, type Uploaded } from "./wizard-shared";
 import { Button } from "@/components/ui/Button";
 import { useFileDrop } from "@/lib/hooks/use-file-drop";
 import { useFilePaste } from "@/lib/hooks/use-file-paste";
+import type { UploadProgress } from "@/lib/upload-image-client";
 
 /** 预览图/插图选择：上传、设封面、移除（最多 maxCount 张，默认 12）；单张上限由宿主配置传入 */
 export default function MediaPicker({
@@ -16,6 +17,7 @@ export default function MediaPicker({
   maxMb,
   maxCount = 12,
   uploadMsg,
+  progress,
   fieldError,
   onPick,
   onRemove,
@@ -31,6 +33,8 @@ export default function MediaPicker({
   maxMb: number;
   maxCount?: number;
   uploadMsg: string | null;
+  /** 批量上传进度：多张时显示「第 n / 共 m」与整体进度条 */
+  progress?: UploadProgress | null;
   fieldError?: string[];
   onPick: (fl: FileList | null) => void;
   onRemove: (id: string) => void;
@@ -120,7 +124,9 @@ export default function MediaPicker({
             {dragging
               ? "松开即可上传"
               : uploading
-                ? "处理中…"
+                ? progress && progress.total > 1
+                  ? `上传中 ${Math.min(progress.done + 1, progress.total)}/${progress.total}`
+                  : "处理中…"
                 : full
                   ? "已达上限"
                   : "＋ 上传图片"}
@@ -141,6 +147,25 @@ export default function MediaPicker({
       </div>
       {fieldError && fieldError.length > 0 && (
         <p className="mt-1 text-xs text-red-500">{fieldError[0]}</p>
+      )}
+      {uploading && progress && progress.total > 0 && (
+        <div className="mt-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-neutral-500">
+            <span className="truncate">
+              正在上传 {Math.min(progress.done + 1, progress.total)}/{progress.total}
+              {progress.name ? ` · ${progress.name}` : ""}
+            </span>
+            <span className="tabular-nums text-neutral-400">
+              {Math.round((progress.done / progress.total) * 100)}%
+            </span>
+          </div>
+          <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-none bg-brand-100">
+            <div
+              className="h-full bg-brand-500 transition-[width] duration-300"
+              style={{ width: `${Math.round((progress.done / progress.total) * 100)}%` }}
+            />
+          </div>
+        </div>
       )}
       {uploadMsg && <p className="mt-2 text-xs text-amber-600">{uploadMsg}</p>}
     </section>

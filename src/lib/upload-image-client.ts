@@ -31,6 +31,20 @@ export type ImageUploadItem = {
 
 export type ImageUploadOutcome = { ok: true; item: ImageUploadItem } | { ok: false; error: string };
 
+/** 批量上传进度（供 UI 显示「第 n / 共 m」与当前阶段） */
+export type UploadProgress = {
+  /** 已完成（成功或失败）的张数 */
+  done: number;
+  /** 本次批量的总张数 */
+  total: number;
+  /** 正在处理的文件下标（0-based），全部完成时为 total */
+  index: number;
+  /** 正在处理的文件名 */
+  name: string;
+  /** 当前文件的阶段；UI 目前只读 done/total/name，保留字段供后续细分 */
+  phase?: "uploading" | "done";
+};
+
 /** 批量结果：good 保持与入参同序（首图用作封面，顺序必须稳定） */
 export type ImageUploadBatchResult = {
   good: ImageUploadItem[];
@@ -93,17 +107,24 @@ function isRetryable(status: number): boolean {
 type Attempt = { ok: true; item: ImageUploadItem } | { ok: false; error: string; retryable: boolean };
 
 /** 单次请求（不发重试）。所有返回分支都带 retryable，供上层决定是否退避 */
-async function postOnce(file: File, maxCount: number): Promise<Attempt> {
+async function postOnce(
+  file: File,
+  maxCount: number,
+  onProgress?: (percent: number) => void,
+): Promise<Attempt> {
   const fd = new FormData();
   fd.append("files", file);
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), REQUEST_TIMEOUT_MS);
   try {
+    onProgress?.(10); // 已开始发送：fetch 无法读上传字节进度，用阶段值而非伪造百分比
     const res = await fetch(`/api/upload?max=${maxCount}`, {
       method: "POST",
       body: fd,
       signal: ctrl.signal,
     });
+    // 请求已送达，进入服务端处理（落三份对象）阶段
+    onProgress?.(60);
     // 先判状态码再看体：失败响应的体可能是空 / 反代 HTML，先 res.json() 会抛解析错、掩盖真实状态
     if (!res.ok) {
       const body = await readJson(res);
@@ -126,7 +147,10 @@ async function postOnce(file: File, maxCount: number): Promise<Attempt> {
     const item = (Array.isArray(data.files) ? data.files[0] : undefined) as
       | ImageUploadItem
       | undefined;
-    if (data.ok === true && item?.ok) return { ok: true, item };
+    if (data.ok === true && item?.ok) {
+      onProgress?.(100);
+      return { ok: true, item };
+    }
     console.warn(`[upload:client] 上传被拒 fileName=${file.name}`, { status: res.status, body: data });
     return {
       ok: false,
@@ -149,10 +173,14 @@ async function postOnce(file: File, maxCount: number): Promise<Attempt> {
 }
 
 /** 上传单张图片：失败时按需退避重试（同名同序的远端对象可能重复，重试以「用户拿到结果」为准） */
-export async function uploadImageFile(file: File, maxCount: number): Promise<ImageUploadOutcome> {
+export async function uploadImageFile(
+  file: File,
+  maxCount: number,
+  onProgress?: (percent: number) => void,
+): Promise<ImageUploadOutcome> {
   let lastError = "上传失败";
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-    const r = await postOnce(file, maxCount);
+    const r = await postOnce(file, maxCount, onProgress);
     if (r.ok) return { ok: true, item: r.item };
     lastError = r.error;
     if (!r.retryable || attempt === MAX_ATTEMPTS) break;
@@ -162,21 +190,40 @@ export async function uploadImageFile(file: File, maxCount: number): Promise<Ima
   return { ok: false, error: lastError };
 }
 
-/** 批量上传：并发受限、逐个收集成败；成功项保持与入参同序 */
+/**
+ * 批量上传：并发受限、逐个收集成败；成功项保持与入参同序。
+ *
+ * `onProgress` 在每张开始 / 结束时回调。注意：服务端返回的是**单个** JSON
+ * （一次请求只落一张图，还要写三份对象），因此没有真实的字节级进度可读，
+ * 这里按「已完成张数」折算成整体百分比（不编造虚假的字节流）。
+ */
 export async function uploadImageFiles(
   files: File[],
   maxCount: number,
-  opts?: { concurrency?: number },
+  opts?: { concurrency?: number; onProgress?: (p: UploadProgress) => void },
 ): Promise<ImageUploadBatchResult> {
   const limit = Math.max(1, Math.min(opts?.concurrency ?? UPLOAD_CONCURRENCY, files.length));
   const results: ImageUploadOutcome[] = new Array(files.length);
+  const total = files.length;
+  let done = 0;
+  const emit = (index: number, phase: UploadProgress["phase"]) =>
+    opts?.onProgress?.({
+      done,
+      total,
+      index,
+      name: files[Math.min(index, total - 1)]?.name ?? "",
+      phase,
+    });
   // 共享游标 + N 个 worker：单线程下「读游标 → 自增」之间没有 await，不会取到同一个下标
   let cursor = 0;
   async function worker() {
     while (cursor < files.length) {
       const i = cursor;
       cursor += 1;
+      emit(i, "uploading");
       results[i] = await uploadImageFile(files[i]!, maxCount);
+      done += 1;
+      emit(i + 1, done < total ? "uploading" : "done");
     }
   }
   await Promise.all(Array.from({ length: limit }, () => worker()));

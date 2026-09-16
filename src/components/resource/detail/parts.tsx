@@ -230,17 +230,11 @@ export function TypeInfoCard({ ctx }: { ctx: DetailCtx }) {
             {meta.lang && <KV k="语言" v={meta.lang} />}
           </>
         )}
-        {meta.kind === "MUSIC" && (
-          <>
-            {meta.artist && <KV k="艺术家" v={meta.artist} />}
-            {meta.album && <KV k="专辑" v={meta.album} />}
-          </>
-        )}
+        {meta.kind === "MUSIC" && meta.artist && <KV k="艺术家" v={meta.artist} />}
         {meta.kind === "VIDEO" && meta.resolution && <KV k="画质" v={meta.resolution} />}
         {(meta.kind === "MUSIC" || meta.kind === "VIDEO") && (
           <>
             {meta.duration && <KV k="时长" v={meta.duration} />}
-            {meta.provider && <KV k="来源平台" v={meta.provider} />}
             <KV k="播放方式" v={meta.mode === "embed" ? "嵌入页" : "直链"} />
           </>
         )}
@@ -257,7 +251,7 @@ export function TypeInfoCard({ ctx }: { ctx: DetailCtx }) {
             <dd className="text-emerald-600">✓ 作者声明原创</dd>
           </div>
         )}
-        {meta.license && <KV k="授权" v={meta.license} />}
+        {"license" in meta && meta.license && <KV k="授权" v={meta.license} />}
         {"sourceNote" in meta && meta.sourceNote && <KV k="来源" v={meta.sourceNote} />}
         {"note" in meta && meta.note && <KV k="说明" v={meta.note} />}
       </dl>

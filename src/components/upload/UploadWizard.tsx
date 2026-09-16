@@ -18,7 +18,7 @@ import {
   isSingleCoverType,
   type UploadLimits,
 } from "@/lib/upload-config";
-import { uploadImageFiles } from "@/lib/upload-image-client";
+import { uploadImageFiles, type UploadProgress } from "@/lib/upload-image-client";
 import {
   DRAFT_AUTOSAVE_DELAY,
   DRAFT_AUTOSAVE_INTERVAL,
@@ -101,8 +101,12 @@ export default function UploadWizard({
   const [coverId, setCoverId] = useState<string>(d?.coverId ?? "");
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState<string | null>(null);
+  /** 图片批量上传进度：显示「第 n / 共 m」与整体百分比 */
+  const [progress, setProgress] = useState<UploadProgress | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [description, setDescription] = useState(d?.description ?? "");
+  /** 附件清单里在飞的上传任务数：>0 时禁止提交，等上传落地再提交 */
+  const [attachBusy, setAttachBusy] = useState(0);
 
   const [state, formAction, pending] = useActionState<ResourceActionState, FormData>(
     createResourceAction,
@@ -219,8 +223,11 @@ export default function UploadWizard({
     const picks = Array.from(fl).slice(0, remain);
     setUploading(true);
     setUploadMsg(null);
+    setProgress({ done: 0, total: picks.length, index: 0, name: picks[0]?.name ?? "" });
     try {
-      const { good, bad } = await uploadImageFiles(picks, maxCount);
+      const { good, bad } = await uploadImageFiles(picks, maxCount, {
+        onProgress: setProgress,
+      });
       if (good.length > 0) {
         const next = [...files, ...good].slice(0, maxCount);
         setFiles(next);
@@ -230,6 +237,7 @@ export default function UploadWizard({
         setUploadMsg(`${bad.map((b) => b.name).join("、")} 上传失败：${bad[0]?.error ?? "未知原因"}`);
     } finally {
       setUploading(false);
+      setProgress(null);
       if (fileRef.current) fileRef.current.value = "";
     }
   }
@@ -337,6 +345,13 @@ export default function UploadWizard({
     <form
       ref={formRef}
       action={formAction}
+      // 附件还在上传就拦下这次提交：不能把半截清单写进库
+      onSubmit={(e) => {
+        if (attachBusy > 0) {
+          e.preventDefault();
+          setUploadMsg("附件正在上传，请等上传完成后再提交");
+        }
+      }}
       // 分节里的非受控输入不会进 React state，用表单级事件统一标记「改过了」触发自动保存
       onChange={() => setFormTick((t) => t + 1)}
       onInput={() => setFormTick((t) => t + 1)}
@@ -469,6 +484,7 @@ export default function UploadWizard({
           }}
           fieldErrors={state.fieldErrors}
           limits={limits}
+          onBusyChange={setAttachBusy}
         />
       )}
       {type === "ARTICLE" && (
@@ -476,14 +492,23 @@ export default function UploadWizard({
           initial={{ downloads: d ? downloadsInit(d) : undefined }}
           fieldErrors={state.fieldErrors}
           limits={limits}
+          onBusyChange={setAttachBusy}
         />
       )}
       {type === "GAME" && (
         <GameSection
-          initial={{ ...textInitial(d), externalUrl: d?.externalUrl ?? "" }}
+          downloads={
+            d
+              ? downloadsOf(d).map((r) => ({
+                  name: r.name || r.url,
+                  url: r.url,
+                }))
+              : undefined
+          }
           fieldErrors={state.fieldErrors}
           limits={limits}
           showChangelog
+          onBusyChange={setAttachBusy}
         />
       )}
       {type === "MUSIC" && (
@@ -492,7 +517,6 @@ export default function UploadWizard({
           initial={avInitial(d)}
           fieldErrors={state.fieldErrors}
           limits={limits}
-          showChangelog
         />
       )}
       {type === "VIDEO" && (
@@ -501,7 +525,6 @@ export default function UploadWizard({
           initial={avInitial(d)}
           fieldErrors={state.fieldErrors}
           limits={limits}
-          showChangelog
         />
       )}
 
@@ -515,6 +538,7 @@ export default function UploadWizard({
         maxMb={limits.galleryImageMaxMb}
         maxCount={mediaMax}
         uploadMsg={uploadMsg}
+        progress={progress}
         fieldError={state.fieldErrors?.mediaIds}
         onPick={onFiles}
         onRemove={remove}
@@ -532,17 +556,22 @@ export default function UploadWizard({
       <div className="mt-6 flex flex-wrap items-center gap-4">
         <Button
           type="submit"
-          disabled={pending || uploading}
+          disabled={pending || uploading || attachBusy > 0}
           className="rounded-none border border-brand-600 bg-brand-500 px-8 py-2 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-50"
         >
           {pending
             ? "提交中…"
-            : !isArticle && files.length === 0
-              ? singleCover
-                ? "先上传封面"
-                : "先上传图片"
-              : "提交发布"}
+            : attachBusy > 0
+              ? "等待附件上传…"
+              : !isArticle && files.length === 0
+                ? singleCover
+                  ? "先上传封面"
+                  : "先上传图片"
+                : "提交发布"}
         </Button>
+        {attachBusy > 0 && (
+          <span className="text-sm text-amber-600">附件上传中，完成后才能提交</span>
+        )}
         {state.ok && state.pending && (
           <span className="flex items-center gap-2 text-sm text-emerald-600">
             ✓ 已提交审核，通过后将自动上架
@@ -570,18 +599,6 @@ function downloadsInit(d: DraftPayload) {
   }));
 }
 
-/** GAME 分节的文本字段 */
-function textInitial(d: DraftPayload | null) {
-  return {
-    version: d?.version ?? "",
-    size: d?.size ?? "",
-    platforms: d?.platforms ?? "",
-    lang: d?.lang ?? "",
-    license: d?.license ?? "",
-    note: d?.note ?? "",
-  };
-}
-
 /** 音乐 / 视频分节的初始值 */
 function avInitial(d: DraftPayload | null) {
   if (!d) return undefined;
@@ -589,12 +606,8 @@ function avInitial(d: DraftPayload | null) {
     source: (d.avSource === "file" ? "file" : "mount") as "file" | "mount",
     mode: (d.avMode === "embed" ? "embed" : "direct") as "embed" | "direct",
     url: d.avUrl,
-    provider: d.avProvider,
     duration: d.duration,
     artist: d.artist,
-    album: d.album,
     resolution: d.resolution,
-    license: d.license,
-    note: d.note,
   };
 }

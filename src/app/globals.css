@@ -30,6 +30,7 @@
   --md-border: #e5e5e5;
   /* 品牌主色：温暖橙（Claude 风赤陶橙）。用法同 Tailwind 色板：bg-brand-500 / text-brand-600 等 */
   --surface: #fffdf9; /* 卡片/面板暖白（比页面背景 #faf9f5 略亮一档） */
+  --panel: #ffffff; /* 抽屉/弹层面板底：比 surface 再亮一档，与内容分离层级 */
   --brand-50: #fdf5f0;
   --brand-100: #faece3;
   --brand-200: #f4d9c8;
@@ -68,6 +69,8 @@ html.dark {
   --md-border: #3a3631;
 
   --surface: #201b15; /* 卡片/面板暖黑（比页面背景略亮一档） */
+  /* 抽屉/弹层面板底：比 surface 再提一层，与表面色分离开层级 */
+  --panel: #2b2419;
   /* brand：50-300 是浅底/边框 → 深暖棕；600-900 是深文字/描边 → 亮暖橙（hover 关系随之反转） */
   --brand-50: #292017;
   --brand-100: #33281e;
@@ -122,6 +125,7 @@ html.dark {
    color-mix 跟随明暗；同时 :root 生成 --color-* 变量供全局 CSS（滚动条等）引用 */
 @theme {
   --color-surface: var(--surface);
+  --color-panel: var(--panel);
   --color-brand-50: var(--brand-50);
   --color-brand-100: var(--brand-100);
   --color-brand-200: var(--brand-200);

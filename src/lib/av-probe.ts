@@ -5,7 +5,6 @@ export type AvProbe = {
   /** 展示用时长，如 3:42 / 1:02:33 */
   duration?: string;
   artist?: string;
-  album?: string;
   resolution?: string;
 };
 
@@ -150,7 +149,6 @@ export async function probeFile(file: File, kind: "audio" | "video"): Promise<Av
     const head = new Uint8Array(await file.slice(0, SNIFF_BYTES).arrayBuffer());
     const tags = { ...parseMp4Tags(head), ...(kind === "audio" ? parseId3(head) : {}) };
     if (tags.artist) out.artist = tags.artist;
-    if (tags.album) out.album = tags.album;
   } catch {
     /* 元数据读不到不影响后续 */
   }
@@ -186,7 +184,6 @@ export function probeSummary(p: AvProbe): string {
     p.duration ? `时长 ${p.duration}` : "",
     p.resolution ? `分辨率 ${p.resolution}` : "",
     p.artist ? `艺术家 ${p.artist}` : "",
-    p.album ? `专辑 ${p.album}` : "",
   ].filter(Boolean);
   return parts.length > 0 ? `已从文件读取：${parts.join("、")}` : "";
 }

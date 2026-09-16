@@ -4,7 +4,7 @@ import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { articleMetaSchema, avMetaSchema, gameMetaSchema, imageMetaSchema } from "@/lib/meta";
 import { randomTail, slugify } from "@/lib/slug";
-import { MAX_TAGS, resourceTextFields } from "@/lib/resource-fields";
+import { MAX_TAGS, resourceTextFields, urlLike } from "@/lib/resource-fields";
 import { ARTICLE_MEDIA_MAX, isSingleCoverType } from "@/lib/upload-config";
 import { TYPE_LABEL } from "@/lib/display";
 
@@ -29,7 +29,7 @@ function str(fd: FormData, key: string): string {
   return String(fd.get(key) ?? "").trim();
 }
 
-/** 读取各分节受控序列化的 downloads JSON（IMAGE 多附件图包 / ARTICLE 文末清单同源） */
+/** 读取各分节受控序列化的 downloads JSON（IMAGE 多附件图包 / ARTICLE 文末清单 / GAME 下载源同源） */
 function readDownloads(fd: FormData): { value: unknown[]; error?: string } {
   try {
     const v = JSON.parse(str(fd, "downloads") || "[]");
@@ -37,6 +37,16 @@ function readDownloads(fd: FormData): { value: unknown[]; error?: string } {
   } catch {
     return { value: [], error: "附件清单格式不正确" };
   }
+}
+
+/** 取清单里第一条有效 url（GAME 的 externalUrl 由它推导） */
+function firstUrl(list: unknown[]): string {
+  for (const d of list) {
+    if (!d || typeof d !== "object") continue;
+    const u = String((d as { url?: unknown }).url ?? "").trim();
+    if (u && urlLike(u)) return u;
+  }
+  return "";
 }
 
 /**
@@ -61,7 +71,9 @@ export async function applyResourceEdit(
     externalUrl: str(fd, "externalUrl"),
   });
   if (!base.success) return { fieldErrors: base.error.flatten().fieldErrors };
-  const { title, summary, description, categoryId, tags, externalUrl } = base.data;
+  const { title, summary, description, categoryId, tags } = base.data;
+  /** GAME 主下载地址：默认取表单值，随后被下载源清单首条覆盖 */
+  let externalUrl = base.data.externalUrl;
 
   const category = await tx.category.findUnique({
     where: { id: categoryId },
@@ -72,6 +84,8 @@ export async function applyResourceEdit(
   // —— 类型化 meta（复用发布侧的 zod schema，保证写库形状一致）——
   const license = str(fd, "license");
   let metaStr: string | undefined;
+  /** GAME 下载源清单（原始 JSON），下方统一落成版本记录 */
+  let gameDownloads: unknown[] = [];
   if (type === "IMAGE") {
     const { value: downloads, error } = readDownloads(fd);
     if (error) return { fieldErrors: { downloads: [error] } };
@@ -100,13 +114,9 @@ export async function applyResourceEdit(
       source: str(fd, "avSource") === "file" ? "file" : "mount",
       mode: str(fd, "avMode") === "embed" ? "embed" : "direct",
       url: str(fd, "avUrl"),
-      provider: str(fd, "avProvider") || undefined,
       artist: str(fd, "artist") || undefined,
-      album: str(fd, "album") || undefined,
       duration: str(fd, "duration") || undefined,
       resolution: str(fd, "resolution") || undefined,
-      license,
-      note: str(fd, "note") || undefined,
       downloads,
     });
     if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
@@ -114,7 +124,6 @@ export async function applyResourceEdit(
   } else {
     const parsed = gameMetaSchema.safeParse({
       version: str(fd, "version") || undefined,
-      size: str(fd, "size") || undefined,
       platforms:
         str(fd, "platforms")
           .split(/[,，、\s]+/)
@@ -122,12 +131,21 @@ export async function applyResourceEdit(
           .filter(Boolean)
           .slice(0, 8) || undefined,
       lang: str(fd, "lang") || undefined,
-      license,
       note: str(fd, "note") || undefined,
     });
     if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
     metaStr = JSON.stringify(parsed.data);
+    const { value: downloads, error } = readDownloads(fd);
+    if (error) return { fieldErrors: { downloads: [error] } };
+    gameDownloads = downloads;
+    // 发布页已移除独立的「下载外链」输入，主下载地址改为取清单首条有效 url；
+    // 清单为空时退回表单里的 externalUrl（兼容外部 API 只传外链的调用）。
+    externalUrl = firstUrl(downloads) || externalUrl;
   }
+
+  // GAME 必填至少一条有效下载源（与发布侧同一规则）
+  if (type === "GAME" && !externalUrl)
+    return { fieldErrors: { downloads: ["请至少保留一条有效的下载地址（http(s):// 或站内附件路径）"] } };
 
   await tx.resource.update({
     where: { id },
@@ -144,6 +162,50 @@ export async function applyResourceEdit(
       allowComments: on(fd, "allowComments"),
     },
   });
+
+  // —— GAME 下载源清单 → 版本记录（发布侧同规则：一个下载源一条版本）——
+  // 身份用 url 判定：改稿只做「新增未出现过的 url / 删掉已不在清单里的 url」，
+  // 已存在的记录原样保留（连带保留其 downloadCount 与 createdAt），改个名字不会清空下载数。
+  if (type === "GAME") {
+    const list = gameDownloads
+      .filter((d): d is Record<string, unknown> => !!d && typeof d === "object")
+      .map((d) => ({
+        name: String(d.name ?? "").trim(),
+        url: String(d.url ?? "").trim(),
+        // 手上没有版本号和更新日志（发布页已移除该字段），沿用资源元信息里的版本号作展示
+        version: str(fd, "version") || "1.0",
+      }))
+      .filter((d) => d.url !== "");
+    const desiredUrls = new Set(list.map((d) => d.url));
+    // 兜底：清单为空时至少保留 externalUrl 一条，避免「有下载外链却没有可下载项」
+    if (list.length === 0 && externalUrl) {
+      list.push({ name: externalUrl, url: externalUrl, version: str(fd, "version") || "1.0" });
+      desiredUrls.add(externalUrl);
+    }
+    // 不会被本清单删掉的记录：老数据里 url 为空的版本行（改稿页无法回填，保留原样）
+    const keepRows = await tx.resourceVersion.findMany({
+      where: { resourceId: id, OR: [{ url: null }, { url: "" }] },
+      select: { id: true },
+    });
+    const keepIds = new Set(keepRows.map((v) => v.id));
+    const existingVersions = await tx.resourceVersion.findMany({
+      where: { resourceId: id },
+      select: { id: true, url: true },
+    });
+    const existingUrls = new Set(existingVersions.map((v) => v.url).filter((u): u is string => !!u));
+
+    for (const d of list) {
+      if (existingUrls.has(d.url)) continue; // 已有同 url 记录 → 保留（含下载计数）
+      await tx.resourceVersion.create({
+        data: { resourceId: id, version: d.version, changelog: null, url: d.url },
+      });
+    }
+    const staleIds = existingVersions
+      .filter((v) => v.url && !desiredUrls.has(v.url) && !keepIds.has(v.id))
+      .map((v) => v.id);
+    if (staleIds.length > 0)
+      await tx.resourceVersion.deleteMany({ where: { id: { in: staleIds }, resourceId: id } });
+  }
 
   // 标签同步：只动差异部分，并同步 Tag.count（保留的不重复计数，移除的递减）
   const existing = await tx.tagOnResource.findMany({
