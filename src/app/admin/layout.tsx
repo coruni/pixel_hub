@@ -34,8 +34,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
       <div className="lg:flex lg:gap-8">
-        {/* 侧栏：桌面左侧竖排，移动端标题下横向滚动 */}
-        <aside className="mb-5 lg:mb-0 lg:w-48 lg:shrink-0">
+        {/* 侧栏：桌面左侧竖排，移动端标题下横向滚动。
+            min-w-0 必需——否则 flex 子项按内容撑开，nav 的 overflow-x-auto 失效，
+            横向溢出会外溢成整页滚动条。 */}
+        <aside className="mb-5 min-w-0 lg:mb-0 lg:w-48 lg:shrink-0">
           <div className="mb-3 flex items-center gap-2.5 lg:mb-4">
             <h1 className="flex items-center gap-2.5 text-lg font-semibold tracking-tight text-neutral-900">
               <span className="h-5 w-1.5 rounded-none bg-brand-500" aria-hidden />

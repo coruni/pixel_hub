@@ -14,22 +14,19 @@ import { useFileDrop } from "@/lib/hooks/use-file-drop";
 import { SquareCheckbox } from "../admin/SquareCheckbox";
 import { Button } from "@/components/ui/Button";
 
-/** 下载源清单行的初始值（已有版本记录回填用） */
+/** 下载源清单行的初始值（已有清单回填用） */
 export type InitialDownload = { name: string; url: string; note?: string };
 
 export function GameSection({
   downloads,
   fieldErrors,
   limits,
-  showChangelog = false,
   onBusyChange,
 }: {
-  /** 已有下载源（改稿时来自 resourceVersions）；发布时为空 */
+  /** 已有下载源（改稿时来自 meta.downloads）；发布时为空 */
   downloads?: InitialDownload[];
   fieldErrors?: Record<string, string[]>;
   limits: UploadLimits;
-  /** 仅发布时创建版本记录需要更新日志；改稿不复用版本，故默认隐藏 */
-  showChangelog?: boolean;
   /** 上传任务数量变化：宿主据此禁用提交 */
   onBusyChange?: (busy: number) => void;
 }) {
@@ -49,18 +46,6 @@ export function GameSection({
       <SectionTitle n={STEP.TYPE}>游戏信息</SectionTitle>
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className={wizLabel} htmlFor="version">
-            版本
-          </label>
-          <input
-            id="version"
-            name="version"
-            maxLength={40}
-            placeholder="v1.2.3"
-            className={wizInput}
-          />
-        </div>
-        <div>
           <label className={wizLabel} htmlFor="lang">
             语言
           </label>
@@ -72,33 +57,18 @@ export function GameSection({
             className={wizInput}
           />
         </div>
-      </div>
-      {showChangelog && (
         <div>
-          <label className={wizLabel} htmlFor="changelog">
-            更新日志
+          <label className={wizLabel} htmlFor="platforms">
+            平台
           </label>
-          <textarea
-            id="changelog"
-            name="changelog"
-            rows={3}
-            maxLength={2000}
-            placeholder="这个版本包含什么内容…"
+          <input
+            id="platforms"
+            name="platforms"
+            maxLength={100}
+            placeholder="Windows / Android / Switch…"
             className={wizInput}
           />
         </div>
-      )}
-      <div>
-        <label className={wizLabel} htmlFor="platforms">
-          平台
-        </label>
-        <input
-          id="platforms"
-          name="platforms"
-          maxLength={100}
-          placeholder="Windows / Android / Switch…"
-          className={wizInput}
-        />
       </div>
       <div className="rounded-none border border-brand-200 p-4">
         <p className="text-sm font-medium text-neutral-700">
@@ -129,12 +99,17 @@ function formatBytes(n: number): string {
   return `${(mb / 1024).toFixed(1)} GB`;
 }
 
-/** 附件直传：OneDrive 走浏览器分片直传，其他存储回退既有 API */
+/**
+ * 附件直传：OneDrive 走浏览器分片直传，其他存储回退既有 API。
+ * `onProgress` 是【当前这个文件】的字节进度（0..100）：分片直传时按已完成分片累计；
+ * 回退到普通 API 的上传拿不到字节回调，只会在完成时收到一次 100。
+ */
 async function postAttachment(
   file: File,
+  onProgress?: (percent: number) => void,
 ): Promise<{ url: string; name: string; size: number } | null> {
   try {
-    return await uploadAttachment(file);
+    return await uploadAttachment(file, onProgress);
   } catch {
     return null;
   }
@@ -209,6 +184,11 @@ export function AttachmentListEditor({
   const [inflight, setInflight] = useState(0);
   /** 上传进度（已完成/总数），仅用于投放区文案 */
   const [batch, setBatch] = useState<{ done: number; total: number } | null>(null);
+  /**
+   * 当前正在传的这一个文件的字节进度（0..100）。
+   * 串行上传，任一时刻只有一个「当前文件」，所以单值就够，不用按文件建表。
+   */
+  const [percent, setPercent] = useState<number | null>(null);
 
   /**
    * 抽屉编辑的是「草稿」而不是清单里的行：
@@ -224,8 +204,15 @@ export function AttachmentListEditor({
   /** 本次会话累计的完成数 / 总数，用于投放区进度文案 */
   const doneRef = useRef(0);
   const totalRef = useRef(0);
-  /** 「抽屉是否被占用」镜像：上传回调是 async，读 state 会拿到旧值 */
-  const drawerHeldRef = useRef(false);
+  /**
+   * 抽屉当前状态的值镜像：`applyUpload` 在 await 之后才跑，直接读 state 会拿到旧值，
+   * 而后面的分支判断需要的是「此刻」的 kind 与下标，不是闭包捕获那一刻的。
+   */
+  const viewRef = useRef<{ draft: AttachRow | null; open: number | null; kinds: string[] }>({
+    draft: null,
+    open: null,
+    kinds: [],
+  });
 
   const isNew = draft != null;
   const editing = isNew ? draft : open == null ? null : (rows[open] ?? null);
@@ -244,10 +231,10 @@ export function AttachmentListEditor({
     onBusyChange?.(inflight);
   }, [inflight, onBusyChange]);
 
-  // 抽屉占用镜像：上传与关抽屉都可能发生在 await 之间
+  // 抽屉状态镜像：上传、关抽屉都可能发生在 await 之间
   useEffect(() => {
-    drawerHeldRef.current = isNew || open !== null;
-  }, [isNew, open]);
+    viewRef.current = { draft, open, kinds: rows.map((r) => r.kind) };
+  }, [draft, open, rows]);
 
   function closeDrawer() {
     setOpen(null);
@@ -318,10 +305,56 @@ export function AttachmentListEditor({
   }
 
   /**
+   * 上传完成后把结果交给「当前打开的那条」，这是用户要的「传完就能改」：
+   *
+   * - 抽屉关着 → 落一行 + 新开草稿指向它，直接进标题改名。
+   * - 抽屉正开着新增草稿 → 只把文件补进草稿，用户填的标题/大小留着；不落行，
+   *   等用户点「添加」时才进清单（否则点「添加」会落出重复行）。
+   * - 抽屉正开着编辑**外链**行 → 一行只能有一个来源，落一行并另起草稿，不覆盖外链。
+   * - 抽屉正开着编辑**站内附件**行 → 落一行并就地更新那一行，不另开草稿。
+   *
+   * 落行由这里统一负责，调用方不要先 setRows 再调用，否则会出现重复行。
+   *
+   * 之前无条件 `setDraft(row)` 的写法有两个洞：关着时会把用户已填的草稿整个顶掉；
+   * 开着新增草稿时又完全不动作，用户看着「传完了」抽屉里却还是空文件占位。
+   */
+  function applyUpload(row: AttachRow) {
+    const v = viewRef.current;
+    // 清单已满：文件已传到站内，但没位置放它。给出提示，不静默吞掉。
+    if (v.kinds.length >= 20) {
+      setMsg("附件已达 20 条上限，新上传的文件未加入清单");
+      return;
+    }
+    const append = () => setRows((p) => (p.length >= 20 ? p : [...p, row]));
+
+    if (v.draft) {
+      if (v.draft.kind === "file") {
+        // 草稿本身就是站内附件：补文件，不落行
+        setDraft((d) => (d ? { ...d, name: row.name, url: row.url, size: row.size } : row));
+      } else {
+        // 草稿是外链：不能塞文件进去，落行 + 另起草稿
+        append();
+        setDraft(row);
+      }
+      return;
+    }
+
+    if (v.open != null) {
+      append();
+      // 编辑外链行时不覆盖（一行只能一个来源）；编辑站内附件行则就地更新
+      if (v.kinds[v.open] !== "file") setDraft(row);
+      else patch(v.open, { name: row.name, url: row.url, size: row.size });
+      return;
+    }
+
+    append();
+    setDraft(row);
+  }
+  /**
    * 投放区上传入口。上传任务与抽屉解耦：
    * - 拖入即开始上传，不等抽屉；关掉抽屉也不中断（在飞任务照常跑完）。
    * - 每个文件完成后立刻成为清单里的一行（标题/地址/大小已齐），
-   *   并在抽屉空闲时自动打开它，方便顺手改标题。
+   *   并交给 applyUpload 写进当前打开的那条，方便顺手改标题。
    * - 串行执行：批量并发容易在反代/云盘侧触发限流。
    *
    * 上传中可以继续拖入：新一批与旧一批各自跑串行循环，进度用「累计」而非每批重置，
@@ -336,7 +369,8 @@ export function AttachmentListEditor({
     setBatch({ done: doneRef.current, total: totalRef.current });
     for (const f of picked) {
       // 单张失败只提示、不打断同批其余文件
-      const r = await postAttachment(f);
+      setPercent(0);
+      const r = await postAttachment(f, setPercent);
       doneRef.current += 1;
       if (!r) {
         setMsg("有附件上传失败，请重试");
@@ -348,12 +382,12 @@ export function AttachmentListEditor({
           url: r.url,
           size: formatBytes(r.size),
         };
-        setRows((p) => (p.length >= 20 ? p : [...p, row]));
-        // 抽屉空闲才自动弹出：用户正开着的抽屉（无论编辑哪条）不抢焦点
-        if (!drawerHeldRef.current) setDraft(row);
+        // 落行 + 写进当前打开的那条统一由 applyUpload 负责，这里不要先 setRows
+        applyUpload(row);
       }
       setBatch({ done: doneRef.current, total: totalRef.current });
       setInflight((n) => Math.max(0, n - 1));
+      setPercent(null);
     }
     // 全部落地后收尾：重置累计计数，投放区回到常态文案
     if (doneRef.current >= totalRef.current) {
@@ -398,6 +432,7 @@ export function AttachmentListEditor({
           onFiles={onFiles}
           limits={limits}
           progress={batch}
+          percent={percent}
           dragging={dragging}
           dropProps={dropProps}
           label={busy ? "继续拖入或点击可追加附件" : "拖入或点击上传附件"}
@@ -487,6 +522,8 @@ export function AttachmentListEditor({
           showSize={showSize}
           isNew={isNew}
           uploading={busy}
+          progress={batch}
+          percent={percent}
           onPatch={patchEditing}
           onSwitchKind={switchKind}
           onUpload={onFiles}
@@ -510,6 +547,8 @@ function AttachmentDrawer({
   showSize,
   isNew = false,
   uploading = false,
+  progress = null,
+  percent = null,
   onPatch,
   onSwitchKind,
   onUpload,
@@ -523,6 +562,10 @@ function AttachmentDrawer({
   /** 草稿态：内容尚未进入清单 */
   isNew?: boolean;
   uploading?: boolean;
+  /** 与外层投放区共享同一份上传进度，避免抽屉内看不到「第 n / 共 m」 */
+  progress?: { done: number; total: number } | null;
+  /** 与投放区共享的当前文件字节进度 */
+  percent?: number | null;
   onPatch: (part: Partial<Omit<AttachRow, "key">>, files?: { url: string; size: string }) => void;
   onSwitchKind: (kind: AttachRow["kind"]) => void;
   onUpload: (files: FileList) => void;
@@ -616,6 +659,8 @@ function AttachmentDrawer({
                   onFiles={onUpload}
                   limits={limits}
                   uploading={uploading}
+                  progress={progress}
+                  percent={percent}
                   dragging={dragOver}
                   dropProps={dropOn}
                   filled={row.url.startsWith("/")}

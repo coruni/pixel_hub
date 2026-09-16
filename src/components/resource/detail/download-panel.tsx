@@ -1,4 +1,5 @@
-// 统一下载面板 —— IMAGE/ARTICLE 按 meta 分发，GAME 走 externalUrl 外链；版本历史由 VersionSection 单独渲染。
+// 统一下载面板 —— IMAGE/ARTICLE 按 meta 分发，GAME 走 externalUrl 外链 + meta.downloads 清单；
+// GAME 不再渲染版本历史（VersionSection 对其返回 null），本面板即唯一下载入口。
 // 服务端决定渲染什么（null = 无下载）；真正的下载/登录墙由客户端 MetaDownloadButton 处理。
 import { Download, ExternalLink, FileText } from "lucide-react";
 import { formatCount } from "@/lib/format";
@@ -134,20 +135,19 @@ function ArticleAttachmentsCard({ ctx }: { ctx: DetailCtx }) {
 
 /** GAME：作者填写的下载源清单（externalUrl 为必填主源，meta.downloads 追加其余）；
  *  样式对齐图包下载清单：同款标题行 + 徽标行 + 小号下载按钮。
- *  版本历史由 VersionSection 单独渲染，两者各自可达、互不替代。 */
+ *  GAME 是唯一下载入口——VersionSection 对 GAME 返回 null，不会再把同一批 URL 列一遍。 */
 function GameExternalCard({ ctx }: { ctx: DetailCtx }) {
   const { detail, authed } = ctx;
   if (!detail.externalUrl) return null;
-  const version = ctx.meta.kind === "GAME" ? ctx.meta.version : undefined;
-  const versionText = version ? `版本 ${version}` : "游戏本体";
+  const fallback = "游戏本体";
   // 主源用 externalUrl（必填、未被删除保护），其余清单项按 url 去重后追加
   const extra =
     ctx.meta.kind === "GAME"
       ? ctx.meta.downloads.filter((d) => d.url && d.url !== detail.externalUrl)
       : [];
   const rows = [
-    { name: versionText, url: detail.externalUrl },
-    ...extra.map((d) => ({ name: d.name || versionText, url: d.url })),
+    { name: fallback, url: detail.externalUrl },
+    ...extra.map((d) => ({ name: d.name || fallback, url: d.url })),
   ];
   return (
     <section className="mt-6 rounded-none border border-brand-200 bg-surface p-5">
@@ -195,7 +195,7 @@ export function DownloadPanel({ ctx }: { ctx: DetailCtx }) {
   }
   // ARTICLE 附件清单
   if (meta.kind === "ARTICLE") return <ArticleAttachmentsCard ctx={ctx} />;
-  // GAME：externalUrl 外链主下载；版本历史另行渲染（VersionSection）
+  // GAME：externalUrl 外链主下载，是 GAME 唯一下载入口（VersionSection 对 GAME 隐藏）
   if (meta.kind === "GAME" && detail.externalUrl) return <GameExternalCard ctx={ctx} />;
   return null;
 }

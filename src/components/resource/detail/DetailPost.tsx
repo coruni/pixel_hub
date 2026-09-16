@@ -48,11 +48,6 @@ function MetaChips({ ctx }: { ctx: DetailCtx }) {
       cls: "bg-neutral-100 text-neutral-600",
     });
   if (meta.kind === "GAME") {
-    if (meta.version)
-      chips.push({
-        node: `v${meta.version.replace(/^v/i, "")}`,
-        cls: "bg-neutral-100 text-neutral-600",
-      });
     if (meta.size) chips.push({ node: meta.size, cls: "bg-neutral-100 text-neutral-600" });
     if (meta.platforms && meta.platforms.length > 0)
       chips.push({

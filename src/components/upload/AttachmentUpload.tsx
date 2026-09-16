@@ -38,6 +38,7 @@ export function AttachmentUpload({
   multiple = false,
   uploading = false,
   progress,
+  percent,
   hint,
   filled = false,
   dragging = false,
@@ -53,6 +54,11 @@ export function AttachmentUpload({
   uploading?: boolean;
   /** 批量上传进度：多文件时才显示「第 n / 共 m」 */
   progress?: { done: number; total: number } | null;
+  /**
+   * 当前文件的字节进度（0..100）。多文件串行时它指的是「正在传的那一个」。
+   * 0 与 undefined 都当作「还没有可展示的进度」——避免刚起步就闪一条 0% 空条。
+   */
+  percent?: number | null;
   /** 追加在「支持 xxx，单文件 y MB」之后的补充说明（如「可多选」） */
   hint?: string;
   /** 已回填站内路径的回执 */
@@ -67,6 +73,9 @@ export function AttachmentUpload({
   const multiText = progress && progress.total > 1 ? ` ${progress.done}/${progress.total}` : "";
   const text = busy ? `上传中${multiText}…` : label;
   const accept = attachmentAcceptAttr(limits.attachmentExts);
+  /** 有意义的字节进度：0 不显示（刚起步，条形还没内容，显示反而像卡住） */
+  const shownPercent =
+    typeof percent === "number" && percent > 0 ? Math.min(100, Math.round(percent)) : null;
 
   // 两条入口共用同一个隐藏 input（点击 label 与拖放都走它），避免逻辑分叉
   const input = (
@@ -91,6 +100,32 @@ export function AttachmentUpload({
     </span>
   );
 
+  /** 单文件字节进度：细条 + 百分比数字，数字是给屏幕阅读器和看不清条的人兜底的 */
+  const bar = shownPercent != null && (
+    <span
+      className={`${variant === "dropzone" ? "mt-1.5" : "ml-0.5"} block w-full`}
+      role="progressbar"
+      aria-label="当前文件上传进度"
+      aria-valuenow={shownPercent}
+      aria-valuemin={0}
+      aria-valuemax={100}
+    >
+      <span
+        className={`block h-1 w-full overflow-hidden rounded-none ${
+          variant === "dropzone" ? "bg-brand-100" : "bg-neutral-100"
+        }`}
+      >
+        <span
+          className="block h-full rounded-none bg-brand-500 transition-[width] duration-200"
+          style={{ width: `${shownPercent}%` }}
+        />
+      </span>
+      <span className={variant === "dropzone" ? "mt-0.5 block text-[11px] opacity-75" : "mt-0.5 block text-xs text-neutral-400"}>
+        {shownPercent}%
+      </span>
+    </span>
+  );
+
   if (variant === "dropzone") {
     return (
       <div {...dropProps} className="w-full">
@@ -105,6 +140,7 @@ export function AttachmentUpload({
         >
           <UploadCloud size={20} aria-hidden />
           <span>{text}</span>
+          {bar}
           {meta}
           {input}
         </label>
@@ -114,12 +150,14 @@ export function AttachmentUpload({
   }
 
   return (
-    <div {...dropProps} className="flex flex-wrap items-center gap-2">
+    <div {...dropProps} className="flex min-w-0 flex-wrap items-center gap-2">
       <label className={`${BTN} ${busy ? BTN_BUSY : ""} ${dragging && !busy ? BTN_DRAG : ""}`}>
         <UploadCloud size={14} aria-hidden />
         {text}
         {input}
       </label>
+      {/* 进度条占满剩余宽度：按钮是行内的，整条只有贴着它才读得出「这是这个文件在传」 */}
+      {shownPercent != null ? <span className="min-w-24 flex-1">{bar}</span> : null}
       {filled && <span className="text-xs text-emerald-600">✓ 已上传站内附件</span>}
       {meta}
     </div>

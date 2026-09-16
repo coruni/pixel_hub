@@ -20,8 +20,10 @@ export default function SidebarLayout({
         style={{ "--rail": `${railWidth ?? 320}px` } as CSSProperties}
       >
         <div className="min-w-0">{children}</div>
-        {/* 移动端 rail 折叠到内容下方：补左右/底部边距，与主列自带 px-4 对齐；桌面端回零 */}
-        <div className="px-4 pb-6 lg:px-0 lg:pb-0">{rail}</div>
+        {/* 移动端 rail 折叠到内容下方：补左右/底部边距，与主列自带 px-4 对齐；桌面端回零。
+            min-w-0 必需：grid 子项默认 min-width:auto，rail 内的模块（如「热门内容」网格）
+            会把这一列撑破 --rail 定宽，表现为内容溢出容器。 */}
+        <div className="min-w-0 px-4 pb-6 lg:px-0 lg:pb-0">{rail}</div>
       </div>
     </div>
   );

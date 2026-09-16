@@ -127,7 +127,6 @@ export async function createResourceAction(
     metaStr = JSON.stringify(am.data);
   } else {
     const gm = gameMetaSchema.safeParse({
-      version: String(fd.get("version") ?? "").trim() || undefined,
       platforms:
         String(fd.get("platforms") ?? "")
           .split(/[,，、\s]+/)
@@ -265,38 +264,9 @@ export async function createResourceAction(
       if (finalCover)
         await tx.resource.update({ where: { id: r.id }, data: { coverMediaId: finalCover } });
 
-      // 下载源落版本记录（GAME）：一个下载源一条版本，详情页「版本历史」逐条下载。
-      // 清单为空时兜底 externalUrl 一条，保证「有下载外链就有可下载项」。
-      const sources: { name: string; url: string }[] = [];
-      if (effectiveUrl) {
-        for (const d of downloads) {
-          if (!d || typeof d !== "object") continue;
-          const url = String((d as { url?: unknown }).url ?? "").trim();
-          if (!url) continue;
-          sources.push({ name: String((d as { name?: unknown }).name ?? "").trim() || url, url });
-        }
-        if (sources.length === 0) sources.push({ name: effectiveUrl, url: effectiveUrl });
-        const ver =
-          type === "GAME"
-            ? (() => {
-                try {
-                  return JSON.parse(metaStr).version ?? "1.0";
-                } catch {
-                  return "1.0";
-                }
-              })()
-            : "1.0";
-        for (const s of sources) {
-          await tx.resourceVersion.create({
-            data: {
-              resourceId: r.id,
-              version: ver,
-              changelog: String(fd.get("changelog") ?? "").trim() || null,
-              url: s.url,
-            },
-          });
-        }
-      }
+      // 版本记录只在「发布新版本」时由 addVersionAction 创建。
+      // 发布/改稿都不再往 ResourceVersion 写——GAME 的下载源清单存 meta.downloads，
+      // 其余类型的下载源也各有自己的 meta.downloads，版本历史是作者主动声明的东西。
       return r;
     });
   } catch (e) {
@@ -370,24 +340,16 @@ export async function addVersionAction(
 
   const resource = await prisma.resource.findUnique({
     where: { id: resourceId },
-    select: { id: true, slug: true, authorId: true, type: true, meta: true, externalUrl: true },
+    select: { id: true, slug: true, authorId: true, type: true, externalUrl: true },
   });
   if (!resource) return { error: "资源不存在" };
   if (resource.authorId !== user.id && user.role !== "ADMIN")
     return { error: "只有作者可发布新版本" };
+  // GAME 没有版本概念：下载源清单在编辑页维护，不接受「发布新版本」
+  if (resource.type === "GAME") return { error: "游戏下载源请在编辑页维护，无需发布版本" };
 
   const finalUrl = url || resource.externalUrl;
   if (!finalUrl) return { fieldErrors: { url: ["请填写该版本的下载地址"] } };
-
-  // GAME：同步 meta.version 供信息卡展示
-  let metaStr = resource.meta;
-  if (resource.type === "GAME" && metaStr) {
-    try {
-      metaStr = JSON.stringify({ ...JSON.parse(metaStr), version });
-    } catch {
-      // 原数据异常时不动 meta
-    }
-  }
 
   await prisma.$transaction([
     prisma.resourceVersion.create({
@@ -395,7 +357,7 @@ export async function addVersionAction(
     }),
     prisma.resource.update({
       where: { id: resource.id },
-      data: { meta: metaStr, externalUrl: finalUrl },
+      data: { externalUrl: finalUrl },
     }),
   ]);
   revalidatePath(`/resources/${resource.slug}`);

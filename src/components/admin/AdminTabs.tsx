@@ -44,7 +44,7 @@ export default function AdminTabs({ tabs, isAdmin }: { tabs: AdminTab[]; isAdmin
   const pathname = usePathname();
   const list = tabs.filter((t) => !t.adminOnly || isAdmin);
   return (
-    <nav className="flex gap-1.5 overflow-x-auto pb-2 lg:sticky lg:top-20 lg:flex-col lg:gap-0.5 lg:overflow-visible lg:pb-0">
+    <nav className="flex w-full min-w-0 gap-1.5 overflow-x-auto pb-2 lg:sticky lg:top-20 lg:flex-col lg:gap-0.5 lg:overflow-visible lg:pb-0">
       {list.map((t) => {
         const active = t.href === "/admin" ? pathname === "/admin" : pathname.startsWith(t.href);
         const Icon = TAB_ICONS[t.href];
@@ -52,20 +52,24 @@ export default function AdminTabs({ tabs, isAdmin }: { tabs: AdminTab[]; isAdmin
           <Link
             key={t.href}
             href={t.href}
-            className={
+            className={`flex items-center gap-2 rounded-none px-3 py-2 text-sm ${
+              // 移动端横向滚动：不能被压缩，否则文字被挤成竖排
+              "shrink-0 lg:shrink"
+            } ${
               active
-                ? "flex shrink-0 items-center gap-2 rounded-none border border-brand-600 bg-brand-500 px-3 py-2 text-sm font-medium text-white"
-                : "flex shrink-0 items-center gap-2 rounded-none px-3 py-2 text-sm text-neutral-600 transition hover:bg-brand-50 hover:text-neutral-900"
-            }
+                ? "border border-brand-600 bg-brand-500 font-medium text-white"
+                : "text-neutral-600 transition hover:bg-brand-50 hover:text-neutral-900"
+            }`}
           >
             {Icon && (
               <Icon
                 size={15}
-                className={active ? "text-white/90" : "text-neutral-400"}
+                className={`shrink-0 ${active ? "text-white/90" : "text-neutral-400"}`}
                 aria-hidden
               />
             )}
-            {t.label}
+            {/* 桌面窄栏（lg:w-48）容纳不下时省略而不是撑破容器 */}
+            <span className="min-w-0 truncate">{t.label}</span>
           </Link>
         );
       })}

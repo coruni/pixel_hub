@@ -48,9 +48,11 @@ export const imageMetaSchema = z.object({
 });
 export type ImageMeta = z.infer<typeof imageMetaSchema>;
 
-// GAME：版本/平台/语言 + 下载源清单（D1）。
+// GAME：平台/语言 + 下载源清单（D1）。GAME 没有版本概念——下载源本身就是清单，
+// 不按版本分代（历史上曾把清单存进 ResourceVersion 表并渲染成「版本历史」，已废弃）。
 // size / license / note 已从发布页移除，schema 仍保留字段以兼容存量数据（读取时按缺省忽略）。
 export const gameMetaSchema = z.object({
+  /** @deprecated 已废弃：GAME 不再展示版本号，仅存量数据回读 */
   version: z.string().max(40).optional(),
   size: z.string().max(40).optional(),
   platforms: z.array(z.string().max(20)).optional(),
@@ -58,7 +60,7 @@ export const gameMetaSchema = z.object({
   license: z.string().max(40).default(""),
   /** @deprecated 发布/改稿表单已移除「说明」输入，仅存量数据回读 */
   note: z.string().max(300).optional(),
-  // 下载源：仅 link（作者外链 / 站内附件路径），一个源对应一条版本记录
+  // 下载源清单：这是 GAME 下载源的唯一存储（仅 link：作者外链 / 站内附件路径）
   downloads: z.array(articleItemSchema).max(20).default([]),
 });
 export type GameMeta = z.infer<typeof gameMetaSchema>;

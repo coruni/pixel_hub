@@ -39,7 +39,9 @@ export default async function SiteSidebar({
   if (!nodes) return null;
 
   return (
-    <aside className={`space-y-4 mt-8 ${theme.sidebar.sticky ? "sticky top-16 h-fit" : "h-fit"}`}>
+    <aside
+      className={`min-w-0 space-y-4 mt-8 ${theme.sidebar.sticky ? "sticky top-16 h-fit" : "h-fit"}`}
+    >
       {nodes}
     </aside>
   );

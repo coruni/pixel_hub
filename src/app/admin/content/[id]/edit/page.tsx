@@ -29,7 +29,6 @@ export default async function EditResourcePage({ params }: { params: Promise<{ i
           orderBy: { sort: "asc" },
           select: { id: true, fileName: true, thumbKey: true, bigKey: true, storageKey: true },
         },
-        versions: { orderBy: { createdAt: "asc" }, select: { version: true, url: true } },
       },
     }),
     prisma.category.findMany({
@@ -84,7 +83,6 @@ export default async function EditResourcePage({ params }: { params: Promise<{ i
             bigUrl: m.bigKey ? publicUrl(m.bigKey) : publicUrl(m.storageKey),
           })),
           coverMediaId: resource.coverMediaId ?? "",
-          versions: resource.versions,
         }}
         categories={categories}
         limits={limits}

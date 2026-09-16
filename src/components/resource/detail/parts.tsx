@@ -29,6 +29,14 @@ export type DetailCtx = {
 /** 类型展示名：统一取 TYPE_LABEL，新增类型无需再改这里 */
 export const typeLabel = (t: string) => TYPE_LABEL[t] ?? t;
 
+/**
+ * 版本号统一显示为带 v 前缀。
+ *
+ * 版本号是自由文本，用户按占位符的引导可能已经打了 `v`。这里先剥掉再补，
+ * 避免出现 `vv1.2.3`——渲染处兜住比在写入处剥更稳，存量数据也一并治好。
+ */
+export const formatVersion = (v: string) => `v${v.trim().replace(/^v/i, "")}`;
+
 const callbackPath = (slug: string) => `/resources/${slug}`;
 
 export function PendingBanner({ ctx }: { ctx: DetailCtx }) {
@@ -222,7 +230,6 @@ export function TypeInfoCard({ ctx }: { ctx: DetailCtx }) {
         )}
         {detail.type === "GAME" && meta.kind === "GAME" && (
           <>
-            {meta.version && <KV k="版本" v={meta.version} />}
             {meta.size && <KV k="大小" v={meta.size} />}
             {meta.platforms && meta.platforms.length > 0 && (
               <KV k="平台" v={meta.platforms.join(" / ")} />
@@ -273,9 +280,18 @@ export function TypeInfoCard({ ctx }: { ctx: DetailCtx }) {
   );
 }
 
-/** 版本历史：列表 + 下载（作者可追加新版本，附件上限提示跟随后台配置） */
+/**
+ * 版本历史：列表 + 下载（作者可追加新版本，附件上限提示跟随后台配置）。
+ *
+ * GAME 不渲染本区块——它没有版本概念，下载源清单由 DownloadPanel 的「游戏下载」完整呈现，
+ * 版本号改动走编辑页改下载源清单，不需要「发布新版本」这条独立路径。
+ * 早期版本曾把 GAME 的下载源逐条写成 ResourceVersion 并在这里列出来，
+ * 导致同一批 URL 在详情页出现两处；现已改为清单只存 meta.downloads。
+ */
 export async function VersionSection({ ctx }: { ctx: DetailCtx }) {
   const { detail, isAuthor } = ctx;
+  // 防御性守卫：GAME 已无「发布新版本」入口，存量版本记录也不再展示
+  if (detail.type === "GAME") return null;
   const versions = detail.versions;
   if (versions.length === 0) return null;
   // 仅作者会看到「发布新版本」表单时才读配置，省一次 DB 查询
@@ -290,7 +306,7 @@ export async function VersionSection({ ctx }: { ctx: DetailCtx }) {
             className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3 first:pt-0 last:pb-0"
           >
             <span className="rounded-none border border-brand-600 bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">
-              v{v.version}
+              {formatVersion(v.version)}
             </span>
             <span className="text-xs text-neutral-400">{timeAgo(v.createdAt)}</span>
             {v.changelog && (

@@ -84,8 +84,6 @@ export async function applyResourceEdit(
   // —— 类型化 meta（复用发布侧的 zod schema，保证写库形状一致）——
   const license = str(fd, "license");
   let metaStr: string | undefined;
-  /** GAME 下载源清单（原始 JSON），下方统一落成版本记录 */
-  let gameDownloads: unknown[] = [];
   if (type === "IMAGE") {
     const { value: downloads, error } = readDownloads(fd);
     if (error) return { fieldErrors: { downloads: [error] } };
@@ -122,8 +120,11 @@ export async function applyResourceEdit(
     if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
     metaStr = JSON.stringify(parsed.data);
   } else {
+    const { value: downloads, error } = readDownloads(fd);
+    if (error) return { fieldErrors: { downloads: [error] } };
+    // GAME 无版本概念：下载源清单直接存进 meta.downloads（不再写 ResourceVersion 表）。
+    // 详情页「游戏下载」与改稿回填都读这一处，downloadCount 走资源级 detail.downloadCount。
     const parsed = gameMetaSchema.safeParse({
-      version: str(fd, "version") || undefined,
       platforms:
         str(fd, "platforms")
           .split(/[,，、\s]+/)
@@ -132,12 +133,10 @@ export async function applyResourceEdit(
           .slice(0, 8) || undefined,
       lang: str(fd, "lang") || undefined,
       note: str(fd, "note") || undefined,
+      downloads,
     });
     if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
     metaStr = JSON.stringify(parsed.data);
-    const { value: downloads, error } = readDownloads(fd);
-    if (error) return { fieldErrors: { downloads: [error] } };
-    gameDownloads = downloads;
     // 发布页已移除独立的「下载外链」输入，主下载地址改为取清单首条有效 url；
     // 清单为空时退回表单里的 externalUrl（兼容外部 API 只传外链的调用）。
     externalUrl = firstUrl(downloads) || externalUrl;
@@ -163,49 +162,8 @@ export async function applyResourceEdit(
     },
   });
 
-  // —— GAME 下载源清单 → 版本记录（发布侧同规则：一个下载源一条版本）——
-  // 身份用 url 判定：改稿只做「新增未出现过的 url / 删掉已不在清单里的 url」，
-  // 已存在的记录原样保留（连带保留其 downloadCount 与 createdAt），改个名字不会清空下载数。
-  if (type === "GAME") {
-    const list = gameDownloads
-      .filter((d): d is Record<string, unknown> => !!d && typeof d === "object")
-      .map((d) => ({
-        name: String(d.name ?? "").trim(),
-        url: String(d.url ?? "").trim(),
-        // 手上没有版本号和更新日志（发布页已移除该字段），沿用资源元信息里的版本号作展示
-        version: str(fd, "version") || "1.0",
-      }))
-      .filter((d) => d.url !== "");
-    const desiredUrls = new Set(list.map((d) => d.url));
-    // 兜底：清单为空时至少保留 externalUrl 一条，避免「有下载外链却没有可下载项」
-    if (list.length === 0 && externalUrl) {
-      list.push({ name: externalUrl, url: externalUrl, version: str(fd, "version") || "1.0" });
-      desiredUrls.add(externalUrl);
-    }
-    // 不会被本清单删掉的记录：老数据里 url 为空的版本行（改稿页无法回填，保留原样）
-    const keepRows = await tx.resourceVersion.findMany({
-      where: { resourceId: id, OR: [{ url: null }, { url: "" }] },
-      select: { id: true },
-    });
-    const keepIds = new Set(keepRows.map((v) => v.id));
-    const existingVersions = await tx.resourceVersion.findMany({
-      where: { resourceId: id },
-      select: { id: true, url: true },
-    });
-    const existingUrls = new Set(existingVersions.map((v) => v.url).filter((u): u is string => !!u));
-
-    for (const d of list) {
-      if (existingUrls.has(d.url)) continue; // 已有同 url 记录 → 保留（含下载计数）
-      await tx.resourceVersion.create({
-        data: { resourceId: id, version: d.version, changelog: null, url: d.url },
-      });
-    }
-    const staleIds = existingVersions
-      .filter((v) => v.url && !desiredUrls.has(v.url) && !keepIds.has(v.id))
-      .map((v) => v.id);
-    if (staleIds.length > 0)
-      await tx.resourceVersion.deleteMany({ where: { id: { in: staleIds }, resourceId: id } });
-  }
+  // GAME 的下载源清单已存进 meta.downloads（见上方分支），不再写 ResourceVersion 表。
+  // 这张表对 GAME 不再有任何读写，历史上灌进去的记录由迁移脚本清理。
 
   // 标签同步：只动差异部分，并同步 Tag.count（保留的不重复计数，移除的递减）
   const existing = await tx.tagOnResource.findMany({

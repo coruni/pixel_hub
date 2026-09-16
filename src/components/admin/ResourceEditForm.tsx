@@ -52,8 +52,6 @@ export type EditableResource = {
   meta: ResourceMetaOutput;
   gallery: GalleryItem[];
   coverMediaId: string;
-  /** 已有版本记录（GAME 的下载源清单从这个表回填） */
-  versions: { version: string; url: string | null }[];
 };
 
 export function ResourceEditForm({
@@ -251,10 +249,7 @@ export function ResourceEditForm({
       {/* 按类型渲染对应分节（与发布向导同一套组件，保证字段/样式/交互一致） */}
       {resource.type === "GAME" && resource.meta.kind === "GAME" && (
         <GameSection
-          downloads={resource.versions.map((v) => ({
-            name: v.url || `v${v.version}`,
-            url: v.url ?? "",
-          }))}
+          downloads={resource.meta.downloads.map((d) => ({ name: d.name, url: d.url }))}
           fieldErrors={fe}
           limits={limits}
           onBusyChange={setAttachBusy}
