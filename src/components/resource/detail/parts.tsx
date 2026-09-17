@@ -1,10 +1,11 @@
 // 详情页共享部件 —— 纯服务端展示片段，三种模板（post/banner/twocol）复用同一套数据。
 // 组件均为 server component；内部按钮（关注/点赞/收藏/举报）为客户端交互组件。
 import Link from "next/link";
-import { Bot, CalendarDays, Download, Eye, Heart, Pencil, Star } from "lucide-react";
+import { Bot, CalendarDays, Download, Eye } from "lucide-react";
 import type { ResourceDetail } from "@/lib/queries";
 import type { parseMeta } from "@/lib/meta";
 import { formatCount, timeAgo } from "@/lib/format";
+import { ACTION_TEXT } from "@/lib/ui/cls";
 import { TYPE_LABEL } from "@/lib/display";
 import Comments from "@/components/social/Comments";
 import Avatar from "@/components/ui/Avatar";
@@ -121,13 +122,21 @@ export function AuthorStrip({ ctx }: { ctx: DetailCtx }) {
   );
 }
 
-/** 主操作：点赞 / 收藏 / 举报（未登录给登录入口）；下载统一走附件面板 */
+/**
+ * 主操作：点赞 / 收藏 / 举报 / 编辑（未登录给登录入口）；下载统一走附件面板。
+ *
+ * 文字化操作条——只用一行文字承载全部动作，不带边框、底色和图标：
+ * 详情页的动作是低频轻量交互，做成按钮会在图集下方堆出一整块视觉重量，
+ * 还把原本属于作品本身的注意力抢走。状态靠颜色 + 文案（点赞 ↔ 已赞）双通道表达，
+ * 不依赖颜色单通道。动作项样式见 `ACTION_TEXT`。
+ */
 export function ActionBar({ ctx }: { ctx: DetailCtx }) {
   const { detail, meId, authed, isAuthor, isStaff } = ctx;
   const path = callbackPath(detail.slug);
+  const loginHref = `/login?callbackUrl=${encodeURIComponent(path)}`;
   return (
     <div>
-      <div className="flex flex-wrap items-stretch gap-2">
+      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-0.5">
         {authed ? (
           <>
             <LikeButton
@@ -145,32 +154,23 @@ export function ActionBar({ ctx }: { ctx: DetailCtx }) {
           </>
         ) : (
           <>
-            <Link
-              href={`/login?callbackUrl=${encodeURIComponent(path)}`}
-              className="inline-flex items-center gap-1.5 rounded-none border border-brand-200 bg-surface px-3.5 py-2 text-sm text-neutral-700 hover:border-brand-500"
-            >
-              <Heart size={15} aria-hidden /> 点赞
+            <Link href={loginHref} className={ACTION_TEXT}>
+              点赞
             </Link>
-            <Link
-              href={`/login?callbackUrl=${encodeURIComponent(path)}`}
-              className="inline-flex items-center gap-1.5 rounded-none border border-brand-200 bg-surface px-3.5 py-2 text-sm text-neutral-700 hover:border-brand-500"
-            >
-              <Star size={15} aria-hidden /> 收藏
+            <Link href={loginHref} className={ACTION_TEXT}>
+              收藏
             </Link>
           </>
         )}
         {meId && !isAuthor && <ReportButton resourceId={detail.id} resourceTitle={detail.title} />}
         {isAuthor && (
-          <Link
-            href={`/resources/${detail.slug}/edit`}
-            className="inline-flex items-center gap-1.5 rounded-none border border-brand-200 bg-surface px-3.5 py-2 text-sm text-neutral-700 hover:border-brand-500"
-          >
-            <Pencil size={15} aria-hidden /> 编辑
+          <Link href={`/resources/${detail.slug}/edit`} className={ACTION_TEXT}>
+            编辑
           </Link>
         )}
       </div>
       {!isStaff && !detail.allowComments && !isAuthor && (
-        <p className="mt-1.5 text-xs text-neutral-400">作者已关闭评论。</p>
+        <p className="mt-1 text-xs text-neutral-400">作者已关闭评论。</p>
       )}
     </div>
   );

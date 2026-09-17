@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Download, Heart, Star } from "lucide-react";
+import { Download } from "lucide-react";
 import {
   toggleLikeAction,
   toggleFavoriteAction,
@@ -10,8 +10,11 @@ import {
   setFavoriteCollectionAction,
 } from "@/lib/actions/social";
 import { Button } from "@/components/ui/Button";
+import { ACTION_TEXT } from "@/lib/ui/cls";
 import { useDownloadBump } from "@/components/resource/detail/download-count";
 
+// 关注按钮专用：唯一保留描边/实底的社交控件 —— 它是详情页唯一的主转化动作。
+// 点赞/收藏/举报/编辑已统一走 ACTION_TEXT 文字化（详情页操作条，见 parts.tsx 的 ActionBar）。
 const baseBtn =
   "inline-flex items-center gap-1.5 rounded-none border px-3.5 py-2 text-sm transition disabled:opacity-60";
 
@@ -36,10 +39,12 @@ export function LikeButton({
     setN(count);
   }
   const [pending, start] = useTransition();
+  // 文字化动作项：见 ACTION_TEXT 注释。状态用文案（点赞 ↔ 已赞）+ 颜色双通道表达
   return (
     <Button
       type="button"
       disabled={pending}
+      aria-pressed={liked}
       onClick={() =>
         start(async () => {
           const r = await toggleLikeAction(resourceId);
@@ -49,14 +54,10 @@ export function LikeButton({
           }
         })
       }
-      className={`${baseBtn} ${
-        liked
-          ? "border-red-300 bg-red-50 text-red-600 hover:bg-red-100"
-          : "border-brand-200 bg-surface text-neutral-700 hover:border-brand-500"
-      }`}
+      className={`${ACTION_TEXT} ${liked ? "font-medium text-red-600 hover:text-red-600" : ""}`}
     >
-      <Heart size={15} aria-hidden className={liked ? "fill-current" : ""} />
-      {n > 0 ? ` 点赞 ${n}` : "点赞"}
+      {liked ? "已赞" : "点赞"}
+      {n > 0 ? ` ${n}` : ""}
     </Button>
   );
 }
@@ -96,10 +97,11 @@ export function FavoriteButton({
   const [pending, start] = useTransition();
   const list = collections ?? [];
   return (
-    <span className="inline-flex items-stretch gap-1.5">
+    <span className="inline-flex items-center gap-2">
       <Button
         type="button"
         disabled={pending}
+        aria-pressed={fav}
         onClick={() =>
           start(async () => {
             const r = await toggleFavoriteAction(resourceId);
@@ -109,16 +111,12 @@ export function FavoriteButton({
             }
           })
         }
-        className={`${baseBtn} ${
-          fav
-            ? "border-amber-300 bg-amber-50 text-amber-600 hover:bg-amber-100"
-            : "border-brand-200 bg-surface text-neutral-700 hover:border-brand-500"
-        }`}
+        className={`${ACTION_TEXT} ${fav ? "font-medium text-amber-600 hover:text-amber-600" : ""}`}
       >
-        <Star size={15} aria-hidden className={fav ? "fill-current" : ""} />
-        {n > 0 ? ` 收藏 ${n}` : "收藏"}
+        {fav ? "已收藏" : "收藏"}
+        {n > 0 ? ` ${n}` : ""}
       </Button>
-      {/* 已收藏且已有夹子可选：下拉切换所属夹子 */}
+      {/* 已收藏且已有夹子可选：下拉切换所属夹子（同样去边框，跟随文字化） */}
       {fav && list.length > 0 && (
         <select
           value={colId ?? ""}
@@ -131,7 +129,7 @@ export function FavoriteButton({
             });
           }}
           title="所属收藏夹"
-          className="max-w-28 rounded-none border border-brand-200 bg-surface px-1.5 py-1.5 text-xs text-neutral-600 hover:border-brand-500"
+          className="max-w-28 rounded-none bg-transparent py-1 text-xs text-neutral-500 transition hover:text-neutral-900 focus-visible:underline"
         >
           <option value="">未分组</option>
           {list.map((c) => (

@@ -38,3 +38,11 @@ export const BTN_GHOST_SM =
 /** 危险按钮（小尺寸，删除/封禁类确认操作） */
 export const BTN_DANGER_SM =
   "inline-flex items-center gap-1 rounded-none border border-red-300 px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50 focus-visible:ring-2 focus-visible:ring-brand-400 disabled:opacity-50";
+
+/**
+ * 详情页操作条的文字化动作项（点赞/收藏/举报/编辑）。
+ * 去掉 border/bg/图标，只留文字；整条操作压成一行，靠颜色 + 文案（「点赞」↔「已赞」）表达状态，
+ * 保底高度 32px（py-1.5 + text-sm）满足 WCAG 2.5.8 的 24px 触控下限。
+ */
+export const ACTION_TEXT =
+  "inline-flex items-center rounded-none py-1.5 text-sm text-neutral-500 transition hover:text-neutral-900 focus-visible:underline disabled:opacity-60";

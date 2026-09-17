@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Flag } from "lucide-react";
 import { reportResourceAction } from "@/lib/actions/report";
 import { REASONS } from "@/lib/report-options";
 import { Button } from "@/components/ui/Button";
+import { ACTION_TEXT } from "@/lib/ui/cls";
 
 const PANEL_W = 288;
 
@@ -79,16 +79,16 @@ export default function ReportButton({
   }
 
   return (
-    <span className="relative inline-flex">
+    <span className="relative inline-flex items-center">
       <Button
         ref={btnRef}
         type="button"
         aria-expanded={open}
         aria-haspopup="dialog"
         onClick={togglePanel}
-        className="inline-flex items-center gap-1.5 rounded-none border border-brand-200 bg-surface px-3.5 py-2 text-sm text-neutral-400 transition hover:border-red-300 hover:text-red-500"
+        className={`${ACTION_TEXT} hover:text-red-500`}
       >
-        <Flag size={15} aria-hidden /> 举报
+        举报
       </Button>
 
       {msg && msg.startsWith("✓") && <span className="ml-2 text-xs text-emerald-600">{msg}</span>}

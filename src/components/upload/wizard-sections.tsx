@@ -289,6 +289,19 @@ export function AttachmentListEditor({
     setRows((p) => p.map((r, idx) => (idx === i ? { ...r, ...part } : r)));
   }
 
+  /**
+   * 追加一行并返回它的下标（已满返回 -1）。
+   * 同时前推 `viewRef.kinds`：同一批里多个文件连续完成时，镜像不跟着走就会把后一个文件
+   * 写到已经过期的下标上（此时 `rows` 的 state 还没被 React 提交）。
+   */
+  function appendRow(row: AttachRow): number {
+    if (viewRef.current.kinds.length >= 20) return -1;
+    const idx = viewRef.current.kinds.length;
+    viewRef.current.kinds = [...viewRef.current.kinds, row.kind];
+    setRows((p) => (p.length >= 20 ? p : [...p, row]));
+    return idx;
+  }
+
   function remove(i: number) {
     setRows((p) => p.filter((_, idx) => idx !== i));
     // 删的就是抽屉里那条：关掉抽屉，避免编辑一个已不存在的下标
@@ -305,18 +318,16 @@ export function AttachmentListEditor({
   }
 
   /**
-   * 上传完成后把结果交给「当前打开的那条」，这是用户要的「传完就能改」：
+   * 上传完成后把结果写进清单，这是用户要的「传完就能改、关掉也不丢」：
    *
-   * - 抽屉关着 → 落一行 + 新开草稿指向它，直接进标题改名。
-   * - 抽屉正开着新增草稿 → 只把文件补进草稿，用户填的标题/大小留着；不落行，
-   *   等用户点「添加」时才进清单（否则点「添加」会落出重复行）。
-   * - 抽屉正开着编辑**外链**行 → 一行只能有一个来源，落一行并另起草稿，不覆盖外链。
-   * - 抽屉正开着编辑**站内附件**行 → 落一行并就地更新那一行，不另开草稿。
+   * - 抽屉里正在设置某一条**站内附件** → 拖进来的文件就是用来替换它的（更换文件），就地更新，不另起一行。
+   * - 其余所有情况（草稿态 / 外链行 / 抽屉关着）→ 文件落成清单里的一行，并把抽屉切到「设置这一条」。
    *
-   * 落行由这里统一负责，调用方不要先 setRows 再调用，否则会出现重复行。
+   * 落行这一步是防丢的关键：草稿只活在抽屉里，Esc 或点遮罩关掉就没了，
+   * 而文件此刻已经躺在存储上——用户会白传一次。切到编辑态后底部按钮是「完成」，
+   * 点它只关抽屉、不会再追加一行，所以也不会出现「草稿已落行、点添加又落一遍」的重复行。
    *
-   * 之前无条件 `setDraft(row)` 的写法有两个洞：关着时会把用户已填的草稿整个顶掉；
-   * 开着新增草稿时又完全不动作，用户看着「传完了」抽屉里却还是空文件占位。
+   * 落行由这里统一负责，调用方不要先 setRows 再调用。
    */
   function applyUpload(row: AttachRow) {
     const v = viewRef.current;
@@ -325,30 +336,33 @@ export function AttachmentListEditor({
       setMsg("附件已达 20 条上限，新上传的文件未加入清单");
       return;
     }
-    const append = () => setRows((p) => (p.length >= 20 ? p : [...p, row]));
 
-    if (v.draft) {
-      if (v.draft.kind === "file") {
-        // 草稿本身就是站内附件：补文件，不落行
-        setDraft((d) => (d ? { ...d, name: row.name, url: row.url, size: row.size } : row));
-      } else {
-        // 草稿是外链：不能塞文件进去，落行 + 另起草稿
-        append();
-        setDraft(row);
-      }
+    if (v.open != null && v.kinds[v.open] === "file") {
+      patch(v.open, { name: row.name, url: row.url, size: row.size });
       return;
     }
 
-    if (v.open != null) {
-      append();
-      // 编辑外链行时不覆盖（一行只能一个来源）；编辑站内附件行则就地更新
-      if (v.kinds[v.open] !== "file") setDraft(row);
-      else patch(v.open, { name: row.name, url: row.url, size: row.size });
-      return;
+    // 抽屉里还有一条外链草稿：用户填到一半也是他的输入，先落进清单再往下走，别静默丢掉
+    if (v.draft && v.draft.kind === "link") {
+      const filled = v.draft.name.trim() || v.draft.url.trim();
+      if (filled) appendRow({ ...v.draft, name: filled });
     }
 
-    append();
-    setDraft(row);
+    // 草稿选的是「站内附件」时，用户可能先填了标题再传文件——标题优先用他填的，没填才退回文件名
+    const idx = appendRow(
+      v.draft && v.draft.kind === "file"
+        ? { ...v.draft, name: v.draft.name.trim() || row.name, url: row.url, size: row.size }
+        : row,
+    );
+    if (idx < 0) {
+      setMsg("附件已达 20 条上限，新上传的文件未加入清单");
+      return;
+    }
+    // 草稿态上传时抽屉跟着切到刚落的这一条；抽屉空闲时也打开它让用户顺手改名。
+    // 用户正在改「另一条外链行」时不抢焦点——他手上的输入还在，文件安静地躺在清单尾部。
+    const follow = v.draft != null || v.open == null;
+    setDraft(null);
+    if (follow) setOpen(idx);
   }
   /**
    * 投放区上传入口。上传任务与抽屉解耦：
