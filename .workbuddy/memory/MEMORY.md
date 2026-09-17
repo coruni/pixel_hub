@@ -43,6 +43,21 @@
 - `media-picker.tsx` 是「图片缩略图网格投放区」，**不属于附件按钮**，不要合并进来。
 - `av-section.tsx`（MUSIC/VIDEO）的 `AttachmentUpload` 是**单文件直传**场景（直接写 `avUrl`，没有清单/抽屉），保持独立，不要套用上面的草稿模型。
 
+## 详情页操作条（ActionBar / ACTION_TEXT）—— 用户明确要过，别改回去
+- 形态 = **「图标 + 文字」**：Heart / Star / Flag / Pencil，`size={15}`，一律 `aria-hidden`（无障碍名称只由文字承担）。曾经提交过的「纯文字、无图标」版本已被用户否掉（`74f4c4f` 那次），不要再退回无图标写法。
+- `ACTION_TEXT`（`src/lib/ui/cls.ts`）= 动作项样式：无边框、无底色、`gap-1.5 py-1.5 text-sm`（32px 高，满足 WCAG 2.5.8 的 24px 触控下限）。`FollowButton` 是全站唯一保留描边/实底的动作（详情页唯一主转化），不要一起文字化。
+- `ActionBar` 行容器用 `justify-end`（**收在右边**）——用户原话「点赞 actions 放右边，符合操作习惯」；下面那句「作者已关闭评论。」跟着 `text-right`，否则会跟右对齐的行错开。状态仍走文案 + 颜色双通道（点赞↔已赞 / 收藏↔已收藏），不靠颜色单通道。
+- **模板里的落位**（关键，用户纠正过两次，别改回去）：banner 模板的 `<ActionBar>` 要落在 **`DownloadPanel` 之后、`DescriptionBlock` 之前**（即「描述上边」），并且必须在两栏网格 `CollapsibleAside` **之外**——塞进图集左列时 `justify-end` 只能顶到 340px 侧栏的左边缘，够不到版心右侧（用户原话「独立在banner外，不然没办法直接到右边」）。用户先说「banner 下边」，我理解成「紧跟横幅、图集上方」是错的；他要的是图集/侧栏那块之后、贴在描述上方。post 在右栏底部（已右对齐）、article 是居中栏、twocol 仍在左列内。
+- **`CollapsibleAside` 收起时必须「不重排」**（用户明确要求过「修复折叠之后文字换行导致高度被撑开」）：
+  - `overflow-hidden` 有 grid 容器 + `<aside>` 两层；`<aside>` 内再套一层 `<div className="space-y-4 whitespace-nowrap lg:w-[340px]">`，把内容宽度**锁死在展开态轨道宽**。关键点：光裁剪挡不住高度重排——列宽被压到 0 时内容宽度跟着变，文本逐字折行、卡片高度暴涨，会把整个 grid 行撑开（表现为页面高度抖动）。锁死宽度后内容任何时刻都在同一宽度下排版，收起只是「看不见」而非「重新排版」。
+  - `whitespace-nowrap` 另挡长值（平台串/分类名）在 340px 内的折行抖动；代价是超长文本被硬切——侧栏是概览不是正文，刻意取舍。
+  - 340 这个值出现在 `RAIL_OPEN` / `RAIL_SHUT` / `RAIL_BOX` / 把手 `style.right` 四处，已用文件顶部常量 + **完整类名字符串**集中（不能拼接：Tailwind 只扫字面量，写成 JS 模板拼类名会静默不生成规则）。
+  - `DetailTwocol` 的 360px `<aside>` 尚未同步加固。
+
+## 详情页模板是高发改动区（回退要按文件粒度）
+- 四种模板共用 `src/components/resource/detail/parts.tsx` 的部件，改一处全站生效；`detailTemplate.byType` 后台可配，所以任何模板改动都要考虑「换个类型套同一模板」的情形（典型：信息面板标题不能写死「游戏信息」）。
+- **回退不要按目录**：`git checkout HEAD -- src/components/resource/detail/` 会一次带走该目录下**所有**未提交改动（曾连带撤掉用户自己提的「右栏下移 + 去折叠」）。回退前先 `git diff --stat` 看清范围，并把现场备份到 `%TEMP%`。
+
 ## 本机验证环境（务必沿用）
 - **PowerShell 工具在本机吞 stdout**：裸命令、`Write-Output`、`Out-File` 都拿不到内容，`cmd /c "... > f"` 被沙箱拦。
 - **PowerShell 的 `Remove-Item` 对仓库内文件静默失败**（以为删了其实还在）。删除仓库内文件用 `node -e "fs.unlinkSync(...)"` / `fs.rmSync(dir,{recursive:true})`。

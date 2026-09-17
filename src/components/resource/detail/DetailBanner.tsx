@@ -81,12 +81,7 @@ export default function DetailBanner({
 
       <div className="relative">
         <CollapsibleAside
-          main={
-            <>
-              <Gallery media={detail.gallery} />
-              <ActionBar ctx={ctx} />
-            </>
-          }
+          main={<Gallery media={detail.gallery} />}
           aside={
             <>
               <AuthorStrip ctx={ctx} />
@@ -102,6 +97,9 @@ export default function DetailBanner({
         <VersionSection ctx={ctx} />
         {/* 统一下载面板：贴近描述上方（IMAGE/ARTICLE/GAME externalUrl；无关类型返回 null） */}
         <DownloadPanel ctx={ctx} />
+        {/* 操作条贴在描述上边、且在两栏网格之外：放进图集左列时 justify-end
+            只能顶到 340px 侧栏的左边缘，够不到版心右侧。 */}
+        <ActionBar ctx={ctx} />
         <DescriptionBlock ctx={ctx} />
         {middleSlot}
         <CommentBlock ctx={ctx} />

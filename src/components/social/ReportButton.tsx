@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Flag } from "lucide-react";
 import { reportResourceAction } from "@/lib/actions/report";
 import { REASONS } from "@/lib/report-options";
 import { Button } from "@/components/ui/Button";
@@ -88,7 +89,7 @@ export default function ReportButton({
         onClick={togglePanel}
         className={`${ACTION_TEXT} hover:text-red-500`}
       >
-        举报
+        <Flag size={15} aria-hidden /> 举报
       </Button>
 
       {msg && msg.startsWith("✓") && <span className="ml-2 text-xs text-emerald-600">{msg}</span>}
