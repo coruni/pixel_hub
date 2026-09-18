@@ -35,6 +35,7 @@ const BTN_BUSY = "cursor-not-allowed opacity-60";
 export function AttachmentUpload({
   onFiles,
   limits,
+  accept,
   multiple = false,
   uploading = false,
   progress,
@@ -49,6 +50,12 @@ export function AttachmentUpload({
   /** 选中的文件；与 <input type="file"> 的 FileList 同型，两条入口共用一条上传链路 */
   onFiles: (files: FileList) => void;
   limits: AttachLimits;
+  /**
+   * 覆盖文件选择器的 accept，默认按附件后缀表（`limits.attachmentExts`）。
+   * 音乐 / 视频必须传 `avAcceptAttr(kind)`——它们的白名单是 `avExtsFor(kind)` 那套
+   * （含 m4a/aac/opus/m4v/mov 等附件表里没有的后缀），沿用附件表会把合法音视频挡在选择器外。
+   */
+  accept?: string;
   /** 一次可选多个（清单类），默认单选 */
   multiple?: boolean;
   uploading?: boolean;
@@ -72,7 +79,7 @@ export function AttachmentUpload({
   const busy = uploading;
   const multiText = progress && progress.total > 1 ? ` ${progress.done}/${progress.total}` : "";
   const text = busy ? `上传中${multiText}…` : label;
-  const accept = attachmentAcceptAttr(limits.attachmentExts);
+  const acceptAttr = accept ?? attachmentAcceptAttr(limits.attachmentExts);
   /** 有意义的字节进度：0 不显示（刚起步，条形还没内容，显示反而像卡住） */
   const shownPercent =
     typeof percent === "number" && percent > 0 ? Math.min(100, Math.round(percent)) : null;
@@ -84,7 +91,7 @@ export function AttachmentUpload({
       hidden
       multiple={multiple}
       disabled={busy}
-      accept={accept}
+      accept={acceptAttr}
       onChange={(e) => {
         const fl = e.target.files;
         e.target.value = "";

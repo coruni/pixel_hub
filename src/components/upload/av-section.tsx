@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link2, Trash2, UploadCloud } from "lucide-react";
 import {
+  avAcceptAttr,
   avExtsSample,
   avMountPlaceholder,
   avClassFor,
@@ -269,8 +270,14 @@ export function AvSection({
             <AttachmentUpload
               onFiles={(fl) => onFile(fl[0] ?? null)}
               limits={limits}
+              /* accept 必须走音视频白名单：附件表里没有 m4a/aac/opus/m4v/mov/ogv，
+                 而服务端对 kind=music|video 是按 avExtsFor(kind) 放行的——
+                 两边不一致时，合法的音视频在文件选择器里根本选不中。 */
+              accept={avAcceptAttr(avKind)}
               uploading={uploading}
-              progress={progress == null ? null : { done: progress, total: 100 }}
+              /* 单文件字节进度：走 percent（0..100）。传 progress({done,total}) 会被
+                 当成「第 n / 共 m 个文件」渲染成「上传中 45/100…」，语义完全错位。 */
+              percent={progress}
               label={`选择${label}文件`}
               hint={`仅 ${acceptedExts}`}
             />

@@ -29,6 +29,8 @@
 ## 附件上传区域：统一入口与清单容器
 - **唯一上传按钮组件** = `src/components/upload/AttachmentUpload.tsx` 的 `AttachmentUpload`（导出 `AttachLimits` 类型）。全站任何「选文件上传附件」入口都必须复用它，禁止再手写 `<label>` + `<input type="file">` 的按钮样式。
   - 收口四态：可上传 / 拖拽悬停（`dragging` + `dropProps`）/ 上传中（`progress`）/ 已上传回执（`filled`）；提示文案由 `limits` 驱动，`hint` 追加「可多选」等补充。
+  - **`accept` 必须按 kind 分派**（踩过的坑）：组件默认用后台「附件后缀表」生成 accept，MUSIC/VIDEO **必须**显式传 `accept={avAcceptAttr(kind)}` —— 服务端对 kind=music|video 是按 `avExtsFor(kind)` 放行的（m4a/aac/opus/m4v/mov/ogv 都不在附件表里）。两边不一致 = 合法文件在文件选择器里选不中；后台一旦把附件后缀改窄，音视频会**完全无法上传**，而 `hint` 还照着 `avExtsSample(kind)` 显示允许后缀，文案与行为直接矛盾。
+  - **进度参数别混用**：单文件字节进度走 `percent`（0..100）；`progress({done,total})` 是**批量**语义，会被渲染成「第 n / 共 m 个文件」。把百分比塞进 `progress` 只会显示「上传中 45/100…」并且真正的进度条不出现。
   - `multiple` 决定单选/多选；内部已 `e.target.value = ""`（否则同一批文件第二次选择不触发 change），调用方不要再清一遍。
   - `wizard-sections.tsx` 里同名的 `AttachmentUpload` 是它的薄包装，保留只为兼容 GameSection 的多选进度语义，不要再往里加样式。
 - **清单编辑器** = `AttachmentListEditor`（IMAGE 图包 / ARTICLE 文末附件 / GAME 下载源共用）。新增同类清单一律走它，不要复制行布局。
