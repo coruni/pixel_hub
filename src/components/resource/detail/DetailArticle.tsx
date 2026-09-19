@@ -25,7 +25,9 @@ export default function DetailArticle({
 }) {
   const { detail } = ctx;
   const a = detail.author;
-  const cover = detail.gallery[0];
+  // 视频类型不铺独立封面：封面已经挂在播放器的 poster 上（见 av-player），
+  // 这里再放一张带边框的封面图就是「封面 / 视频」两块分离
+  const cover = ctx.meta.kind === "VIDEO" ? undefined : detail.gallery[0];
   const rest = detail.gallery.slice(1);
   // 阅读时长：中文按 ~300 字/分钟估算
   const minutes = Math.max(1, Math.ceil(detail.description.replace(/\s/g, "").length / 300));

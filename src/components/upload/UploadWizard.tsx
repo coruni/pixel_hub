@@ -248,6 +248,42 @@ export default function UploadWizard({
     if (coverId === id) setCoverId(next.find((f) => f.ok)?.id ?? "");
   }
 
+  // ---- 视频自动封面 ----
+  // 抽帧图与手选封面走同一条上传通道（同一套尺寸/格式校验与压缩），只是发起者不同。
+  const coverIdRef = useRef(coverId);
+  useEffect(() => {
+    coverIdRef.current = coverId;
+  });
+  /** 上一次自动写入的封面 id：自动值之间可互相覆盖，用户手选过就不再抢 */
+  const autoCoverId = useRef("");
+
+  const onCoverFrame = useCallback(async (frame: File) => {
+    const cur = coverIdRef.current;
+    if (cur && cur !== autoCoverId.current) return;
+    const stale = autoCoverId.current;
+    setUploading(true);
+    setUploadMsg("正在从视频生成封面…");
+    setProgress({ done: 0, total: 1, index: 0, name: frame.name });
+    try {
+      const { good, bad } = await uploadImageFiles([frame], ARTICLE_MEDIA_MAX, {
+        onProgress: setProgress,
+      });
+      const item = good[0];
+      if (!item) {
+        setUploadMsg(bad[0]?.error ?? "封面生成失败，可手动上传封面");
+        return;
+      }
+      autoCoverId.current = item.id;
+      // 换新视频时把上一张自动封面挤掉，别在封面槽里留两份
+      setFiles((prev) => [item, ...prev.filter((f) => f.id !== stale)].slice(0, ARTICLE_MEDIA_MAX));
+      setCoverId(item.id);
+      setUploadMsg(null);
+    } finally {
+      setUploading(false);
+      setProgress(null);
+    }
+  }, []);
+
   // 草稿状态条：模式屏与表单屏共用，分隔线/外框由调用处决定。
   // 自动保存开关不在这里（已移到账户设置·发布），这里只留「存到哪 / 现在什么状态 / 手动存一次」。
   const draftBar = (
@@ -526,6 +562,7 @@ export default function UploadWizard({
           fieldErrors={state.fieldErrors}
           limits={limits}
           onBusyChange={setAttachBusy}
+          onCoverFrame={onCoverFrame}
         />
       )}
 

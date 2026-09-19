@@ -27,7 +27,10 @@ export default function DetailBanner({
   middleSlot?: ReactNode;
 }) {
   const { detail } = ctx;
-  const cover = detail.gallery[0];
+  const isVideo = ctx.meta.kind === "VIDEO";
+  // 视频的封面已经挂在播放器的 poster 上，横幅再铺一遍就是同一张图出现两次；
+  // 这里退化成一条深色标题带（横幅仍保留页面首屏的层级，只是不再重复封面）。
+  const cover = isVideo ? undefined : detail.gallery[0];
   // 类型用图标徽标表示（不重复文字），分类仍用可点击的文字徽标
   const { Icon: TypeIcon, cls: typeCls } = typeBadge(detail.type);
 
@@ -42,6 +45,8 @@ export default function DetailBanner({
             alt=""
             className="h-72 w-full object-cover opacity-90 sm:h-80 md:h-[22rem]"
           />
+        ) : isVideo ? (
+          <div className="h-40 w-full sm:h-44" />
         ) : (
           <div className="grid h-72 w-full place-items-center text-5xl font-bold text-white/20 sm:h-80 md:h-[22rem]">
             {detail.title.slice(0, 1).toUpperCase()}
@@ -81,7 +86,7 @@ export default function DetailBanner({
 
       <div className="relative">
         <CollapsibleAside
-          main={<Gallery media={detail.gallery} />}
+          main={isVideo ? null : <Gallery media={detail.gallery} />}
           aside={
             <>
               <AuthorStrip ctx={ctx} />

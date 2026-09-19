@@ -27,6 +27,8 @@
   - **必须接 `onBusyChange`**（`uploading ? 1 : 0`），漏接 = 大文件还在传就能点发布。
   - **字段错误 key 是 `url` 不是 `avUrl`**（服务端 `avMetaSchema` 的 issue path）；GAME/ARTICLE 是 `downloads`、IMAGE 是 `mediaIds`。读错 key 错误被静默吞掉、页面「点了没反应」。
   - 「已上传」回执不能等元数据抓取（`probeFile()` 读大视频最坏 12s 超时，按钮会像卡死）：先出回执，probe 结果异步补进提示。
+  - **视频自动封面**：`av-section` 加 `onCoverFrame?(File)`，只在 `!isAudio && 宿主接了回调` 时、**上传成功之后**调 `capturePoster()`（`av-probe`：`<video>`+canvas 抽 **10% 处**那帧，不是第 0 帧——首帧常是纯黑/台标）。宿主负责走 `uploadImageFiles` 上传并落封面槽。
+  - 自动值语义：宿主维护 `autoCoverId` ref —— **自动值可覆盖自动值，用户手选过封面就不抢**（与 av-section 里 duration/artist 的 `autoRef` 同规则）。
 - **大文件通道**（无云盘时）：`/attachment/session` 回答三种——云盘分片 / `{mode:"driver"}` 本站流式直传 / `409 NO_CLOUD` 回退旧单请求通道。
   - 旧 `/attachment` 走 `req.formData()`，整个请求体进内存，硬限 250MB，且 `Content-Length` 预检必须在 `formData()` **之前**。
   - 流式直传：`PUT /api/upload/attachment/stream?name=&kind=`，体就是字节；`localDriver.putStream` 先写 `.uploads-tmp/`（**故意不在 public 下**，也**不放 `os.tmpdir()`** —— 跨盘 rename 会 EXDEV）再 rename。
@@ -61,6 +63,16 @@
 ## 详情页模板是高发改动区
 - 四种模板共用 `src/components/resource/detail/parts.tsx`，改一处全站生效；`detailTemplate.byType` 后台可配，任何改动都要考虑「换类型套同一模板」（典型：信息面板标题不能写死「游戏信息」）。
 - **回退不要按目录**：`git checkout HEAD -- src/components/resource/detail/` 会一次带走该目录下所有未提交改动。先 `git diff --stat` 看清范围，现场备份到 `%TEMP%`。
+- **VIDEO 只有一个视频**（用户明确要过）：`av-player` 里 `boxed = isAudio`——视频**不套卡片**（无边框无内边距，`block aspect-video w-full bg-black`），封面改挂 `<video poster>`；模板层对 VIDEO **整块不渲染 `<Gallery>`**。
+  - ⚠️ 跳过必须「不渲染」，**不能传空数组**：`Gallery` 收到 `[]` 会渲染「暂无预览图」占位框，又变成一块多余的空块。
+  - 落位：`DetailTwocol` 的视频播放器要进**主列**（不进则左列被抽空、视频孤零零落在两栏之外）；`DetailBanner` 的视频退化成一截深色标题带（横幅不再重复同一张封面）；`DetailArticle` 跳过带边框的封面 hero。
+  - 默认 VIDEO 走 `post` 模板（`theme.detailTemplate`：default=post，byType 只覆盖 IMAGE/GAME/ARTICLE）。
+- **音视频在 OneDrive 也要能在线播放**：`/od` 出口按扩展名分流——音视频走代理转发（自定 MIME + `Content-Disposition: inline` + `Accept-Ranges`，`Range`/`Content-Range` **必须透传**，206 原样返回），其余仍 302 到预鉴权下载地址（不为附件转发字节）。
+  - 测试「路径穿越」别用 HTTP 客户端：fetch/undici 与 Next 路由都会**先折叠 `..`**，看到的 200 是折叠后的合法 key。要么裸 socket + 让上游桩回显收到的路径，要么别断言这一条。
+
+## 本地文件读写路径（打包器文件追踪）
+- 追踪只能静态分析 `path.join(process.cwd(), "<字面量>", 动态尾段)`。路径一经函数（`path.resolve(root, rest)`）计算，就退化成「追踪整个项目」并在 build 打出 `Warning: Dynamic filesystem access`（把 public 与全部源码都算进产物）。
+- 规矩：**字面前缀留在真正调用 `fs` 的地方**（`src/app/api/dl/route.ts` 已改）。越界靠「结果一定拼在 `public/<sub>/` 之下」在结构上排除（`safeRel` 拒 `..`/NUL/空、`\` 统一成 `/`），不要再用「abs 前缀比较」兜。
 
 ## 首页板块「加载更多」
 - `list` 板块追加方式 = `paged`（开关）+ `loadMode: "button" | "infinite"`（默认 button），后台 `/admin/site` 三选下拉。
@@ -72,9 +84,11 @@
 - **PowerShell 工具吞 stdout**（裸命令、`Write-Output`、`Out-File` 都拿不到；`cmd /c "... > f"` 被沙箱拦）；`Remove-Item` 对仓库内文件静默失败 → 删除用 `node -e "fs.unlinkSync/rmSync"`。
 - **bash 工具的 `rm` 是坏 shim**（`safe_delete_main: command not found`）且缺 `head`/`ls`/`grep`/`tail`。查文件用 Read、搜内容用 Grep、批量文件操作用 node 一行脚本。`cd X && node -e "..."` 与 `for` 循环可用。
 - 校验 runner 写 `%TEMP%`（别放仓库根，`git status` 会被长期污染），用 `execFileSync(process.execPath, [...], {cwd, encoding:"utf8"})` 包 tsc/eslint 再打印，跑完删。
-- 校验命令：`node_modules/typescript/bin/tsc --noEmit`、`node_modules/eslint/bin/eslint.js`。**当前应为零错误零 warning。**
+- 校验命令：`node_modules/typescript/bin/tsc --noEmit`、`node_modules/eslint/bin/eslint.js src`。**tsc 应零错误；eslint 存量有 3 条 no-unused-vars warning**（`src/app/admin/media/page.tsx` 的 `enumParam`、`src/components/auth/PublishForm.tsx` 的 `draftCount`、`src/components/sidebar/SiteSidebar.tsx` 的 `authed`），都在未改动文件里，别顺手改、也别新增。
 - 无浏览器验证流程见 skill `pixel-hub-verify`（铸管理员 cookie 走 HTTP / jsdom 挂组件 / 反证断言）。
 
 ## 临时脚本纪律
 - 验证脚本一律 `_` 前缀放 `prisma/`，**用完立即删**；删除未提交文件前先 `copyFileSync` 到 `%TEMP%`（git 无法恢复）。
+- **探针曾被误提交**（`c01bd55` 把 `prisma/_od.ts`、`_odstub.cjs`、`_up4.ts` 一起带进了 git）。
+  提交前必须 `git status --short` 逐行确认、**只 add 本次任务的文件**，绝不用 `git add -A` / `git add .`。
 - `.workbuddy/` 是项目数据**不是缓存**，git status 显示删除也不要顺手清理；全部受 git 跟踪，误删用 `git checkout -- .workbuddy/` 恢复。

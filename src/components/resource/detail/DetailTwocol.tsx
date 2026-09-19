@@ -25,6 +25,8 @@ export default function DetailTwocol({
   middleSlot?: ReactNode;
 }) {
   const { detail } = ctx;
+  // 视频没有独立封面：播放器顶到主列，否则左列会被抽空、视频孤零零落在两栏之外
+  const isVideo = ctx.meta.kind === "VIDEO";
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3 border-b border-neutral-100 pb-4">
@@ -55,7 +57,8 @@ export default function DetailTwocol({
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
         {/* 主列：图集 + 操作（与图集同宽） */}
         <div className="min-w-0 space-y-5">
-          <Gallery media={detail.gallery} />
+          {!isVideo && <Gallery media={detail.gallery} />}
+          {isVideo && <AvPlayerBlock ctx={ctx} />}
           <ActionBar ctx={ctx} />
         </div>
 
@@ -67,8 +70,8 @@ export default function DetailTwocol({
         </aside>
       </div>
 
-      {/* 音视频播放（MUSIC/VIDEO；其余类型返回 null） */}
-      <AvPlayerBlock ctx={ctx} />
+      {/* 音视频播放（MUSIC/VIDEO；其余类型返回 null。视频已在主列内渲染，这里只补音频） */}
+      {!isVideo && <AvPlayerBlock ctx={ctx} />}
 
       {/* 统一下载面板（IMAGE/ARTICLE/GAME externalUrl；无关类型返回 null） */}
       <DownloadPanel ctx={ctx} />

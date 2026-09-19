@@ -22,7 +22,7 @@ import {
   type AvMode,
   type AvSource,
 } from "@/lib/av";
-import { probeFile, probeSummary, probeUrl, type AvProbe } from "@/lib/av-probe";
+import { capturePoster, probeFile, probeSummary, probeUrl, type AvProbe } from "@/lib/av-probe";
 import { mbText, type UploadLimits } from "@/lib/upload-config";
 import { uploadAttachment } from "@/lib/upload-attachment-client";
 import { useFileDrop } from "@/lib/hooks/use-file-drop";
@@ -58,6 +58,7 @@ export function AvSection({
   fieldErrors,
   limits,
   onBusyChange,
+  onCoverFrame,
 }: {
   avKind: AvKind;
   /** audio=音乐 / video=视频 */
@@ -66,6 +67,11 @@ export function AvSection({
   limits: UploadLimits;
   /** 在飞上传数（0/1）：宿主据此禁用提交，避免「文件还在传就点了发布」 */
   onBusyChange?: (busy: number) => void;
+  /**
+   * 视频抽帧得到的封面（JPEG File）。宿主负责上传并落到「封面」槽位。
+   * 只有 video 会调用——音频没有画面可抽。
+   */
+  onCoverFrame?: (file: File) => void;
 }) {
   const [source, setSource] = useState<AvSource>(initial?.source ?? "mount");
   const [mode, setMode] = useState<AvMode>(initial?.mode ?? "direct");
@@ -89,6 +95,11 @@ export function AvSection({
   const fieldsRef = useRef(fields);
   // 记录各字段「上一次自动填的值」：等于该值说明用户没改过，可继续被新文件覆盖
   const autoRef = useRef<Partial<Record<FieldKey, string>>>({});
+  // 抽帧是异步的，回调身份每渲染都在变——用 ref 取最新值，别让闭包拿着旧函数
+  const coverFrameRef = useRef(onCoverFrame);
+  useEffect(() => {
+    coverFrameRef.current = onCoverFrame;
+  });
 
   function setField(k: FieldKey, v: string) {
     const next = { ...fieldsRef.current, [k]: v };
@@ -173,11 +184,16 @@ export function AvSection({
       setUploading(false);
       setProgress(null);
     }
-    // 元数据抓取放到「已上传」回执之后：大视频读时长要等 loadedmetadata，
+    // 元数据抓取与封面抽帧都放到「已上传」回执之后：大视频读时长要等 loadedmetadata，
     // 最坏等到 12s 超时——卡在校验里会让按钮一直停在「上传中…」，像卡死。
     if (!done) return;
+    // 两者互不依赖，并行跑。宿主没接 onCoverFrame（例如后台改稿页）就整段跳过，白抽一帧没意义。
+    const posterP = !isAudio && coverFrameRef.current ? capturePoster(file) : null;
     const summary = probeSummary(applyProbe(await probeP));
     if (summary) setMsg(`已上传 ${done.name}（${formatBytes(done.size)}），${summary}`);
+    const poster = await posterP;
+    // 抽到的帧交给宿主上传并落到「封面」槽位；本组件不持有封面状态
+    if (poster) coverFrameRef.current?.(poster);
   }
 
   /** 文件选择器与投放区共用同一条入口；音视频只取第一个文件 */

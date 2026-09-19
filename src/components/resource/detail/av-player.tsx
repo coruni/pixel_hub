@@ -33,8 +33,18 @@ export function AvPlayerBlock({ ctx }: { ctx: DetailCtx }) {
   const localFile = meta.url.startsWith("/");
   const fileName = meta.url.split("/").pop()?.split("?")[0] ?? `${detail.slug}`;
 
+  // 视频不套卡片：视频自带黑底与 16:9 画幅，再包一层边框＋内边距就是多余的一层框，
+  // 而且会让「封面 / 播放器」看起来是两块分开的东西。封面直接当 poster 挂在播放器上，
+  // 视觉上就只有一个视频。音频没有画面，保留原来的卡片形态。
+  const boxed = isAudio;
+  const coverUrl = detail.gallery[0]?.bigUrl;
+
   return (
-    <section className="mt-6 rounded-none border border-brand-200 bg-surface p-5">
+    <section
+      className={
+        boxed ? "mt-6 rounded-none border border-brand-200 bg-surface p-5" : "mt-6"
+      }
+    >
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <h2 className="flex items-center gap-1.5 text-sm font-semibold text-neutral-400">
           <KindIcon size={14} aria-hidden />
@@ -62,7 +72,7 @@ export function AvPlayerBlock({ ctx }: { ctx: DetailCtx }) {
           </p>
         ) : meta.mode === "embed" && /^https?:\/\//i.test(meta.url) ? (
           // 嵌入页：sandbox 只放行播放脚本；referrerPolicy 避免把本站地址带给外站
-          <div className="aspect-video w-full border border-brand-200 bg-neutral-100">
+          <div className={boxed ? "aspect-video w-full border border-brand-200 bg-neutral-100" : "aspect-video w-full bg-black"}>
             <iframe
               src={meta.url}
               title={`${detail.title} · ${kindLabel}嵌入`}
@@ -83,7 +93,8 @@ export function AvPlayerBlock({ ctx }: { ctx: DetailCtx }) {
             preload="metadata"
             playsInline
             src={meta.url}
-            className="aspect-video w-full border border-brand-200 bg-black"
+            poster={coverUrl}
+            className="block aspect-video w-full bg-black"
           >
             你的浏览器不支持视频播放。
           </video>

@@ -6,7 +6,7 @@
 //   - GameSection / ImageSection / ArticleSection（wizard-sections）按类型渲染分节
 //   - MediaPicker + /api/upload 上传图片
 // 保证「改稿」与「发布」在字段、样式、交互上完全一致。slug / 作者 / 计数 / 历史版本由服务端保持不变。
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import MdEditor from "@/components/rte/MdEditor";
 import { BTN_GHOST_SM } from "@/lib/ui/cls";
@@ -153,6 +153,39 @@ export function ResourceEditForm({
     if (coverId === id) setCoverId(next.find((f) => f.ok)?.id ?? "");
   }
 
+  // ---- 视频自动封面（与发布向导同一套语义：自动值可覆盖自动值，不抢手选封面） ----
+  const coverIdRef = useRef(coverId);
+  useEffect(() => {
+    coverIdRef.current = coverId;
+  });
+  const autoCoverId = useRef("");
+
+  const onCoverFrame = useCallback(async (frame: File) => {
+    const cur = coverIdRef.current;
+    if (cur && cur !== autoCoverId.current) return;
+    const stale = autoCoverId.current;
+    setUploading(true);
+    setUploadMsg("正在从视频生成封面…");
+    setProgress({ done: 0, total: 1, index: 0, name: frame.name });
+    try {
+      const { good, bad } = await uploadImageFiles([frame], ARTICLE_MEDIA_MAX, {
+        onProgress: setProgress,
+      });
+      const item = good[0];
+      if (!item) {
+        setUploadMsg(bad[0]?.error ?? "封面生成失败，可手动上传封面");
+        return;
+      }
+      autoCoverId.current = item.id;
+      setFiles((prev) => [item, ...prev.filter((f) => f.id !== stale)].slice(0, ARTICLE_MEDIA_MAX));
+      setCoverId(item.id);
+      setUploadMsg(null);
+    } finally {
+      setUploading(false);
+      setProgress(null);
+    }
+  }, []);
+
   return (
     <form
       action={formAction}
@@ -291,6 +324,7 @@ export function ResourceEditForm({
           fieldErrors={fe}
           limits={limits}
           onBusyChange={setAttachBusy}
+          onCoverFrame={onCoverFrame}
         />
       )}
 
