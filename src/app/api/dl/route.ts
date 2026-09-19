@@ -17,8 +17,11 @@ import { getRuntimeConfig } from "@/lib/runtime-config";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const UPLOADS_ROOT = path.join(process.cwd(), "public", "uploads");
-const SEED_ROOT = path.join(process.cwd(), "public", "seed");
+// 本地文件的根：**故意不在模块顶层拼成常量**——打包器的文件追踪靠静态分析
+// `path.join(process.cwd(), <字面量>, …)` 来决定把哪些文件带进产物；一旦路径经
+// `path.resolve(root, rest)` 这类函数计算，分析器只能退化成「追踪整个项目」
+// （构建时那两条 `Dynamic filesystem access` 警告）。现在把字面前缀留在
+// 真正调用 `stat`/`createReadStream` 的地方，追踪范围自然收窄到 public 之下。
 
 // Graph / OneDrive 下载主机（其预鉴权下载 URL 已自带原始文件名，302 即可）
 const GRAPH_HOSTS = [
@@ -51,11 +54,23 @@ async function externalHosts(): Promise<{ s3: string[]; chevereto: string | null
   return out;
 }
 
-/** 受控拼接本地路径：越界（路径穿越）返回 null */
-function safeLocal(rest: string, root: string): string | null {
-  const abs = path.resolve(root, rest);
-  if (abs !== root && !abs.startsWith(root + path.sep)) return null;
-  return abs;
+const UPLOADS_SUB = "uploads";
+const SEED_SUB = "seed";
+
+/**
+ * 归一化 `/uploads`、`/seed` 之后的相对路径，返回 null 表示非法。
+ *
+ * 与旧的 `path.resolve(root, rest)` + 前缀比较相比，这里**不再依赖前缀判断**：
+ * 调用方随后一定用 `path.join(process.cwd(), "public", <sub>, rel)` 重新拼绝对路径，
+ * 含 `..` 的段在归一化阶段就被拒掉，越界在结构上不可能发生，而不是靠字符串比较兜住。
+ * 顺带把 `\` 统一成 `/`（Windows 客户端可能传反斜杠），并拒绝 NUL。
+ */
+function safeRel(rest: string): string | null {
+  const raw = rest.replace(/\\/g, "/");
+  if (!raw || raw.includes("\u0000")) return null;
+  const segs = raw.split("/").filter((s) => s !== "" && s !== ".");
+  if (segs.length === 0 || segs.some((s) => s === "..")) return null;
+  return segs.join("/");
 }
 
 /** 构造 Content-Disposition：ascii 兜底 + RFC5987 UTF-8 原名（优先） */
@@ -104,7 +119,7 @@ export async function GET(req: NextRequest) {
 
   const origin = req.nextUrl.origin;
   type Target =
-    | { kind: "local"; abs: string; rel: string }
+    | { kind: "local"; sub: string; rel: string }
     | { kind: "redirect"; url: string }
     | { kind: "external"; url: string };
   let target: Target | null = null;
@@ -116,13 +131,13 @@ export async function GET(req: NextRequest) {
       const p = parsed.pathname;
       const m = /^\/uploads\/(.+)$/.exec(p);
       if (m) {
-        const abs = safeLocal(m[1], UPLOADS_ROOT);
-        if (abs) target = { kind: "local", abs, rel: m[1] };
+        const rel = safeRel(m[1]);
+        if (rel) target = { kind: "local", sub: UPLOADS_SUB, rel };
       } else {
         const s = /^\/seed\/(.+)$/.exec(p);
         if (s) {
-          const abs = safeLocal(s[1], SEED_ROOT);
-          if (abs) target = { kind: "local", abs, rel: s[1] };
+          const rel = safeRel(s[1]);
+          if (rel) target = { kind: "local", sub: SEED_SUB, rel };
         } else if (/^\/od(\/|$)/.test(p)) {
           target = { kind: "redirect", url: p };
         }
@@ -152,14 +167,15 @@ export async function GET(req: NextRequest) {
 
   try {
     if (target.kind === "local") {
+      const abs = path.join(process.cwd(), "public", target.sub, target.rel);
       let s: Awaited<ReturnType<typeof stat>>;
       try {
-        s = await stat(target.abs);
+        s = await stat(abs);
       } catch {
         return new Response("not found", { status: 404 });
       }
       if (!s.isFile()) return new Response("not found", { status: 404 });
-      const node = createReadStream(target.abs);
+      const node = createReadStream(abs);
       const web = Readable.toWeb(node) as unknown as ReadableStream;
       const fallback = target.rel.split("/").pop() ?? "file";
       return new Response(web, {
