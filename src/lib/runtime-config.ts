@@ -27,7 +27,7 @@ export const runtimeConfigSchema = z.object({
   s3AclPrivate: z.boolean().default(false),
   // 附件去向：auto=跟随存储驱动（chevereto 默认走云盘，其余走驱动）；on=强制云盘；off=强制存储驱动
   attachmentCloud: z.enum(["auto", "on", "off"]).default("auto"),
-  // 音视频去向：音乐/视频资源上传的来源文件走哪（语义同 attachmentCloud，独立开关）
+  // 音视频去向：音乐/视频资源上传的来源文件走哪（on/off 独立；auto = 跟随 attachmentCloud 的结论）
   avCloud: z.enum(["auto", "on", "off"]).default("auto"),
   // ---- SMTP 邮件 ----
   smtpHost: z.string().default(""),
@@ -186,12 +186,17 @@ export function attachmentCloudEnabled(c: RuntimeConfig): boolean {
 
 /**
  * 音视频（音乐/视频资源的上传文件）是否走云盘（OneDrive）。
- * 与附件同语义但独立开关：音视频体积大、常需要断点续传，未配置 Graph 或未标记活跃盘时自动回退存储驱动。
+ * on/off 强制；**auto 跟随附件去向**，与 attachmentCloud 的 auto 同一个答案。
+ *
+ * 为什么不是各自看 storageDriver：音视频与附件只是体积档位不同，落点没理由分家。
+ * 两个开关各自 auto 时，把附件设成 on 而音视频留 auto，就会出现「小附件进云盘、
+ * 大视频退回单请求通道」——恰恰是最需要云盘的那一类走了最窄的通道。
+ * 未配置 Graph 或未标记活跃盘时，两者都会自动回退存储驱动（见 resolveUploadTarget）。
  */
 export function avCloudEnabled(c: RuntimeConfig): boolean {
   if (c.avCloud === "on") return true;
   if (c.avCloud === "off") return false;
-  return c.storageDriver === "chevereto";
+  return attachmentCloudEnabled(c);
 }
 
 export function graphTenant(c: RuntimeConfig): string {

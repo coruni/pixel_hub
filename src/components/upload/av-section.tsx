@@ -25,6 +25,7 @@ import {
 import { probeFile, probeSummary, probeUrl, type AvProbe } from "@/lib/av-probe";
 import { mbText, type UploadLimits } from "@/lib/upload-config";
 import { uploadAttachment } from "@/lib/upload-attachment-client";
+import { useFileDrop } from "@/lib/hooks/use-file-drop";
 import { fieldErr, wizInput, wizLabel, SectionTitle, STEP } from "./wizard-shared";
 import { AttachmentUpload } from "./AttachmentUpload";
 import { Button } from "@/components/ui/Button";
@@ -56,12 +57,15 @@ export function AvSection({
   initial,
   fieldErrors,
   limits,
+  onBusyChange,
 }: {
   avKind: AvKind;
   /** audio=音乐 / video=视频 */
   initial?: AvSectionInitial;
   fieldErrors?: Record<string, string[]>;
   limits: UploadLimits;
+  /** 在飞上传数（0/1）：宿主据此禁用提交，避免「文件还在传就点了发布」 */
+  onBusyChange?: (busy: number) => void;
 }) {
   const [source, setSource] = useState<AvSource>(initial?.source ?? "mount");
   const [mode, setMode] = useState<AvMode>(initial?.mode ?? "direct");
@@ -155,24 +159,41 @@ export function AvSection({
     setMsg(null);
     // 抓取（本地、快）与上传（可能很慢）并行，谁先完成都不互相阻塞
     const probeP = probeFile(file, avKind).catch((): AvProbe => ({}));
+    let done: { url: string; name: string; size: number } | null = null;
     try {
-      const r = await uploadAttachment(file, setProgress, isAudio ? "music" : "video");
-      setUrl(r.url);
+      done = await uploadAttachment(file, setProgress, isAudio ? "music" : "video");
+      setUrl(done.url);
       setSource("file");
       setMode("direct");
       setModeTouched(true);
-      const applied = applyProbe(await probeP);
-      const summary = probeSummary(applied);
-      setMsg(
-        `已上传 ${r.name}（${formatBytes(r.size)}）${summary ? `，${summary}` : ""}`,
-      );
+      setMsg(`已上传 ${done.name}（${formatBytes(done.size)}）`);
     } catch (e) {
       setMsg(e instanceof Error ? e.message : `${label}上传失败，请重试`);
     } finally {
       setUploading(false);
       setProgress(null);
     }
+    // 元数据抓取放到「已上传」回执之后：大视频读时长要等 loadedmetadata，
+    // 最坏等到 12s 超时——卡在校验里会让按钮一直停在「上传中…」，像卡死。
+    if (!done) return;
+    const summary = probeSummary(applyProbe(await probeP));
+    if (summary) setMsg(`已上传 ${done.name}（${formatBytes(done.size)}），${summary}`);
   }
+
+  /** 文件选择器与投放区共用同一条入口；音视频只取第一个文件 */
+  function onFiles(files: FileList) {
+    void onFile(files[0] ?? null);
+  }
+
+  /** 拖入区域即上传，与文章/游戏的附件投放区同一套交互。
+      音视频是单文件字段，上传中不接受新的拖入（与文件选择器的 disabled 语义对齐），
+      否则并发的第二次上传会先一步把 uploading 置回 false，提交按钮提前解锁。 */
+  const { dragging, dropProps } = useFileDrop({ onFiles, disabled: uploading });
+
+  // 把「是否还有上传在飞」同步给宿主，供提交按钮禁用（与 AttachmentListEditor 同契约）
+  useEffect(() => {
+    onBusyChange?.(uploading ? 1 : 0);
+  }, [uploading, onBusyChange]);
 
   function clearUrl() {
     setUrl("");
@@ -263,12 +284,13 @@ export function AvSection({
             </Button>
           )}
         </div>
-        {fieldErr(fieldErrors?.avUrl)}
+        {fieldErr(fieldErrors?.url)}
 
         {source === "file" && (
           <div className="mt-2">
             <AttachmentUpload
-              onFiles={(fl) => onFile(fl[0] ?? null)}
+              variant="dropzone"
+              onFiles={onFiles}
               limits={limits}
               /* accept 必须走音视频白名单：附件表里没有 m4a/aac/opus/m4v/mov/ogv，
                  而服务端对 kind=music|video 是按 avExtsFor(kind) 放行的——
@@ -278,7 +300,9 @@ export function AvSection({
               /* 单文件字节进度：走 percent（0..100）。传 progress({done,total}) 会被
                  当成「第 n / 共 m 个文件」渲染成「上传中 45/100…」，语义完全错位。 */
               percent={progress}
-              label={`选择${label}文件`}
+              dragging={dragging}
+              dropProps={dropProps}
+              label={url ? `拖入或点击更换${label}文件` : `拖入或点击上传${label}文件`}
               hint={`仅 ${acceptedExts}`}
             />
           </div>

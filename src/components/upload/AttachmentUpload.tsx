@@ -94,8 +94,10 @@ export function AttachmentUpload({
       accept={acceptAttr}
       onChange={(e) => {
         const fl = e.target.files;
-        e.target.value = "";
+        // 清空必须排在 onFiles 之后：input.files 返回的是挂在元素上的同一份 FileList，
+        // 先清空会把已捕获的引用一起清掉，消费方拿到空列表 → 「点了没反应」。
         if (fl && fl.length > 0) onFiles(fl);
+        e.target.value = "";
       }}
     />
   );

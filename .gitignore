@@ -46,6 +46,9 @@ next-env.d.ts
 /prisma/dev.db
 /prisma/dev.db-journal
 
+# 大文件流式上传的临时落点（成功后 rename 进 public/uploads）
+/.uploads-tmp/
+
 # local temp scripts & dev log
 _tmp_*
 _dev.log

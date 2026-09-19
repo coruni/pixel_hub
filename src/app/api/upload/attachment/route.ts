@@ -15,10 +15,19 @@ import { MIB } from "@/lib/upload-config";
 import { extFromName, parseUploadKind, rejectFile, resolveUploadTarget } from "@/lib/av-upload";
 
 export const runtime = "nodejs";
-// 兼容旧调用方的单请求路径；OneDrive 新客户端走 session 直传，不占 Vercel 文件传输资源。
-export const maxDuration = 60;
 
-const DIRECT_UPLOAD_MAX_BYTES = 250 * MIB;
+/**
+ * 缓冲通道的内存安全线。
+ *
+ * 这条通道走 `req.formData()` + `arrayBuffer()`，**整个文件必须先进内存**才能拿到 File，
+ * 所以它的上限与宿主平台无关，只取决于进程能给多少堆：一个 2GB 的请求体会先在
+ * `formData()` 里把内存吃光，压根走不到后面的体积校验。
+ *
+ * 大文件一律走 `/attachment/stream`（边收边落盘，上限就是后台配的 attachmentMaxMb，
+ * 本地存储实测 300MB/4.2s）——客户端由 `/session` 的 `mode: "driver"` 自动改道。
+ * 这里保留一个上限只是为了「不支持流式的驱动（s3 / chevereto）」和旧客户端不把进程撑爆。
+ */
+const BUFFERED_MAX_BYTES = 250 * MIB;
 
 // 文件直传：任意分发格式（压缩包/文档）与音视频来源文件（kind=music|video）。
 // 单文件上限与允许后缀由后台配置决定（见 av-upload.ts / getUploadLimits）；
@@ -33,6 +42,19 @@ export async function POST(req: NextRequest) {
   if (!(await rateLimit(`attach:${session.user.id}`, 10, 60 * 60_000)))
     return NextResponse.json({ ok: false, error: "上传过于频繁，请稍后再试" }, { status: 429 });
 
+  // 先看 Content-Length 再解析：`req.formData()` 会把整个请求体读进内存才能拿到 File，
+  // 超限的请求必须在这里就挡住，否则一个 2GB 的请求体会先把进程内存吃光再去判上限。
+  const declared = Number(req.headers.get("content-length") ?? "");
+  if (Number.isSafeInteger(declared) && declared > BUFFERED_MAX_BYTES)
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "USE_UPLOAD_SESSION",
+        error: "文件过大，请改用流式直传通道（刷新页面后会自动启用）",
+      },
+      { status: 413 },
+    );
+
   const form = await req.formData();
   const kind = parseUploadKind(form.get("kind"));
   const file = form.get("file");
@@ -43,14 +65,16 @@ export async function POST(req: NextRequest) {
   const target = await resolveUploadTarget(kind);
   const rejected = rejectFile(target, file.name || "file", file.size);
   if (rejected) return NextResponse.json({ ok: false, error: rejected }, { status: 400 });
-  if (file.size > DIRECT_UPLOAD_MAX_BYTES) {
+  // 走到这里说明该文件已整个进了内存（formData 的代价），再判一次安全线
+  if (file.size > BUFFERED_MAX_BYTES) {
     return NextResponse.json(
       {
         ok: false,
-        code: target.cloud ? "USE_UPLOAD_SESSION" : "STORAGE_LIMIT",
-        error: target.cloud
-          ? "大文件请使用支持分片上传的客户端"
-          : "当前存储未启用 OneDrive，暂不支持超过 250MB 的文件",
+        code: target.cloud || target.stream ? "USE_UPLOAD_SESSION" : "STORAGE_LIMIT",
+        error:
+          target.cloud || target.stream
+            ? "大文件请改用流式直传通道"
+            : "当前存储驱动不支持大文件流式上传，请压缩体积或启用 OneDrive 云盘",
       },
       { status: 413 },
     );

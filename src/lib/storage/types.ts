@@ -10,6 +10,17 @@ export interface StorageDriver {
   size(key: string): Promise<number>;
   /** 删除（尽力而为：远端失败不阻塞调用方） */
   del(key: string): Promise<void>;
+  /**
+   * 可选：流式写入大文件（不把整个文件读进内存）。
+   * 只有本地磁盘能这么写；s3 / chevereto 需要各自的 multipart 实现，暂不提供 ——
+   * 调用方必须先问 `streamCapable()`，不要假定所有驱动都有。
+   * 返回实际落盘字节数，供调用方写 Media.size。
+   */
+  putStream?(
+    key: string,
+    body: ReadableStream<Uint8Array>,
+    maxBytes: number,
+  ): Promise<{ url: string; size: number }>;
 }
 
 export function isUrl(key: string): boolean {

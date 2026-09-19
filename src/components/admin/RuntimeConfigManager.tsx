@@ -68,6 +68,15 @@ export default function RuntimeConfigManager({
 
   const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
 
+  // auto 的落点：Chevereto 走云盘更稳，其余驱动走所选驱动（与服务端 attachmentCloudEnabled 同规则）
+  const attachCloudOn =
+    form.attachmentCloud === "on" ||
+    (form.attachmentCloud === "auto" && form.storageDriver === "chevereto");
+  // 音视频 auto = 跟随附件结论，不再自己重复算一遍（与服务端 avCloudEnabled 同规则）
+  const avCloudOn =
+    form.avCloud === "on" ||
+    (form.avCloud === "auto" && attachCloudOn);
+
   const save = () =>
     start(async () => {
       setMessage(null);
@@ -171,10 +180,7 @@ export default function RuntimeConfigManager({
 
           <label className="flex cursor-pointer items-start gap-2.5">
             <SquareCheckbox
-              checked={
-                form.attachmentCloud === "on" ||
-                (form.attachmentCloud === "auto" && form.storageDriver === "chevereto")
-              }
+              checked={attachCloudOn}
               onChange={(next) => set({ attachmentCloud: next ? "on" : "off" })}
               ariaLabel="附件上传走云盘"
               className="mt-0.5"
@@ -190,10 +196,7 @@ export default function RuntimeConfigManager({
 
           <label className="flex cursor-pointer items-start gap-2.5">
             <SquareCheckbox
-              checked={
-                form.avCloud === "on" ||
-                (form.avCloud === "auto" && form.storageDriver === "chevereto")
-              }
+              checked={avCloudOn}
               onChange={(next) => set({ avCloud: next ? "on" : "off" })}
               ariaLabel="音视频上传走云盘"
               className="mt-0.5"
@@ -202,8 +205,9 @@ export default function RuntimeConfigManager({
               <span className="block text-sm text-neutral-900">音视频上传走云盘（OneDrive）</span>
               <span className="mt-0.5 block text-xs text-neutral-400">
                 仅作用于「音乐 / 视频」资源的上传来源文件（在线挂载不受影响）。
-                勾选后经 Graph 分片直传活跃云盘（支持超大文件与断点续传）；不勾则走上方所选存储驱动。
-                未配置 Graph 凭据或没有活跃盘时自动回退存储驱动，不会阻断发布。
+                勾选后经 Graph 分片直传活跃云盘（支持超大文件与断点续传）；
+                不勾时走上方所选存储驱动——本地存储按「附件上限」流式直传，s3 / Chevereto
+                仍受单请求通道约 250MB 的限制。未配置 Graph 凭据或没有活跃盘时自动回退，不会阻断发布。
               </span>
             </span>
           </label>

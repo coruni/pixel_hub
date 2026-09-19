@@ -276,10 +276,22 @@ export function ResourceEditForm({
         />
       )}
       {resource.type === "MUSIC" && resource.meta.kind === "MUSIC" && (
-        <AvSection avKind="audio" initial={resource.meta} fieldErrors={fe} limits={limits} />
+        <AvSection
+          avKind="audio"
+          initial={resource.meta}
+          fieldErrors={fe}
+          limits={limits}
+          onBusyChange={setAttachBusy}
+        />
       )}
       {resource.type === "VIDEO" && resource.meta.kind === "VIDEO" && (
-        <AvSection avKind="video" initial={resource.meta} fieldErrors={fe} limits={limits} />
+        <AvSection
+          avKind="video"
+          initial={resource.meta}
+          fieldErrors={fe}
+          limits={limits}
+          onBusyChange={setAttachBusy}
+        />
       )}
 
       {/* 图片上传（与发布向导同一组件；文章/音乐/视频为单张封面） */}

@@ -516,6 +516,7 @@ export default function UploadWizard({
           initial={avInitial(d)}
           fieldErrors={state.fieldErrors}
           limits={limits}
+          onBusyChange={setAttachBusy}
         />
       )}
       {type === "VIDEO" && (
@@ -524,6 +525,7 @@ export default function UploadWizard({
           initial={avInitial(d)}
           fieldErrors={state.fieldErrors}
           limits={limits}
+          onBusyChange={setAttachBusy}
         />
       )}
 

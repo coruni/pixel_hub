@@ -1,5 +1,6 @@
-// 上传去向解析（服务端）——三个上传入口（attachment / attachment.session / attachment.complete）
-// 共用同一套「后缀白名单 + 体积上限 + 是否走 OneDrive」判定，避免三处各写一遍导致行为漂移。
+// 上传去向解析（服务端）——上传入口（attachment / attachment.session / attachment.stream /
+// attachment.complete）共用同一套「后缀白名单 + 体积上限 + 是否走 OneDrive」判定，
+// 避免几处各写一遍导致行为漂移。
 //
 // 关键约束：是否走云盘一律由后台运行配置决定（attachmentCloud / avCloud），代码里不写死。
 //   kind=attachment → attachmentCloud + /admin/uploads 的后缀表与上限
@@ -11,6 +12,7 @@
 import type { CloudDrive } from "@prisma/client";
 import { activeCloudDrive, graphEnabled } from "@/lib/storage/onedrive";
 import { attachmentCloudEnabled, avCloudEnabled, getRuntimeConfig } from "@/lib/runtime-config";
+import { streamCapable } from "@/lib/storage";
 import { getUploadLimits } from "@/lib/upload-limits";
 import { attachmentExtsSample, MIB } from "@/lib/upload-config";
 import { avExtsFor, avExtsSample, type AvKind } from "@/lib/av";
@@ -32,6 +34,12 @@ export type UploadTarget = {
   kind: UploadKind;
   /** 有值 = 该次上传经 Microsoft Graph 分片直传；null = 走统一存储驱动 */
   cloud: CloudDrive | null;
+  /**
+   * 无云盘时，统一存储层能否流式接收（边收边落盘）。
+   * false = 只剩 `/attachment` 那条「整个请求体读进内存」的通道，
+   * 实际承载上限远低于后台配的 attachmentMaxMb（见 DIRECT_UPLOAD_MAX_BYTES）。
+   */
+  stream: boolean;
   maxBytes: number;
   maxMb: number;
   allowedExts: Set<string>;
@@ -57,6 +65,8 @@ export async function resolveUploadTarget(kind: UploadKind): Promise<UploadTarge
   return {
     kind,
     cloud,
+    // 有云盘时走 Graph 分片，无所谓；无云盘才需要问存储层能不能流式收
+    stream: cloud ? false : await streamCapable(),
     maxBytes: limits.attachmentMaxMb * MIB,
     maxMb: limits.attachmentMaxMb,
     allowedExts,

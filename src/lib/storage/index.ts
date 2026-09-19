@@ -45,3 +45,23 @@ export async function fileSize(key: string): Promise<number> {
 export async function delFile(key: string): Promise<void> {
   return (await getDriver()).del(key);
 }
+
+/** 当前驱动能否流式接收大文件（只有 local 实现了 putStream；见 types.ts） */
+export async function streamCapable(): Promise<boolean> {
+  return typeof (await getDriver()).putStream === "function";
+}
+
+/**
+ * 流式写入大文件：请求体不经过内存缓冲，边收边落盘。
+ * 调用方必须先 `streamCapable()`；不支持时抛错而不是悄悄 buff 整个文件
+ * （2GB 的音视频读进 Buffer 会直接把进程打崩）。
+ */
+export async function saveStream(
+  key: string,
+  body: ReadableStream<Uint8Array>,
+  maxBytes: number,
+): Promise<{ url: string; size: number }> {
+  const driver = await getDriver();
+  if (!driver.putStream) throw new Error(`存储驱动 ${driver.name} 不支持流式写入`);
+  return driver.putStream(key, body, maxBytes);
+}

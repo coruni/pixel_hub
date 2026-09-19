@@ -84,6 +84,14 @@ export function isDirectAvUrl(url: string, kind?: AvKind): boolean {
   return (exts as readonly string[]).includes(ext);
 }
 
+/** 后缀 → 音视频种类；两者都不是返回 null。用于「内联播放还是直接下载」这类按文件判定的场景 */
+export function avKindByExt(nameOrUrl: string): AvKind | null {
+  const ext = extOf(nameOrUrl);
+  if ((AUDIO_EXTS as readonly string[]).includes(ext)) return "audio";
+  if ((VIDEO_EXTS as readonly string[]).includes(ext)) return "video";
+  return null;
+}
+
 /** 依据 URL 推定播放形态；空地址时沿用 direct（避免未填就跳到 iframe） */
 export function suggestMode(url: string, kind?: AvKind): AvMode {
   if (!url.trim()) return "direct";

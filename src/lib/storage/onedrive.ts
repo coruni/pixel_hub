@@ -170,7 +170,7 @@ const truncate = (s: string, n: number) => (s.length > n ? `${s.slice(0, n)}…`
 
 let tokenCache: { token: string; expiresAt: number } | null = null;
 
-/** app-only client_credentials 取 token（提前 60s 视为过期；模块级缓存，Vercel 冷启动自动重取） */
+/** app-only client_credentials 取 token（提前 60s 视为过期；模块级缓存，进程冷启动自动重取） */
 async function requestToken(creds: GraphCreds): Promise<string> {
   const authority = `https://login.microsoftonline.com/${creds.tenant}/oauth2/v2.0/token`;
   const res = await fetch(authority, {
@@ -373,7 +373,7 @@ async function signTicket(payload: string): Promise<string> {
   return createHmac("sha256", await ticketSecret()).update(payload).digest("base64url");
 }
 
-/** 给完成接口使用的短期签名凭证，不把 uploadUrl 或文件内容交回 Vercel。 */
+/** 给完成接口使用的短期签名凭证，不把 uploadUrl 或文件内容交回本站。 */
 export async function createDriveUploadTicket(
   input: Omit<DriveUploadTicket, "expiresAt">,
 ): Promise<string> {
@@ -471,6 +471,27 @@ export async function resolveDriveDownloadUrl(
   if (!c.ok) throw await graphErr(c, "获取下载链接");
   await c.arrayBuffer().catch(() => {});
   throw new GraphError("无法为该文件生成下载链接");
+}
+
+/**
+ * 直读文件字节（供本站代理播放用）。
+ *
+ * 与 `resolveDriveDownloadUrl` 的区别：那条地址是**下载**语义（响应头带
+ * `Content-Disposition: attachment`，且短时效、由微软域名签发），浏览器拿到它会存盘、
+ * `<video>` 也放不出内联播放。需要内联播放时改为由本站转发字节、自己定响应头。
+ *
+ * range 原样透传给 Graph：它的 `/content` 支持 Range 并返回 206，
+ * `<video>` 拖动进度条依赖这一点（不给 Range 支持就只能在已缓冲范围内拖）。
+ */
+export async function fetchDriveContent(
+  drive: CloudDrive,
+  itemPath: string,
+  range?: string | null,
+): Promise<Response> {
+  const creds = await graphCreds();
+  if (!creds) throw new GraphError("GRAPH 未配置");
+  const url = `${driveRoot(creds, drive)}:/${encPath(itemPath)}:/content`;
+  return graphRequest(url, range ? { headers: { range } } : {});
 }
 
 /** 删除：先按路径取 item id 再 DELETE；404（两处任一）视为已删除 */
