@@ -27,7 +27,9 @@ export async function renderHot(w: SidebarWidget) {
     cfg.sort === "popular" ? "likes" : cfg.sort === "downloads" ? "downloads" : "views";
   return (
     <WidgetShell title={widgetTitle(w)}>
-      <div className={compact ? "grid grid-cols-2 gap-2" : "grid gap-1"}>
+      {/* 单列一律写 grid-cols-1（= minmax(0,1fr)）：裸 grid 的隐式 auto 轨道会被
+          行内 nowrap 标题的 min-content 撑开，挤出卡片右边界。 */}
+      <div className={compact ? "grid grid-cols-2 gap-2" : "grid grid-cols-1 gap-1"}>
         {items.map((item, i) =>
           compact ? (
             <MiniCard key={item.id} item={item} rank={i + 1} metric={metric} />
@@ -51,7 +53,7 @@ export async function renderRandom(w: SidebarWidget) {
 
   return (
     <WidgetShell title={widgetTitle(w)}>
-      <div className="grid gap-2">
+      <div className="grid grid-cols-1 gap-2">
         {items.map((item) => (
           <MiniRow key={item.id} item={item} />
         ))}
@@ -79,7 +81,7 @@ export async function renderAuthorWorks(w: SidebarWidget, detail?: DetailWidgetC
 
   return (
     <WidgetShell title={widgetTitle(w)}>
-      <div className="grid gap-1">
+      <div className="grid grid-cols-1 gap-1">
         {list.map((item) => (
           <MiniRow key={item.id} item={item} />
         ))}
@@ -129,7 +131,7 @@ export async function renderSameCategory(w: SidebarWidget, detail?: DetailWidget
 
   return (
     <WidgetShell title={widgetTitle(w)}>
-      <div className="grid gap-1">
+      <div className="grid grid-cols-1 gap-1">
         {out.map((item) => (
           <MiniRow key={item.id} item={item} />
         ))}
