@@ -43,6 +43,12 @@
 - 同一句话不要在一个页面里出现两次（页首说明 + 区块 info 块重复是常见来源）；跨页重复可以接受。
 - 无限滚动哨兵（`feed/FeedInfinite.tsx`）删文案后必须保留容器高度，否则 IntersectionObserver 目标塌陷。
 
+## 破坏性操作 / 评论区楼层树
+- **全站禁止原生 `confirm`/`alert`/`prompt`**：统一用 `src/components/ui/feedback.tsx` 的 `confirmDialog()` / `toast()`（全局惰性 host，零 Provider 侵入）。删除类操作 = 先 `confirmDialog({danger:true})` → 再调 action → 结果出 `toast`。**action 的失败原因要能直接 toast**（返回 `error?: string`，别只回 `ok:false`）。
+- 确认后立刻进入「进行中」态（按钮 `disabled` + 文案换「删除中…」）再发请求；`finally` 里无论成败都 `router.refresh()` —— 网络异常时服务端可能已经改完了，刷新才能回到真实状态。
+- **评论楼层树的根判定必须与 `rootIdOf` 同一口径**：根 = 无父 **或** 父已被删（上溯链断裂）。`getResourceDetail`（`src/lib/queries.ts`）曾用 `filter(c => !c.parentId)` 当根，而 `rootIdOf` 会把「父被删的回复」算成根 → 这类回复**既不是根、也不在任何根的 replies 里，整条被静默吞掉**（页面看不到，库里仍是 `PUBLIC`，侧栏「最新评论」却还显示）。改成 `rootIds = Set(过滤 rootIdOf(c) === c.id)`，replies 循环用 `if (rootIds.has(c.id)) continue` 排除自身（否则升格的那条会把自己列成自己的回复）。
+- `Resource.commentCount` 对**每条评论（含回复）**都 `+1`，而删一条评论只 `-1`。所以「删根 → 回复升格」时计数天然对得上（剩下的回复仍算 1 条），不需要额外改动；反过来若改成「连回复一起删」，必须同步补扣。
+
 ## 详情页操作条（用户明确要过，别改回去）
 - 形态 = **图标 + 文字**（Heart/Star/Flag/Pencil，`size={15}`，`aria-hidden`）；无图标版已被否。`ACTION_TEXT`（`src/lib/ui/cls.ts`）：无边框无底色、`gap-1.5 py-1.5 text-sm`。`FollowButton` 是全站唯一保留描边/实底的动作。
 - `ActionBar` 行容器 `justify-end`；状态走文案 + 颜色双通道。

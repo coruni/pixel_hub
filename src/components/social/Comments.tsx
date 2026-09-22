@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ImagePlus, X } from "lucide-react";
 import { addCommentAction, deleteCommentAction } from "@/lib/actions/social";
 import ImageViewer from "@/components/ui/ImageViewer";
+import { confirmDialog, toast } from "@/components/ui/feedback";
 import CommentItem, { commentInputCls, type ReplyState } from "./comment-item";
 import { flashComment, useCommentPolling } from "./use-comment-polling";
 import type { CommentImage, CommentShape } from "./comment-types";
@@ -33,6 +34,8 @@ export default function Comments({
   const router = useRouter();
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  /** 正在删除的评论 id（非空时该条删除按钮禁用，防重复提交） */
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [reply, setReply] = useState<ReplyState>({ openFor: null, text: "", target: null });
   const [error, setError] = useState<string | null>(null);
   // 主楼附图（仅登录用户，回复不带图）
@@ -99,8 +102,32 @@ export default function Comments({
   }
 
   async function remove(commentId: string) {
-    const res = await deleteCommentAction(commentId);
-    if (res.ok) router.refresh();
+    // 删的是根楼层时提醒回复的去向：回复不会一起消失，会上移成独立评论（见 queries 的 rootIdOf 上溯）
+    const replies = merged.find((c) => c.id === commentId)?.replies.length ?? 0;
+    const ok = await confirmDialog({
+      title: "删除评论",
+      message: replies
+        ? `删除后无法恢复。这条评论下的 ${replies} 条回复会保留，并上移为独立评论。`
+        : "删除后无法恢复，确认删除这条评论？",
+      confirmLabel: "删除",
+      danger: true,
+    });
+    if (!ok) return;
+    setDeletingId(commentId);
+    try {
+      const res = await deleteCommentAction(commentId);
+      if (res.ok) {
+        toast("评论已删除", "success");
+      } else {
+        toast(res.error ?? "删除失败，请稍后再试", "error");
+      }
+    } catch {
+      toast("网络异常，未能确认删除结果，请刷新页面查看", "error");
+    } finally {
+      setDeletingId(null);
+      // 成功或结果未知都刷新：服务端可能已经删掉了，让列表回到真实状态
+      router.refresh();
+    }
   }
 
   // 总数含楼中楼回复
@@ -189,6 +216,7 @@ export default function Comments({
             isStaff={isStaff}
             reply={reply}
             sending={sending}
+            deletingId={deletingId}
             inputCls={commentInputCls}
             onReplyChange={setReply}
             onPost={post}

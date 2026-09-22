@@ -28,6 +28,7 @@ export default function CommentItem({
   isStaff,
   reply,
   sending,
+  deletingId,
   inputCls,
   onReplyChange,
   onPost,
@@ -41,15 +42,18 @@ export default function CommentItem({
   isStaff?: boolean;
   reply: ReplyState;
   sending: boolean;
+  /** 全树共用一个「正在删除」id：该条（含其回复）的删除按钮禁用并改文案，避免确认后重复点击 */
+  deletingId?: string | null;
   inputCls: string;
   onReplyChange: (next: ReplyState) => void;
   onPost: (parentId: string | null, text: string) => void;
-  onDelete: (commentId: string) => void;
+  onDelete: (commentId: string) => Promise<void>;
   onNavigate: (commentId: string, fallbackRootId: string) => void;
   onViewImages: (images: CommentImage[], index: number) => void;
 }) {
   const replyOpen = reply.openFor === c.id;
   const canDel = viewerId === c.authorId || !!isStaff;
+  const deleting = deletingId === c.id;
   return (
     <li id={`comment-${c.id}`} data-comment-id={c.id} className="scroll-mt-24">
       <div className="flex items-center gap-2">
@@ -77,10 +81,11 @@ export default function CommentItem({
         {canDel && (
           <Button
             type="button"
+            disabled={deleting}
             onClick={() => onDelete(c.id)}
-            className="ml-auto text-xs text-neutral-400 hover:text-red-500"
+            className="ml-auto text-xs text-neutral-400 hover:text-red-500 disabled:opacity-50"
           >
-            删除
+            {deleting ? "删除中…" : "删除"}
           </Button>
         )}
       </div>
@@ -161,6 +166,7 @@ export default function CommentItem({
               rp={rp}
               canPost={canPost}
               canDel={viewerId === rp.authorId || !!isStaff}
+              deleting={deletingId === rp.id}
               onReplyTo={(parent, to) =>
                 onReplyChange({ openFor: c.id, text: reply.text, target: { parent, to } })
               }
@@ -179,6 +185,7 @@ function ReplyItem({
   rootId,
   canPost,
   canDel,
+  deleting,
   onReplyTo,
   onDelete,
   onNavigate,
@@ -187,8 +194,9 @@ function ReplyItem({
   rootId: string;
   canPost: boolean;
   canDel: boolean;
+  deleting: boolean;
   onReplyTo: (parent: string, to: string) => void;
-  onDelete: (commentId: string) => void;
+  onDelete: (commentId: string) => Promise<void>;
   onNavigate: (commentId: string, fallbackRootId: string) => void;
 }) {
   return (
@@ -228,10 +236,11 @@ function ReplyItem({
         {canDel && (
           <Button
             type="button"
+            disabled={deleting}
             onClick={() => onDelete(rp.id)}
-            className="ml-auto text-[11px] text-neutral-400 hover:text-red-500"
+            className="ml-auto text-[11px] text-neutral-400 hover:text-red-500 disabled:opacity-50"
           >
-            删除
+            {deleting ? "删除中…" : "删除"}
           </Button>
         )}
       </div>

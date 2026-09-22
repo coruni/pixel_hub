@@ -464,6 +464,10 @@ export const getResourceDetail = cache(async (slug: string, viewerId?: string) =
     return cur.id;
   };
   const replyName = (a: { username: string; name: string | null }) => a.name ?? a.username;
+  // 根楼层 = 无父，或父已被删除（上溯链断裂）。**必须与 rootIdOf 同一口径**：
+  // 只按 `!parentId` 判根，会让「父被删掉的那条回复」既不是根、也不会出现在任何根的 replies 里
+  // ——整条回复连同它的子回复被静默吞掉（评论区看不到，但它在库里仍是 PUBLIC）。
+  const rootIds = new Set(allComments.filter((c) => rootIdOf(c) === c.id).map((c) => c.id));
   const repliesByRoot = new Map<
     string,
     {
@@ -472,10 +476,13 @@ export const getResourceDetail = cache(async (slug: string, viewerId?: string) =
     }[]
   >();
   for (const c of allComments) {
-    if (!c.parentId) continue;
+    if (rootIds.has(c.id)) continue;
+    // 类型收窄用；逻辑上非根楼层的 parentId 必然存在（无父的已在 rootIds 里）
+    const parentId = c.parentId;
+    if (!parentId) continue;
     const rootId = rootIdOf(c);
     const list = repliesByRoot.get(rootId) ?? [];
-    const parent = commentMap.get(c.parentId);
+    const parent = commentMap.get(parentId);
     // 二级回复 replyTo 为 null；深层回复指向被回复评论（供 UI hover 卡片定位、引用卡显示原文）
     list.push({
       c,
@@ -537,7 +544,7 @@ export const getResourceDetail = cache(async (slug: string, viewerId?: string) =
       online: isOnline(resource.author.lastSeenAt),
     },
     comments: allComments
-      .filter((c) => !c.parentId)
+      .filter((c) => rootIds.has(c.id))
       .map((c) => ({
         id: c.id,
         authorId: c.authorId,

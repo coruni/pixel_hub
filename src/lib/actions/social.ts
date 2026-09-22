@@ -503,17 +503,20 @@ export async function addCommentAction(
   return { ok: true };
 }
 
-export async function deleteCommentAction(commentId: string): Promise<{ ok: boolean }> {
+/** 删除评论。失败时给可读原因 —— 前台要把它直接 toast 出来，不能只回一个 ok:false。 */
+export async function deleteCommentAction(
+  commentId: string,
+): Promise<{ ok: boolean; error?: string }> {
   const user = await requiredUser();
-  if (!user) return { ok: false };
+  if (!user) return { ok: false, error: "请先登录再操作" };
   const comment = await prisma.comment.findUnique({
     where: { id: commentId },
     include: { resource: { select: { authorId: true } } },
   });
-  if (!comment) return { ok: false };
+  if (!comment) return { ok: false, error: "这条评论不存在或已被删除" };
   const isStaff = user.role === "ADMIN" || user.role === "MODERATOR";
   if (comment.authorId !== user.id && !isStaff && comment.resource.authorId !== user.id)
-    return { ok: false };
+    return { ok: false, error: "没有权限删除这条评论" };
   // 条件更新 + 计数扣减同事务：只有原本公开的评论被删除才扣；重复删除/非公开评论不重复扣
   const deleted = await prisma.$transaction(async (tx) => {
     const upd = await tx.comment.updateMany({
