@@ -48,3 +48,52 @@ export async function sendTipAction(input: {
   revalidatePath("/me/coins");
   return { ok: true };
 }
+
+/**
+ * 直接打赏作者（不挂作品，`TipRecord.resourceId = null`）。
+ *
+ * 【为什么这里必须收 toUserId】没有作品可反查收款方，toUserId 是唯一入口参数。
+ * 但「不能打赏自己 / 收款方不存在 / 已被封禁」全部由 `sendTip` 在事务内再判一遍 ——
+ * 客户端伪造 toUserId 最多把 PIX 打给另一个真人，构造不出「钱进 A、说明指向 B」的错账：
+ * 附言不参与记账，收款方恒等于 toUserId。
+ */
+export async function sendUserTipAction(input: {
+  toUserId: string;
+  coin: number;
+  message?: string;
+  /** 客户端一次性幂等 token（crypto.randomUUID） */
+  token: string;
+}): Promise<ActionResult> {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return { ok: false, error: "请先登录后再打赏" };
+
+  if (!(await rateLimit(`tip:${userId}`, 20, 60_000))) {
+    return { ok: false, error: "操作过于频繁，请稍后再试" };
+  }
+
+  const toUserId = input.toUserId.trim();
+  if (!toUserId) return { ok: false, error: "缺少打赏对象" };
+  if (toUserId === userId) return { ok: false, error: "不能打赏自己" };
+
+  const target = await prisma.user.findUnique({
+    where: { id: toUserId },
+    select: { username: true, bannedAt: true },
+  });
+  if (!target) return { ok: false, error: "用户不存在" };
+  if (target.bannedAt) return { ok: false, error: "该用户已被封禁，暂时无法打赏" };
+
+  const res = await sendTip({
+    fromUserId: userId,
+    toUserId,
+    resourceId: null,
+    coin: Math.trunc(input.coin),
+    message: input.message ?? null,
+    token: input.token,
+  });
+  if (!res.ok) return { ok: false, error: res.error };
+
+  revalidatePath(`/u/${target.username}`);
+  revalidatePath("/me/coins");
+  return { ok: true };
+}

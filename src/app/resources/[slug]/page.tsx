@@ -6,7 +6,7 @@ import { getCollections, getRelated, getResourceDetail, type ResourceDetail } fr
 import { parseMeta } from "@/lib/meta";
 import { getTheme, detailTemplateFor } from "@/lib/site";
 import { getIncentive } from "@/lib/incentive";
-import { tipPresets } from "@/lib/points-config";
+import { tipFormOf } from "@/lib/points-config";
 import { sidebarVisible } from "@/lib/site-config";
 import SiteSidebar, { WidgetArea, type DetailWidgetCtx } from "@/components/sidebar/SiteSidebar";
 import SidebarLayout from "@/components/layout/SidebarLayout";
@@ -150,16 +150,7 @@ export default async function ResourcePage({ params }: PageProps) {
     myCollections,
     related,
     // 打赏入口只在「体系开启 + 打赏开启」时给出；具体到作者本人/未发布内容由 ActionBar 判定
-    tip:
-      incentive.enabled && incentive.tip.enabled
-        ? {
-            minCoin: incentive.tip.minCoin,
-            maxCoin: incentive.tip.maxCoin,
-            symbol: incentive.coin.symbol,
-            messageMax: incentive.tip.messageMax,
-            presets: tipPresets(incentive.tip.minCoin, incentive.tip.maxCoin),
-          }
-        : undefined,
+    tip: tipFormOf(incentive),
   };
 
   const template = detailTemplateFor(theme, detail.type);

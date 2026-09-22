@@ -6,7 +6,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { getIncentive } from "@/lib/incentive";
 import { getPointBalance } from "@/lib/points";
-import { levelNameOf, levelOf } from "@/lib/points-config";
+import { levelNameOf, levelOf, tipFormOf } from "@/lib/points-config";
 import LevelBadge from "@/components/ui/LevelBadge";
 import {
   getFeed,
@@ -27,7 +27,12 @@ import { publicUrl } from "@/lib/storage/url";
 import ResourceGrid from "@/components/resource/ResourceGrid";
 import Avatar from "@/components/ui/Avatar";
 import { FollowButton } from "@/components/social/interactions";
+import TipUserButton from "@/components/social/TipUserButton";
 import { Button } from "@/components/ui/Button";
+
+/** 头部描边按钮：与 FollowButton 的「已关注」态同规格，打赏不抢主转化的视觉权重 */
+const outlinedBtn =
+  "inline-flex items-center gap-1.5 rounded-none border border-brand-200 bg-surface px-3.5 py-2 text-sm text-neutral-700 transition hover:border-brand-500 hover:text-neutral-900";
 
 export async function generateMetadata({
   params,
@@ -130,6 +135,43 @@ export default async function UserPage({
   ]);
   const levelName = incentive.enabled ? levelNameOf(pointBalance, incentive.levels) : null;
   const levelIndex = levelOf(pointBalance, incentive.levels);
+
+  // 头部操作区。**hero / 无 hero 两套头部共用这一个节点** —— 打赏入口只补在其中一套里，
+  // 另一套就会莫名缺按钮（两套头部的结构是一样的，别各写一遍）。
+  const tipForm = tipFormOf(incentive);
+  const headerActions = (
+    <div className="flex flex-wrap items-center gap-3">
+      {profile.isViewer ? (
+        <Link
+          href="/settings"
+          className="rounded-none border border-brand-200 bg-surface px-4 py-2 text-sm text-neutral-700 hover:border-brand-500 hover:text-neutral-900"
+        >
+          编辑资料
+        </Link>
+      ) : me ? (
+        <>
+          <FollowButton targetUserId={profile.id} initialFollowing={profile.following} />
+          {/* 直接打赏作者（不挂作品）：本人看不到（不能给自己打赏），
+              激励体系或打赏关闭时 tipForm 为 undefined，按钮整体不渲染 */}
+          {tipForm && (
+            <TipUserButton
+              userId={profile.id}
+              username={profile.username}
+              className={outlinedBtn}
+              {...tipForm}
+            />
+          )}
+        </>
+      ) : (
+        <Link
+          href={`/login?callbackUrl=${encodeURIComponent(`/u/${profile.username}`)}`}
+          className="rounded-none border border-brand-600 bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600"
+        >
+          ＋ 关注
+        </Link>
+      )}
+    </div>
+  );
 
   // tab 可见性：本人始终可见；其余访客按对方的隐私开关（收藏默认仅本人，粉丝/关注默认公开）
   const tabVisible = (t: (typeof TABS)[number]) =>
@@ -336,25 +378,7 @@ export default async function UserPage({
                 <CalendarDays size={12} aria-hidden /> {joined} 加入
               </p>
             </div>
-            <div className="flex gap-3">
-              {profile.isViewer ? (
-                <Link
-                  href="/settings"
-                  className="rounded-none border border-brand-200 bg-surface px-4 py-2 text-sm text-neutral-700 hover:border-brand-500 hover:text-neutral-900"
-                >
-                  编辑资料
-                </Link>
-              ) : me ? (
-                <FollowButton targetUserId={profile.id} initialFollowing={profile.following} />
-              ) : (
-                <Link
-                  href={`/login?callbackUrl=${encodeURIComponent(`/u/${profile.username}`)}`}
-                  className="rounded-none border border-brand-600 bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600"
-                >
-                  ＋ 关注
-                </Link>
-              )}
-            </div>
+            {headerActions}
           </div>
           {statsRow}
         </section>
@@ -394,25 +418,7 @@ export default async function UserPage({
               <CalendarDays size={12} aria-hidden /> {joined} 加入
             </p>
           </div>
-          <div className="flex gap-3">
-            {profile.isViewer ? (
-              <Link
-                href="/settings"
-                className="rounded-none border border-brand-200 bg-surface px-4 py-2 text-sm text-neutral-700 hover:border-brand-500 hover:text-neutral-900"
-              >
-                编辑资料
-              </Link>
-            ) : me ? (
-              <FollowButton targetUserId={profile.id} initialFollowing={profile.following} />
-            ) : (
-              <Link
-                href={`/login?callbackUrl=${encodeURIComponent(`/u/${profile.username}`)}`}
-                className="rounded-none border border-brand-600 bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600"
-              >
-                ＋ 关注
-              </Link>
-            )}
-          </div>
+          {headerActions}
         </div>
       )}
       {!profile.heroImageKey && statsRow}

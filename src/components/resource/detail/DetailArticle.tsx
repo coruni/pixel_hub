@@ -6,6 +6,7 @@ import Markdown from "@/components/rte/Markdown";
 import {
   ActionBar,
   AuthorIdentity,
+  AuthorTipButton,
   CommentBlock,
   FollowControl,
   RelatedSection,
@@ -72,7 +73,8 @@ export default function DetailArticle({
           </span>
           <span>约 {minutes} 分钟</span>
         </span>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-3">
+          <AuthorTipButton ctx={ctx} />
           <FollowControl ctx={ctx} />
         </div>
       </div>

@@ -399,3 +399,27 @@ export function tipPresets(minCoin: number, maxCoin: number, count = 4): number[
   }
   return [...out].sort((a, b) => a - b);
 }
+
+/**
+ * 打赏面板参数。**「打赏作品」与「直接打赏作者」共用这一份形状** —— 两者 UI 完全一致，
+ * 只差提交目标（TipRecord.resourceId 有没有值），所以参数不该各拼一遍。
+ * 关闭激励体系或关闭打赏时返回 `undefined`：此时前台**完全不出入口**，不要渲染点了没反应的按钮。
+ */
+export type TipForm = {
+  minCoin: number;
+  maxCoin: number;
+  presets: number[];
+  symbol: string;
+  messageMax: number;
+};
+
+export function tipFormOf(cfg: IncentiveConfig): TipForm | undefined {
+  if (!cfg.enabled || !cfg.tip.enabled) return undefined;
+  return {
+    minCoin: cfg.tip.minCoin,
+    maxCoin: cfg.tip.maxCoin,
+    presets: tipPresets(cfg.tip.minCoin, cfg.tip.maxCoin),
+    symbol: cfg.coin.symbol,
+    messageMax: cfg.tip.messageMax,
+  };
+}
