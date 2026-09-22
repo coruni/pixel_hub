@@ -342,7 +342,52 @@ export function attachmentExtsSample(exts: string[], n = 5): string {
   return exts.length > n ? `${head} 等` : head;
 }
 
-/** “≤200MB” / “≤250GB” 式体积提示 */
+// ---------- 体积文本与单位换算（纯函数，后台表单与前台提示共用） ----------
+
+export const MB_PER_GB = 1024;
+/**
+ * 切 GB 的对齐粒度：半个 GB。
+ * 取 512 而不是 1024，是为了让 1.5GB / 2.5GB 这类值也能用 GB 干净地表达；
+ * 同时天然排除 1500MB（= 1.46484375GB）这类除不尽的档位。
+ */
+const GB_ALIGN_MB = MB_PER_GB / 2;
+
+/**
+ * MB 数值 → 可读体积文本。
+ *
+ * 【为什么不是 `mb/1024` 直接换算】1500MB / 1024 = 1.46484375GB —— 后台只要填一个非整 GB 的数，
+ * 界面就会出现一长串小数（「有零有整」），跟前端提示也对不上。
+ * 规则：能整除成 1GB / 1.5GB 这类干净值时才切 GB，否则原样显示 MB，
+ * 保证「填什么、到哪都显示什么」。
+ */
+export function sizeText(mb: number): string {
+  if (!Number.isFinite(mb)) return "—";
+  if (mb >= MB_PER_GB && mb % GB_ALIGN_MB === 0) return `${mb / MB_PER_GB}GB`;
+  return `${mb}MB`;
+}
+
+/** “≤200MB” / “≤2GB” 式体积提示（发布向导、附件上传的提示行共用） */
 export function mbText(mb: number): string {
-  return mb >= 1024 ? `≤${mb / 1024}GB` : `≤${mb}MB`;
+  return `≤${sizeText(mb)}`;
+}
+
+/** 体积输入单位：MB / GB。存储一律是整数 MB，单位只影响输入与展示 */
+export const SIZE_UNITS = ["MB", "GB"] as const;
+export type SizeUnit = (typeof SIZE_UNITS)[number];
+
+/** 表单值 + 单位 → 存储用的整数 MB（服务端 save 时仍会 clamp 一次） */
+export function toMb(value: number, unit: SizeUnit): number {
+  const n = Number.isFinite(value) ? value : 0;
+  return Math.round(unit === "GB" ? n * MB_PER_GB : n);
+}
+
+/**
+ * 存储值 → 表单的「数值 + 单位」，与 sizeText 用**同一条规则**，
+ * 保证输入框、概览卡、前台提示三处永远说的是同一个数。
+ */
+export function fromMb(mb: number): { value: number; unit: SizeUnit } {
+  if (Number.isFinite(mb) && mb >= MB_PER_GB && mb % GB_ALIGN_MB === 0) {
+    return { value: mb / MB_PER_GB, unit: "GB" };
+  }
+  return { value: Number.isFinite(mb) ? mb : 0, unit: "MB" };
 }

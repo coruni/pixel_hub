@@ -23,66 +23,53 @@ import {
   DEFAULT_ATTACH_EXTS,
   DEFAULT_IMAGE_FORMAT,
   DEFAULT_IMAGE_QUALITY,
+  MB_PER_GB,
   MB_RANGE,
   QUALITY_RANGE,
+  SIZE_UNITS,
+  fromMb,
+  sizeText,
+  toMb,
   type ImageOutputFormat,
+  type SizeUnit,
   type UploadLimits,
 } from "@/lib/upload-config";
 import { useAction } from "@/lib/hooks";
 import { confirmDialog } from "@/components/ui/feedback";
 import { resetUploadLimitsAction, saveUploadLimitsAction } from "@/lib/actions/uploads";
-import { BTN_DANGER_SM, BTN_PRIMARY_SM, INPUT_SM } from "@/lib/ui/cls";
+import { BTN_DANGER_SM, BTN_PRIMARY_SM, INPUT_SM, SELECT_SM } from "@/lib/ui/cls";
 import { Button } from "@/components/ui/Button";
 
-/** 数值字段规约：key / label / 范围（提交时服务端还会 clamp，这里仅辅助输入） */
-const NUM_FIELDS: {
-  key:
-    | "attachmentMaxMb"
-    | "galleryImageMaxMb"
-    | "commentImageMaxMb"
-    | "avatarMaxMb"
-    | "heroImageMaxMb";
-  label: string;
-  min: number;
-  max: number;
-  hint: string;
-}[] = [
-  {
-    key: "attachmentMaxMb",
-    label: "附件单文件上限（MB）",
-    min: 1,
-    max: MB_RANGE.attachment.max,
-    hint: "zip/rar/PDF/音视频等站内附件。启用 OneDrive 时使用分片上传，最大支持 250GB；其他存储仍受自身限制。",
-  },
+/** 图片类体积字段：档位只有 1–100MB，用 MB 输入即自然，不配单位选择 */
+type ImageMbKey = "galleryImageMaxMb" | "commentImageMaxMb" | "avatarMaxMb" | "heroImageMaxMb";
+/** 概览卡覆盖的全部体积字段（含附件） */
+type MbKey = "attachmentMaxMb" | ImageMbKey;
+
+const IMAGE_MB_FIELDS: { key: ImageMbKey; label: string; hint: string }[] = [
   {
     key: "galleryImageMaxMb",
     label: "图集 / 原图单张（MB）",
-    min: 1,
-    max: 100,
     hint: "预览图、图包封面、详情原图，以及后台媒体库管理员直传共用此档。",
   },
   {
     key: "commentImageMaxMb",
     label: "评论附图单张（MB）",
-    min: 1,
-    max: 100,
     hint: "评论里附带图片（服务端会按下方压缩配置输出，此限在原图字节上判定）。",
   },
   {
     key: "avatarMaxMb",
     label: "头像（MB）",
-    min: 1,
-    max: 100,
     hint: "设置页上传头像的单张上限（裁剪产物通常远小于此）。",
   },
   {
     key: "heroImageMaxMb",
     label: "主页横幅（MB）",
-    min: 1,
-    max: 100,
     hint: "个人主页顶部 16:5 横幅（导出 1600×500）的单张上限。横幅比头像宽得多，建议单独放宽。",
   },
 ];
+
+const ATTACH_HINT =
+  "zip/rar/PDF/音视频等站内附件。启用 OneDrive 时使用分片上传，上限可开到 250GB；其他存储驱动仍受各自限制。";
 
 /** 图片数量限制字段：key / label / 范围（张）；**省略 max = 无上界**（图集张数已去掉 60 张天花板） */
 const COUNT_FIELDS: {
@@ -107,15 +94,13 @@ const COUNT_FIELDS: {
   },
 ];
 
-const OVERVIEW_FIELDS = [
+const OVERVIEW_FIELDS: { key: MbKey; label: string; note: string; Icon: typeof FileUp }[] = [
   { key: "attachmentMaxMb", label: "附件", note: "单文件上限", Icon: FileUp },
   { key: "galleryImageMaxMb", label: "图集 / 原图", note: "单张上限", Icon: ImageIcon },
   { key: "commentImageMaxMb", label: "评论附图", note: "单张上限", Icon: MessageCircle },
   { key: "avatarMaxMb", label: "头像", note: "单张上限", Icon: UserRound },
   { key: "heroImageMaxMb", label: "主页横幅", note: "单张上限", Icon: PanelTop },
-] as const;
-
-const IMAGE_FIELDS = NUM_FIELDS.filter((field) => field.key !== "attachmentMaxMb");
+];
 
 /** 压缩输出格式选项：value / 展示名 / 一句话说明（透明通道差异必须写明，避免选错格式丢透明） */
 const FORMAT_OPTIONS: { value: ImageOutputFormat; label: string; note: string }[] = [
@@ -130,13 +115,10 @@ const FORMAT_QUALITY_HINT: Record<ImageOutputFormat, string> = {
   png: "png 走调色板量化，推荐 70–90；设为 100 时改为无损压缩（体积最大）。透明通道保留。",
 };
 
-const limitText = (mb: number) => {
-  if (!Number.isFinite(mb)) return "—";
-  return mb >= 1024 ? `${mb / 1024}GB` : `${mb}MB`;
-};
-
 type Draft = {
-  attachmentMaxMb: string;
+  /** 附件上限的输入值；单位单独存，避免"以 GB 思维填 MB 数字" */
+  attachmentSize: string;
+  attachmentUnit: SizeUnit;
   attachmentExts: string;
   galleryImageMaxMb: string;
   commentImageMaxMb: string;
@@ -148,18 +130,22 @@ type Draft = {
   imageQuality: string;
 };
 
-const toDraft = (l: UploadLimits): Draft => ({
-  attachmentMaxMb: String(l.attachmentMaxMb),
-  attachmentExts: l.attachmentExts.join(" "),
-  galleryImageMaxMb: String(l.galleryImageMaxMb),
-  commentImageMaxMb: String(l.commentImageMaxMb),
-  avatarMaxMb: String(l.avatarMaxMb),
-  heroImageMaxMb: String(l.heroImageMaxMb),
-  galleryImageMaxCount: String(l.galleryImageMaxCount),
-  commentImageMaxCount: String(l.commentImageMaxCount),
-  imageFormat: l.imageFormat,
-  imageQuality: String(l.imageQuality),
-});
+const toDraft = (l: UploadLimits): Draft => {
+  const attach = fromMb(l.attachmentMaxMb);
+  return {
+    attachmentSize: String(attach.value),
+    attachmentUnit: attach.unit,
+    attachmentExts: l.attachmentExts.join(" "),
+    galleryImageMaxMb: String(l.galleryImageMaxMb),
+    commentImageMaxMb: String(l.commentImageMaxMb),
+    avatarMaxMb: String(l.avatarMaxMb),
+    heroImageMaxMb: String(l.heroImageMaxMb),
+    galleryImageMaxCount: String(l.galleryImageMaxCount),
+    commentImageMaxCount: String(l.commentImageMaxCount),
+    imageFormat: l.imageFormat,
+    imageQuality: String(l.imageQuality),
+  };
+};
 
 export default function UploadLimitsManager({ limits }: { limits: UploadLimits }) {
   const { run, pending } = useAction();
@@ -174,10 +160,49 @@ export default function UploadLimitsManager({ limits }: { limits: UploadLimits }
 
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft((d) => ({ ...d, [k]: v }));
 
+  // 附件上限：输入值 + 单位 → 整数 MB。存储口径始终是 MB，单位只影响输入与展示。
+  const attachRaw = draft.attachmentSize.trim();
+  const attachNum = attachRaw === "" ? NaN : Number(attachRaw);
+  const attachMb = toMb(attachNum, draft.attachmentUnit);
+  const attachBad =
+    attachRaw === "" ||
+    !Number.isFinite(attachNum) ||
+    attachMb < MB_RANGE.attachment.min ||
+    attachMb > MB_RANGE.attachment.max
+      ? `请输入 ${sizeText(MB_RANGE.attachment.min)} – ${sizeText(MB_RANGE.attachment.max)} 之间的上限`
+      : null;
+
+  /** 概览卡的取值：附件走折算后的 MB，图片档直接读草稿 */
+  const draftMb = (key: MbKey): number =>
+    key === "attachmentMaxMb" ? attachMb : Number(draft[key]);
+
+  /** 输入框的 min/max/step 随单位走；真正的合法性判定统一用折算后的 MB */
+  const attachBounds =
+    draft.attachmentUnit === "GB"
+      ? { min: 1, max: MB_RANGE.attachment.max / MB_PER_GB, step: 0.5 }
+      : { min: MB_RANGE.attachment.min, max: MB_RANGE.attachment.max, step: 1 };
+
+  /**
+   * 切换单位时把数值一起折算过去 —— 否则「200」从 MB 切到 GB 会被重新解读成 200GB。
+   * 非法输入只换单位不折算（不做无意义的换算，也不假装它是合法的）。
+   */
+  function changeUnit(unit: SizeUnit) {
+    setDraft((d) => {
+      if (attachBad) return { ...d, attachmentUnit: unit };
+      const mb = toMb(Number(d.attachmentSize), d.attachmentUnit);
+      return {
+        ...d,
+        attachmentUnit: unit,
+        // 4 位小数足够无损往返：误差 ≤ 0.00005GB = 0.0512MB，round 后必然回到同一个 MB
+        attachmentSize: unit === "GB" ? String(Number((mb / MB_PER_GB).toFixed(4))) : String(mb),
+      };
+    });
+  }
+
   function save() {
     void run(() =>
       saveUploadLimitsAction({
-        attachmentMaxMb: Number(draft.attachmentMaxMb),
+        attachmentMaxMb: attachMb,
         attachmentExts: draft.attachmentExts,
         galleryImageMaxMb: Number(draft.galleryImageMaxMb),
         commentImageMaxMb: Number(draft.commentImageMaxMb),
@@ -223,7 +248,7 @@ export default function UploadLimitsManager({ limits }: { limits: UploadLimits }
             <div className="min-w-0">
               <p className="truncate text-xs text-neutral-500">{label}</p>
               <p className="mt-0.5 text-base font-semibold tabular-nums text-neutral-900">
-                {limitText(Number(draft[key]))}
+                {sizeText(draftMb(key))}
               </p>
               <p className="text-[10px] text-neutral-400">{note}</p>
             </div>
@@ -247,7 +272,7 @@ export default function UploadLimitsManager({ limits }: { limits: UploadLimits }
             </div>
           </div>
           <div className="divide-y divide-brand-100">
-            {IMAGE_FIELDS.map((f) => (
+            {IMAGE_MB_FIELDS.map((f) => (
               <div
                 key={f.key}
                 className="grid gap-3 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_10rem] sm:items-start sm:px-5"
@@ -258,7 +283,7 @@ export default function UploadLimitsManager({ limits }: { limits: UploadLimits }
                       {f.label}
                     </label>
                     <span className="rounded-none bg-neutral-100 px-1.5 py-0.5 text-[10px] text-neutral-400">
-                      {f.min}–{f.max} MB
+                      {MB_RANGE.image.min}–{MB_RANGE.image.max} MB
                     </span>
                   </div>
                   <p className="mt-1 text-[11px] leading-4 text-neutral-400">{f.hint}</p>
@@ -267,8 +292,8 @@ export default function UploadLimitsManager({ limits }: { limits: UploadLimits }
                   id={`ul-${f.key}`}
                   type="number"
                   inputMode="numeric"
-                  min={f.min}
-                  max={f.max}
+                  min={MB_RANGE.image.min}
+                  max={MB_RANGE.image.max}
                   step={1}
                   value={draft[f.key]}
                   onChange={(e) => set(f.key, e.target.value)}
@@ -342,26 +367,54 @@ export default function UploadLimitsManager({ limits }: { limits: UploadLimits }
           <div className="space-y-5 p-4 sm:p-5">
             <div>
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <label
-                  className="text-xs font-medium text-neutral-700"
-                  htmlFor="ul-attachmentMaxMb"
-                >
-                  附件单文件上限（MB）
+                <label className="text-xs font-medium text-neutral-700" htmlFor="ul-attachmentSize">
+                  附件单文件上限
                 </label>
-                <span className="text-[10px] text-neutral-400">1MB–250GB</span>
+                <span className="text-[10px] text-neutral-400">
+                  {sizeText(MB_RANGE.attachment.min)}–{sizeText(MB_RANGE.attachment.max)}
+                </span>
               </div>
-              <input
-                id="ul-attachmentMaxMb"
-                type="number"
-                inputMode="numeric"
-                min={1}
-                max={MB_RANGE.attachment.max}
-                step={1}
-                value={draft.attachmentMaxMb}
-                onChange={(e) => set("attachmentMaxMb", e.target.value)}
-                className={`${INPUT_SM} mt-2 w-full text-right tabular-nums sm:text-left`}
-              />
-              <p className="mt-1 text-[11px] leading-4 text-neutral-400">{NUM_FIELDS[0].hint}</p>
+              <div className="mt-2 flex gap-2">
+                <input
+                  id="ul-attachmentSize"
+                  type="number"
+                  inputMode="decimal"
+                  step={attachBounds.step}
+                  min={attachBounds.min}
+                  max={attachBounds.max}
+                  value={draft.attachmentSize}
+                  onChange={(e) => set("attachmentSize", e.target.value)}
+                  aria-describedby="ul-attachmentSize-hint"
+                  className={`${INPUT_SM} min-w-0 flex-1 text-right tabular-nums sm:text-left`}
+                />
+                <select
+                  aria-label="附件上限单位"
+                  value={draft.attachmentUnit}
+                  onChange={(e) => changeUnit(e.target.value as SizeUnit)}
+                  className={`${SELECT_SM} shrink-0`}
+                >
+                  {SIZE_UNITS.map((u) => (
+                    <option key={u} value={u}>
+                      {u}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {attachBad ? (
+                <p id="ul-attachmentSize-hint" className="mt-1 text-[11px] leading-4 text-red-600">
+                  {attachBad}
+                </p>
+              ) : (
+                <p
+                  id="ul-attachmentSize-hint"
+                  className="mt-1 text-[11px] leading-4 text-neutral-400"
+                >
+                  {ATTACH_HINT}
+                  {draft.attachmentUnit === "GB" && (
+                    <span className="ml-1 tabular-nums text-neutral-500">当前 = {attachMb}MB</span>
+                  )}
+                </p>
+              )}
             </div>
 
             <div className="border-t border-brand-100 pt-5">
@@ -484,7 +537,7 @@ export default function UploadLimitsManager({ limits }: { limits: UploadLimits }
       <div className="flex flex-col gap-2.5 border-t border-brand-100 pt-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
         <Button
           type="button"
-          disabled={pending}
+          disabled={pending || !!attachBad}
           onClick={save}
           className={`${BTN_PRIMARY_SM} min-h-10 w-full justify-center px-4 sm:w-auto`}
         >

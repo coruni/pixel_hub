@@ -12,6 +12,12 @@
 - alpha：webp 锁 `alphaQuality:100`；png `quality<100` 用 `palette:true`、`=100` 无损；jpg 先 `flatten({background:"#ffffff"})`（否则透明变黑）。
 - 参数取自 `SiteSetting["uploadLimits"]`（后台 `/admin/uploads`）；缩略图质量 = 主图 − 8（下限 40）。落盘 key 扩展名必须与输出格式一致。
 
+## 上传体积的存储与展示（单位化）
+- **存储口径恒为整数 MB**（`attachmentMaxMb` 等），单位只活在输入层与展示层。
+- 展示**唯一落点** = `src/lib/upload-config.ts` 的 `sizeText(mb)`；前台再套 `mbText()` 加「≤」。**禁止任何地方再写 `mb/1024` 裸折算** —— 曾把 1500MB 渲成 `1.46484375GB`（"有零有整"）。
+- GB 只在 **`mb % 512 === 0`**（半 GB 对齐，`GB_ALIGN_MB`）时启用 → 1/1.5/2/2.5…GB 干净表达，1500/3000 这类除不尽的档位天然落回 MB。`fromMb()` 与 `sizeText()` 必须用**同一条规则**，否则输入框单位与概览卡会打架。
+- 后台附件上限 = 数值输入 + 单位下拉（draft 拆 `attachmentSize` + `attachmentUnit`）；换单位走 `changeUnit()` 无损折算（MB→GB 用 `.toFixed(4)`，误差 ≤0.0512MB，round 回来是同一个 MB）；非法输入时保存按钮必须 `disabled`。图片四档（1–100MB）不给单位选择。
+
 ## 附件 / 音视频上传（改动前必读）
 - 唯一上传按钮 = `src/components/upload/AttachmentUpload.tsx`；全站禁止再手写 `<label>`+`<input type=file>`。四态：可上传 / 拖拽悬停（`dragging`+`dropProps`）/ 上传中（`progress`）/ 已回执（`filled`）。
 - `accept` 按 kind 分派：MUSIC/VIDEO **必须**传 `avAcceptAttr(kind)`（否则合法文件选不中）。
@@ -92,14 +98,19 @@
 - **bash 的 `rm` 是坏 shim**，且缺 `head`/`ls`/`grep`/`tail`/`sleep`/`dirname`。查文件用 Read、搜内容用 Grep、批量文件操作用 node 一行脚本。
 - 后台长任务用 `run_in_background`（`(cmd &)` 会随工具退出被杀）；轮询用 node 循环发 `curl --noproxy '*'`。
 - 校验 runner 写 `%TEMP%`，用 `execFileSync(process.execPath, [...], {cwd, encoding:"utf8"})` 包 tsc/eslint 再打印。命令：`node node_modules/typescript/bin/tsc --noEmit`（零错误）、`node node_modules/eslint/bin/eslint.js src`。**存量 3 条 no-unused-vars warning**（`admin/media/page.tsx` 的 `enumParam`、`auth/PublishForm.tsx` 的 `draftCount`、`sidebar/SiteSidebar.tsx` 的 `authed`），别顺手改也别新增。
-- 无浏览器验证：skill `pixel-hub-verify`。
+- 无浏览器验证（**没有** `pixel-hub-verify` 这个 skill，别去找）：走两条路 —— ① **纯函数/纯逻辑**抽成 `prisma/_*.ts` + tsx 跑断言（含全区间遍历）；② **页面渲染**铸管理员 JWT cookie 后 dev server fetch，断言 HTML 里的标签/`value`/`selected`/文案。三者都用反证断言（旧字符串必须消失、非法态必须出现红字）。
 - **`npm` 在这个 bash shim 里不通**（`npm run build` 退 127）。改用 node 直调：`node node_modules/prisma/build/index.js generate`、`node node_modules/next/dist/bin/next build`（约 2.5 分钟，用 `run_in_background`）。
 - **构建不触库**：全站路由都是 `ƒ` 按需渲染，所以新增表没跑迁移也能 build 过；但**运行时**会 500。别拿「build 过了」当「迁移可以不做」的证据。
 - **校验响应体首字节（BOM 等）不能用 `fetch().text()`** —— WHATWG 规范下 `text()` 会剥掉 U+FEFF，断言 `charCodeAt(0)===0xFEFF` 必然假红灯。必须 `Buffer.from(await r.arrayBuffer())` 查原始字节（UTF-8 BOM = `EF BB BF`）。
 - **`next dev` 有目录级互斥锁**：同目录第二个实例会打印 `⨯ Another next dev server is already running`（含在跑实例的 PID/端口/日志路径）**并退出**。所以「探测某端口 ECONNRESET/超时」**不等于**没有实例 —— 先读 `.next/dev/logs/next-development.log` 或新实例日志再决定要不要重启。
 - 放在 `%TEMP%` 的验证脚本 **require 基于脚本目录解析**，取不到仓库依赖；用 `createRequire("E:/project/pixel_hub/package.json")` 再 require。
+- **DB 抖动时鉴权页是「静默重定向」**：`src/lib/auth.ts` 的 jwt 回调每次请求回查 DB 取 `role/trusted/passwordHash`；DB 不可达 → token 身份被清空 → `auth()` 得未登录态 → 受保护页 `redirect()`。SSR 表现 = **HTTP 200 + `<meta id="__next-page-redirect" http-equiv="refresh" content="1;url=/admin">`**（不是 307，也不是 500）。**别当权限 bug 追**；判据是同一 cookie 打 `/api/auth/session` 能不能拿到 `role`。
+- **Supabase 会话池 `connection_limit=5`**：dev server 长驻占满时 `PrismaClient` 首连必报 `Can't reach database server`，而**裸 TCP 9ms 就通**。校验脚本一律包一层退避重试（~8 次 × 1.2s 递增）再跑；别据此改连接串。
+- 铸管理员会话 cookie 做真机验证：`@auth/core/jwt` 的 `encode({ token: { id, username, role }, secret, salt: "authjs.session-token" })` —— `pw` 可省（服务端首次请求自行回查补上），**salt 必须是 cookie 名**。
+- **`useAction`（→ `useRouter`）的客户端组件不能 `renderToStaticMarkup`**（`invariant expected app router to be mounted`）→ 涉及 `useAction` 的后台表单只能走「铸 cookie + dev server fetch」，别浪费一轮写静态渲染探针。
+- 真机验证需临时改库时：读出**原始字符串** → 逐档改 → 抓页面断言 → **`finally` 无条件写回并复查与原值相等**（`getUploadLimits` 只有 `cache()` 请求内去重、无跨请求缓存，改完即时可见）。
 - HTTP 层验证脚本**别写进仓库**（放 `%TEMP%`），跑完连 admin cookie 一起删（cookie 是有效凭据，别留在磁盘上）。
-- 布局必须真机量测：`msedge.exe --headless=new --remote-debugging-port=<p> --user-data-dir=%TEMP%\x --no-proxy-server` + Node 内置 `WebSocket` 连 CDP，`Runtime.evaluate` 量 `getBoundingClientRect`。应用路由**不能**做探针（`src/app/_xxx` 不路由；根 layout 在 DB 不通时 500 且被 dev 遮罩替换）→ 改用 tsx `renderToStaticMarkup` + 内联 `.next/dev/static/chunks/*.css` + 本地 static server。
+- 布局必须真机量测：`msedge.exe --headless=new --remote-debugging-port=<p> --user-data-dir=%TEMP%\x --no-proxy-server` + Node 内置 `WebSocket` 连 CDP，`Runtime.evaluate` 量 `getBoundingClientRect`。应用路由**不能**做探针（`src/app/_xxx` 不路由；根 layout 在 DB 不通时 500 且被 dev 遮罩替换）→ 改用 tsx `renderToStaticMarkup` + 内联 `.next/dev/static/chunks/*.css` + 本地 static server（**仅限不含 `useAction` 的纯展示组件**，见上条）。
 
 ## 临时脚本纪律
 - 验证脚本一律 `_` 前缀放 `prisma/`，**用完立即删**；删未提交文件前先 `copyFileSync` 到 `%TEMP%`。
