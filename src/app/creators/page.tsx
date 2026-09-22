@@ -158,8 +158,8 @@ export default async function CreatorsPage({
           <div>
             <h2 className="text-lg font-semibold tracking-tight text-neutral-900">激励公示</h2>
             <p className="mt-1 text-sm text-neutral-500">
-              每期分成池的来源与去向：`收入 × 分成比例 = 池子`，按贡献分权重分给达标创作者。
-              逐人分配明细统一列在资金公示页 —— 同一个数字只在一处出现，才对得上账。
+              每期分成池的来源与去向：收入 × 分成比例 = 池子，再按贡献分权重分给达标创作者。
+              逐人分配明细在资金公示页。
             </p>
           </div>
           <Link
@@ -188,7 +188,7 @@ export default async function CreatorsPage({
                 </span>
                 {p.carryInFen > 0 && (
                   <span className="text-[11px] text-neutral-400">
-                    （含上期结转 {formatYuan(p.carryInFen)}，结转不参与分成）
+                    （含上期结转 {formatYuan(p.carryInFen)}）
                   </span>
                 )}
                 <span className="text-[11px] text-neutral-500">{counts.get(p.id) ?? 0} 人</span>
@@ -213,7 +213,7 @@ export default async function CreatorsPage({
 
       <p className="mt-6 text-xs text-neutral-500">
         激励结算不承诺固定金额：池子取决于当期实际到账收入，收入为 0 时池子为 0。
-        {cfg.coin.name} 是站内代币，可提现，也可用于打赏喜欢的作品；兑换比例与门槛见资金公示页。
+        {cfg.coin.name} 是站内代币，可提现，也可用于打赏喜欢的作品。
       </p>
     </div>
   );

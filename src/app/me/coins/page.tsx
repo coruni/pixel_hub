@@ -1,13 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { Info } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { getIncentive } from "@/lib/incentive";
 import { getCoinAccount, getCoinLedger } from "@/lib/coin";
 import { getTipsReceived, getTipsSent } from "@/lib/tip";
-import { coinReasonLabel, coinToFen } from "@/lib/points-config";
+import { coinReasonLabel } from "@/lib/points-config";
 import { formatCoin, formatYuan } from "@/lib/money";
 import { timeAgo } from "@/lib/format";
 import WithdrawForm from "@/components/coins/WithdrawForm";
@@ -50,9 +49,6 @@ export default async function MyCoinsPage() {
       },
     }),
   ]);
-
-  // 提现门槛折合多少钱（文案用）；比例来自配置，不写死
-  const minFen = coinToFen(cfg.withdraw.minCoin, cfg.coin.perYuan);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
@@ -115,9 +111,7 @@ export default async function MyCoinsPage() {
               frozen={account.frozen}
             />
             <p className="mt-2 text-[11px] leading-4 text-neutral-400">
-              提现门槛折合 {formatYuan(minFen)}
-              {cfg.withdraw.manualReview ? "；每笔均需人工审核" : ""}。
-              冻结中的代币不能用于打赏或再次提现。
+              冻结中的代币不能用于打赏，也不能再次提现。
             </p>
           </>
         ) : (
@@ -177,13 +171,6 @@ export default async function MyCoinsPage() {
       {/* 代币流水 */}
       <section className="mt-6">
         <h2 className="text-base font-medium text-neutral-900">代币流水</h2>
-        <div className="mt-1 flex items-start gap-1.5 text-xs text-neutral-500">
-          <Info size={13} className="mt-0.5 shrink-0" aria-hidden />
-          <span>
-            只有「激励结算入账」会新增代币（全站总量只由激励池创造）；
-            打赏是站内转账，转出与转入同额。
-          </span>
-        </div>
         {ledger.length === 0 ? (
           <div className="mt-3 grid place-items-center rounded-none border-2 border-dashed border-brand-300 py-12 text-sm text-neutral-500">
             还没有代币记录。每期激励结算确认后，按当期贡献分会自动入账。

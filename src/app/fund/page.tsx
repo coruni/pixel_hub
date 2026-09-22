@@ -148,8 +148,7 @@ export default async function FundPage({
         <section id="settlements" className="scroll-mt-20">
           <h2 className="text-sm font-semibold text-neutral-900">各期激励结算公示</h2>
           <p className="mt-0.5 text-xs text-neutral-500">
-            每期「收入 × 分成比例 = 池子」，再按当期贡献分分配。确认后金额与名次即锁定，
-            不提供任何编辑入口 —— 已公示的数字必须永远可复算。
+            每期「收入 × 分成比例 = 池子」，再按当期贡献分分配。确认后金额与名次即锁定。
           </p>
           <div className="mt-3">
             <SettlementList blocks={settlements} symbol={cfg.coin.symbol} />
@@ -197,7 +196,7 @@ export default async function FundPage({
                 </li>
               </ul>
               <p className="mt-3 text-[11px] leading-4 text-neutral-400">
-                每一项的实际支出都逐笔记在「成本」里。收入不足时，创作者结算会被偿付闸门暂缓，
+                每一项的实际支出都逐笔记在「成本」里。收入不足时，创作者结算会顺延到收入到账后再处理，
                 而不是靠压缩内容或加广告硬撑。
               </p>
             </div>
@@ -216,8 +215,7 @@ export default async function FundPage({
         </section>
 
         <p className="border border-brand-200 bg-surface px-3 py-3 text-[11px] leading-5 text-neutral-500">
-          本页只显示聚合数字，不显示任何人的个人余额、收款信息或密钥。
-          提现流水号仅显示后 4 位，便于本人核对到账。<br />
+          本页只显示聚合数字，不显示任何人的余额或收款信息；提现流水号仅显示后 4 位，便于本人核对到账。<br />
           代币不可购买、不可转让、不可赠送，只由激励池按当期贡献分创造；
           打赏是站内代币转账，全站代币总量不因此改变。
         </p>

@@ -43,7 +43,7 @@ export default function SettlementList({
             </span>
             {period.carryInFen > 0 && (
               <span className="text-[11px] text-neutral-500">
-                （含上期结转 {formatYuan(period.carryInFen)}，结转不参与分成）
+                （含上期结转 {formatYuan(period.carryInFen)}）
               </span>
             )}
             <span className="text-[11px] text-neutral-500">{payouts.length} 人</span>

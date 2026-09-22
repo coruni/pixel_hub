@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { Check, Info, Minus } from "lucide-react";
+import { Check, Minus } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { getIncentive } from "@/lib/incentive";
 import {
@@ -134,7 +134,7 @@ export default async function MyContributionPage() {
       <section className="mt-6">
         <h2 className="text-base font-medium text-neutral-900">等级阶梯</h2>
         <p className="mt-0.5 text-xs text-neutral-500">
-          门槛由站长配置。等级<strong className="font-medium">不含免审、不含任何功能特权</strong>
+          等级<strong className="font-medium">不含免审、不含任何功能特权</strong>
           —— 免审属于风控，只由人工授予，任何贡献分都换不到。
         </p>
         <div className="mt-3 overflow-hidden rounded-none border border-brand-200">
@@ -185,13 +185,9 @@ export default async function MyContributionPage() {
       {/* 贡献流水：标明每一项是否计入结算 */}
       <section className="mt-6">
         <h2 className="text-base font-medium text-neutral-900">贡献流水</h2>
-        <div className="mt-1 flex items-start gap-1.5 text-xs text-neutral-500">
-          <Info size={13} className="mt-0.5 shrink-0" aria-hidden />
-          <span>
-            「计入结算」= 该项贡献参与激励池分配。点赞、评论、关注默认不参与 —— 它们容易被自我循环刷出来，
-            只作荣誉展示。
-          </span>
-        </div>
+        <p className="mt-1 text-xs text-neutral-500">
+          「计入结算」的项参与激励池分配，「仅荣誉」只计等级与榜单。
+        </p>
         {logs.length === 0 ? (
           <div className="mt-3 grid place-items-center rounded-none border-2 border-dashed border-brand-300 py-12 text-sm text-neutral-500">
             还没有贡献记录。发布内容通过审核后就会开始计分。
@@ -233,7 +229,7 @@ export default async function MyContributionPage() {
         )}
         {enabledPeriods.length > 0 && (
           <p className="mt-2 text-xs text-neutral-500">
-            月榜/周榜按滚动窗口统计（近 30 / 7 天），与结算期的「自然月」口径不同。
+            月榜 / 周榜是滚动窗口（近 30 / 7 天），不是自然月。
           </p>
         )}
       </section>

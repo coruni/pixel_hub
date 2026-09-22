@@ -62,10 +62,13 @@ export default function WithdrawForm({
         <div className="min-w-0">
           <h2 className="text-sm font-semibold text-neutral-900">提现</h2>
           <p className="mt-1 text-xs leading-5 text-neutral-500">
-            门槛 {formatCoin(minCoin, symbol)}；{feeFen > 0 ? `手续费 ${formatYuan(feeFen)}；` : "免手续费；"}
-            {cooldownDays > 0 ? `两次申请至少间隔 ${cooldownDays} 天；` : ""}
-            提交后由站长线下打款，不是自动到账。折算比例 {perYuan} {symbol}/元，以提交时的比例为准。
+            提交后由站长线下打款，不是自动到账；申请期间这部分代币会冻结。
           </p>
+          <ul className="mt-1.5 space-y-0.5 text-[11px] text-neutral-500">
+            <li>· 门槛 {formatCoin(minCoin, symbol)}</li>
+            {feeFen > 0 && <li>· 手续费 {formatYuan(feeFen)}</li>}
+            {cooldownDays > 0 && <li>· 两次申请至少间隔 {cooldownDays} 天</li>}
+          </ul>
         </div>
       </div>
 

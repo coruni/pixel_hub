@@ -33,9 +33,8 @@ export default function PoolMeter({
         <div className="min-w-0">
           <h2 className="text-sm font-semibold text-neutral-900">资金池水位</h2>
           <p className="mt-1 text-xs leading-5 text-neutral-500">
-            站点账上的真钱是「可用资金」；创作者手上还没提现的代币折算成钱，是「代币负债」。
-            两条数字的相对位置就是这条水位。安全线以下，新结算才放行；越过安全线，
-            新结算会暂缓到收入到账后处理 —— 这是为了保住已发出的代币能真的兑付。
+            「可用资金」是站上的真钱；「代币负债」是创作者手上还没提现的代币折算成的钱。
+            越过安全线时，新结算会顺延到收入到账后再处理 —— 为了保住已发出的代币能真的兑付。
           </p>
         </div>
         <span
@@ -91,17 +90,15 @@ export default function PoolMeter({
           )}
         </div>
         <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px] text-neutral-500">
-          <span>
-            安全线 {safePct.toFixed(0)}%（安全水位 {((10000 - bufferPermille) / 100).toFixed(0)}% 可用）
-          </span>
+          <span>安全线 {safePct.toFixed(0)}%</span>
           <span>1 元 = {perYuan} 代币</span>
         </div>
       </div>
 
       {over && (
         <p className="mt-3 border border-red-300 bg-red-50 px-3 py-2 text-xs leading-5 text-red-700">
-          当前创作者代币负债已达可用资金的 {(ratio * 100).toFixed(1)}%，已超过安全线。
-          新结算会暂缓到收入到账后处理 —— 这是为了保护已发出的代币能真的兑付。
+          当前代币负债已达可用资金的 {(ratio * 100).toFixed(1)}%，超过安全线：
+          新结算顺延到收入到账后再处理。
         </p>
       )}
     </section>
