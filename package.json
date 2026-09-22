@@ -8,8 +8,6 @@
     "start": "next start",
     "lint": "eslint",
     "format": "prettier --write src prisma _test *.ts *.mjs",
-    "test:smoke": "node _test/smoke.mjs",
-    "test:admin-data": "node _test/admin-data.mjs",
     "test:incentive": "tsx _test/incentive-conserve.ts",
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
@@ -33,6 +31,7 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-markdown": "^10.1.0",
+    "redis": "^6.2.1",
     "sharp": "^0.35.4",
     "swiper": "^14.2.0",
     "zod": "^4.5.4"

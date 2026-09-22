@@ -1,7 +1,8 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { prisma } from "@/lib/db/prisma";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import { adminOnly, audit } from "@/lib/actions/_guards";
 import {
   DETAIL_TEMPLATE_IDS,
@@ -26,6 +27,10 @@ import {
 import { isContentType, type ContentType } from "@/lib/display";
 
 function themeRevalidate() {
+  // 主题已改为跨请求缓存（见 src/lib/site.ts 的 getTheme），revalidatePath 清不掉它 ——
+  // 必须按标签显式失效，否则会出现「后台改了主题、前台不变」。
+  // 本函数是主题写入的唯一出口（下面 8 处调用全覆盖），所以标签失效挂这一处即可。
+  revalidateTag(CACHE_TAGS.siteSetting, "max");
   // 前台动态页每次请求现读 DB；这里刷新路由缓存与后台自身
   revalidatePath("/admin/site");
   revalidatePath("/admin");

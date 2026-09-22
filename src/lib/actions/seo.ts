@@ -1,8 +1,9 @@
 "use server";
 
 // SEO 后台配置保存：仅管理员；SiteSetting(key="seo") 乐观锁写回，防后台并发互相覆盖。
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { prisma } from "@/lib/db/prisma";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import { adminOnly, audit } from "@/lib/actions/_guards";
 import { submitIndexNow } from "@/lib/indexnow";
 import {
@@ -40,6 +41,8 @@ export async function updateSeoConfigAction(
     if (!created || created.count !== 1) return CONFLICT;
   }
   await audit(admin.id, "EDIT_SEO", "SITE_SETTING", SEO_KEY);
+  // getSeoConfig 已改为跨请求缓存，必须按标签失效，否则后台改完前台仍是旧站名/描述
+  revalidateTag(CACHE_TAGS.siteSetting, "max");
   // metadata 全站动态读取；刷新首页路由缓存与后台自身（SEO 配置已并入 /admin/runtime）
   revalidatePath("/admin/runtime");
   revalidatePath("/");

@@ -76,7 +76,25 @@ const securityHeaders = [
   },
 ];
 
+// 服务端缓存后端（可选）：只有配置了 REDIS_URL 才注册 Redis cacheHandler。
+// 未配置时不注册任何东西 —— Next 走默认的进程内(50MB) + 磁盘缓存，行为与接入前完全一致。
+// 因此「启用 Redis」是一次纯环境变量变更，可随时回滚（删掉 REDIS_URL 重启即可）。
+//
+// 注意 cacheHandler（单数）服务的是 ISR 页面、路由处理器响应、next/image 优化结果
+// 与 unstable_cache 的数据；`use cache` 指令用的是 cacheHandlers（复数），本项目未使用。
+const redisUrl = (process.env.REDIS_URL ?? "").trim();
+// 多实例共享 Redis 时必须关掉进程内前置缓存：否则 A 实例 revalidate 后，
+// B 实例仍会拿自己内存里的旧条目继续发旧内容。单实例部署可设 CACHE_KEEP_MEMORY=1 保留内存缓存。
+const keepMemoryCache = process.env.CACHE_KEEP_MEMORY === "1";
+const cacheBackend: Pick<NextConfig, "cacheHandler" | "cacheMaxMemorySize"> = redisUrl
+  ? {
+      cacheHandler: "./cache-handler.js",
+      ...(keepMemoryCache ? {} : { cacheMaxMemorySize: 0 }),
+    }
+  : {};
+
 const nextConfig: NextConfig = {
+  ...cacheBackend,
   experimental: {
     // 图片直传走 Server Action，需要放宽默认 1MB 限制（multipart 还有额外开销）
     serverActions: {
