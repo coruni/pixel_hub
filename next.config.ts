@@ -79,6 +79,8 @@ const securityHeaders = [
 // 服务端缓存后端（可选）：只有配置了 REDIS_URL 才注册 Redis cacheHandler。
 // 未配置时不注册任何东西 —— Next 走默认的进程内(50MB) + 磁盘缓存，行为与接入前完全一致。
 // 因此「启用 Redis」是一次纯环境变量变更，可随时回滚（删掉 REDIS_URL 重启即可）。
+// 凭据支持 REDIS_URL 内嵌（redis://user:pass@host）或单独 REDIS_PASSWORD / REDIS_USERNAME，
+// 环境变量优先；细节见 cache-handler.js。
 //
 // 注意 cacheHandler（单数）服务的是 ISR 页面、路由处理器响应、next/image 优化结果
 // 与 unstable_cache 的数据；`use cache` 指令用的是 cacheHandlers（复数），本项目未使用。

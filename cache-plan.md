@@ -13,7 +13,8 @@
 | 现状 | **全站零服务端缓存**。每个请求都要重新查库；`revalidatePath` 有 143 处，但没有任何东西被缓存 |
 | 已落地 ① | **Redis 缓存后端**（`cache-handler.js` + 条件注册）。**未配置 `REDIS_URL` 时行为与接入前完全一致** |
 | 已落地 ② | **全局配置跨请求缓存**（SEO / 主题 / 运行配置三个读取器 + 标签失效）。**不依赖 Redis 也能生效** |
-| 待议 ③④ | 热内容数据缓存、页面缓存（后者需先解开顶层鉴权耦合） |
+| 已落地 ③ | **热内容数据缓存**（分类 / 热门标签 / 最新评论 / 全站统计 / 人气创作者）。范围比原计划**收窄**：5 个做了，6 个**明确不做**并写清原因（见 5.2） |
+| 待议 ④ | 页面缓存（需先解开顶层鉴权耦合） |
 | 需要你拍板 | Redis 部署形态（同机容器 / 托管）与实例数；以及第 ④ 批是否接受前端结构改动 |
 
 **最重要的一个发现**：全站之所以每页都动态渲染，直接原因是 `src/app/layout.tsx` 里调用了一次 `auth()`，而这个结果只用来给 `<PresencePing signedIn={boolean} />` 传一个布尔值；再加上 `Navbar` 自己也调 `auth()`。**要拿到真正的整页缓存，必须先解开这个耦合**（详见第 6 节）。
@@ -153,6 +154,16 @@ docker run -d --name pixelhub-redis --restart unless-stopped \
 # 2) 在 .env 里加一行
 REDIS_URL=redis://127.0.0.1:6379
 
+# 2b) Redis 有密码时（两种写法，环境变量优先）
+#   a) 内嵌（密码含 @ # / % 等字符必须先 percent-encode）
+REDIS_URL=redis://:你的密码@127.0.0.1:6379
+#   b) 独立环境变量（推荐，密码不用编码；ACL 用户再加 REDIS_USERNAME）
+REDIS_URL=redis://127.0.0.1:6379
+REDIS_PASSWORD=你的密码
+# REDIS_USERNAME=cacheuser     # 只有 ACL 用户才需要；默认 default
+
+# 托管 Redis 走 TLS：把 scheme 换成 rediss:// 即可，其余不变
+
 # 3) 重新构建并启动
 npm run build && npm run start
 ```
@@ -289,26 +300,60 @@ export const getRuntimeConfig = cache(async (): Promise<RuntimeConfig> => {
 
 ---
 
-## 5. 批次三：热内容数据缓存
+## 5. 批次三：热内容数据缓存（已落地，范围比原计划收窄）
 
-针对真正吃 DB 的读路径（`src/lib/queries.ts`，1353 行）：
+原计划列了 6 个候选。**逐个函数查完写入面和返回类型后，只落地了 5 个**——另外几个不是「先不做」，而是**现在做了就是错的**。这个收窄是本批最重要的结论。
 
-| 函数 | 现状 | 建议 |
-|---|---|---|
-| `getFeed`（:213） | 无缓存，列表主路径 | 加 `unstable_cache`，标签 `feed`，TTL 60～120s |
-| `getResourceDetail`（:336） | 已有 React `cache()`（请求内去重） | 升级为跨请求缓存，标签 `resource:<id>`，失效挂在资源编辑/审核/下架 |
-| `getRelated`（:571） | 无缓存 | 按资源 id 缓存，TTL 较长（相关推荐对时效不敏感） |
-| `getRecommendations`（:1027） | 无缓存 | 同上 |
-| `getCategories` / `getTopTags`（:321/:325） | 已有 React `cache()` | 跨请求缓存，标签挂分类/标签的增删改 |
-| 侧栏 widget（`src/components/sidebar/widgets/*`） | 每个 widget 独立查库 | 按 widget 类型 + 页面分组缓存，TTL 短 |
+### 5.1 落地清单
 
-**这一批必须逐个函数确认三件事**，否则就是「缓存了但没人负责失效」：
+| 函数 | 位置 | 失效方式 | 为什么安全 |
+|---|---|---|---|
+| `getCategories` | `queries.ts` | 标签 `categories` + TTL 600s | 写入面**可枚举**：运行时代码里只有 `actions/taxonomy.ts` 的 create/update/delete，三者都收口在 `revalidateAll()` |
+| `getTopTags` | `queries.ts` | 仅 TTL 60s | `tag.count` 每次上架/编辑都自增，写入点不可枚举；取 top N 时单条 ±1 不改排序 |
+| `getRecentComments` | `queries.ts` | 仅 TTL 60s | 评论写入点遍布前台；「最新评论」慢 1 分钟无感 |
+| `getHomeStats` | `home.ts` | 仅 TTL 300s | 写入点是**每一次浏览/下载**，按次失效物理上不可行；数字本身是「大概齐」 |
+| `getTopCreators` | `home.ts` | 仅 TTL 60s | 关注/贡献分/封禁写入点分散；⚠️ 见 5.4 的在线点滞后 |
 
-1. 写入点在哪（`revalidateTag` 挂上去）；
-2. 返回值是否可安全序列化（含 `Date` / `Buffer` / `Decimal` 的要先规整）；
-3. **是否夹带副作用**（如 4.4 的 `setS3Runtime`）。
+`getCategories` / `getTopTags` 保留原有 React `cache()` 作为**外层**，把 `unstable_cache` 放在**内层**——两层各管一件事：外层做同页请求内去重（Navbar + 侧栏 + 首页板块常常同页重复取），内层做跨请求缓存。
 
-`queries.ts` 已到 1353 行、远超 `AGENTS.md` 的 800 行硬上限。**建议借这一批顺手按领域拆分**（如 `queries/feed.ts`、`queries/resource.ts`），而不是继续往里加缓存包装。
+写入侧只有一处改动：`actions/taxonomy.ts` 的 `revalidateAll()` 里加 `revalidateTag(CACHE_TAGS.categories, "max")`。它对分类/标签动作**统一失效同一组标签**，不细分——后台 taxonomy 是人手动点的、频率极低，多失效一次可忽略，漏失效一次就是线上可见的错误（后台建了分类、前台导航没有）。
+
+### 5.2 明确**不**缓存，以及原因（这不是漏做）
+
+| 函数 | 卡在哪 |
+|---|---|
+| `getFeed` | 第 223 行 `viewerAuthed()` **读 cookies**。塞进 `unstable_cache` 会把「游客的 SFW 结果」当成「所有人的结果」复用 = **把 NSFW 漏给游客**，踩 D9 红线。另外 `searchRuntime()` 让 where 依赖运行时配置，键也覆盖不了 |
+| `getRandomResourceIds` | 同上 cookie 问题；且函数体里有 `Math.random()`，缓存等于把「每次刷新换一批」的产品行为杀掉 |
+| `getResourceDetail` | `viewerId` 进缓存键（键空间随用户数增长）；且要确认管理员可见非 PUBLISHED 资源时不会越权 |
+| `getRecommendations` | 个性化，本质按用户分片；explore 模式还带 `noStore()` |
+| `getTagsBySlugs` | 入参是任意 slug 数组 → 进缓存键 → 键空间无界。只有 1 个调用方，不值得做键归一化 |
+| `getHomeSections` | 只有 1 个调用方、查询极廉价；且与 `ensureHomeSections()` 的「空表落默认」路径有交互，收益不抵复杂度 |
+
+这些函数在源码里都写了注释说明**为什么没有缓存**，避免以后被当成遗漏而「顺手补上」。其中 `getFeed` / `getRandomResourceIds` 必须先解耦 `viewerAuthed()`（把 NSFW 判定上提到调用层）才谈得上缓存——**这正是第 6 节路线 A 要做的事**。
+
+### 5.3 逐个函数确认的三件事（原计划要求）
+
+1. **写入点**：见 5.1。可枚举的挂标签，不可枚举的只靠 TTL，且把「为什么只用 TTL」写进 `cache-tags.ts` 的常量注释里。
+2. **可序列化**：`unstable_cache` 会在交给缓存后端**之前**先 `JSON.stringify` 结果（`node_modules/next/dist/server/web/spec-extension/unstable-cache.js` 的 `cacheNewResult`，第 24 行 `body: JSON.stringify(result)`）。**所以 `Date` 变 ISO 字符串是 Next 自身行为，与是否接 Redis 无关。** 本批唯一受影响的是 `getRecentComments` 的 `createdAt` / `author.lastSeenAt`；消费方 `timeAgo()`（`format.ts:9`）与 `isOnline()`（`online.ts:6`）都已是 `Date | string` 签名，安全。已在源码注释里标注「以后新增消费方不能再假定拿到 Date」。
+3. **副作用**：本批 5 个函数都不带副作用（4.4 的 `setS3Runtime` 陷阱只在 `getRuntimeConfig` 上）。`getTopCreators` 里的 `online: isOnline(...)` 是**计算值而非副作用**，但会被冻结——见 5.4。
+
+### 5.4 ⚠️ 两个必须知道的运行时事实（已实测，非推断）
+
+**事实 1：`revalidatePath` 会连带清掉 `unstable_cache` 条目。**
+实测：改库插入一个新分类 → `/browse` 不显示（说明缓存生效）；调 `revalidatePath("/browse")` → 立刻显示。
+含义：仓库里已有的 143 处 `revalidatePath` 会顺带失效相关的 `unstable_cache` 条目。
+- **好消息**：不会出现「`revalidatePath` 该刷新却没刷新」的脏数据。
+- **代价**：`getCategories` 的缓存命中率会低于预期（每次 `revalidatePath("/")` 或 `/browse` 后，下一次该路由渲染会重查一次分类）。这是「正确性优先于命中率」的合理取舍，但**不要按 100% 命中来估算收益**。
+
+**事实 2：缓存条目是「全站一份」，但失效判定按当前路由的 soft tag。**
+`getCategories` 的键是 `函数源码 + ["categories"]`，与路由无关，所以全站共用一条。实测中 `/browse` 重取后，`/` 也立刻看到新数据（因为读到的是同一条已被刷新的条目）。
+含义：某条路由的 `revalidatePath` 只让**该路由**的下一次读取判定为 stale；stale 读取会**先返回旧值、后台刷新**（stale-while-revalidate），因此同一秒内的两次请求可能一个新一个旧。**这是预期行为，不是 bug**——实测 `b8`（stale，旧标签集）→ `b9`（刷新后，新标签集）正是这个序列。
+
+### 5.5 本批的诚实边界
+
+- 只验证了「`getCategories`（带标签）」和「`getTopTags`（纯 TTL）」两条代表性路径，覆盖了两种失效策略；其余 3 个函数用的是同一种包装，未逐个单独观测。
+- **没有**用真实管理员会话走完「后台点保存 → 前台立刻变」的完整链路（需要 admin 登录态）。已确认的是：`revalidateTag` 这一 Next 原语在本仓库真实生效（实测），且 `revalidateAll()` 是三个分类动作的唯一收口点（源码可查）。
+- `queries.ts` 现在约 1415 行，**远超 `AGENTS.md` 的 800 行硬上限**（本批之前就已超标，本批又加了注释）。**建议下一批优先按领域拆分**（`queries/feed.ts`、`queries/resource.ts`、`queries/taxonomy.ts`），而不是继续往里加缓存包装。
 
 ---
 
@@ -399,7 +444,7 @@ export const getRuntimeConfig = cache(async (): Promise<RuntimeConfig> => {
 2. **实例数**：短期是否仍为单实例？若长期单实例，批次二、三可以直接用 Next 默认的磁盘缓存先吃到收益，**Redis 可以推迟**——需要你确认是否仍要现在引入。
 3. **长期路线**：走「C（数据缓存）→ A（前端化会话态）」，还是直接投入「B（Cache Components + PPR）」？这两条路**不要都做**（第 6.3 节）。
 4. **兜底 TTL**：批次二已按 300s 落地（`CONFIG_CACHE_REVALIDATE_SECONDS`）。要更保守就调小、更省库就调大——只改这一个常量。
-5. **是否继续做批次三**（热内容数据缓存）？它收益更大，但涉及 `queries.ts` 里多个函数逐个确认写入点与副作用，工作量明显高于批次二。
+5. ~~是否继续做批次三（热内容数据缓存）？~~ **已落地**（见第 5 节）。下一步的岔路是：**先按领域拆分 `queries.ts`**（纯重构、零行为变化、给批次四腾出可读性），还是**直接进批次四**（页面缓存，要动前端结构）？建议**先拆分**——批次四要改的正是 `getFeed` 那条链路，在 1400 行的文件里动鉴权耦合风险偏高。
 
 ---
 

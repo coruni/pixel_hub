@@ -2,6 +2,8 @@
 // 板块目录与 config 校验见 home-config.ts。
 import { prisma } from "@/lib/db/prisma";
 import { isOnline } from "@/lib/online";
+import { unstable_cache } from "next/cache";
+import { HOT_CACHE_REVALIDATE_SECONDS, STATS_CACHE_REVALIDATE_SECONDS } from "@/lib/cache-tags";
 import {
   DEFAULT_SECTIONS,
   HOME_SECTION_KINDS,
@@ -102,22 +104,36 @@ export function toView(r: {
 
 export type HomeStats = { resources: number; users: number; downloads: number; views: number };
 
-export async function getHomeStats(): Promise<HomeStats> {
-  const [resources, users, agg] = await Promise.all([
-    prisma.resource.count({ where: { status: "PUBLISHED" } }),
-    prisma.user.count({ where: { bannedAt: null } }),
-    prisma.resource.aggregate({
-      where: { status: "PUBLISHED" },
-      _sum: { downloadCount: true, viewCount: true },
-    }),
-  ]);
-  return {
-    resources,
-    users,
-    downloads: agg._sum.downloadCount ?? 0,
-    views: agg._sum.viewCount ?? 0,
-  };
-}
+/**
+ * 全站统计数字（首页 stats 板块 + 侧栏 stats 组件共用）。
+ *
+ * 三个查询里 `resource.aggregate` 要扫全部已上架资源行，是全站最贵的聚合之一，
+ * 而它挂在首页和侧栏上 —— 缓存收益最大的一处。
+ *
+ * 失效策略：**只靠 TTL，不挂标签**。写入点是每一次浏览/下载（viewCount、downloadCount），
+ * 按次失效在物理上不可行。首页这几个数字本身是「大概齐」的社会证明，5 分钟滞后无感。
+ * 理由详见 cache-tags.ts 的 STATS_CACHE_REVALIDATE_SECONDS。
+ */
+export const getHomeStats = unstable_cache(
+  async (): Promise<HomeStats> => {
+    const [resources, users, agg] = await Promise.all([
+      prisma.resource.count({ where: { status: "PUBLISHED" } }),
+      prisma.user.count({ where: { bannedAt: null } }),
+      prisma.resource.aggregate({
+        where: { status: "PUBLISHED" },
+        _sum: { downloadCount: true, viewCount: true },
+      }),
+    ]);
+    return {
+      resources,
+      users,
+      downloads: agg._sum.downloadCount ?? 0,
+      views: agg._sum.viewCount ?? 0,
+    };
+  },
+  ["home-stats"],
+  { revalidate: STATS_CACHE_REVALIDATE_SECONDS },
+);
 
 /** 分类 id → 已上架资源数 */
 export async function getPublishedCountByCategory(): Promise<Map<string, number>> {
@@ -157,8 +173,17 @@ export type CreatorRow = {
  *   - followers + week/month → 按**近期新增关注数**排（「最近谁最受关注」），而非累计粉丝数
  *   - points + week/month    → 按滚动窗口内的贡献分排（与 /creators 月榜/周榜同一口径）
  * 已封禁用户在任何路径下都不上榜。
+ *
+ * 【缓存取舍】下面 `queryTopCreators` 是真实查询，`getTopCreators` 只是它的跨请求缓存包装。
+ * 只用 TTL 不用标签：关注、贡献分、封禁的写入点散落在各业务流里，无法枚举。
+ *
+ * ⚠️ **已知滞后**：`online` 字段在**缓存写入那一刻**算好并冻结，因此在线点最多滞后
+ * `HOT_CACHE_REVALIDATE_SECONDS`（60 秒）。因为在线判定本就是 5 分钟窗口
+ * （见 online.ts 的 `ONLINE_WINDOW_MS`），60 秒在同一量级内，不改变语义。
+ * 如果以后要求在线点必须实时，应当把它从返回值里拆出去、由客户端心跳单独更新，
+ * 而不是把整个榜单的缓存去掉。
  */
-export async function getTopCreators(
+async function queryTopCreators(
   limit: number,
   sort: CreatorSort = "followers",
   period: RankPeriod = "all",
@@ -247,6 +272,16 @@ export async function getTopCreators(
   }
   return out;
 }
+
+/**
+ * 首页 creators 板块与侧栏 creators 组件共用的取数（跨请求缓存，TTL 见上）。
+ *
+ * 拆成「真实查询 + 缓存包装」而不是把 `unstable_cache` 内联，是为了让上面那段
+ * 排序口径的说明贴在**真正的查询**上，避免以后有人改了包装层却以为改的是查询。
+ */
+export const getTopCreators = unstable_cache(queryTopCreators, ["top-creators"], {
+  revalidate: HOT_CACHE_REVALIDATE_SECONDS,
+});
 
 /** 供 hero 后台挑选时补全标题等展示信息 */
 export async function getResourcePickMeta(

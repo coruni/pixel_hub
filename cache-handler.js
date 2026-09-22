@@ -10,6 +10,11 @@
  * 注册方式（见 next.config.ts）：仅在配置了 REDIS_URL 时才注册本文件。
  * 未配置时 Next 走默认的进程内 + 磁盘缓存，行为与接入前完全一致。
  *
+ * 凭据：两种写法二选一，环境变量优先 ——
+ *   REDIS_URL=redis://user:pass@host:6379        （密码需 percent-encode）
+ *   REDIS_URL=redis://host:6379 + REDIS_PASSWORD=xxx（可选 REDIS_USERNAME，ACL 用户）
+ * 托管 Redis 走 TLS 用 rediss:// 即可，客户端按协议自动启用。
+ *
  * 注意与 `cacheHandlers`（复数）区分：
  *   - 本文件对应 `cacheHandler`（单数）→ 服务 ISR / 路由 / 图片 / unstable_cache
  *   - `cacheHandlers`（复数）只服务 `'use cache'` 指令，需要开 cacheComponents
@@ -18,6 +23,10 @@
  * 降级策略（与仓库既有 rate-limit / register-code 同款约定）：
  *   Redis 不可用时透明回退进程内 Map，缓存自身不成为故障点；回退期间各实例缓存不共享。
  */
+// 本文件必须保持 CommonJS：Next 的 cacheHandler 加载器用 require() 读取它，
+// 并要求以 module.exports 暴露 get/set/revalidateTag/resetRequestCache。
+// 改成 ESM `import` 会导致缓存后端直接加载失败（静默退回默认缓存，很难查）。
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const { createClient } = require("redis");
 
 /** 键前缀：避免与同一 Redis 上的其他业务键撞名 */
@@ -70,6 +79,36 @@ let client = null;
 let connectPromise = null;
 let warned = false;
 
+/**
+ * 把连接串里的 userinfo（`redis://user:pass@host`）摘出来，返回去掉凭据的 URL。
+ *
+ * 为什么不能直接 `createClient({ url, password })`：`@redis/client` 的
+ * `parseOptions` 是 `Object.assign(options, parsedUrl)`，URL 解析结果会**覆盖**
+ * 显式传入的 password —— 两边都配时谁生效取决于库内部顺序，不可控。
+ * 这里统一摘出 userinfo 再走 username/password 选项，优先级固定为
+ * `REDIS_USERNAME` / `REDIS_PASSWORD` > URL 内嵌凭据。
+ */
+function splitCredentials(rawUrl) {
+  const m = /^([a-z+]+:\/\/)([^@/]*)@/i.exec(rawUrl);
+  if (!m) return { url: rawUrl, username: "", password: "" };
+  const colon = m[2].indexOf(":");
+  const rawUser = colon < 0 ? m[2] : m[2].slice(0, colon);
+  const rawPass = colon < 0 ? "" : m[2].slice(colon + 1);
+  // URL 里的凭据是 percent-encoded（node-redis 自己也是这么解的），密码带 @ # / 时必须编
+  const dec = (s) => {
+    try {
+      return decodeURIComponent(s);
+    } catch {
+      return s;
+    }
+  };
+  return {
+    url: rawUrl.slice(0, m[1].length) + rawUrl.slice(m[0].length),
+    username: dec(rawUser),
+    password: dec(rawPass),
+  };
+}
+
 /** 进程内降级存储（Redis 不可用期间使用） */
 const fallback = new Map();
 
@@ -94,7 +133,14 @@ async function getClient() {
   if (!connectPromise) {
     connectPromise = (async () => {
       try {
-        const c = createClient({ url });
+        const bare = splitCredentials(url);
+        const username = (process.env.REDIS_USERNAME || "").trim() || bare.username;
+        const password = (process.env.REDIS_PASSWORD || "").trim() || bare.password;
+        const c = createClient({
+          url: bare.url,
+          ...(username ? { username } : {}),
+          ...(password ? { password } : {}),
+        });
         // 必须挂 error 监听：未捕获的 error 事件会让 Node 进程直接退出
         c.on("error", warnOnce);
         await c.connect();
