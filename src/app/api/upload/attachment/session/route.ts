@@ -8,7 +8,7 @@ import {
   createDriveUploadSession,
   createDriveUploadTicket,
 } from "@/lib/storage/onedrive";
-import { MIB } from "@/lib/upload-config";
+import { GRAPH_CHUNK_BYTES } from "@/lib/upload-config";
 import { parseUploadKind, rejectFile, resolveUploadTarget } from "@/lib/av-upload";
 
 export const runtime = "nodejs";
@@ -109,7 +109,8 @@ export async function POST(req: NextRequest) {
       ticket,
       uploadUrl: upload.uploadUrl,
       expirationDateTime: upload.expirationDateTime,
-      chunkSize: 10 * MIB,
+      // 分片大小由服务端下发、客户端跟随；必须是 320 KiB 的整数倍且 < 60 MiB（Graph 硬约束）
+      chunkSize: GRAPH_CHUNK_BYTES,
     });
   } catch (e) {
     console.error("[upload-attachment-session]", e);

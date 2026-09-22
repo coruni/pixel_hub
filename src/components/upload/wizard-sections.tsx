@@ -101,7 +101,8 @@ function formatBytes(n: number): string {
 
 /**
  * 附件直传：OneDrive 走浏览器分片直传，其他存储回退既有 API。
- * `onProgress` 是【当前这个文件】的字节进度（0..100）：分片直传时按已完成分片累计；
+ * `onProgress` 是【当前这个文件】的字节进度（0..100）：分片直传时按已发送字节实时上报，
+ * 单调递增且传输中封顶 99，只有服务端确认后才给 100；
  * 回退到普通 API 的上传拿不到字节回调，只会在完成时收到一次 100。
  */
 async function postAttachment(

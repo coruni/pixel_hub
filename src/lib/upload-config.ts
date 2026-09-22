@@ -24,6 +24,41 @@ export const MIB = 1024 * 1024;
 /** OneDrive 单文件上限：250GiB，配置字段以 MiB 存储。 */
 export const MAX_ATTACHMENT_MB = 250 * 1024;
 
+// ---------- OneDrive Graph 分片参数（前后端共用，避免两处各写一个数） ----------
+
+/**
+ * Graph 对 upload session 分片的硬约束：每个 byte range 必须是 320 KiB 的整数倍。
+ * 不整除不会当场报错，而是**传完最后一片才失败**——大文件传到底才炸，排查成本极高，
+ * 所以分片大小一律经 snapChunkBytes 收口，不手写裸字节数。
+ */
+export const GRAPH_CHUNK_MULTIPLE = 320 * 1024;
+
+/** 分片上限：Graph 要求单请求体 < 60 MiB，取 40 MiB（= 128 × 320 KiB）留出余量 */
+export const GRAPH_CHUNK_MAX = 40 * MIB;
+
+/** 分片下限：5 MiB（= 16 × 320 KiB）。弱网下更小的分片重传成本更低 */
+export const GRAPH_CHUNK_MIN = 5 * MIB;
+
+/**
+ * 默认分片 40 MiB（= 128 × 320 KiB）。
+ * 取舍：分片越大往返次数越少（2GiB 从 205 片降到 52 片，10GiB 从 1024 片降到 256 片），
+ * 但单片失败要重传的字节也越多。官方文档在稳定高速链路下推荐 10 MiB；
+ * 若站点用户多在弱网，把它调回 10 * MIB 即可，客户端会原样跟随服务端下发的值。
+ */
+export const GRAPH_CHUNK_BYTES = 40 * MIB;
+
+/**
+ * 把任意字节数收敛到 [GRAPH_CHUNK_MIN, GRAPH_CHUNK_MAX] 内的 320 KiB 整数倍。
+ * 用于兜住服务端下发的（可能是旧版本或误配的）分片值——不合规的分片会让整次上传白跑。
+ */
+export function snapChunkBytes(bytes: unknown): number {
+  const n = typeof bytes === "number" && Number.isFinite(bytes) ? bytes : 0;
+  const steps = Math.floor(n / GRAPH_CHUNK_MULTIPLE);
+  const minSteps = GRAPH_CHUNK_MIN / GRAPH_CHUNK_MULTIPLE;
+  const maxSteps = GRAPH_CHUNK_MAX / GRAPH_CHUNK_MULTIPLE;
+  return Math.min(maxSteps, Math.max(minSteps, steps)) * GRAPH_CHUNK_MULTIPLE;
+}
+
 /** 附件后缀：≤200 项、每项 ^[a-z0-9]{1,10}$（全小写、不带点） */
 export const MAX_EXT_COUNT = 200;
 export const EXT_TOKEN_RE = /^[a-z0-9]{1,10}$/;
