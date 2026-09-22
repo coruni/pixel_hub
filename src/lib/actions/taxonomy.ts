@@ -3,21 +3,15 @@
 // 分类/标签管理（后台 taxonomy）：全部 ADMIN 守卫 + AuditLog（共享 _guards）。
 // 删除类动作单独立名（DELETE_CATEGORY / DELETE_TAG），不再混在 EDIT_* 里——
 // 否则日志页「编辑分类」同时混着新建/更新/删除，事后无法按动作筛出删除记录。
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db/prisma";
 import { slugify } from "@/lib/slug";
 import { translateToEnglish } from "@/lib/edge-translate";
-import { CACHE_TAGS } from "@/lib/cache-tags";
 import { adminOnly, audit } from "@/lib/actions/_guards";
 
 type Result = { ok: true } | { ok: false; error: string };
 
 function revalidateAll() {
-  // 分类列表现在有跨请求缓存（getCategories），改完必须显式失效，否则「后台建了分类、前台导航没有」。
-  // 这里对分类/标签动作统一失效同一组标签，不做细分：后台 taxonomy 动作是人手动点的、
-  // 频率极低，多失效一次的代价可以忽略，而漏失效一次就是线上可见的错误。
-  // revalidateTag 在 Next 16 必须传第二个参数（profile），"max" = 走 stale-while-revalidate。
-  revalidateTag(CACHE_TAGS.categories, "max");
   for (const p of ["/", "/browse", "/admin/categories", "/admin/tags"])
     revalidatePath(p);
 }

@@ -1,5 +1,4 @@
 import type { NextConfig } from "next";
-import path from "node:path";
 
 // 安全响应头（H1 修复：点击劫持 / MIME 嗅探 / SSL strip / XSS 兜底）。
 // 宽松档 CSP：保留 'unsafe-inline' 以兼容 themeInitScript / JSON-LD 内联脚本，
@@ -77,33 +76,7 @@ const securityHeaders = [
   },
 ];
 
-// 服务端缓存后端（可选）：只有配置了 REDIS_URL 才注册 Redis cacheHandler。
-// 未配置时不注册任何东西 —— Next 走默认的进程内(50MB) + 磁盘缓存，行为与接入前完全一致。
-// 因此「启用 Redis」是一次纯环境变量变更，可随时回滚（删掉 REDIS_URL 重启即可）。
-// 凭据支持 REDIS_URL 内嵌（redis://user:pass@host）或单独 REDIS_PASSWORD / REDIS_USERNAME，
-// 环境变量优先；细节见 cache-handler.js。
-//
-// 注意 cacheHandler（单数）服务的是 ISR 页面、路由处理器响应、next/image 优化结果
-// 与 unstable_cache 的数据；`use cache` 指令用的是 cacheHandlers（复数），本项目未使用。
-const redisUrl = (process.env.REDIS_URL ?? "").trim();
-// 多实例共享 Redis 时必须关掉进程内前置缓存：否则 A 实例 revalidate 后，
-// B 实例仍会拿自己内存里的旧条目继续发旧内容。单实例部署可设 CACHE_KEEP_MEMORY=1 保留内存缓存。
-const keepMemoryCache = process.env.CACHE_KEEP_MEMORY === "1";
-// 必须传绝对路径：Next 内部有两处解析，一处以**项目根目录**为基准（构建/导出期
-// createIncrementalCache，传的是 dir），另一处以 **distDir（.next）** 为基准
-// （运行时 next-server.js，传的是 this.distDir）。写相对路径会让两者指向不同位置：
-// 构建期恰好命中、运行时去找 /app/.next/cache-handler.js，启动即崩
-// ERR_MODULE_NOT_FOUND。绝对路径在两处都指向同一个文件，不受基准差异影响。
-const cacheHandlerPath = path.join(process.cwd(), "cache-handler.js");
-const cacheBackend: Pick<NextConfig, "cacheHandler" | "cacheMaxMemorySize"> = redisUrl
-  ? {
-      cacheHandler: cacheHandlerPath,
-      ...(keepMemoryCache ? {} : { cacheMaxMemorySize: 0 }),
-    }
-  : {};
-
 const nextConfig: NextConfig = {
-  ...cacheBackend,
   experimental: {
     // 图片直传走 Server Action，需要放宽默认 1MB 限制（multipart 还有额外开销）
     serverActions: {

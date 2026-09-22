@@ -30,9 +30,6 @@ ENV NODE_ENV=production
 COPY --from=build /app/.next ./.next
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
-# cache-handler.js：next.config.ts 以绝对路径注册，运行时由 next-server 动态 import，
-# 必须单独拷进运行镜像（构建期那一份留在 build 阶段，不会被 .next 带上）
-COPY --from=build /app/cache-handler.js ./cache-handler.js
 COPY --from=build /app/public ./public
 COPY --from=build /app/prisma ./prisma
 EXPOSE 3000

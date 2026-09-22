@@ -2,9 +2,8 @@
 
 // 站点运行配置保存：仅管理员；SiteSetting(key="site-runtime") 乐观锁写回，防后台并发互相覆盖。
 // 覆盖 GitHub OAuth / 存储驱动 / SMTP 邮件三类 .env 运营配置。
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db/prisma";
-import { CACHE_TAGS } from "@/lib/cache-tags";
 import { adminOnly, audit } from "@/lib/actions/_guards";
 import {
   RUNTIME_CONFIG_KEY,
@@ -48,9 +47,6 @@ export async function updateRuntimeConfigAction(
     if (!created || created.count !== 1) return CONFLICT;
   }
   await audit(admin.id, "EDIT_RUNTIME_CONFIG", "SITE_SETTING", RUNTIME_CONFIG_KEY);
-  // getRuntimeConfig 的纯读取层已跨请求缓存，必须按标签失效，
-  // 否则后台切了存储驱动 / 改了 GitHub 或 SMTP 配置，前台仍读旧值。
-  revalidateTag(CACHE_TAGS.siteSetting, "max");
   // 登录页（GitHub 按钮）、设置页（绑定入口）、云盘页（Graph 凭据卡）读此配置；刷新首页兜底
   revalidatePath("/admin/runtime");
   revalidatePath("/admin/drives");

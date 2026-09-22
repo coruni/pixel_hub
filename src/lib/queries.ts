@@ -4,12 +4,7 @@ import { isOnline } from "@/lib/online";
 import { auth } from "@/lib/auth";
 import { searchRuntime } from "@/lib/search";
 import { cache } from "react";
-import { unstable_cache, unstable_noStore as noStore } from "next/cache";
-import {
-  CACHE_TAGS,
-  CATEGORY_CACHE_REVALIDATE_SECONDS,
-  HOT_CACHE_REVALIDATE_SECONDS,
-} from "@/lib/cache-tags";
+import { unstable_noStore as noStore } from "next/cache";
 import type { Prisma, ResourceType } from "@prisma/client";
 
 export type FeedItem = {
@@ -215,16 +210,6 @@ async function viewerAuthed(): Promise<boolean> {
   }
 }
 
-/**
- * 内容流查询。
- *
- * 【为什么这里**没有**跨请求缓存 —— 不是漏了，是被两件事卡住】
- *   1. 第 223 行 `viewerAuthed()` 会读 cookies。把它塞进 `unstable_cache` 会让
- *      「游客的 SFW 结果」被当成「所有人的结果」复用，等于**把 NSFW 内容漏给游客**
- *      （D9 红线）。要缓存必须先把这个 cookie 依赖从查询里剥离出去。
- *   2. `searchRuntime()` 的参与让 where 依赖运行时搜索后端配置，缓存键无法覆盖。
- * 在 `viewerAuthed()` 解耦之前，getFeed 只能保持逐次查询。
- */
 export async function getFeed(
   params: FeedParams,
 ): Promise<{ items: FeedItem[]; page: number; hasMore: boolean }> {
@@ -332,35 +317,18 @@ export async function getFeed(
   return { items: rows.slice(0, pageSize).map(toFeedItem), page, hasMore };
 }
 
-// 两层缓存叠加，各管一件事：
-//   cache()          —— 请求内去重：Navbar 分类菜单、sidebar widget、首页 categories 板块
-//                       常在同一页重复取，这一层保证同页只读一次缓存。
-//   unstable_cache() —— 跨请求缓存：不同用户、不同请求之间不再回库。
-// 分类是后台低频写入数据，失效以 tags 为主（写入点见 actions/taxonomy.ts 的 revalidateAll）。
-export const getCategories = cache(
-  unstable_cache(
-    async () => prisma.category.findMany({ orderBy: [{ sort: "asc" }, { name: "asc" }] }),
-    ["categories"],
-    { tags: [CACHE_TAGS.categories], revalidate: CATEGORY_CACHE_REVALIDATE_SECONDS },
-  ),
-);
+// 请求内去重：Navbar 分类菜单、sidebar widget、首页 categories 板块常在同页重复取
+export const getCategories = cache(async () => {
+  return prisma.category.findMany({ orderBy: [{ sort: "asc" }, { name: "asc" }] });
+});
 
-// 刻意只用 TTL、不挂标签：tag.count 在每次资源上架/编辑时自增，写入点散布且不可枚举，
-// 漏挂一处就是永久脏数据。取 top N 时单条 ±1 几乎不改变排序，60 秒滞后用户不可感知。
-// 理由详见 cache-tags.ts 的 HOT_CACHE_REVALIDATE_SECONDS。
-export const getTopTags = cache(
-  unstable_cache(
-    async (limit = 24) => {
-      return prisma.tag.findMany({
-        orderBy: { count: "desc" },
-        take: limit,
-        select: { slug: true, name: true, count: true },
-      });
-    },
-    ["top-tags"],
-    { revalidate: HOT_CACHE_REVALIDATE_SECONDS },
-  ),
-);
+export const getTopTags = cache(async (limit = 24) => {
+  return prisma.tag.findMany({
+    orderBy: { count: "desc" },
+    take: limit,
+    select: { slug: true, name: true, count: true },
+  });
+});
 
 export type ResourceDetail = Awaited<ReturnType<typeof getResourceDetail>>;
 
@@ -1349,14 +1317,7 @@ export async function getNotifications(
 
 // ---------- 侧边栏组件取数（SiteSidebar widgets 共用） ----------
 
-/**
- * 按 slug 列表取标签（保持传入顺序；不存在的 slug 忽略）。
- *
- * 【为什么没有跨请求缓存】入参是**任意 slug 数组**，会进入缓存键
- * （unstable_cache 用 `JSON.stringify(args)` 拼键），等于把调用方能构造出的
- * 所有组合都变成一条常驻缓存记录 —— 键空间无界，属于典型的「缓存反被缓存打」。
- * 只有 1 个调用方且数据量极小，不值得为此引入键归一化。
- */
+/** 按 slug 列表取标签（保持传入顺序；不存在的 slug 忽略） */
 export async function getTagsBySlugs(slugs: string[]) {
   const rows = await prisma.tag.findMany({
     where: { slug: { in: slugs } },
@@ -1366,44 +1327,23 @@ export async function getTagsBySlugs(slugs: string[]) {
   return slugs.flatMap((s) => (order.get(s) ? [order.get(s)!] : []));
 }
 
-/**
- * 最新公开评论（仅已上架资源；含作者与所属资源摘要）。
- *
- * 【序列化注意】`unstable_cache` 会在交给缓存后端之前先 `JSON.stringify` 结果
- * （见 next/dist/server/web/spec-extension/unstable-cache.js 的 cacheNewResult），
- * 因此 `createdAt` 与 `author.lastSeenAt` 这两个 `Date` 读回来会变成 ISO 字符串。
- * 这是 Next 自身的行为，与是否接了 Redis 无关。消费方 `timeAgo()` 与 `isOnline()`
- * 都已显式接受 `Date | string`，故此处安全；**但若以后新增消费方，不能再假定拿到的是 Date**。
- *
- * 只用 TTL 不用标签：评论写入点遍布前台（发评论、删评论、审核），无法枚举。
- */
-export const getRecentComments = unstable_cache(
-  async (limit: number) => {
-    return prisma.comment.findMany({
-      where: { status: "PUBLIC", resource: { status: "PUBLISHED" } },
-      orderBy: { createdAt: "desc" },
-      take: limit,
-      select: {
-        id: true,
-        content: true,
-        createdAt: true,
-        author: { select: { username: true, name: true, avatarKey: true, lastSeenAt: true } },
-        resource: { select: { slug: true, title: true } },
-      },
-    });
-  },
-  ["recent-comments"],
-  { revalidate: HOT_CACHE_REVALIDATE_SECONDS },
-);
+/** 最新公开评论（仅已上架资源；含作者与所属资源摘要） */
+export function getRecentComments(limit: number) {
+  return prisma.comment.findMany({
+    where: { status: "PUBLIC", resource: { status: "PUBLISHED" } },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+    select: {
+      id: true,
+      content: true,
+      createdAt: true,
+      author: { select: { username: true, name: true, avatarKey: true, lastSeenAt: true } },
+      resource: { select: { slug: true, title: true } },
+    },
+  });
+}
 
-/**
- * 随机「手气不错」id 池：轻量 id 池洗牌后精取（SQLite 无原生 random 排序；池子封顶 500）。
- *
- * 【为什么没有跨请求缓存】两个独立原因，任一都足以否掉：
- *   1. 与 getFeed 同样的 `viewerAuthed()` cookie 依赖 → 缓存会造成 NSFW 越权可见；
- *   2. 函数体里有 `Math.random()` 洗牌，缓存等于把「每次刷新换一批」这个**产品行为**杀掉。
- * 这两个问题都必须靠改调用方（把 NSFW 判定上提到调用层）才能解，不在缓存层解决。
- */
+/** 随机「手气不错」id 池：轻量 id 池洗牌后精取（SQLite 无原生 random 排序；池子封顶 500） */
 export async function getRandomResourceIds(count: number, includeNsfw?: boolean) {
   // D9：随机池对游客同样不含 NSFW（getFeed 二次精取还有兜底，池内提前滤更省）
   const allowNsfw = includeNsfw ?? (await viewerAuthed());
