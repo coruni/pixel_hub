@@ -1,17 +1,22 @@
 import Link from "next/link";
 import BlockShell from "@/components/home/BlockShell";
-import { getTopCreators } from "@/lib/home";
-import { formatCount } from "@/lib/format";
+import { getTopCreators, type CreatorSort } from "@/lib/home";
+import { creatorMetaText } from "@/lib/format";
+import type { RankPeriod } from "@/lib/points";
 import Avatar from "@/components/ui/Avatar";
 
 export default async function CreatorsBlock({
   title,
   count,
+  sort = "followers",
+  period = "all",
 }: {
   title: string | null;
   count: number;
+  sort?: CreatorSort;
+  period?: RankPeriod;
 }) {
-  const creators = await getTopCreators(count);
+  const creators = await getTopCreators(count, sort, period);
   if (creators.length === 0) return null;
 
   return (
@@ -35,7 +40,7 @@ export default async function CreatorsBlock({
                 {c.name ?? c.username}
               </span>
               <span className="block truncate text-[11px] text-neutral-400">
-                {c.resources} 作品 · {formatCount(c.followers)} 粉丝
+                {creatorMetaText(c.resources, c.metric, sort, period)}
               </span>
             </span>
           </Link>

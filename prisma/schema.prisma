@@ -66,6 +66,18 @@ model User {
   passwordResets PasswordResetToken[]
   uploads        Media[]       @relation("Uploads")
   drafts         ResourceDraft[] @relation("ResourceDrafts")
+  // ---- 创作者激励 ----
+  points          UserPoint?
+  pointLogs       PointLog[]
+  coinAccount     CoinAccount?
+  coinLedger      CoinLedger[]
+  withdrawals     WithdrawalRequest[]
+  payouts         IncentivePayout[]
+  tipsSent        TipRecord[]       @relation("TipFrom")
+  tipsReceived    TipRecord[]       @relation("TipTo")
+  downloadRecords DownloadRecord[]
+  // ---- 支付 ----
+  orders PaymentOrder[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -163,6 +175,8 @@ model Resource {
   likes        Like[]
   favorites    Favorite[]
   reports      Report[]       @relation("ReportResource") // 被举报目标
+  downloadRecords DownloadRecord[]
+  tips            TipRecord[]
 
   viewCount     Int @default(0)
   likeCount     Int @default(0)
@@ -538,4 +552,307 @@ model RegisterCode {
   code      String
   expiresAt DateTime
   attempts  Int      @default(0)
+}
+
+// ---------- 创作者激励（贡献分 / PIX / 结算 —— 见 creator-incentive-plan.md） ----------
+// 命名纪律：Contribution **贡献分**（荣誉层，只增不减）与 **PIX**（资产层，会因提现/打赏减少）
+// 是两套独立数字，任何一处混用都会让口径失效。连接点只有「每期结算 = 贡献分 → PIX 的单向兑换」。
+// 资金纪律：`LedgerEntry`（见 payment-plan.md）只记真钱进出；结算分配只抬升「PIX 负债」，不进那张表。
+
+/// 贡献分余额（荣誉层，物化；事实来源 PointLog，可随时重算对账）
+/// 注：**刻意没有 frozen 列** —— 「冻结计分」只认配置 `risk.frozenUserIds`
+/// （points-config.ts）。曾经同时存在「列」与「配置」两个来源，写侧读配置、读侧读列，
+/// 会把后台加的冻结名单静默失效。现在单一事实来源 = 配置。
+model UserPoint {
+  userId    String   @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  balance   Int      @default(0)
+  level     Int      @default(0) // 冗余等级，仅供排序（事实来源是 levelOf(balance)）
+  updatedAt DateTime @updatedAt
+
+  @@index([balance(sort: Desc)])
+  @@index([level])
+}
+
+/// 贡献分流水（事实来源）。口径「累计获得不回冲」：取消点赞不产生负向记录
+model PointLog {
+  id        String      @id @default(cuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  actorId   String? // 触发者（拦截自产自销）；不建关系：触发者可能已注销
+  reason    PointReason
+  delta     Int
+  refId     String? // 幂等键（语义见计划 §5）；ADMIN_ADJUST 用 null
+  balance   Int // 记账后余额快照，便于对账
+  note      String?
+  createdAt DateTime    @default(now())
+
+  @@unique([userId, reason, refId]) // 幂等闸门：同 reason + refId 只可能有一条
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([reason, createdAt])
+}
+
+/// PIX 账户（资产层）
+model CoinAccount {
+  userId            String   @id
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  balance           Int      @default(0) // 可用 PIX
+  frozen            Int      @default(0) // 提现申请中冻结
+  lifetimeEarned    Int      @default(0) // 累计获得（不因提现/打赏减少）
+  lifetimeWithdrawn Int      @default(0)
+  lifetimeTippedOut Int      @default(0) // 累计打赏出去
+  updatedAt         DateTime @updatedAt
+
+  @@index([balance(sort: Desc)])
+}
+
+/// PIX 流水（事实来源）
+model CoinLedger {
+  id        String     @id @default(cuid())
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  delta     Int // 正=入账，负=出账
+  kind      CoinReason
+  refType   String? // SETTLE_PERIOD | TIP | WITHDRAWAL | MANUAL
+  refId     String? // 幂等键
+  balance   Int // 记账后可用余额快照
+  note      String?
+  createdAt DateTime   @default(now())
+
+  @@unique([userId, kind, refId])
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+/// 打赏记录：一笔打赏 = 两条 CoinLedger（发出方 −N、接收方 +N），全站 Σ PIX 不变
+model TipRecord {
+  id         String    @id @default(cuid())
+  fromUserId String
+  fromUser   User      @relation("TipFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUserId   String
+  toUser     User      @relation("TipTo", fields: [toUserId], references: [id], onDelete: Cascade)
+  resourceId String?
+  resource   Resource? @relation(fields: [resourceId], references: [id], onDelete: SetNull)
+  coin       Int // PIX 数量
+  message    String? // 附言（≤60 字，过敏感词）
+  createdAt  DateTime  @default(now())
+
+  @@index([toUserId, createdAt(sort: Desc)])
+  @@index([fromUserId, createdAt(sort: Desc)])
+  @@index([resourceId])
+}
+
+/// 提现申请。accountInfo 为敏感字段：仅 adminOnly 可见，永不进日志/公示页
+model WithdrawalRequest {
+  id           String         @id @default(cuid())
+  userId       String
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  coinAmount   Int // 申请提现的 PIX
+  fiatFen      Int // 折算金额（分）—— 提交时快照
+  rateSnapshot Int // 提交时的兑换比例（PIX/元）
+  feeFen       Int            @default(0)
+  status       WithdrawStatus @default(PENDING)
+  method       String // alipay | wechat
+  accountInfo  String // 收款账号 + 姓名
+  note         String?
+  handledBy    String?
+  handledAt    DateTime?
+  rejectNote   String?
+  paidAt       DateTime?
+  payRef       String?
+  createdAt    DateTime       @default(now())
+
+  @@index([status, createdAt])
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+/// 下载记录：同时承担「下载量去重」与「计分去重」（写记录成功才计一次）
+model DownloadRecord {
+  id         String   @id @default(cuid())
+  resourceId String
+  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  subjectKey String // 登录 `u:<userId>`；匿名 `ip:<ipHash>`
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  ipHash     String // 加盐哈希，与 Visit.ipHash 同算法（src/lib/ip.ts）
+  periodKey  String // YYYY-MM
+  counted    Boolean  @default(true) // 是否通过当期计分闸门（排查用）
+  createdAt  DateTime @default(now())
+
+  @@unique([resourceId, subjectKey]) // 主体级去重：同一主体对同一作品只计一次
+  @@index([subjectKey, periodKey])
+  @@index([resourceId, periodKey])
+  @@index([periodKey])
+}
+
+/// 收入录入（纪律：仅在钱**已实际到账**后录入，否则偿付水位公式是假的）
+model RevenueEntry {
+  id         String   @id @default(cuid())
+  periodKey  String // 归属期 YYYY-MM
+  source     String // 联盟广告 / 站点赞助 / 其他
+  amountFen  Int
+  receivedAt DateTime
+  note       String?
+  createdBy  String
+  createdAt  DateTime @default(now())
+
+  @@index([periodKey])
+}
+
+/// 结算期（确认后金额与名次冻结为快照 —— 已公示的数字必须永远可复算）
+model IncentivePeriod {
+  id             String          @id @default(cuid())
+  periodKey      String          @unique
+  status         IncentiveStatus @default(DRAFT)
+  revenueFen     Int             @default(0)
+  ratePermille   Int             @default(0)
+  carryInFen     Int             @default(0) // 上期未发完的池余：**全额**回流，不再乘分成比例
+  poolFen        Int             @default(0)
+  totalScore     Int             @default(0)
+  paidFen        Int             @default(0)
+  carryOutFen    Int             @default(0)
+  configSnapshot String? // 确认时冻结配置：事后改配置不影响已确认期
+  confirmedAt    DateTime?
+  confirmedBy    String?
+  note           String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  payouts IncentivePayout[]
+}
+
+/// 结算明细（确认后锁定；公示与审计的唯一依据）
+model IncentivePayout {
+  id           String          @id @default(cuid())
+  periodId     String
+  period       IncentivePeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  score        Int
+  rank         Int
+  amountFen    Int
+  coin         Int // 折算 PIX（冻结值）
+  capped       Boolean         @default(false)
+  coinCredited Boolean         @default(false) // 防重复入账
+  createdAt    DateTime        @default(now())
+
+  @@unique([periodId, userId])
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+/// 贡献分／结算分的来源。新增值必须同步 `points-config.ts` 的文案表与默认分值
+enum PointReason {
+  PUBLISH
+  LIKE_RECEIVED
+  FAVORITE_RECEIVED
+  DOWNLOAD_RECEIVED
+  COMMENT_RECEIVED
+  FOLLOWER_GAINED
+  FEATURED
+  DAILY_LOGIN
+  ADMIN_ADJUST
+}
+
+/// PIX 流动方向。SETTLE 是唯一的新增来源（PIX 总量只由激励池创造，打赏只是搬运）
+enum CoinReason {
+  SETTLE
+  TIP_SENT
+  TIP_RECEIVED
+  WITHDRAW_FREEZE
+  WITHDRAW_PAID
+  WITHDRAW_REFUND
+  ADMIN_ADJUST
+}
+
+enum WithdrawStatus {
+  PENDING
+  APPROVED
+  PAID
+  REJECTED
+}
+
+enum IncentiveStatus {
+  DRAFT
+  CONFIRMED
+  PAID
+}
+
+// ---------- 支付（易支付 Epay）—— 见 payment-plan.md ----------
+// 命名纪律：本组模型**只记真钱进站**。创作者分成不进这里（那只是 PIX 负债上升，记在
+// IncentivePeriod / IncentivePayout）；打赏是站内 PIX 转账，**永不产生 PaymentOrder**。
+// 两件事混进一张表，账永远对不平（creator-incentive-plan.md §3.4 现金/负债分离表）。
+
+/// 支付订单（唯一事实来源；微信/支付宝侧只负责把状态推回来）
+model PaymentOrder {
+  id          String      @id @default(cuid())
+  outTradeNo  String      @unique // 发给易支付的商户订单号（cuid，不可预测 —— 防枚举、防伪造回调）
+  kind        OrderKind
+  userId      String? // 付款人；未登录赞助可为空
+  user        User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  amountFen   Int // 金额，单位：分（全链路整数，不出现浮点）
+  subject     String // 提交给易支付的商品名
+  periodKey   String? // 归属期 YYYY-MM（赞助计入哪一期激励池的收入）
+  status      OrderStatus @default(PENDING)
+  // 上游回执
+  epayTradeNo String?
+  payType     String? // alipay / wxpay
+  notifyRaw   String? // 回调原始 query（审计用；**落库前已剔除 key/sign**）
+  paidAt      DateTime?
+  refundedFen Int         @default(0)
+  // 展示与风控
+  message     String? // 赞助留言
+  anonymous   Boolean     @default(false)
+  displayName String? // 鸣谢墙展示名快照（匿名 = null）；用户名事后改了不重写历史
+  ipHash      String? // 加盐哈希（不存明文 IP），供刷单排查
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([status, createdAt])
+  @@index([kind, periodKey])
+  @@index([kind, status, paidAt]) // 鸣谢墙按「已支付 + 时间」取
+  @@index([userId])
+}
+
+/// 订单种类。QUOTA 属支付二期（需前置配额体系），一期只落 SPONSOR
+enum OrderKind {
+  SPONSOR // 站点赞助（覆盖成本 + 进激励池）
+  QUOTA // 容量扩容包
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  CLOSED // 超时未支付 / 用户放弃
+  REFUNDED
+}
+
+/// 收支台账：**只记真钱进出**（收入 / 成本 / 提现打款）。
+/// 结算分配（向创作者入账 PIX）**不进这张表** —— 它只抬升代币负债，钱还没出去。
+model LedgerEntry {
+  id        String     @id @default(cuid())
+  periodKey String // YYYY-MM
+  kind      LedgerKind
+  direction String // IN（收入） / OUT（支出）—— 由 LEDGER_KIND_META 派生，唯一写入口填
+  amountFen Int
+  note      String?
+  refType   String? // PAYMENT_ORDER | WITHDRAWAL | MANUAL
+  refId     String? // 关联单据 id；与 kind 组成幂等键（MANUAL 可留空，NULL 不参与唯一约束）
+  createdBy String?
+  createdAt DateTime   @default(now())
+
+  @@unique([kind, refId]) // 幂等：同一单据同一科目只可能有一条
+  @@index([periodKey, direction])
+  @@index([createdAt(sort: Desc)])
+}
+
+/// 台账科目。direction 由代码里的科目表派生，库里同步存一份供 SQL 聚合
+enum LedgerKind {
+  COST_SERVER // OUT
+  COST_STORAGE // OUT
+  COST_DOMAIN // OUT
+  COST_OTHER // OUT
+  INCOME_SPONSOR // IN
+  INCOME_AD // IN
+  INCOME_OTHER // IN
+  WITHDRAWAL_PAID // OUT，创作者提现打款（独立成组：它不是「运营成本」）
+  REFUND_SPONSOR // OUT，赞助原路退回（独立成组：它是「收入冲减」，不是成本）
 }

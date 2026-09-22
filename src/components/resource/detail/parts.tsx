@@ -13,6 +13,7 @@ import UserHoverCard from "@/components/ui/UserHoverCard";
 import Markdown from "@/components/rte/Markdown";
 import { FavoriteButton, LikeButton, FollowButton } from "@/components/social/interactions";
 import ReportButton from "@/components/social/ReportButton";
+import TipButton from "@/components/social/TipButton";
 import { VersionDownloadButton, VersionForm } from "@/components/resource/version";
 import { getUploadLimits } from "@/lib/upload-limits";
 
@@ -25,6 +26,11 @@ export type DetailCtx = {
   isStaff: boolean;
   myCollections?: { id: string; name: string }[];
   related?: import("@/lib/queries").FeedCard[];
+  /**
+   * 打赏参数（来自激励配置）。`undefined` = 打赏开关关闭或不适用（非已发布内容），
+   * 此时完全不出打赏入口 —— 不要渲染出一个点了没反应的按钮。
+   */
+  tip?: { minCoin: number; maxCoin: number; symbol: string; messageMax: number; presets: number[] };
 };
 
 /** 类型展示名：统一取 TYPE_LABEL，新增类型无需再改这里 */
@@ -163,6 +169,10 @@ export function ActionBar({ ctx }: { ctx: DetailCtx }) {
           </>
         )}
         {meId && !isAuthor && <ReportButton resourceId={detail.id} resourceTitle={detail.title} />}
+        {/* 打赏：与点赞/收藏同形态留在同一行（计划 §8）；作者不给自己打赏，未登录不给入口 */}
+        {authed && !isAuthor && ctx.tip && detail.status === "PUBLISHED" && (
+          <TipButton resourceId={detail.id} {...ctx.tip} />
+        )}
         {isAuthor && (
           <Link href={`/resources/${detail.slug}/edit`} className={ACTION_TEXT}>
             <Pencil size={15} aria-hidden /> 编辑

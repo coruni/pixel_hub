@@ -12,6 +12,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // 注意：/search 已并入 /browse 并由 next.config redirects 301 跳转，
     // sitemap 不得收录会跳转的 URL（Bing 会报 "URL redirects" 并浪费抓取配额）
     { url: `${base}/rules`, changeFrequency: "yearly", priority: 0.2 },
+    // 创作者榜：动态榜单页，日更；激励关闭时该页自带 noindex，这里的收录不会造成空页收录
+    { url: `${base}/creators`, changeFrequency: "daily", priority: 0.5 },
+    // 资金池与收支公示：公开透明页，内容随收支变化但非高频，按日更收录
+    { url: `${base}/fund`, changeFrequency: "daily", priority: 0.5 },
   ];
 
   // 已发布资源详情；未发布/下架的详情页不可收录

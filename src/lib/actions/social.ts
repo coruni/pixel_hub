@@ -1,6 +1,6 @@
 "use server";
 
-import { cookies, headers } from "next/headers";
+import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { Prisma } from "@prisma/client";
@@ -10,7 +10,10 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { parseMeta, metaHasDownload } from "@/lib/meta";
-import { clientIp, rateLimit } from "@/lib/rate-limit";
+import { rateLimit } from "@/lib/rate-limit";
+import { hashIp, ipFromHeaders } from "@/lib/ip";
+import { recordDownload } from "@/lib/download-record";
+import { awardPoints, interactionRefId } from "@/lib/points";
 import { notifyByEmail } from "@/lib/mail-notify";
 import { createNotification } from "@/lib/notify";
 import { audit } from "@/lib/actions/_guards";
@@ -121,7 +124,7 @@ export async function toggleLikeAction(resourceId: string): Promise<{ liked: boo
       });
       return true;
     });
-    if (liked)
+    if (liked) {
       await createNotification({
         userId: resource.authorId,
         actorId: user.id,
@@ -129,6 +132,16 @@ export async function toggleLikeAction(resourceId: string): Promise<{ liked: boo
         resourceId,
         coalesce: true, // 取消赞再点不重复提醒；同批多个赞聚合成一条「X 等 N 人」
       });
+      // 计分：只有「点上」才加，「取消赞」不回冲（口径=累计获得，见计划 §5）
+      after(() =>
+        awardPoints({
+          userId: resource.authorId,
+          actorId: user.id,
+          reason: "LIKE_RECEIVED",
+          refId: interactionRefId("like", user.id, resourceId),
+        }),
+      );
+    }
     return { liked };
   } catch (e) {
     // 并发双击：唯一键冲突 → 已是点赞态，幂等返回
@@ -156,7 +169,7 @@ export async function toggleFavoriteAction(resourceId: string): Promise<{ favori
   // 与 toggleLikeAction 一致：只能收藏已上架资源（防操纵未发布/已下架内容计数）
   const target = await prisma.resource.findFirst({
     where: { id: resourceId, status: "PUBLISHED" },
-    select: { id: true },
+    select: { id: true, authorId: true },
   });
   if (!target) return { favorited: false };
   try {
@@ -181,6 +194,16 @@ export async function toggleFavoriteAction(resourceId: string): Promise<{ favori
       });
       return true;
     });
+    if (favorited)
+      // 计分：取消收藏不回冲；同一人反复收藏同一作品只算一次
+      after(() =>
+        awardPoints({
+          userId: target.authorId,
+          actorId: user.id,
+          reason: "FAVORITE_RECEIVED",
+          refId: interactionRefId("fav", user.id, resourceId),
+        }),
+      );
     return { favorited };
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002")
@@ -274,6 +297,15 @@ export async function toggleFollowAction(targetUserId: string): Promise<{ follow
     type: "FOLLOW",
     coalesce: true, // 取关后再关注不重复刷屏
   });
+  // 计分：取关不回冲；同一人对同一被关注者只算一次（取关再关注不再加）
+  after(() =>
+    awardPoints({
+      userId: targetUserId,
+      actorId: user.id,
+      reason: "FOLLOWER_GAINED",
+      refId: interactionRefId("flw", user.id, targetUserId),
+    }),
+  );
   return { following: true };
 }
 
@@ -459,6 +491,15 @@ export async function addCommentAction(
       email: true,
     });
   }
+  // 计分记给资源作者（「收到评论」）；删评不回冲，同一人对同一作品只算一次（防灌水刷分）
+  after(() =>
+    awardPoints({
+      userId: resource.authorId,
+      actorId: user.id,
+      reason: "COMMENT_RECEIVED",
+      refId: interactionRefId("cmt", user.id, resource.id),
+    }),
+  );
   return { ok: true };
 }
 
@@ -495,31 +536,47 @@ export async function deleteCommentAction(commentId: string): Promise<{ ok: bool
   return { ok: true };
 }
 
-// ---------- 下载计数（会话去重） ----------
+// ---------- 下载计数（主体级去重 + 月度计分配额） ----------
+// 去重口径从 cookie 改为「登录 userId / 匿名 ipHash」的主体级唯一键：cookie 一清就白送一次下载量，
+// 而下载量是结算分来源，等于把激励池敞开。闸门细节见 src/lib/download-record.ts。
 export async function incrementDownloadAction(resourceId: string): Promise<{ ok: boolean }> {
   // 下载源：GAME 走 externalUrl；IMAGE/ARTICLE 走 meta（download / downloads）
   const resource = await prisma.resource.findUnique({
     where: { id: resourceId },
-    select: { id: true, type: true, externalUrl: true, meta: true },
+    select: { id: true, type: true, externalUrl: true, meta: true, authorId: true, status: true },
   });
   if (!resource) return { ok: false };
   const hasDl =
     !!resource.externalUrl ||
     metaHasDownload(parseMeta(resource.type as "GAME" | "IMAGE" | "ARTICLE", resource.meta));
   if (!hasDl) return { ok: false };
-  // 内存限流兜底 cookie 伪造：每 IP 60 次 / 分钟，超限静默不计数（下载本身不受影响）
-  if (!(await rateLimit(`dl:${clientIp(await headers())}`, 60, 60_000))) return { ok: true };
-  const ck = await cookies();
-  const marker = ck.get("dl_done")?.value ?? "";
-  if (!marker.includes(resourceId)) {
+
+  const ip = ipFromHeaders(await headers());
+  // 限流兜底伪造：每 IP 60 次 / 分钟，超限静默不计数（下载本身不受影响）
+  if (!(await rateLimit(`dl:${ip}`, 60, 60_000))) return { ok: true };
+
+  const session = await auth();
+  const userId =
+    typeof session?.user?.id === "string" && session.user.id ? session.user.id : null;
+  const rec = await recordDownload({ resourceId, userId, ipHash: hashIp(ip) });
+
+  if (rec.firstTime) {
     await prisma.resource.update({
       where: { id: resourceId },
       data: { downloadCount: { increment: 1 } },
     });
-    ck.set("dl_done", `${marker},${resourceId}`.slice(0, 1024), {
-      path: "/",
-      maxAge: 60 * 60 * 24,
-    });
+  }
+  // 只对已上架资源计分，且不给自己加分；after() 保证计分不拖慢下载响应
+  const refId = rec.counted ? rec.refId : null;
+  if (refId && resource.status === "PUBLISHED" && resource.authorId !== userId) {
+    after(() =>
+      awardPoints({
+        userId: resource.authorId,
+        actorId: userId,
+        reason: "DOWNLOAD_RECEIVED",
+        refId,
+      }),
+    );
   }
   return { ok: true };
 }

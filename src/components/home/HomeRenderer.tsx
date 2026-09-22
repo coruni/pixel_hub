@@ -104,6 +104,10 @@ export default async function HomeRenderer({
             key={s.id}
             title={s.title}
             count={typeof cfg.count === "number" ? cfg.count : 6}
+            sort={cfg.sort === "points" ? "points" : "followers"}
+            period={
+              cfg.period === "week" || cfg.period === "month" ? cfg.period : "all"
+            }
           />
         );
       case "tags":

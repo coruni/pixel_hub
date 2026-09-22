@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ChevronDown,
+  Coins,
   LayoutDashboard,
   LogOut,
   Bell,
@@ -24,8 +25,17 @@ export type MenuUser = {
   avatarKey?: string | null;
 };
 
-/** 顶部导航右侧的用户菜单：头像 + 下拉（个人主页/通知/设置/发布/管理/退出）。草稿箱已并入账户设置。 */
-export default function UserMenu({ user, unread = 0 }: { user: MenuUser; unread?: number }) {
+/** 顶部导航右侧的用户菜单：头像 + 下拉（个人主页/通知/代币/设置/发布/管理/退出）。草稿箱已并入账户设置。 */
+export default function UserMenu({
+  user,
+  unread = 0,
+  showCoins = false,
+}: {
+  user: MenuUser;
+  unread?: number;
+  /** 激励体系开启时才出现「我的代币」（关闭后留一个 0 余额的死链更糟） */
+  showCoins?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(unread);
   const boxRef = useRef<HTMLDivElement>(null);
@@ -141,6 +151,11 @@ export default function UserMenu({ user, unread = 0 }: { user: MenuUser; unread?
                 </span>
               )}
             </Link>
+            {showCoins && (
+              <Link href="/me/coins" className={itemCls} onClick={() => setOpen(false)}>
+                <Coins size={15} className="text-neutral-400" aria-hidden /> 我的代币
+              </Link>
+            )}
             <Link href="/settings" className={itemCls} onClick={() => setOpen(false)}>
               <Settings size={15} className="text-neutral-400" aria-hidden /> 账号设置
             </Link>

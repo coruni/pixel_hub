@@ -1,92 +1,109 @@
 # Pixel Hub —— 长期项目约定
 
-> 只留「改错了会再踩一次」的规则。踩坑经过放 `.workbuddy/memory/YYYY-MM-DD.md`。
+> 只留「改错了会再踩一次」的规则；踩坑经过放 `.workbuddy/memory/YYYY-MM-DD.md`。
 
-## CSS 布局红线（最容易踩）
-- **单列 grid 必须显式写 `grid-cols-1`**（= `minmax(0,1fr)`）。裸 `grid gap-1` 的隐式 auto 轨道按 min-content 起算：行内 `truncate`（nowrap）标题把轨道撑到 779px，直接挤出卡片右边界（320px 侧栏实测溢出 493px → 修复后 286px/0）。
-  - `min-w-0`/`truncate` 只加在**行内层**压不住：轨道基数取的是行（flex 容器）的 min-content contribution，不是内层 flex item 的 min-width。只有容器给 `minmax(0,1fr)` 才根治。
-  - 侧栏 widget 列表（`sidebar/widgets/feed.tsx` 四处）已修；新增单列 grid 一律照写。
-- **无层优先**：`globals.css` 中 `@import "tailwindcss"` 之后的规则是**无层**的，优先于任何 `@layer`（层序判断先于特异性）。与 `* { scrollbar-width:thin }` 冲突时 Tailwind 任意值（中括号）写法被静默压掉 → 用无层普通 class（现有 `.scrollbar-none`）。`globals.css` 注释里别原样写中括号类名（Tailwind 会当候选类扫）。
-- `overflow-x-auto` 会把 overflow-y 算成 auto 并裁掉自身溢出：横向滚动 + 下划线 tab 时 `-mb-px` 要挂**滚动容器**，挂按钮上会被裁 1px。
+## CSS 布局
+- 单列 grid 必须显式 `grid-cols-1`（= `minmax(0,1fr)`）。裸 `grid gap-1` 的隐式 auto 轨道按 min-content 起算，行内 `truncate` 会撑爆卡片；`min-w-0`/`truncate` 只加行内层压不住。
+- `globals.css` 中 `@import "tailwindcss"` 之后的规则是**无层**的，优先于任何 `@layer`：与 `* { scrollbar-width:thin }` 冲突时 Tailwind 任意值（中括号）写法被静默压掉 → 用无层普通 class（`.scrollbar-none`）。注释里别原样写中括号类名。
+- `overflow-x-auto` 会把 overflow-y 变 auto 并裁自身溢出：横向滚动 + 下划线 tab 的 `-mb-px` 挂在**滚动容器**上。
 
 ## 图片压缩
-- 服务端压缩一律走 `src/lib/media/compress.ts` 的 `compressWith()`，业务代码禁止直接 `.webp()/.jpeg()/.png()`。
-- alpha：webp 锁 `alphaQuality:100`；png `quality<100` 走 `palette:true` 量化、`=100` 无损；jpg 无 alpha，必须先 `flatten({background:"#ffffff"})` 再编码（否则透明变黑）。
-- 参数来自 `SiteSetting["uploadLimits"]` 的 `imageFormat`/`imageQuality`（后台 `/admin/uploads`）。缩略图质量 = 主图质量 − 8（下限 40）。落盘 key 扩展名必须与输出格式一致（驱动靠扩展名定 content-type）。回归：`npx tsx _test/compress-alpha.ts`。
+- 一律走 `src/lib/media/compress.ts` 的 `compressWith()`，禁止直接 `.webp()/.jpeg()/.png()`。
+- alpha：webp 锁 `alphaQuality:100`；png `quality<100` 用 `palette:true`、`=100` 无损；jpg 先 `flatten({background:"#ffffff"})`（否则透明变黑）。
+- 参数取自 `SiteSetting["uploadLimits"]`（后台 `/admin/uploads`）；缩略图质量 = 主图 − 8（下限 40）。落盘 key 扩展名必须与输出格式一致。
 
 ## 附件 / 音视频上传（改动前必读）
-- **唯一上传按钮** = `src/components/upload/AttachmentUpload.tsx`（导出 `AttachLimits`）。全站禁止再手写 `<label>` + `<input type=file>`。
-  - 四态：可上传 / 拖拽悬停（`dragging`+`dropProps`）/ 上传中（`progress`）/ 已回执（`filled`）。
-  - `accept` 按 kind 分派：MUSIC/VIDEO **必须**显式传 `avAcceptAttr(kind)`（服务端按 `avExtsFor` 放行，m4a/aac/opus/m4v/mov/ogv 不在附件表里；不一致 = 合法文件选不中）。
-  - 进度别混用：单文件字节进度走 `percent`（0..100）；`progress({done,total})` 是**批量**语义（渲染成「第 n / 共 m」）。
-  - 清空 `input.value` 必须在 `onFiles` 之后（Chrome 的 `input.files` 是同一份 FileList，先清空 = 点选「没反应」），调用方不要再清。
-  - `wizard-sections.tsx` 同名 `AttachmentUpload` 是薄包装，不要再加样式。
-- **清单编辑器** = `AttachmentListEditor`（IMAGE 图包 / ARTICLE 文末 / GAME 下载源），新增同类清单一律走它。
-  - 主入口是 `variant="dropzone"` 投放区，不是按钮。上传与抽屉**解耦**：`onFiles` 拖入即传；抽屉关掉不中断在飞任务。
-  - `useFileDrop({disabled})` 只挂 `rows.length>=20`，**不挂 busy**；计数用 `doneRef`/`totalRef` 累计，别每批重置。
-  - 提交闸门：`onBusyChange(inflight)` 交给宿主禁用提交 + `<form onSubmit>` 里 `preventDefault()` 兜回车。**新增带附件清单的表单必须接。**
-  - 抽屉用草稿模型（`open` 编辑既有行 / `draft` 新增，互斥）；上传回调里读 `drawerHeldRef` 判断占用（async 闭包读 state 是旧值）。
-- `av-section.tsx`（MUSIC/VIDEO）是**单文件直传**（直接写 `avUrl`），不套清单草稿模型，但对外契约对齐：
-  - `variant="dropzone"` + `useFileDrop({disabled: uploading})`（单文件字段，上传中不收新拖入；清单那边故意相反，别抄错）。
-  - **必须接 `onBusyChange`**（`uploading ? 1 : 0`），漏接 = 大文件还在传就能点发布。
-  - **字段错误 key 是 `url` 不是 `avUrl`**（服务端 `avMetaSchema` 的 issue path）；GAME/ARTICLE 是 `downloads`、IMAGE 是 `mediaIds`。读错 key 错误被静默吞掉、页面「点了没反应」。
-  - 「已上传」回执不能等元数据抓取（`probeFile()` 最坏 12s，按钮像卡死）：先出回执，probe 结果异步补进提示。
-  - **视频自动封面**：`av-section` 加 `onCoverFrame?(File)`，只在 `!isAudio && 宿主接了回调` 时、**上传成功后**调 `capturePoster()`（抽 **10% 处**那帧，不是第 0 帧——首帧常是纯黑/台标）。宿主走 `uploadImageFiles` 上传并落封面槽。
-  - 自动值语义：宿主维护 `autoCoverId` ref —— 自动值可覆盖自动值，用户手选过就不抢（同 duration/artist 的 `autoRef` 规则）。
-- **大文件通道**（无云盘时）：`/attachment/session` 三态——云盘分片 / `{mode:"driver"}` 本站流式直传 / `409 NO_CLOUD` 回退旧单请求。
-  - 旧 `/attachment` 走 `req.formData()`（整请求体进内存，硬限 250MB），`Content-Length` 预检必须在 `formData()` **之前**。
-  - 流式直传 `PUT /api/upload/attachment/stream?name=&kind=`：`localDriver.putStream` 先写 `.uploads-tmp/`（故意不在 public 下、不放 `os.tmpdir()` —— 跨盘 rename EXDEV）再 rename。
-  - 驱动能力用 `streamCapable()` 判（别写死驱动名）；s3/chevereto 无 `putStream` → 仍 250MB。
-  - 客户端进度**只能用 XHR**（`fetch` 读不到上传进度）。限流只挂真建会话/真收字节那一步，探测不扣配额。
+- 唯一上传按钮 = `src/components/upload/AttachmentUpload.tsx`；全站禁止再手写 `<label>`+`<input type=file>`。四态：可上传 / 拖拽悬停（`dragging`+`dropProps`）/ 上传中（`progress`）/ 已回执（`filled`）。
+- `accept` 按 kind 分派：MUSIC/VIDEO **必须**传 `avAcceptAttr(kind)`（否则合法文件选不中）。
+- 进度别混用：单文件字节进度用 `percent`；`progress({done,total})` 是**批量**语义。
+- 清空 `input.value` 必须在 `onFiles` **之后**（Chrome 的 `input.files` 是同一份 FileList）。
+- 清单编辑器 = `AttachmentListEditor`。`variant="dropzone"` 投放区，上传与抽屉**解耦**；`useFileDrop({disabled})` 只挂 `rows.length>=20`，**不挂 busy**；计数用 `doneRef`/`totalRef`。抽屉草稿模型（`open` 编辑 / `draft` 新增互斥），上传回调读 `drawerHeldRef`（async 闭包读 state 是旧值）。
+- 提交闸门 `onBusyChange(inflight)` → 宿主禁用提交 + `<form onSubmit>` 里 `preventDefault()` 兜回车。**新增带附件清单的表单必须接。**
+- `av-section.tsx`（MUSIC/VIDEO）是单文件直传（写 `avUrl`），不套草稿模型：`dropzone` + `useFileDrop({disabled: uploading})`（上传中不收拖入，别抄清单那套）；**必须接 `onBusyChange`**。
+- **字段错误 key 是 `url` 不是 `avUrl`**；GAME/ARTICLE 是 `downloads`、IMAGE 是 `mediaIds`。读错 key 错误被静默吞、页面「点了没反应」。
+- 回执不能等 `probeFile()`（最坏 12s）：先出回执，probe 结果异步补提示。
+- 视频自动封面：上传成功后 `capturePoster()` 抽 **10% 处**那帧（首帧常纯黑）；`autoCoverId` ref —— 自动值可覆盖自动值，用户手选过就不抢。
+- 大文件通道：`/attachment/session` 三态（云盘分片 / `{mode:"driver"}` 流式直传 / `409 NO_CLOUD` 回退旧单请求）。旧 `/attachment` 走 `formData()`（整请求体进内存，硬限 250MB），`Content-Length` 预检必须在 `formData()` **之前**。流式直传 `PUT /api/upload/attachment/stream`：`localDriver.putStream` 先写 `.uploads-tmp/`（不在 public 下、不放 `os.tmpdir()` —— 跨盘 rename EXDEV）再 rename。能力用 `streamCapable()` 判，s3/chevereto 无 `putStream` → 仍 250MB。客户端进度**只能用 XHR**。
 
-## ImageViewer（src/components/ui/ImageViewer.tsx）
-- 平移按「可平移空间」（`panBounds`/`canPan`）判，不用 `zoom > 1` 当代理条件（缩小时也能拖）。
-- 位移必须在 `applyZoom`/`rotateBy` 后重新夹取，否则放大拖动再缩回会停在偏移位置。
+## ImageViewer（`src/components/ui/ImageViewer.tsx`）
+- 平移按「可平移空间」（`panBounds`/`canPan`）判，不用 `zoom > 1` 当代理；位移必须在 `applyZoom`/`rotateBy` 后重新夹取。
 - react-hooks v7 immutability：`useCallback`/`useEffect` 内不许写 `useRef.current`（只有 `useLayoutEffect` 可以）。
 
-## UI 文案（tip）取舍
-- 只讲「怎么操作」且已由可见控件表达的文案＝多余 tip，不写。必写四类：配置含义、约束（尺寸/格式/上限）、状态反馈（加载/空/错误/权限）、行为后果。
-- 图标按钮的 `title` 是**无障碍名称**，必留（a11y 红线），别当 tip 删。
-- 沿用写法：admin 表单 `hint`、settings 页 `sectionHint`（`mb-4 mt-1 text-xs text-neutral-400`）、admin 页首说明框（`rounded-none border border-brand-200 bg-surface px-4 py-3 text-xs leading-5 text-neutral-500`）。
-- 无限滚动哨兵（`feed/FeedInfinite.tsx`）删文案后必须保留容器高度（现 `mt-6 flex h-8 items-center justify-center`），否则 IntersectionObserver 目标塌陷。
+## UI 文案（tip）
+- 只讲「怎么操作」且已由可见控件表达的文案＝多余。必写四类：配置含义、约束、状态反馈、行为后果。
+- 图标按钮的 `title` 是**无障碍名称**，必留。沿用写法：admin 表单 `hint`、settings 页 `sectionHint`、admin 页首说明框。
+- 无限滚动哨兵（`feed/FeedInfinite.tsx`）删文案后必须保留容器高度，否则 IntersectionObserver 目标塌陷。
 
 ## 详情页操作条（用户明确要过，别改回去）
-- 形态 = **「图标 + 文字」**：Heart / Star / Flag / Pencil，`size={15}`，一律 `aria-hidden`。无图标版已被否（`74f4c4f`）。
-- `ACTION_TEXT`（`src/lib/ui/cls.ts`）：无边框无底色、`gap-1.5 py-1.5 text-sm`（32px 高）。`FollowButton` 是全站唯一保留描边/实底的动作。
-- `ActionBar` 行容器 `justify-end`；下面「作者已关闭评论。」跟着 `text-right`。状态走文案+颜色双通道。
-- **落位**（纠正过两次）：banner 模板的 `<ActionBar>` 在 **`DownloadPanel` 之后、`DescriptionBlock` 之前**，且在两栏网格 `CollapsibleAside` **之外**（塞进左列时 `justify-end` 只顶到 340px 侧栏左边缘）。post 在右栏底部、article 居中栏、twocol 在左列内。
-- **`CollapsibleAside` 收起必须「不重排」**：`overflow-hidden` + `<aside>` 两层，内层套 `space-y-4 whitespace-nowrap lg:w-[340px]` 锁死宽度。光裁剪挡不住高度重排（列宽压到 0 → 逐字折行 → 撑开整行）。`whitespace-nowrap` 另挡长值抖动，代价是超长文本硬切（刻意取舍）。
-- 340 出现在 `RAIL_OPEN`/`RAIL_SHUT`/`RAIL_BOX`/把手 `style.right` 四处，用文件顶部常量 + **完整类名字符串**集中（Tailwind 只扫字面量，不能 JS 拼）。`DetailTwocol` 的 360px `<aside>` 尚未同步加固。
+- 形态 = **图标 + 文字**（Heart/Star/Flag/Pencil，`size={15}`，`aria-hidden`）；无图标版已被否。`ACTION_TEXT`（`src/lib/ui/cls.ts`）：无边框无底色、`gap-1.5 py-1.5 text-sm`。`FollowButton` 是全站唯一保留描边/实底的动作。
+- `ActionBar` 行容器 `justify-end`；状态走文案 + 颜色双通道。
+- **落位**（纠正过两次）：banner 模板的 `<ActionBar>` 在 `DownloadPanel` 之后、`DescriptionBlock` 之前，且在 `CollapsibleAside` **之外**；post 在右栏底部、article 居中栏、twocol 在左列内。
+- **`CollapsibleAside` 收起必须「不重排」**：`overflow-hidden` + `<aside>` 两层，内层 `space-y-4 whitespace-nowrap lg:w-[340px]` 锁宽（光裁剪挡不住列宽压 0 → 折行 → 撑开整行）。340 用文件顶部常量 + **完整类名字符串**集中（Tailwind 只扫字面量）。`DetailTwocol` 的 360px `<aside>` 尚未同步加固。
 
 ## 详情页模板是高发改动区
-- 四种模板共用 `src/components/resource/detail/parts.tsx`，改一处全站生效；`detailTemplate.byType` 后台可配，改动要考虑「换类型套同一模板」（信息面板标题不能写死「游戏信息」）。
-- **回退不要按目录**：`git checkout HEAD -- src/components/resource/detail/` 会带走该目录所有未提交改动。先 `git diff --stat` 看清范围，现场备份到 `%TEMP%`。
-- **VIDEO 只有一个视频**（用户明确要过）：`av-player` 里 `boxed = isAudio`——视频不套卡片（`block aspect-video w-full bg-black`），封面挂 `<video poster>`；模板层对 VIDEO **整块不渲染 `<Gallery>`**（传空数组会渲染「暂无预览图」空框）。
-  - 落位：`DetailTwocol` 视频播放器进**主列**（否则左列被抽空、视频落在两栏之外）；`DetailBanner` 视频退化成一截深色标题带；`DetailArticle` 跳过带边框的封面 hero。默认 VIDEO 走 `post` 模板。
-- **音视频在 OneDrive 也要能在线播放**：`/od` 出口按扩展名分流——音视频走代理转发（自定 MIME + `Content-Disposition: inline` + `Accept-Ranges`，`Range`/`Content-Range` **必须透传**，206 原样返回），其余 302 到预鉴权下载地址。
-  - 测「路径穿越」别用 HTTP 客户端：fetch/undici 与 Next 路由都会**先折叠 `..`**，看到的 200 是折叠后的合法 key。要么裸 socket + 上游桩回显路径，要么别断言。
+- 四模板共用 `src/components/resource/detail/parts.tsx`；`detailTemplate.byType` 后台可配（信息面板标题不能写死）。
+- **回退不要按目录**：`git checkout HEAD -- <dir>` 会带走该目录所有未提交改动；先 `git diff --stat`。
+- **VIDEO 只有一个视频**：`av-player` 里 `boxed = isAudio`；模板层对 VIDEO **整块不渲染 `<Gallery>`**（空数组会渲染「暂无预览图」）。落位：`DetailTwocol` 播放器进**主列**；`DetailBanner` 退化成深色标题带；`DetailArticle` 跳过封面 hero。
+- **音视频在 OneDrive 也要能播**：`/od` 按扩展名分流 —— 音视频走代理转发（自定 MIME + `Content-Disposition: inline` + `Accept-Ranges`，`Range`/`Content-Range` **必须透传**，206 原样返回），其余 302 预鉴权地址。
+- 测「路径穿越」别用 HTTP 客户端（fetch/undici 与 Next 路由会**先折叠 `..`**）；要么裸 socket + 上游桩回显路径，要么别断言。
 
-## 本地文件读写路径（打包器文件追踪）
-- 追踪只能静态分析 `path.join(process.cwd(), "<字面量>", 动态尾段)`。路径一经函数（`path.resolve(root, rest)`）计算就退化成「追踪整个项目」，build 打 `Warning: Dynamic filesystem access`。
-- 规矩：**字面前缀留在真正调用 `fs` 的地方**。越界靠「结果一定拼在 `public/<sub>/` 之下」在结构上排除（`safeRel` 拒 `..`/NUL/空、`\` 统一 `/`），不要再用 abs 前缀比较兜。
+## 打包器文件追踪
+- 追踪只静态分析 `path.join(process.cwd(), "<字面量>", 动态尾段)`；路径一经函数计算就退化成「追踪整个项目」，build 打 `Warning: Dynamic filesystem access`。规矩：**字面前缀留在真正调 `fs` 的地方**，越界靠「结果一定在 `public/<sub>/` 之下」结构排除（`safeRel` 拒 `..`/NUL/空、`\` 统一 `/`）。
+
+## IP / 防刷
+- IP 取法与哈希的**唯一实现** = `src/lib/ip.ts`：`ipFromHeaders()`（`x-forwarded-for` 首段 || `x-real-ip`）、`hashIp()`（`sha256(ip + AUTH_SECRET)` 取 16 位 hex）、`subjectKeyFor(userId, ipHash)`（`u:<id>` / `ip:<hash>`）。新的按 IP 去重/配额必须复用这一份；各写一份 → 算法漂移 → 同一 IP 在两表算出不同哈希，跨表关联不上。**别再往 `track/route.ts` 里加内联的第二份**（那里曾有一份，取 IP 时漏了 `x-real-ip` 回退，导致无反代部署下全站共用一个限流桶）。
+- `rateLimit(key, limit, periodMs)` 走 Postgres（表缺失自动回退内存 Map），非原子；key 带维度前缀。
+
+## 贡献分 / 创作者激励（`points*.ts`）
+- 阈值唯一落点 = `src/lib/points-config.ts`（后台 `/admin/incentive` 可改）；业务模块**不许再写业务数值字面量**。加减 `PointReason` 枚举时 `DEFAULT_SCORES` 的 `satisfies Record<PointReason, number>` 会立刻报错 —— 这是刻意的编译期护栏，别改成宽松类型。
+- 贡献分**唯一写入口** = `src/lib/points.ts` 的 `awardPoints()`（永不抛错、P2002 静默）。幂等键 = `@@unique([userId, reason, refId])`。
+- **`refId` 必须把触发者编进去**（`interactionRefId("like", actorId, targetId)`）：只写目标 id 的话「全站对同一作品永远只加一次分」，第二个点赞的人不产生任何分，「收到点赞」直接废掉。
+- 自产自销拦截集合 = `NO_SELF_BENEFIT`（点赞/收藏/下载/评论/关注），**不含** PUBLISH/FEATURED/ADMIN_ADJUST/DAILY_LOGIN（这些的 actor 本来就是本人或管理员）。判定走 `isSelfBenefit()`，别在别处重写一份。
+- 下载防刷：主体去重 + 月配额**只停计分，绝不拦下载**（`download-record.ts`）。
+- 后台配置页保存是**整份替换（WYSIWYG）**：表单必须提交完整文档，`safeIncentive()` 用 zod 兜住缺失字段。不要改成分字段增量写。
+
 
 ## 首页板块「加载更多」
-- `list` 板块追加方式 = `paged`（开关）+ `loadMode: "button" | "infinite"`（默认 button），后台 `/admin/site` 三选下拉。
-- **别把 `paged` 合并成单字段**：存量 JSON 只有 `paged`，保留才能零迁移兼容。
-- `useLoadMore`（`src/lib/hooks/use-load-more.ts`）page/done 用 ref、并发用 ref 闩 —— 常驻 IntersectionObserver 闭包用 state 会取到旧页并追加重复卡片。
-- 无限滚动哨兵 effect 依赖要带 `more.length`，否则内容不足一屏时不会自动补页。
+- 追加方式 = `paged` + `loadMode: "button" | "infinite"`，后台 `/admin/site` 三选。**别把 `paged` 合并成单字段**（存量 JSON 只有 `paged`）。
+- `useLoadMore`（`src/lib/hooks/use-load-more.ts`）page/done 用 ref、并发用 ref 闩；哨兵 effect 依赖要带 `more.length`。
 
-## 本机验证环境（务必沿用）
-- **PowerShell 工具吞 stdout**（裸命令、`Write-Output`、`Out-File` 都拿不到；`cmd /c "... > f"` 被沙箱拦）；`Remove-Item` 对仓库内文件静默失败 → 删除用 `node -e "fs.unlinkSync/rmSync"`。
-- **bash 工具的 `rm` 是坏 shim**（`safe_delete_main: command not found`），且缺 `head`/`ls`/`grep`/`tail`/`sleep`/`dirname`。查文件用 Read、搜内容用 Grep、批量文件操作用 node 一行脚本。`cd X && node -e "..."` 可用。
-- **后台长任务用 `run_in_background`**（`(cmd &)` 子 shell 会随 bash 工具退出被杀）；轮询等待用 node 循环发 `curl --noproxy '*'`。
-- 校验 runner 写 `%TEMP%`（别放仓库根，`git status` 会被长期污染），用 `execFileSync(process.execPath, [...], {cwd, encoding:"utf8"})` 包 tsc/eslint 再打印，跑完删。
-- 校验命令：`node node_modules/typescript/bin/tsc --noEmit`（应零错误）、`node node_modules/eslint/bin/eslint.js src`。**eslint 存量 3 条 no-unused-vars warning**（`src/app/admin/media/page.tsx` 的 `enumParam`、`src/components/auth/PublishForm.tsx` 的 `draftCount`、`src/components/sidebar/SiteSidebar.tsx` 的 `authed`），别顺手改也别新增（另 `prisma/seed-*.ts` 有 4 条，扫 prisma 目录时才会出现）。
-- **无浏览器验证**：skill `pixel-hub-verify`（铸管理员 cookie 走 HTTP / jsdom 挂组件 / 反证断言）。
-- **布局问题必须真机量测**，别靠读 CSS 推断：本机有 `C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe`，可直接 `--headless=new --remote-debugging-port=<p> --user-data-dir=%TEMP%\x --no-proxy-server --window-size=…`，再用 Node 内置 `WebSocket` 连 CDP，`Emulation.setDeviceMetricsOverride` 定视口 + `Runtime.evaluate` 量 `getBoundingClientRect`。
-  - 应用路由**不能**用来做探针：`src/app/_xxx` 是私有目录（不路由）；且根 layout 在 DB 不通时会 500 并弹 dev 错误遮罩，DOM 全被替换。DB 不通时改为「tsx 脚本 `renderToStaticMarkup` 真实组件 + 内联 `.next/dev/static/chunks/*.css` + 本地 static server（把 `/fonts/*` 指到 `public/fonts`）+ Edge 量测」，字体能正常加载。
+## creators 板块排序（`sort` / `period`）
+- `getTopCreators(limit, sort="followers", period="all")`：**默认值就是兼容红线** —— 存量配置只有 `count`，改默认会让不改后台的现网排序被动变化。
+- 返回的 `metric` = **驱动本次排名的那个数**，四组合语义不同（`followers`+`week/month` 是**窗口内新增关注数**，不是累计粉丝数）。展示必须走同一个 `creatorMetaText(resources, metric, sort, period)`（`src/lib/format.ts`），标签随口径变；写死「粉丝」会把贡献分榜的分数说成粉丝数。
+- 配置四处要同步：`home-config.ts` / `site-config.ts` 的 `creatorsCfg`、`HomeSectionConfig` 联合、`DEFAULT_*`。后台**两个**编辑器（`home-admin/SectionEditor.tsx`、`site-admin/WidgetEditor.tsx`）都要加控件，漏一个 = 「能存但界面调不了」。
+
+## TypeScript 配置联合的类型陷阱
+- 往 `HomeSectionConfig` / `SidebarWidgetConfig` 这类**按 shape 区分的联合**加字段时，若字段名与别的成员重名（如 creators 的 `sort` vs list 的 `sort`），对象字面量赋值会挑错成员并报出**看不懂的错**：`Type '"followers"' is not assignable to type '"latest"|"popular"|"downloads"'`，或对着 `stats` 的 `Record<string, never>` 报 `Type 'number' is not assignable to type 'never'`。这不是写错了，是联合匹配歧义。
+- 对策：一次把 **schema / 联合类型 / 默认值 / 全部构造点** 补齐并精确匹配；必要时给该分支独有字段名或改用 `kind` 判别式联合。**看到 `never` 的赋值错误，先怀疑 `Record<string, never>` 这个能把任何对象都当候选的成员。**
+
+
+## PIX / 结算 / 支付（`coin*` / `settle*` / `payment*`）
+- **冻结名单唯一事实来源 = `cfg.risk.frozenUserIds`**（`points-config.ts`）。`UserPoint.frozen` 列**已删**，别再按"列 + 配置"两套口径理解冻结点。人工调整要绕过冻结必须显式 `awardPoints({ bypassFrozen: true })`。
+- **两个池别混**：激励池 P = `floor(本期收入 × ratePermille) + carryInFen`（**carryIn 原样并入，不再乘比例**）；现金池 C = Σ收入 − Σ成本 − Σ已打款 − Σ退款（跨期结存）。偿付闸门只认 `getSolvency()` 一处实现（`coin.ts`），前台 `/fund`、结算确认、提现申请、后台水位**必须共用**，禁止任一处自己算一遍。
+- **记账纪律**：`LedgerEntry` **只记真钱进出**（结算分配不进台账）；`WITHDRAW_PAID` **不写 `CoinLedger`**（只做 frozen−N、lifetimeWithdrawn+）。台面数字必须能追回一条记录，追不到的不许上页面。
+- **密钥永不出服务端**：对外一律走 `publicPaymentConfig()` 的**结构投影**（白名单式，不是"记得手动删 key"）。后台表单在无密钥保存时提交 `KEEP_SECRET` 哨兵值，服务端在 zod 校验**之前**换回库内真值 —— 校验前置换顺序不能颠倒。
+- `permilleText(n)` **去掉无意义小数位**（`6000 → "60%"`，不是 `"60.00%"`）；金额一律整数分，字符串解析走 `parseYuanToFen()`，禁止 `parseFloat*100`。
+
+## 本机验证环境
+- **PowerShell 工具吞 stdout**；`Remove-Item` 对仓库内文件静默失败 → 用 `node -e "fs.unlinkSync/rmSync"`。
+- **bash 的 `rm` 是坏 shim**，且缺 `head`/`ls`/`grep`/`tail`/`sleep`/`dirname`。查文件用 Read、搜内容用 Grep、批量文件操作用 node 一行脚本。
+- 后台长任务用 `run_in_background`（`(cmd &)` 会随工具退出被杀）；轮询用 node 循环发 `curl --noproxy '*'`。
+- 校验 runner 写 `%TEMP%`，用 `execFileSync(process.execPath, [...], {cwd, encoding:"utf8"})` 包 tsc/eslint 再打印。命令：`node node_modules/typescript/bin/tsc --noEmit`（零错误）、`node node_modules/eslint/bin/eslint.js src`。**存量 3 条 no-unused-vars warning**（`admin/media/page.tsx` 的 `enumParam`、`auth/PublishForm.tsx` 的 `draftCount`、`sidebar/SiteSidebar.tsx` 的 `authed`），别顺手改也别新增。
+- 无浏览器验证：skill `pixel-hub-verify`。
+- **`npm` 在这个 bash shim 里不通**（`npm run build` 退 127）。改用 node 直调：`node node_modules/prisma/build/index.js generate`、`node node_modules/next/dist/bin/next build`（约 2.5 分钟，用 `run_in_background`）。
+- **构建不触库**：全站路由都是 `ƒ` 按需渲染，所以新增表没跑迁移也能 build 过；但**运行时**会 500。别拿「build 过了」当「迁移可以不做」的证据。
+- **校验响应体首字节（BOM 等）不能用 `fetch().text()`** —— WHATWG 规范下 `text()` 会剥掉 U+FEFF，断言 `charCodeAt(0)===0xFEFF` 必然假红灯。必须 `Buffer.from(await r.arrayBuffer())` 查原始字节（UTF-8 BOM = `EF BB BF`）。
+- **`next dev` 有目录级互斥锁**：同目录第二个实例会打印 `⨯ Another next dev server is already running`（含在跑实例的 PID/端口/日志路径）**并退出**。所以「探测某端口 ECONNRESET/超时」**不等于**没有实例 —— 先读 `.next/dev/logs/next-development.log` 或新实例日志再决定要不要重启。
+- 放在 `%TEMP%` 的验证脚本 **require 基于脚本目录解析**，取不到仓库依赖；用 `createRequire("E:/project/pixel_hub/package.json")` 再 require。
+- HTTP 层验证脚本**别写进仓库**（放 `%TEMP%`），跑完连 admin cookie 一起删（cookie 是有效凭据，别留在磁盘上）。
+- 布局必须真机量测：`msedge.exe --headless=new --remote-debugging-port=<p> --user-data-dir=%TEMP%\x --no-proxy-server` + Node 内置 `WebSocket` 连 CDP，`Runtime.evaluate` 量 `getBoundingClientRect`。应用路由**不能**做探针（`src/app/_xxx` 不路由；根 layout 在 DB 不通时 500 且被 dev 遮罩替换）→ 改用 tsx `renderToStaticMarkup` + 内联 `.next/dev/static/chunks/*.css` + 本地 static server。
 
 ## 临时脚本纪律
-- 验证脚本一律 `_` 前缀放 `prisma/`，**用完立即删**；删除未提交文件前先 `copyFileSync` 到 `%TEMP%`（git 无法恢复）。
-- **探针曾被误提交**（`c01bd55` 把 `prisma/_od.ts`、`_odstub.cjs`、`_up4.ts` 一起带进 git）。提交前必须 `git status --short` 逐行确认、**只 add 本次任务的文件**，绝不用 `git add -A` / `git add .`。
-- `.workbuddy/` 是项目数据**不是缓存**，git status 显示删除也不要顺手清理；全部受 git 跟踪，误删用 `git checkout -- .workbuddy/` 恢复。
+- 验证脚本一律 `_` 前缀放 `prisma/`，**用完立即删**；删未提交文件前先 `copyFileSync` 到 `%TEMP%`。
+- **探针曾被误提交**（`c01bd55`）。提交前必须 `git status --short` 逐行确认、**只 add 本次任务的文件**，绝不用 `git add -A`。
+- `.workbuddy/` 是项目数据**不是缓存**，受 git 跟踪；误删用 `git checkout -- .workbuddy/` 恢复。
+
+## 编辑纪律（本仓真实踩到过）
+- **同一个文件的多处改动不要放进同一批并行编辑调用**：会互相覆盖，且**失败的静默丢失**——工具仍回「Successfully edited」。本轮 `home.ts` 的 `metricById` 改写、`home-config.ts` 的联合类型、`site-config.ts` 的 meta 描述都被这样丢过，最后靠 tsc 报错才发现。规则：**一个文件一次只改一处**；批量改完后必须回头核对（grep 关键字 / 跑 tsc）。
+- 批量并行编辑只用于**不同文件**。
+

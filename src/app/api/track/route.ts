@@ -1,37 +1,25 @@
-import { createHash } from "crypto";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { rateLimit } from "@/lib/rate-limit";
 import { sameOrigin } from "@/lib/origin";
 import { dayKey } from "@/lib/format";
+import { hashIp, ipFromHeaders } from "@/lib/ip";
 
 // PV/IP 采集端：PageTracker 发 beacon，失败静默（统计不能影响页面）
 export async function POST(req: NextRequest) {
   try {
     if (!sameOrigin(req)) return new Response(null, { status: 204 });
+    // IP 取值与哈希统一走 src/lib/ip.ts（与下载去重共用同一实现，避免两处哈希漂移）
+    const ip = ipFromHeaders(req.headers);
     // 采集限流：每 IP 60 次 / 分钟（防刷量）
-    if (
-      !(await rateLimit(
-        `track:${req.headers.get("x-forwarded-for")?.split(",")[0] ?? "local"}`,
-        60,
-        60_000,
-      ))
-    )
-      return new Response(null, { status: 204 });
+    // 修：原先限流 key 只取 x-forwarded-for（无则统一落 "local"），无代理部署下所有访客共用一个桶，
+    // 60 次/分钟被瞬间打满后全体丢采集。改用统一取值（含 x-real-ip 回退）后每客户端独立计数。
+    if (!(await rateLimit(`track:${ip}`, 60, 60_000))) return new Response(null, { status: 204 });
     const body = (await req.json().catch(() => null)) as { path?: unknown } | null;
     const path = typeof body?.path === "string" ? body.path.slice(0, 200) : "";
     if (!path.startsWith("/")) return new Response(null, { status: 204 });
 
-    // 反向代理后真实 IP 在 x-forwarded-for 首段；本地开发无代理时用占位
-    const ip =
-      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-      req.headers.get("x-real-ip") ||
-      "local";
-    // 加盐哈希：不落明文 IP，AUTH_SECRET 作盐
-    const ipHash = createHash("sha256")
-      .update(ip + (process.env.AUTH_SECRET ?? ""))
-      .digest("hex")
-      .slice(0, 16);
+    const ipHash = hashIp(ip);
 
     const day = dayKey(new Date());
 

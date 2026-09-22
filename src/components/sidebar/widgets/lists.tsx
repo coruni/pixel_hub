@@ -3,7 +3,7 @@ import { ArrowUpRight } from "lucide-react";
 import { getCategories, getRecentComments, getTagsBySlugs, getTopTags } from "@/lib/queries";
 import { getTopCreators } from "@/lib/home";
 import { widgetTitle, type SidebarWidget } from "@/lib/site-config";
-import { formatCount, timeAgo } from "@/lib/format";
+import { creatorMetaText, timeAgo } from "@/lib/format";
 import { isOnline } from "@/lib/online";
 import Avatar from "@/components/ui/Avatar";
 import { WidgetShell } from "../shell";
@@ -76,8 +76,8 @@ export async function renderTags(w: SidebarWidget) {
 }
 
 export async function renderCreators(w: SidebarWidget) {
-  const cfg = w.config as { count: number };
-  const creators = await getTopCreators(cfg.count);
+  const cfg = w.config as { count: number; sort: "followers" | "points"; period: "all" | "week" | "month" };
+  const creators = await getTopCreators(cfg.count, cfg.sort, cfg.period);
   if (creators.length === 0) return null;
   return (
     <WidgetShell title={widgetTitle(w)}>
@@ -100,7 +100,7 @@ export async function renderCreators(w: SidebarWidget) {
                   {c.name ?? c.username}
                 </span>
                 <span className="block truncate text-[11px] text-neutral-400">
-                  {c.resources} 作品 · {formatCount(c.followers)} 粉丝
+                  {creatorMetaText(c.resources, c.metric, cfg.sort, cfg.period)}
                 </span>
               </span>
             </Link>

@@ -110,6 +110,10 @@ export default function SectionEditor({
   const [period, setPeriod] = useState<"all" | "week" | "month">(
     cfg.period === "week" || cfg.period === "month" ? cfg.period : "all",
   );
+  // 创作者榜：排行口径（粉丝数 / 贡献分）；时间窗口复用上面的 period
+  const [creatorSort, setCreatorSort] = useState<"followers" | "points">(
+    cfg.sort === "points" ? "points" : "followers",
+  );
   // 广告位（共享编辑字段，草稿见 admin-shared/ad-config-fields）
   const [ad, setAd] = useState(() => initAdConfig(cfg));
   const [pending, start] = useTransition();
@@ -143,7 +147,7 @@ export default function SectionEditor({
       case "feed":
         return { showTags };
       case "creators":
-        return { count };
+        return { count, sort: creatorSort, period };
       case "tags":
         return { count, slugs: tagSel };
       case "stats":
@@ -574,20 +578,58 @@ export default function SectionEditor({
         )}
 
         {kind === "creators" ? (
-          <div>
-            <label className={field} htmlFor={`n-${row.id}`}>
-              展示数量（1–12）
-            </label>
-            <input
-              id={`n-${row.id}`}
-              type="number"
-              min={1}
-              max={12}
-              value={count}
-              onChange={(e) => setCount(Math.max(1, Math.min(12, Number(e.target.value) || 1)))}
-              className={input}
-            />
-          </div>
+          <>
+            <div>
+              <label className={field} htmlFor={`n-${row.id}`}>
+                展示数量（1–12）
+              </label>
+              <input
+                id={`n-${row.id}`}
+                type="number"
+                min={1}
+                max={12}
+                value={count}
+                onChange={(e) => setCount(Math.max(1, Math.min(12, Number(e.target.value) || 1)))}
+                className={input}
+              />
+            </div>
+            <div>
+              <label className={field} htmlFor={`cs-${row.id}`}>
+                排行口径
+              </label>
+              <select
+                id={`cs-${row.id}`}
+                value={creatorSort}
+                onChange={(e) => setCreatorSort(e.target.value as "followers" | "points")}
+                className={input}
+              >
+                <option value="followers">按粉丝数</option>
+                <option value="points">按贡献分</option>
+              </select>
+            </div>
+            <div className="sm:col-span-2">
+              <label className={field} htmlFor={`cp-${row.id}`}>
+                时间窗口
+              </label>
+              <select
+                id={`cp-${row.id}`}
+                value={period}
+                onChange={(e) => setPeriod(e.target.value as "all" | "week" | "month")}
+                className={input}
+              >
+                <option value="all">
+                  {creatorSort === "points" ? "累计贡献分" : "累计粉丝数"}
+                </option>
+                <option value="week">近 7 天</option>
+                <option value="month">近 30 天</option>
+              </select>
+              <p className="mt-1 text-[11px] text-neutral-400">
+                {creatorSort === "points"
+                  ? "近 7 / 30 天 = 该窗口内新增的贡献分（与贡献榜的周榜/月榜同口径）。"
+                  : "近 7 / 30 天 = 该窗口内新增的关注数，卡片上会显示为「近 7 天 N 粉丝」，不是累计粉丝数。"}
+              </p>
+            </div>
+          </>
         ) : null}
 
         {(kind === "hero" || kind === "featured") && (

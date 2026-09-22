@@ -113,7 +113,7 @@ export const SIDEBAR_KIND_META: Record<
     defaultTitle: "分类直达",
   },
   tags: { label: "标签云", desc: "热门标签，或手动挑选的标签", defaultTitle: "热门标签" },
-  creators: { label: "人气创作者", desc: "按粉丝数展示创作者", defaultTitle: "人气创作者" },
+  creators: { label: "人气创作者", desc: "创作者排行；可按粉丝数或贡献分", defaultTitle: "人气创作者" },
   stats: { label: "站点数据", desc: "社区规模数字小览", defaultTitle: "社区数据" },
   about: { label: "站点说明", desc: "一段自定义文字（简介/公告/指引）", defaultTitle: "关于本站" },
   comments: {
@@ -181,6 +181,9 @@ const tagsCfg = z.object({
 });
 const creatorsCfg = z.object({
   count: z.number().int().min(1).max(6).default(3),
+  // 同首页 creators 板块：默认值必须保持 followers/all，否则存量侧栏配置的排序会被动变化
+  sort: z.enum(["followers", "points"]).default("followers"),
+  period: z.enum(["all", "week", "month"]).default("all"),
 });
 const statsCfg = z.object({});
 const aboutCfg = z.object({
@@ -262,7 +265,7 @@ export type SidebarWidgetConfig =
     } // hot
   | { slugs: string[] } // categories
   | { count: number; slugs: string[] } // tags
-  | { count: number } // creators
+  | { count: number; sort: "followers" | "points"; period: "all" | "week" | "month" } // creators
   | Record<string, never> // stats
   | { text: string } // about
   | { count: number } // comments
@@ -571,7 +574,7 @@ export const DEFAULT_SIDEBAR_WIDGETS: SidebarWidget[] = [
     kind: "creators",
     title: "人气创作者",
     enabled: false,
-    config: { count: 3 },
+    config: { count: 3, sort: "followers", period: "all" },
   },
 ];
 

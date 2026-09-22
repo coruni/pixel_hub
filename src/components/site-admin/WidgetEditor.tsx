@@ -96,6 +96,10 @@ export default function WidgetEditor({
   );
   // 广告位（共享编辑字段）
   const [ad, setAd] = useState(() => initAdConfig(cfg));
+  // 创作者榜：排行口径（粉丝数 / 贡献分）；时间窗口复用上面的 period
+  const [creatorSort, setCreatorSort] = useState<"followers" | "points">(
+    cfg.sort === "points" ? "points" : "followers",
+  );
 
   const setLink = (i: number, key: "label" | "href", v: string) =>
     setLinks((arr) => arr.map((l, idx) => (idx === i ? { ...l, [key]: v } : l)));
@@ -333,20 +337,58 @@ export default function WidgetEditor({
         )}
 
         {kind === "creators" && (
-          <div>
-            <label className={LABEL_STRONG} htmlFor={id("count")}>
-              数量（1–6）
-            </label>
-            <input
-              id={id("count")}
-              type="number"
-              min={1}
-              max={6}
-              value={count}
-              onChange={(e) => setCount(Math.max(1, Math.min(6, Number(e.target.value) || 1)))}
-              className={INPUT}
-            />
-          </div>
+          <>
+            <div>
+              <label className={LABEL_STRONG} htmlFor={id("count")}>
+                数量（1–6）
+              </label>
+              <input
+                id={id("count")}
+                type="number"
+                min={1}
+                max={6}
+                value={count}
+                onChange={(e) => setCount(Math.max(1, Math.min(6, Number(e.target.value) || 1)))}
+                className={INPUT}
+              />
+            </div>
+            <div>
+              <label className={LABEL_STRONG} htmlFor={id("crsort")}>
+                排行口径
+              </label>
+              <select
+                id={id("crsort")}
+                value={creatorSort}
+                onChange={(e) => setCreatorSort(e.target.value as "followers" | "points")}
+                className={INPUT}
+              >
+                <option value="followers">按粉丝数</option>
+                <option value="points">按贡献分</option>
+              </select>
+            </div>
+            <div className="sm:col-span-2">
+              <label className={LABEL_STRONG} htmlFor={id("crperiod")}>
+                时间窗口
+              </label>
+              <select
+                id={id("crperiod")}
+                value={period}
+                onChange={(e) => setPeriod(e.target.value as "all" | "week" | "month")}
+                className={INPUT}
+              >
+                <option value="all">
+                  {creatorSort === "points" ? "累计贡献分" : "累计粉丝数"}
+                </option>
+                <option value="week">近 7 天</option>
+                <option value="month">近 30 天</option>
+              </select>
+              <p className="mt-1 text-[11px] text-neutral-400">
+                {creatorSort === "points"
+                  ? "近 7 / 30 天 = 该窗口内新增的贡献分（与贡献榜的周榜/月榜同口径）。"
+                  : "近 7 / 30 天 = 该窗口内新增的关注数，展示为「近 7 天 N 粉丝」，不是累计粉丝数。"}
+              </p>
+            </div>
+          </>
         )}
 
         {kind === "about" && (

@@ -25,3 +25,25 @@ export function timeAgo(date: Date | string | null | undefined): string {
 export function dayKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
+
+/** 本地月份 key（YYYY-MM）：下载月度配额、结算归属期、收入归属期共用。
+ *  用本地时区而非 UTC —— 「自然月」对站长的含义是本机日历月，不是 UTC 月。 */
+export function monthKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/**
+ * 创作者卡片的副信息行。`metric` 必须来自 `getTopCreators()` 的同口径返回值 ——
+ * 标签随 sort/period 变化，写死「粉丝」会在贡献分榜上把分数说成粉丝数。
+ * 首页 creators 板块与侧栏 creators 组件共用，避免两处文案漂移。
+ */
+export function creatorMetaText(
+  resources: number,
+  metric: number,
+  sort: "followers" | "points",
+  period: "all" | "week" | "month",
+): string {
+  const unit = sort === "points" ? "贡献分" : "粉丝";
+  const prefix = period === "all" ? "" : period === "week" ? "近 7 天 " : "近 30 天 ";
+  return `${resources} 作品 · ${prefix}${formatCount(metric)} ${unit}`;
+}

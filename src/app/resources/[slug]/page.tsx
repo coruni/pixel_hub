@@ -5,6 +5,8 @@ import { prisma } from "@/lib/db/prisma";
 import { getCollections, getRelated, getResourceDetail, type ResourceDetail } from "@/lib/queries";
 import { parseMeta } from "@/lib/meta";
 import { getTheme, detailTemplateFor } from "@/lib/site";
+import { getIncentive } from "@/lib/incentive";
+import { tipPresets } from "@/lib/points-config";
 import { sidebarVisible } from "@/lib/site-config";
 import SiteSidebar, { WidgetArea, type DetailWidgetCtx } from "@/components/sidebar/SiteSidebar";
 import SidebarLayout from "@/components/layout/SidebarLayout";
@@ -114,6 +116,8 @@ export default async function ResourcePage({ params }: PageProps) {
     getTheme(),
     meId ? getCollections(meId) : Promise.resolve([]),
   ]);
+  // 激励配置（请求级缓存，与 sidebar/首页共用一次查询）：只为详情页取打赏参数
+  const incentive = await getIncentive();
 
   if (!detail) notFound();
   // 未发布内容仅作者/管理可见
@@ -145,6 +149,17 @@ export default async function ResourcePage({ params }: PageProps) {
     isStaff: me?.role === "ADMIN" || me?.role === "MODERATOR",
     myCollections,
     related,
+    // 打赏入口只在「体系开启 + 打赏开启」时给出；具体到作者本人/未发布内容由 ActionBar 判定
+    tip:
+      incentive.enabled && incentive.tip.enabled
+        ? {
+            minCoin: incentive.tip.minCoin,
+            maxCoin: incentive.tip.maxCoin,
+            symbol: incentive.coin.symbol,
+            messageMax: incentive.tip.messageMax,
+            presets: tipPresets(incentive.tip.minCoin, incentive.tip.maxCoin),
+          }
+        : undefined,
   };
 
   const template = detailTemplateFor(theme, detail.type);

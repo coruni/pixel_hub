@@ -7,6 +7,7 @@ import { queueIndexNowForResource } from "@/lib/indexnow";
 import { notifyByEmail } from "@/lib/mail-notify";
 import { adminOnly, audit, staff } from "@/lib/actions/_guards";
 import { createNotification, notifyAccountSecurity } from "@/lib/notify";
+import { awardPoints } from "@/lib/points";
 import type { Prisma } from "@prisma/client";
 
 async function notifyMod(userId: string, actorId: string, resourceId: string, message: string) {
@@ -61,6 +62,16 @@ export async function approveResourceAction(
   });
   await audit(admin.id, "APPROVE", "RESOURCE", resourceId);
   await notifyMod(r.authorId, admin.id, resourceId, "你的内容已通过审核并上架 🎉");
+  // 投稿奖励（贡献分）：refId=资源 id，同一作品只奖励一次 —— 下架后再上架不重复得分。
+  // actorId 记审核人：PUBLISH 是作者的产出奖励，不属于「自产自销」拦截范围。
+  after(() =>
+    awardPoints({
+      userId: r.authorId,
+      actorId: admin.id,
+      reason: "PUBLISH",
+      refId: resourceId,
+    }),
+  );
   queueIndexNowForResource(resourceId); // 上架即告知搜索引擎（未启用 IndexNow 时内部直接跳过）
   revalidatePath("/admin");
   revalidatePath("/admin/queue");

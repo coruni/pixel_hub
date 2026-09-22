@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  BadgeDollarSign,
   ClipboardCheck,
+  CreditCard,
   FileText,
   Flag,
   FolderOpen,
@@ -12,11 +14,14 @@ import {
   Images,
   LayoutDashboard,
   PanelsTopLeft,
+  ReceiptText,
   ScrollText,
   Settings2,
+  Sparkles,
   Tag,
   Upload,
   Users,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 
@@ -37,6 +42,11 @@ const TAB_ICONS: Record<string, LucideIcon> = {
   "/admin/media": Images,
   "/admin/drives": HardDrive,
   "/admin/uploads": Upload,
+  "/admin/incentive": Sparkles,
+  "/admin/settlement": ReceiptText,
+  "/admin/withdrawals": Wallet,
+  "/admin/finance": BadgeDollarSign,
+  "/admin/payment": CreditCard,
 };
 
 /** 后台侧栏导航：桌面左侧竖排（sticky），移动端横向滚动；当前路由橙色高亮 */

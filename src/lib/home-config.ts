@@ -55,7 +55,11 @@ export const HOME_KIND_META: Record<
     defaultTitle: "发现",
   },
   stats: { label: "数据一览", desc: "社区规模数字横幅", defaultTitle: "社区数据" },
-  creators: { label: "人气创作者", desc: "按粉丝数排行展示创作者", defaultTitle: "人气创作者" },
+  creators: {
+    label: "人气创作者",
+    desc: "创作者排行；可按粉丝数，或按贡献分（激励体系口径）",
+    defaultTitle: "人气创作者",
+  },
   tags: {
     label: "热门标签",
     desc: "标签云快捷入口；可按热度，或手动挑选特定标签",
@@ -119,6 +123,12 @@ const feedCfg = z.object({
 const statsCfg = z.object({});
 const creatorsCfg = z.object({
   count: z.number().int().min(1).max(12).default(6),
+  // 排序口径：followers=按粉丝数（原行为）；points=按贡献分（激励体系的口径）。
+  // 【兼容红线】默认值必须是 followers —— 存量配置只有 count，改默认会让现网排序被动变化。
+  sort: z.enum(["followers", "points"]).default("followers"),
+  // 时间窗口：all=累计；week/month=滚动窗口（近 7 / 30 天）。
+  // followers 下 = 近期新增关注；points 下 = 窗口内贡献分（与 /creators 周榜/月榜同口径）。
+  period: z.enum(["all", "week", "month"]).default("all"),
 });
 const tagsCfg = z.object({
   count: z.number().int().min(1).max(24).default(12),
@@ -178,7 +188,7 @@ export type HomeSectionConfig =
   | { featuredIds: string[]; display: "card" | "list"; ratio: CardRatio; period: "all" | "week" | "month" } // featured
   | { showTags: boolean } // feed
   | Record<string, never> // stats
-  | { count: number } // creators
+  | { count: number; sort: "followers" | "points"; period: "all" | "week" | "month" } // creators
   | { count: number; slugs: string[] } // tags
   | {
       mode: "image" | "html";
@@ -239,6 +249,12 @@ export const DEFAULT_SECTIONS: DefaultSectionSpec[] = [
   { kind: "categories", title: "按分类探索", order: 20, enabled: false, config: { slugs: [] } },
   { kind: "feed", title: null, order: 30, enabled: true, config: { showTags: false } },
   { kind: "tags", title: "热门标签", order: 40, enabled: false, config: { count: 12, slugs: [] } },
-  { kind: "creators", title: "人气创作者", order: 50, enabled: false, config: { count: 6 } },
+  {
+    kind: "creators",
+    title: "人气创作者",
+    order: 50,
+    enabled: false,
+    config: { count: 6, sort: "followers", period: "all" },
+  },
   { kind: "stats", title: "社区数据", order: 60, enabled: false, config: {} },
 ];

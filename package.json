@@ -10,13 +10,15 @@
     "format": "prettier --write src prisma _test *.ts *.mjs",
     "test:smoke": "node _test/smoke.mjs",
     "test:admin-data": "node _test/admin-data.mjs",
+    "test:incentive": "tsx _test/incentive-conserve.ts",
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
     "db:seed:extra": "tsx prisma/seed-extra.ts",
     "db:seed:bulk": "tsx prisma/seed-bulk.ts",
     "db:seed:av": "tsx prisma/seed-av-demo.ts",
     "db:seed:av:clean": "tsx prisma/seed-av-demo.ts --clean",
-    "search:reindex": "tsx prisma/search-reindex.ts"
+    "search:reindex": "tsx prisma/search-reindex.ts",
+    "points:backfill": "tsx prisma/backfill-points.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",

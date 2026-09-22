@@ -9,6 +9,8 @@ import {
   type HomeSectionConfig,
   type HomeSectionKind,
 } from "@/lib/home-config";
+// 榜单周期口径与 /creators 共用一份（滚动窗口 all/month/week），避免两处各写一套
+import { periodSince, type RankPeriod } from "@/lib/points";
 
 export type HomeSectionView = {
   id: string;
@@ -127,36 +129,123 @@ export async function getPublishedCountByCategory(): Promise<Map<string, number>
   return new Map(rows.map((r) => [r.categoryId as string, r._count._all]));
 }
 
+export type CreatorSort = "followers" | "points";
+
 export type CreatorRow = {
   username: string;
   name: string | null;
   avatarKey: string | null;
   resources: number;
-  followers: number;
+  /**
+   * **驱动本次排名的数值**，口径由 sort + period 决定，展示时必须配套 `creatorMetaText()` 才能对上标签：
+   *   - sort=followers + period=all   → 累计粉丝数
+   *   - sort=followers + week/month   → 窗口内**新增关注数**（不等于累计粉丝数！）
+   *   - sort=points    + period=all   → 累计贡献分
+   *   - sort=points    + week/month   → 窗口内贡献分
+   */
+  metric: number;
   online: boolean;
 };
 
-export async function getTopCreators(limit: number): Promise<CreatorRow[]> {
+/**
+ * 首页 creators 板块与侧栏 creators 组件共用的取数。
+ *
+ * 【兼容红线】`sort` 默认必须是 `"followers"`、`period` 默认必须是 `"all"` ——
+ * 存量板块配置里只有 `count`，默认值一改，不改后台配置的现网排序就会被动变化。
+ *
+ * `period` 在两种排序下都生效：
+ *   - followers + week/month → 按**近期新增关注数**排（「最近谁最受关注」），而非累计粉丝数
+ *   - points + week/month    → 按滚动窗口内的贡献分排（与 /creators 月榜/周榜同一口径）
+ * 已封禁用户在任何路径下都不上榜。
+ */
+export async function getTopCreators(
+  limit: number,
+  sort: CreatorSort = "followers",
+  period: RankPeriod = "all",
+): Promise<CreatorRow[]> {
+  const since = periodSince(period);
+  const ids: string[] = [];
+  const metricById = new Map<string, number>();
+
+  if (sort === "points") {
+    if (since) {
+      const rows = await prisma.pointLog.groupBy({
+        by: ["userId"],
+        where: { createdAt: { gte: since }, delta: { gt: 0 }, user: { bannedAt: null } },
+        _sum: { delta: true },
+        orderBy: [{ _sum: { delta: "desc" } }, { userId: "asc" }],
+        take: limit,
+      });
+      for (const r of rows) {
+        ids.push(r.userId);
+        metricById.set(r.userId, r._sum.delta ?? 0);
+      }
+    } else {
+      const rows = await prisma.userPoint.findMany({
+        where: { user: { bannedAt: null } },
+        orderBy: [{ balance: "desc" }, { userId: "asc" }],
+        take: limit,
+        select: { userId: true, balance: true },
+      });
+      for (const r of rows) {
+        ids.push(r.userId);
+        metricById.set(r.userId, r.balance);
+      }
+    }
+  } else if (since) {
+    const rows = await prisma.follow.groupBy({
+      by: ["followingId"],
+      where: { createdAt: { gte: since }, following: { bannedAt: null } },
+      _count: { followingId: true },
+      orderBy: [{ _count: { followingId: "desc" } }, { followingId: "asc" }],
+      take: limit,
+    });
+    for (const r of rows) {
+      ids.push(r.followingId);
+      metricById.set(r.followingId, r._count.followingId);
+    }
+  } else {
+    const rows = await prisma.user.findMany({
+      where: { bannedAt: null },
+      orderBy: { followers: { _count: "desc" } },
+      take: limit,
+      select: { id: true, _count: { select: { followers: true } } },
+    });
+    for (const r of rows) {
+      ids.push(r.id);
+      metricById.set(r.id, r._count.followers);
+    }
+  }
+
+  if (ids.length === 0) return [];
+
+  // 两步取数（先定序再补展示信息）：让排序走索引，避免 orderBy 与 join 互相牵制
   const users = await prisma.user.findMany({
-    where: { bannedAt: null },
-    orderBy: { followers: { _count: "desc" } },
-    take: limit,
+    where: { id: { in: ids } },
     select: {
+      id: true,
       username: true,
       name: true,
       avatarKey: true,
       lastSeenAt: true,
-      _count: { select: { resources: true, followers: true } },
+      _count: { select: { resources: true } },
     },
   });
-  return users.map((u) => ({
-    username: u.username,
-    name: u.name,
-    avatarKey: u.avatarKey,
-    resources: u._count.resources,
-    followers: u._count.followers,
-    online: isOnline(u.lastSeenAt),
-  }));
+  const byId = new Map(users.map((u) => [u.id, u]));
+  const out: CreatorRow[] = [];
+  for (const id of ids) {
+    const u = byId.get(id);
+    if (!u) continue; // 期间被删号
+    out.push({
+      username: u.username,
+      name: u.name,
+      avatarKey: u.avatarKey,
+      resources: u._count.resources,
+      metric: metricById.get(id) ?? 0,
+      online: isOnline(u.lastSeenAt),
+    });
+  }
+  return out;
 }
 
 /** 供 hero 后台挑选时补全标题等展示信息 */

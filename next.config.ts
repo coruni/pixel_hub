@@ -84,8 +84,14 @@ const nextConfig: NextConfig = {
     },
   },
   // /search 已并入 /browse（同一 FeedBrowser 承载浏览与全文搜索），旧直达链接 301 保留兼容
+  // /sponsor、/sponsors 已并入 /fund 的资金池公示页（「钱去哪了」与「我要给钱」必须同屏），
+  // 页脚入口、二维码与历史外链不能失效 —— 用 301 永久跳转到对应锚点。
   async redirects() {
-    return [{ source: "/search", destination: "/browse", permanent: true }];
+    return [
+      { source: "/search", destination: "/browse", permanent: true },
+      { source: "/sponsor", destination: "/fund#sponsor", permanent: true },
+      { source: "/sponsors", destination: "/fund#thanks", permanent: true },
+    ];
   },
   // 全站安全响应头（H1 修复）。source 覆盖所有路径。
   async headers() {

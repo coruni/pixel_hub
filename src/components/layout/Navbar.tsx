@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db/prisma";
 import { publicUrl } from "@/lib/storage";
 import { getTheme } from "@/lib/site";
 import { getCategories } from "@/lib/queries";
+import { getIncentive } from "@/lib/incentive";
 import { getUnreadNotificationCount } from "@/lib/notify";
 import type { NavItem } from "@/lib/site-config";
 import { NAV_CONTROL_H } from "@/lib/ui/cls";
@@ -65,6 +66,10 @@ export default async function Navbar() {
     : [null, 0];
   const avatarKey = me?.avatarKey ? publicUrl(me.avatarKey) : null;
 
+  // 「我的代币」入口只在激励体系开启时出现 —— 关掉激励后留一个只有 0 余额的死链更糟。
+  // getIncentive 是 cache() 过的，页面里别处读过就不会再查库。
+  const showCoins = u ? (await getIncentive()).enabled : false;
+
   return (
     <header className="sticky top-0 z-40 border-b border-brand-200 bg-surface">
       {/* 窄屏收缩策略：logo 可截断不折行、右侧控件不压扁、间距压缩，320px 仍单行 */}
@@ -108,6 +113,7 @@ export default async function Navbar() {
           {u ? (
             <UserMenu
               unread={unread}
+              showCoins={showCoins}
               user={{
                 name: u.name ?? null,
                 username: u.username ?? "",

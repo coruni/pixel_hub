@@ -1,9 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { CalendarDays, Eye, MessageSquare, ThumbsUp } from "lucide-react";
+import { CalendarDays, Eye, MessageSquare, Sparkles, ThumbsUp } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
+import { getIncentive } from "@/lib/incentive";
+import { getPointBalance } from "@/lib/points";
+import { levelNameOf, levelOf } from "@/lib/points-config";
+import LevelBadge from "@/components/ui/LevelBadge";
 import {
   getFeed,
   getProfile,
@@ -117,6 +121,15 @@ export default async function UserPage({
 
   const profile = await getProfile(username, meId);
   if (!profile) notFound();
+
+  // 贡献分等级：等级名一律现算（`UserPoint.level` 冗余列会因后台改档位而过期，只用于排序）。
+  // 激励总开关关掉时整块不显示，避免留下一个永远停在「新人」的空徽章。
+  const [pointBalance, incentive] = await Promise.all([
+    getPointBalance(profile.id),
+    getIncentive(),
+  ]);
+  const levelName = incentive.enabled ? levelNameOf(pointBalance, incentive.levels) : null;
+  const levelIndex = levelOf(pointBalance, incentive.levels);
 
   // tab 可见性：本人始终可见；其余访客按对方的隐私开关（收藏默认仅本人，粉丝/关注默认公开）
   const tabVisible = (t: (typeof TABS)[number]) =>
@@ -264,6 +277,15 @@ export default async function UserPage({
         <span className="inline-flex items-center gap-1">
           <ThumbsUp size={12} aria-hidden /> {formatCount(agg._sum.likeCount ?? 0)} 次点赞
         </span>
+        {/* 贡献分追加在这条右侧累计行，而不是给上面三格统计加第四格 —— 窄屏四格会挤破 */}
+        {incentive.enabled && (
+          <Link
+            href={profile.isViewer ? "/creators/me" : "/creators"}
+            className="inline-flex items-center gap-1 transition hover:text-brand-700"
+          >
+            <Sparkles size={12} aria-hidden /> 贡献分 {formatCount(pointBalance)}
+          </Link>
+        )}
       </div>
     </div>
   );
@@ -305,6 +327,7 @@ export default async function UserPage({
                     免审发布
                   </span>
                 )}
+                {levelName && <LevelBadge level={levelIndex} name={levelName} />}
               </div>
               <p className="mt-1.5 text-sm leading-6 text-neutral-600">
                 {profile.bio || "这个人很懒，还没写简介。"}
@@ -362,6 +385,7 @@ export default async function UserPage({
                   免审发布
                 </span>
               )}
+              {levelName && <LevelBadge level={levelIndex} name={levelName} />}
             </div>
             <p className="mt-1.5 text-sm leading-6 text-neutral-600">
               {profile.bio || "这个人很懒，还没写简介。"}
