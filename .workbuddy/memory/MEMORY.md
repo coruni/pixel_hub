@@ -93,19 +93,30 @@
 - **密钥永不出服务端**：对外一律走 `publicPaymentConfig()` 的**结构投影**（白名单式，不是"记得手动删 key"）。后台表单在无密钥保存时提交 `KEEP_SECRET` 哨兵值，服务端在 zod 校验**之前**换回库内真值 —— 校验前置换顺序不能颠倒。
 - `permilleText(n)` **去掉无意义小数位**（`6000 → "60%"`，不是 `"60.00%"`）；金额一律整数分，字符串解析走 `parseYuanToFen()`，禁止 `parseFloat*100`。
 
+## 页面标题（metadata）与收录
+- **根 layout 的 `title.template`（`%s · 站名`）确实作用于子段页面**：`/browse` 传 `浏览` → 渲染成 `浏览 · 资源社区`（实测）。所以给子段页面写 `title` **不要自己再拼站名**，否则重复。
+- **唯一例外是同段的页面**：`app/page.tsx`（首页）拿不到模板，必须自己拼（该文件已有注释说明），所以首页写的是 `发现 · ${name}`。
+- **`/browse` 的 `page` 是死参数**：`FeedBrowser` 里写死 `page = infinite ? 1 : intParam(sp,"page",1)`，而 `/browse` 开的是无限滚动 → `?page=3` 渲染的**就是第 1 页内容**，且没有任何链接指向它（`href()` 对 infinite 直接跳过 page）。所以 canonical **不能带 page**、title **不能带页码**（曾误加过「（第 N 页）」，是错的、已撤）。
+- `/browse` 的 title + description + canonical 都随 **分类** 变：`${cat.name} · 浏览` 配分类专属描述；`cat` **只有命中 `getCategories()` 的真实 slug 才算数**，无效 slug 回落成「无分类」并把 canonical 收敛到 `/browse`（避免脏参数造出自称独立分类的软 404 页）。
+- **每个可收录的列表页都必须有 h1**：`/browse` 曾是全站唯一没有 h1 的列表页（分类名只活在 title 与筛选 chip 里）。h1 取 `cat ? cat.name : "浏览"`，与 title 首段一致；搜索态（noindex）用 `<h1 className="sr-only">搜索</h1>` 补语义。
+- **description 要和 title 一起做**：根 layout 只给**一个**默认描述，页面不自己写就全网相同 —— `/browse`、`/tags/[slug]` 都曾中招（已补）；`/creators`、`/fund`、`/resources/[slug]`、`/collections/[id]` 本来就自己写了。
+- `getCategories()` 是 `cache()` 的 → `generateMetadata` 与页面（含 `FeedBrowser`）同请求只查一次库，两处都调不会多查。
+- **h1 放哪儿**：`ArchiveShell` 只被 `/browse` 与 `/tags/[slug]` 用（首页不用），h1 走它的 `heading` 槽位；`FeedBrowser` **首页也在用**，所以 h1 绝不能加进 `FeedBrowser`（首页会多出一个 h1）。
+
 ## 本机验证环境
 - **PowerShell 工具吞 stdout**；`Remove-Item` 对仓库内文件静默失败 → 用 `node -e "fs.unlinkSync/rmSync"`。
 - **bash 的 `rm` 是坏 shim**，且缺 `head`/`ls`/`grep`/`tail`/`sleep`/`dirname`。查文件用 Read、搜内容用 Grep、批量文件操作用 node 一行脚本。
 - 后台长任务用 `run_in_background`（`(cmd &)` 会随工具退出被杀）；轮询用 node 循环发 `curl --noproxy '*'`。
 - 校验 runner 写 `%TEMP%`，用 `execFileSync(process.execPath, [...], {cwd, encoding:"utf8"})` 包 tsc/eslint 再打印。命令：`node node_modules/typescript/bin/tsc --noEmit`（零错误）、`node node_modules/eslint/bin/eslint.js src`。**存量 3 条 no-unused-vars warning**（`admin/media/page.tsx` 的 `enumParam`、`auth/PublishForm.tsx` 的 `draftCount`、`sidebar/SiteSidebar.tsx` 的 `authed`），别顺手改也别新增。
 - 无浏览器验证（**没有** `pixel-hub-verify` 这个 skill，别去找）：走两条路 —— ① **纯函数/纯逻辑**抽成 `prisma/_*.ts` + tsx 跑断言（含全区间遍历）；② **页面渲染**铸管理员 JWT cookie 后 dev server fetch，断言 HTML 里的标签/`value`/`selected`/文案。三者都用反证断言（旧字符串必须消失、非法态必须出现红字）。
+- 验 **metadata**（title / canonical / robots）同样不用浏览器：起 dev server → fetch 页面 → 解析 `<title>`、`<link rel="canonical">`、`<meta name="robots">`。**canonical 输出的是绝对 URL（被 metadataBase 拼过）且属性里 `&` 转义成 `&amp;`** —— 断言前必须 `new URL()` 归一成 path+search，否则全是假红灯。
 - **`npm` 在这个 bash shim 里不通**（`npm run build` 退 127）。改用 node 直调：`node node_modules/prisma/build/index.js generate`、`node node_modules/next/dist/bin/next build`（约 2.5 分钟，用 `run_in_background`）。
 - **构建不触库**：全站路由都是 `ƒ` 按需渲染，所以新增表没跑迁移也能 build 过；但**运行时**会 500。别拿「build 过了」当「迁移可以不做」的证据。
 - **校验响应体首字节（BOM 等）不能用 `fetch().text()`** —— WHATWG 规范下 `text()` 会剥掉 U+FEFF，断言 `charCodeAt(0)===0xFEFF` 必然假红灯。必须 `Buffer.from(await r.arrayBuffer())` 查原始字节（UTF-8 BOM = `EF BB BF`）。
 - **`next dev` 有目录级互斥锁**：同目录第二个实例会打印 `⨯ Another next dev server is already running`（含在跑实例的 PID/端口/日志路径）**并退出**。所以「探测某端口 ECONNRESET/超时」**不等于**没有实例 —— 先读 `.next/dev/logs/next-development.log` 或新实例日志再决定要不要重启。
 - 放在 `%TEMP%` 的验证脚本 **require 基于脚本目录解析**，取不到仓库依赖；用 `createRequire("E:/project/pixel_hub/package.json")` 再 require。
 - **DB 抖动时鉴权页是「静默重定向」**：`src/lib/auth.ts` 的 jwt 回调每次请求回查 DB 取 `role/trusted/passwordHash`；DB 不可达 → token 身份被清空 → `auth()` 得未登录态 → 受保护页 `redirect()`。SSR 表现 = **HTTP 200 + `<meta id="__next-page-redirect" http-equiv="refresh" content="1;url=/admin">`**（不是 307，也不是 500）。**别当权限 bug 追**；判据是同一 cookie 打 `/api/auth/session` 能不能拿到 `role`。
-- **Supabase 会话池 `connection_limit=5`**：dev server 长驻占满时 `PrismaClient` 首连必报 `Can't reach database server`，而**裸 TCP 9ms 就通**。校验脚本一律包一层退避重试（~8 次 × 1.2s 递增）再跑；别据此改连接串。
+- **Supabase 会话池 `connection_limit=5`**：dev server 长驻占满时 `PrismaClient` 首连必报 `Can't reach database server`，而**裸 TCP 9ms 就通**。校验脚本一律包一层退避重试（~8 次 × 1.2s 递增）再跑；别据此改连接串。同一现象会让 **dev server 整页 500**（根 layout 的 `getSeoConfig`/`getRuntimeConfig` 一起挂，每页十几个并发查询，中一个就整页倒）。两条缓解：校验脚本抓到自己要的数据就 `await prisma.$disconnect()` 让路；必要时重启 dev server 换一个干净池。
 - 铸管理员会话 cookie 做真机验证：`@auth/core/jwt` 的 `encode({ token: { id, username, role }, secret, salt: "authjs.session-token" })` —— `pw` 可省（服务端首次请求自行回查补上），**salt 必须是 cookie 名**。
 - **`useAction`（→ `useRouter`）的客户端组件不能 `renderToStaticMarkup`**（`invariant expected app router to be mounted`）→ 涉及 `useAction` 的后台表单只能走「铸 cookie + dev server fetch」，别浪费一轮写静态渲染探针。
 - 真机验证需临时改库时：读出**原始字符串** → 逐档改 → 抓页面断言 → **`finally` 无条件写回并复查与原值相等**（`getUploadLimits` 只有 `cache()` 请求内去重、无跨请求缓存，改完即时可见）。

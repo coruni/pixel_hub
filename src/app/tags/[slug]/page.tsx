@@ -14,6 +14,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   // canonical 锚定到无参数形态：分页/筛选 query 不产生重复收录
   return {
     title: tag ? `#${tag.name}` : "标签",
+    // 标签页原先只继承根 layout 的默认描述 → 所有标签页描述完全相同（与标题同一类重复问题）
+    description: tag ? `标签「${tag.name}」下的全部资源，可按分类、时间与热度筛选。` : undefined,
     alternates: { canonical: `/tags/${slug}` },
   };
 }
