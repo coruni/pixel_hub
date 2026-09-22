@@ -6,11 +6,13 @@
 - **`npm run test:smoke` / `npm run test:admin-data` 已于 2026-09-22 从 `package.json` 移除** —— 它们指向的 `_test/smoke.mjs`、`_test/admin-data.mjs` 从来不存在，是死链。因此 **AGENTS.md 里「跨核心流程改动要跑 `npm run test:smoke`」这条目前没有可执行的落地物**，只能用 `test:incentive` + `tsc` + `build` 代替，并在报告里说明证据限制。
 - `src/app/api/dev-test/route.ts` 是**仅本地开发**的 action RPC 桥（生产 404），注册了 28 个 action 别名，原本专门给 `_test/*.mjs` 行为测试用。那两个测试文件没了之后**它已无消费者**；保留无害，但要用它就得先补回 `.mjs` 测试。
 - **⚠️ `tsconfig.json` 的 `include` 含 `**/*.ts` / `**/*.mts`，所以仓库内任何位置的临时脚本都会被 `tsc` 一起检查，类型不干净会直接卡死 `next build`**。2026-09-22 就发生过一次：别人提交的 `prisma/_tip-cdp-check.mts`（CDP 检查脚本）贡献了 26 个 tsc 错误，把 `npm run build` 拦死。临时脚本要么类型干净，要么别放仓库里。判断「构建坏了是谁的锅」时，先 `npx tsc --noEmit 2>&1 | grep -oE "^[^(]+" | sort | uniq -c` 按文件归组，一眼看出。
+- **⚠️⚠️ `tsconfig.json` 的 `include` 还显式包含 `.next/types/**/*.ts` 与 `.next/dev/types/**/*.ts`（第 29-30 行），`exclude` 只有 `node_modules`。** 这两处是 Next **生成**的路由类型校验文件。**所以：跑过 `next dev` 之后，如果删掉了当时存在的路由文件，`.next/dev/types/validator.ts` 会留下 `import(".../route.js")` 死引用，导致 `tsc --noEmit` 和 `npm run build` 双双报 `TS2307: Cannot find module`。** 2026-09-22 实测踩到。修法：`rm -rf .next` 后重建（`.next` 已被 gitignore，纯缓存）。**推论：临时新增/删除路由文件后，构建前必须清一次 `.next`**，否则会误判成自己的代码把构建弄坏了。
+- **临时路由文件夹不能用 `_` 前缀**：Next App Router 把 `_` 开头的目录当 **private folder**，不参与路由（访问会落到 404 页而不是你的 handler）。仓库里临时**文件**的 `_tmp_*` 命名约定**不适用于路由目录**，要用 `src/app/api/tmp-xxx/route.ts` 这种形式。
 - **⚠️ 本仓库有第二个 agent 会话在并发提交**（它用 `.workbuddy/` 目录，我用 `.workbuddy-ai/`）。2026-09-22 会话开始时 HEAD 是 `943220e`，结束时已被推到 `6d0443f`（多了 4 个提交）。**开工前与收尾前都要 `git log --oneline -5` 确认 HEAD 有没有移动**，否则会把对方未完成的工作误判成自己的问题。
 - **`npm run build` 约需 10 分钟**，务必后台运行，不要用前台默认超时。
 - **`npm run build` 会被本机 safe-delete 守卫拦下**：报 `[safe-delete][SAFE_DELETE_BULK_CONFIRM_REQUIRED]`，阈值 50 文件/轮，`next build` 清理 `.next/turbopack` 时正好卡在阈值上。这不是代码问题。放开方式：
   `CODEBUDDY_SAFE_DELETE_BULK_THRESHOLD=100000 npm run build`
-- 全仓库 `npm run lint` 基线**并非全绿**：`_seed-demo.js` 有 3 个 `no-require-imports` error，`prisma/seed-*.ts`、`admin/media/page.tsx`、`PublishForm.tsx`、`SiteSidebar.tsx` 有若干 unused-var warning。判断「是否新增问题」时先扣掉这些基线。
+- 全仓库 `npm run lint` **2026-09-22 收尾时为 0 error / 7 warning**（7 个 warning 全是基线，分布在 `prisma/seed-bulk.ts`、`prisma/seed-extra.ts`、`admin/media/page.tsx`、`PublishForm.tsx`、`SiteSidebar.tsx`）。判断「是否新增问题」时先扣掉这些基线。**注意基线会漂移**：更早记录的「`_seed-demo.js` 有 3 个 `no-require-imports` error」已随该文件被删而消失；随后 `cache-handler.js` 的 `require("redis")` 又贡献过 1 个 error（已用 `eslint-disable-next-line` + 原因注释修掉，因为该文件**必须**是 CommonJS）。**所以别背基线数字，每次现跑一次 `npm run lint` 为准。**
 - `src/lib/upload-config.ts` 是**前后端共用**的纯数据/校验层（不依赖 server），客户端组件可以直接 import。
 
 ### 需要验证纯逻辑 / 客户端逻辑时
@@ -67,3 +69,11 @@
   - 改 `actions/site.ts` 时注意：`themeRevalidate()` 的 8 处调用都必须在 `await writeThemeDoc()`（失败即 `return CONFLICT`）之后，**写入先提交再失效**，否则会把旧值重新缓存进去。
 - **通用教训**：把「读配置」函数套进任何跨请求缓存前，先确认有没有夹带副作用——命中缓存时副作用不会执行，而这类 bug 表现为「某个 URL 拼错了」，极难归因到缓存。
 - **缓存条目必须二进制安全**：`IncrementalCacheValue` 里的 `html` / `pageData` / `postponed` / `buffer` 是 Buffer，直接 `JSON.stringify` 会降级成 `{type:"Buffer",data:[…]}`，反序列化后不再是 Buffer，**页面渲染直接报错**。必须显式按 `{__bin: base64}` 打标递归编解码。
+- **`unstable_cache` 会自己先 `JSON.stringify` 结果**（`node_modules/next/dist/server/web/spec-extension/unstable-cache.js` 第 24 行 `body: JSON.stringify(result)`，读回时第 182/261 行 `JSON.parse`）。**所以 `Date` 经 `unstable_cache` 一定变 ISO 字符串，与接不接 Redis 无关。** 好消息：本仓库 `timeAgo()`（`src/lib/format.ts:9`）与 `isOnline()`（`src/lib/online.ts:6`）都已经是 `Date | string` 签名，天然兼容。新增消费方不能再假定拿到 `Date`。
+- **⚠️ `revalidatePath` 会连带失效 `unstable_cache` 条目（实测）**：直接改库插入新分类 → 页面不显示（说明缓存生效）；调 `revalidatePath("/browse")` → 立刻显示。含义：仓库里已有的 143 处 `revalidatePath` 会顺带清掉相关数据缓存 → **不会脏数据，但命中率低于预期，别按 100% 命中估收益**。
+- **缓存条目是「全站一份」，失效判定按当前路由的 soft tag，且是 stale-while-revalidate（实测）**：`getCategories` 的键 = 函数源码 + keyParts，与路由无关。某路由 `revalidatePath` 后，该路由的下一次读取判定 stale → **先返回旧值、后台刷新**，所以同一秒内两次请求可能一新一旧。实测序列：stale 读（旧标签集）→ 下一次读（新标签集）。**这是预期行为，不是 bug，别去「修」。**
+- **批次三已落地（2026-09-22）**：`getCategories`（标签 `categories` + TTL 600s）、`getTopTags` / `getRecentComments` / `getHomeStats` / `getTopCreators`（**只给 TTL、不挂标签**）。判断标准是「写入点能否枚举」——可枚举的挂标签（漏一处就是线上错误），不可枚举的（tag.count 每次上架自增、评论遍布前台、统计数字每次浏览都变）**只靠 TTL，因为挂标签却漏一处 = 永久脏数据，比诚实的近似危险得多**。
+  - `getCategories`/`getTopTags` 是 **React `cache()` 作外层 + `unstable_cache` 作内层**：外层同页去重（Navbar/侧栏/首页板块常同页重复取），内层跨请求。
+  - 写入侧只改 1 处：`actions/taxonomy.ts` 的 `revalidateAll()`。
+  - **明确不缓存**（源码里都写了原因注释，别当遗漏「顺手补上」）：`getFeed` / `getRandomResourceIds`（都读 `viewerAuthed()` cookies，缓存会把游客 SFW 结果复用给所有人 = **NSFW 越权**，踩 D9 红线）、`getResourceDetail`（viewerId 进键）、`getRecommendations`、`getTagsBySlugs`（任意 slug 数组 → 键空间无界）、`getHomeSections`。**前两个必须先解耦 `viewerAuthed()` 才能谈缓存，那正是批次四要做的事。**
+- **`queries.ts` 约 1415 行，远超 AGENTS.md 的 800 行硬上限**（批次三之前就已超标）。下一批建议先按领域拆分再动批次四。

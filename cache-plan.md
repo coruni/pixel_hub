@@ -173,6 +173,12 @@ npm run build && npm run start
 > 单实例部署若想同时保留进程内内存缓存（更快），设 `CACHE_KEEP_MEMORY=1`。
 > **多实例部署不要设它**：否则 A 实例失效后，B 实例仍会拿自己内存里的旧条目继续发旧内容。
 
+> **Docker 部署**：`cache-handler.js` 是**绝对路径注册**的（`process.cwd()` + 文件名），
+> 运行时由 `next-server` 动态 import，不会被打进 `.next`，必须单独 `COPY` 进运行镜像
+> （`Dockerfile` 已加）。缺这一步启动时报
+> `Cannot find module '/app/.next/cache-handler.js'` —— 注意报错路径里的 `.next`，
+> 因为运行时那条代码路径是拿 `distDir` 而不是项目根做基准的。
+
 ### 3.4 本轮的诚实边界
 
 - 本机**没有 Redis 实例**，因此这套后端**没有做过真实 Redis 的端到端联调**（连接串、ACL、集群模式仍需上线前实测）。
