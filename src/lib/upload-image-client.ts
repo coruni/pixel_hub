@@ -55,8 +55,15 @@ export type ImageUploadBatchResult = {
 const MAX_ATTEMPTS = 3;
 /** 重试基础退避（指数）：1s → 2s */
 const RETRY_BASE_MS = 1000;
-/** 批量上传并发上限：给源站留余量，别自己把反代的等待预算耗光 */
+/** 批次之间的并发上限：给源站留余量，别自己把反代的等待预算耗光 */
 export const UPLOAD_CONCURRENCY = 2;
+/**
+ * 单个请求携带的张数。
+ * 服务端一次能处理整批（`form.getAll("files")` 循环 + 等长数组响应），
+ * 但整批太大时单请求耗时线性增长，容易顶到反代的超时预算；
+ * 4 张在「请求数」与「单请求时长」之间取平衡，也天然低于后台图集张数上限。
+ */
+export const BATCH_SIZE = 4;
 /** 单次请求上限：兜住「连接既不成功也不失败」的悬挂态，否则 UI 会永远停在「处理中」 */
 const REQUEST_TIMEOUT_MS = 150_000;
 
@@ -104,16 +111,40 @@ function isRetryable(status: number): boolean {
   return status === 429 || (status >= 500 && status < 600);
 }
 
-type Attempt = { ok: true; item: ImageUploadItem } | { ok: false; error: string; retryable: boolean };
+type Attempt =
+  | { ok: true; items: ImageUploadItem[] }
+  | { ok: false; error: string; retryable: boolean };
 
-/** 单次请求（不发重试）。所有返回分支都带 retryable，供上层决定是否退避 */
+/**
+ * 单次请求（不发重试）。所有返回分支都带 retryable，供上层决定是否退避。
+ *
+ * **一次可以带多张**：服务端 `/api/upload` 本来就是 `form.getAll("files")` 循环处理、
+ * 回 `{ ok, files: [...] }` 数组（上限取 min(?max, 后台 galleryImageMaxCount)）。
+ * 早先客户端逐张 append，拿到数组却只读 `files[0]`，多出来的条目被静默丢弃 ——
+ * 这也是「粘了 3 张只出一张」的直接原因。现在按整批发送、按整批解析。
+ *
+ * 仍然限制并发（见 uploadImageFiles）：这里发的是「一个批次」，批次之间才受并发约束，
+ * 避免十几张图各开一条重请求把反代的超时预算耗光。
+ */
 async function postOnce(
-  file: File,
+  files: File[],
   maxCount: number,
   onProgress?: (percent: number) => void,
 ): Promise<Attempt> {
   const fd = new FormData();
-  fd.append("files", file);
+  // 诊断：确认进到这里的到底是不是数组。staging 结束后移除。
+  const isArr = Array.isArray(files);
+  if (!isArr) {
+    console.error("[upload:diag] postOnce 收到的不是数组", {
+      type: Object.prototype.toString.call(files),
+      ctor: (files as unknown as { constructor?: { name?: string } })?.constructor?.name,
+      hasLength: typeof (files as unknown as { length?: unknown })?.length,
+      isFileList: typeof FileList !== "undefined" && (files as unknown) instanceof FileList,
+      iterable: typeof (files as unknown as { [Symbol.iterator]?: unknown })?.[Symbol.iterator],
+    });
+  }
+  for (const f of files) fd.append("files", f);
+  const label = files.map((f) => f.name).join("、");
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), REQUEST_TIMEOUT_MS);
   try {
@@ -129,7 +160,7 @@ async function postOnce(
     if (!res.ok) {
       const body = await readJson(res);
       const serverError = typeof body?.error === "string" ? body.error : "";
-      console.warn(`[upload:client] 上传被拒 fileName=${file.name}`, {
+      console.warn(`[upload:client] 上传被拒 fileName=${label}`, {
         status: res.status,
         body,
       });
@@ -144,19 +175,27 @@ async function postOnce(
       // 200 但体不是 JSON：不该发生，单独报出来便于定位（而不是伪装成网络错误）
       return { ok: false, error: "服务端返回了非预期的响应内容", retryable: false };
     }
-    const item = (Array.isArray(data.files) ? data.files[0] : undefined) as
-      | ImageUploadItem
-      | undefined;
-    if (data.ok === true && item?.ok) {
-      onProgress?.(100);
-      return { ok: true, item };
+    const arr = Array.isArray(data.files) ? (data.files as ImageUploadItem[]) : [];
+    // 服务端逐个文件回结果，**条数必须与请求张数一致**。
+    // 少了说明有文件被静默吞掉 —— 那正是「粘 3 张只出一张」的病灶，必须报出来而不是当成功。
+    if (data.ok !== true || arr.length !== files.length) {
+      console.warn(`[upload:client] 响应条目数与请求不符 fileName=${label}`, {
+        status: res.status,
+        sent: files.length,
+        got: arr.length,
+        body: data,
+      });
+      return {
+        ok: false,
+        error:
+          arr.length === 0
+            ? (typeof data.error === "string" ? data.error : "上传失败")
+            : `服务端返回了 ${arr.length} 条结果（发了 ${files.length} 张），请重试`,
+        retryable: false,
+      };
     }
-    console.warn(`[upload:client] 上传被拒 fileName=${file.name}`, { status: res.status, body: data });
-    return {
-      ok: false,
-      error: item?.error ?? (typeof data.error === "string" ? data.error : "上传失败"),
-      retryable: false,
-    };
+    onProgress?.(100);
+    return { ok: true, items: arr };
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") {
       return {
@@ -165,11 +204,33 @@ async function postOnce(
         retryable: false,
       };
     }
-    console.warn(`[upload:client] 请求失败 fileName=${file.name}`, err);
+    console.warn(`[upload:client] 请求失败 fileName=${label}`, err);
     return { ok: false, error: "网络错误，请重试", retryable: true };
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * 上传一组图片（一个批次）：失败时按需退避重试。
+ * 返回的 items 顺序与入参一致 —— 上层按绝对下标回填，首图才能稳定当封面。
+ */
+async function uploadImagesOnce(
+  files: File[],
+  maxCount: number,
+): Promise<Attempt> {
+  let lastError = "上传失败";
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+    const r = await postOnce(files, maxCount);
+    if (r.ok) return r;
+    lastError = r.error;
+    if (!r.retryable || attempt === MAX_ATTEMPTS) break;
+    console.warn(
+      `[upload:client] 第 ${attempt} 次失败，退避重试 fileName=${files.map((f) => f.name).join("、")}`,
+    );
+    await wait(RETRY_BASE_MS * 2 ** (attempt - 1));
+  }
+  return { ok: false, error: lastError, retryable: false };
 }
 
 /** 上传单张图片：失败时按需退避重试（同名同序的远端对象可能重复，重试以「用户拿到结果」为准） */
@@ -178,32 +239,45 @@ export async function uploadImageFile(
   maxCount: number,
   onProgress?: (percent: number) => void,
 ): Promise<ImageUploadOutcome> {
-  let lastError = "上传失败";
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-    const r = await postOnce(file, maxCount, onProgress);
-    if (r.ok) return { ok: true, item: r.item };
-    lastError = r.error;
-    if (!r.retryable || attempt === MAX_ATTEMPTS) break;
-    console.warn(`[upload:client] 第 ${attempt} 次失败，退避重试 fileName=${file.name}`);
-    await wait(RETRY_BASE_MS * 2 ** (attempt - 1));
+  const r = await postOnce([file], maxCount, onProgress);
+  if (r.ok) {
+    const item = r.items[0];
+    if (item) return { ok: true, item };
+    return { ok: false, error: "服务端未返回该文件的结果" };
   }
-  return { ok: false, error: lastError };
+  if (r.retryable) {
+    // 单张入口（后台封面等）仍走退避重试，语义与批量一致
+    let lastError = r.error;
+    for (let attempt = 2; attempt <= MAX_ATTEMPTS; attempt += 1) {
+      await wait(RETRY_BASE_MS * 2 ** (attempt - 2));
+      console.warn(`[upload:client] 第 ${attempt - 1} 次失败，退避重试 fileName=${file.name}`);
+      const again = await postOnce([file], maxCount, onProgress);
+      if (again.ok) {
+        const item = again.items[0];
+        return item ? { ok: true, item } : { ok: false, error: "服务端未返回该文件的结果" };
+      }
+      lastError = again.error;
+      if (!again.retryable) break;
+    }
+    return { ok: false, error: lastError };
+  }
+  return { ok: false, error: r.error };
 }
 
 /**
- * 批量上传：并发受限、逐个收集成败；成功项保持与入参同序。
+ * 批量上传：按批切分、批内并发受限；成功项保持与入参同序。
  *
- * `onProgress` 在每张开始 / 结束时回调。注意：服务端返回的是**单个** JSON
- * （一次请求只落一张图，还要写三份对象），因此没有真实的字节级进度可读，
- * 这里按「已完成张数」折算成整体百分比（不编造虚假的字节流）。
+ * 每个请求带 BATCH_SIZE 张（服务端一次就能处理整批并回等长数组），批次之间最多
+ * `UPLOAD_CONCURRENCY` 个在飞。这样既不会「一张一个请求」把请求数放大 N 倍，
+ * 也不会一次把十几张图打满源站、让后面的请求熬完反代的超时预算。
+ *
+ * `onProgress` 按「已完成张数」回调。服务端没有字节级进度可读，不编造虚假百分比。
  */
 export async function uploadImageFiles(
   files: File[],
   maxCount: number,
   opts?: { concurrency?: number; onProgress?: (p: UploadProgress) => void },
 ): Promise<ImageUploadBatchResult> {
-  const limit = Math.max(1, Math.min(opts?.concurrency ?? UPLOAD_CONCURRENCY, files.length));
-  const results: ImageUploadOutcome[] = new Array(files.length);
   const total = files.length;
   let done = 0;
   const emit = (index: number, phase: UploadProgress["phase"]) =>
@@ -214,16 +288,38 @@ export async function uploadImageFiles(
       name: files[Math.min(index, total - 1)]?.name ?? "",
       phase,
     });
-  // 共享游标 + N 个 worker：单线程下「读游标 → 自增」之间没有 await，不会取到同一个下标
+
+  // 切成批次：最后一批可能不满 BATCH_SIZE
+  const batches: { start: number; files: File[] }[] = [];
+  for (let i = 0; i < total; i += BATCH_SIZE) {
+    batches.push({ start: i, files: files.slice(i, i + BATCH_SIZE) });
+  }
+
+  // 批内结果：按绝对下标回填，保证 good 与入参同序（首图要当封面）
+  const results: ImageUploadOutcome[] = new Array(total);
+  const limit = Math.max(1, Math.min(opts?.concurrency ?? UPLOAD_CONCURRENCY, batches.length));
   let cursor = 0;
   async function worker() {
-    while (cursor < files.length) {
-      const i = cursor;
+    while (cursor < batches.length) {
+      const b = batches[cursor];
       cursor += 1;
-      emit(i, "uploading");
-      results[i] = await uploadImageFile(files[i]!, maxCount);
-      done += 1;
-      emit(i + 1, done < total ? "uploading" : "done");
+      if (!b) continue;
+      emit(b.start, "uploading");
+      const r = await uploadImagesOnce(b.files, maxCount);
+      const last = b.start + b.files.length; // 本批结束后的已完成张数下标
+      if (r.ok) {
+        // 服务端逐条回结果且顺序与入参一致（见 /api/upload 的 for 循环）
+        b.files.forEach((_, k) => {
+          const item = r.items[k];
+          results[b.start + k] = item ? { ok: true, item } : { ok: false, error: "服务端未返回结果" };
+        });
+      } else {
+        b.files.forEach((_, k) => {
+          results[b.start + k] = { ok: false, error: r.error };
+        });
+      }
+      done = last;
+      emit(last, done < total ? "uploading" : "done");
     }
   }
   await Promise.all(Array.from({ length: limit }, () => worker()));

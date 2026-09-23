@@ -23,14 +23,15 @@ function imageFilesFrom(e: ClipboardEvent<HTMLElement>): File[] {
 /**
  * 把 File[] 包成与 `<input type="file">` 同型的 FileList，让粘贴与文件选择共用一条上传链路。
  *
- * **必须显式挂 `@@iterator`，否则多张只能传出去一张。** 宿主 FileList 只有 `length` 与数字索引，
- * 自身**没有** `Symbol.iterator`（浏览器的 `Symbol.iterator in FileList.prototype === false`）。
- * `Array.from(fl)` / `[...fl]` 走的是「先查 @@iterator，缺失才回退数组式」的取值顺序；
- * 而 `Object.create(FileList.prototype)` 出来的替身既不继承迭代器、又不是真数组，
- * 于是 `Array.from` 只探到 `length === 0`，**无论粘了几张都返回长度 1 的 `[undefined]`**
- * （`fl[0]` 落在原型的索引访问器上，仍是 undefined）。消费方 `Array.from(fl).slice(...)`
- * 正好把这个 `[undefined]` 放行，上游 `!fl.length` 也拦不住 —— 一路静默腐烂到
- * FormData.append 抛 TypeError，表现为「粘贴上传只能出一张」。
+ * **必须显式挂 `@@iterator`。** 宿主 FileList 只有 `length` + 数字索引，自身**没有**
+ * `Symbol.iterator`（`Symbol.iterator in FileList.prototype === false`），而
+ * `Object.create(FileList.prototype)` 出来的替身既不继承迭代器、又不是真数组：
+ * `[...fl]` / `for...of fl` / `new Set(fl)` / `const [a] = fl` 一律抛
+ * `TypeError: fl is not iterable`。
+ *
+ * 注意 `Array.from(fl)` 是**例外**：迭代器缺失时它会回退到数组式读取，用 length 正确展开，
+ * 所以「只传出一张」不是它造成的（真凶见 lib/upload-image-client 只取 `files[0]` 那段注释）。
+ * 但调用方换一个遍历写法就会当场炸，这里必须补全契约。
  *
  * 不用 `new DataTransfer()`：Safari 14 及更早版本没有它，会直接抛 ReferenceError 把整次粘贴打挂。
  */
