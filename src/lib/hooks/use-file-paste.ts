@@ -21,6 +21,35 @@ function imageFilesFrom(e: ClipboardEvent<HTMLElement>): File[] {
 }
 
 /**
+ * 把 File[] 包成与 `<input type="file">` 同型的 FileList，让粘贴与文件选择共用一条上传链路。
+ *
+ * **必须显式挂 `@@iterator`，否则多张只能传出去一张。** 宿主 FileList 只有 `length` 与数字索引，
+ * 自身**没有** `Symbol.iterator`（浏览器的 `Symbol.iterator in FileList.prototype === false`）。
+ * `Array.from(fl)` / `[...fl]` 走的是「先查 @@iterator，缺失才回退数组式」的取值顺序；
+ * 而 `Object.create(FileList.prototype)` 出来的替身既不继承迭代器、又不是真数组，
+ * 于是 `Array.from` 只探到 `length === 0`，**无论粘了几张都返回长度 1 的 `[undefined]`**
+ * （`fl[0]` 落在原型的索引访问器上，仍是 undefined）。消费方 `Array.from(fl).slice(...)`
+ * 正好把这个 `[undefined]` 放行，上游 `!fl.length` 也拦不住 —— 一路静默腐烂到
+ * FormData.append 抛 TypeError，表现为「粘贴上传只能出一张」。
+ *
+ * 不用 `new DataTransfer()`：Safari 14 及更早版本没有它，会直接抛 ReferenceError 把整次粘贴打挂。
+ */
+function asFileList(files: readonly File[]): FileList {
+  const fl = Object.create(FileList.prototype) as FileList;
+  files.forEach((f, i) => {
+    Object.defineProperty(fl, i, { value: f, enumerable: true });
+  });
+  Object.defineProperty(fl, "length", { value: files.length });
+  Object.defineProperty(fl, Symbol.iterator, {
+    value: function* () {
+      for (let i = 0; i < this.length; i += 1) yield this[i];
+    },
+    configurable: true,
+  });
+  return fl;
+}
+
+/**
  * 「Ctrl+V 直接上传剪贴板里的图片」的通用 hook：返回可直接展开到容器的 props
  * （`<div {...pasteProps} />`）。
  *
@@ -56,18 +85,7 @@ export function useFilePaste({
       const named = files.map((f, i) =>
         f.name ? f : new File([f], `粘贴图片-${i + 1}.png`, { type: f.type }),
       );
-
-      // 调用方只认 FileList（与 input 同型）。这里用「以真 FileList.prototype 为原型、
-      // 补上数字索引与 length」的数组式对象来满足它：
-      // 不用 new DataTransfer() —— 它在 Safari 14 及更早版上不存在，会直接抛
-      // ReferenceError 把整次粘贴打挂；jsdom 也没实现。FileList 是只读的类数组契约，
-      // 消费方只读 length / [i] / 迭代，这个替身在语义上完全等价。
-      const fl = Object.create(FileList.prototype) as FileList;
-      named.forEach((f, i) => {
-        Object.defineProperty(fl, i, { value: f, enumerable: true });
-      });
-      Object.defineProperty(fl, "length", { value: named.length });
-      onFiles(fl);
+      onFiles(asFileList(named));
     },
     [disabled, enabled, onFiles],
   );

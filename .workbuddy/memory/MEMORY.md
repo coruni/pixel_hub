@@ -20,6 +20,7 @@
 
 ## 附件 / 音视频上传（改动前必读）
 - 唯一上传按钮 = `src/components/upload/AttachmentUpload.tsx`；全站禁止再手写 `<label>`+`<input type=file>`。四态：可上传 / 拖拽悬停（`dragging`+`dropProps`）/ 上传中（`progress`）/ 已回执（`filled`）。
+- **别自己造 FileList**：`FileList` 没有 `Symbol.iterator`（只有 `length` + 数字索引，索引访问器长在 prototype 上）。`Object.create(FileList.prototype)` + 补索引的替身会让 `Array.from(fl)` 只探到 `length === 0` → **恒返回长度 1 的 `[undefined]`**（曾导致 `/upload` 粘贴多张只出一张）。自造必须显式挂 `Symbol.iterator`，见 `use-file-paste.ts` 的 `asFileList()`；`useFileDrop` 透传宿主 `dataTransfer.files`，无此问题。
 - `accept` 按 kind 分派：MUSIC/VIDEO **必须**传 `avAcceptAttr(kind)`（否则合法文件选不中）。
 - 进度别混用：单文件字节进度用 `percent`；`progress({done,total})` 是**批量**语义。
 - 清空 `input.value` 必须在 `onFiles` **之后**（Chrome 的 `input.files` 是同一份 FileList）。
