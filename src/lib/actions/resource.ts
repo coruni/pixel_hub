@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
+import { after } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
@@ -18,6 +19,7 @@ import { syncResourceSearch } from "@/lib/search";
 import { queueIndexNowForResource } from "@/lib/indexnow";
 import { discardDraft } from "@/lib/draft-store";
 import { createNotification, notifyStaff } from "@/lib/notify";
+import { awardPoints } from "@/lib/points";
 
 export type ResourceActionState = {
   error?: string;
@@ -283,6 +285,13 @@ export async function createResourceAction(
   if (draftId) await discardDraft(user.id, draftId.slice(0, 64));
 
   if (status === "PUBLISHED") {
+    // 投稿奖励（贡献分）：免审直发绕过了审核队列，不能只让 approveResourceAction 发分，
+    // 否则 trusted / ADMIN / MODERATOR 直发的内容一分不得。refId=资源 id，与审核通过那条路径
+    // 共用同一个幂等键，回填过的存量资源也不会重复计分。
+    // actorId 记本人：PUBLISH 不在 NO_SELF_BENEFIT 内（见 points.ts 的说明），不会被自产自销拦截。
+    after(() =>
+      awardPoints({ userId: user.id, actorId: user.id, reason: "PUBLISH", refId: resource.id }),
+    );
     // 免审直发的内容立即告知搜索引擎（after 在响应后执行，不拖慢跳转；未启用时内部跳过）
     queueIndexNowForResource(resource.id);
     revalidatePath("/", "layout");
