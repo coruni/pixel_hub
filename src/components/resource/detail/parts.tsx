@@ -367,14 +367,13 @@ export async function VersionSection({ ctx }: { ctx: DetailCtx }) {
   );
 }
 
-/** 长描述卡（Markdown 富文本，见 DESIGN 描述=富文本） */
+/** 长描述正文（Markdown 富文本，见 DESIGN 描述=富文本）。
+ *  排版即文章正文本身：不套卡片（无边框/底色/内距），也不带小标题 —— 与 DetailArticle
+ *  的正文逐字一致，四个模板共用这一处实现。 */
 export function DescriptionBlock({ ctx }: { ctx: DetailCtx }) {
   return (
-    <section className="rounded-none border border-brand-200 bg-surface p-5">
-      <h2 className="text-sm font-semibold text-neutral-400">描述</h2>
-      <div className="mt-3 md-body md-body--lg">
-        <Markdown>{ctx.detail.description}</Markdown>
-      </div>
+    <section className="md-body md-body--lg">
+      <Markdown>{ctx.detail.description}</Markdown>
     </section>
   );
 }

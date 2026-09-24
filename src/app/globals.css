@@ -23,7 +23,9 @@
   --md-text-lg: #27272a;
   --md-heading: #171717;
   --md-muted: #737373;
-  --md-marker: #a3a3a3;
+  /* 有序/无序列表的序号与项目符号：取品牌陶土橙阶（亮暗自动跟随，见 html.dark 的 --brand-400），
+     不再用中性灰；编辑器与前台共用这一个 token（编辑器列表标记另见 .md-editor 段） */
+  --md-marker: var(--brand-400);
   --md-link: #a84e31; /* 亮=品牌赤陶橙深阶（对齐暗色浅暖橙），不再用冷 slate 深蓝 */
   --md-link-hover: #8a4129; /* 亮：hover 再深一档（brand-800） */
   --md-code-bg: #f0e9dd; /* 亮=暖米（对齐暗色暖深棕语义），不再用冷 neutral 灰 */
@@ -66,7 +68,6 @@ html.dark {
   --md-text-lg: #c8c3bc;
   --md-heading: #ece9e3;
   --md-muted: #9c978f;
-  --md-marker: #6e6961;
   --md-link: #f0c9b2;
   --md-link-hover: #f7e2d4; /* 暗：hover 提亮至 brand-900 */
   --md-code-bg: #2d2925;
@@ -523,6 +524,16 @@ summary {
 }
 .md-editor .milkdown .ProseMirror li::marker {
   color: var(--md-marker);
+}
+/* Crepe 的列表标记不走 ::marker：由 .milkdown-list-item-block 里的 .label-wrapper 渲染
+   （项目符号是 svg、有序列表是数字），原本取 --crepe-color-outline = brand-200，淡到几乎看不见。
+   这里拉回 --md-marker —— 与前台正文同源，编辑时看到的标记颜色 = 发布后看到的。
+   选择器 4 层压过 Crepe 主题的 3 层（.milkdown .milkdown-list-item-block li .label-wrapper）。 */
+.md-editor .milkdown .ProseMirror .label-wrapper {
+  color: var(--md-marker);
+}
+.md-editor .milkdown .ProseMirror .label-wrapper svg {
+  fill: var(--md-marker);
 }
 /* Crepe 的列表项内部是真段落（前台 li 内是纯文本），压掉首尾段落的 margin，
    否则每一项上下各多 0.4rem，列表比前台松一大截 */

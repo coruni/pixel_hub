@@ -2,12 +2,12 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { CalendarDays, Eye, MessageSquare, Newspaper } from "lucide-react";
 import { formatCount, timeAgo } from "@/lib/format";
-import Markdown from "@/components/rte/Markdown";
 import {
   ActionBar,
   AuthorIdentity,
   AuthorTipButton,
   CommentBlock,
+  DescriptionBlock,
   FollowControl,
   RelatedSection,
   type DetailCtx,
@@ -89,10 +89,10 @@ export default function DetailArticle({
         />
       )}
 
-      {/* 正文 */}
-      <article className="mt-8 md-body md-body--lg">
-        <Markdown>{detail.description}</Markdown>
-      </article>
+      {/* 正文：与其余三个模板共用 DescriptionBlock（同一处实现，避免样式漂移） */}
+      <div className="mt-8">
+        <DescriptionBlock ctx={ctx} />
+      </div>
 
       {/* 插图（封面之外的配图） */}
       {rest.length > 0 && (

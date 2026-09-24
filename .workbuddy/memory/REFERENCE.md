@@ -1,6 +1,6 @@
 # Pixel Hub —— 细则（按需查阅）
 
-> 从 `MEMORY.md` 拆出来的低频但必查的内容：上传链路、Markdown 编辑器、打包器追踪、**本机验证环境**。
+> 从 `MEMORY.md` 拆出来的低频但必查的内容：上传链路与图片压缩、附件/音视频上传、云盘 Graph/OneDrive、Markdown 编辑器与 Crepe 样式、打包器追踪、**本机验证环境**。
 > 改这些领域之前先读本文，别凭记忆写。
 
 ## 上传体积 / 图片压缩
@@ -18,6 +18,15 @@
 - 回执不能等 `probeFile()`（最坏 12s）：先出回执，probe 异步补提示。视频自动封面 `capturePoster()` 抽 **10% 处**那帧；`autoCoverId` ref —— 自动值可覆盖自动值，用户手选过就不抢。
 - 大文件通道 `/attachment/session` 三态（云盘分片 / `{mode:"driver"}` 流式直传 / `409 NO_CLOUD` 回退旧单请求）。旧 `/attachment` 走 `formData()`（整请求体进内存，硬限 250MB），`Content-Length` 预检必须在 `formData()` **之前**。`PUT /api/upload/attachment/stream`：先写 `.uploads-tmp/`（不在 public 下、不放 `os.tmpdir()` —— 跨盘 rename EXDEV）再 rename；能力用 `streamCapable()` 判。客户端进度**只能用 XHR**。
 
+## 云盘（Graph / OneDrive，`src/lib/storage/onedrive.ts`）
+- 凭据：后台运行配置 > `.env`（`GRAPH_TENANT_ID/CLIENT_ID/CLIENT_SECRET`），缺一即整功能关闭、附件回退原存储。app-only，**不能用 `/me/drive`，不支持个人 MSA**。
+- locator 白名单 `drives|sites|users|groups/`。形态：`drives/{id}`、`sites/{siteId}/drive`、`sites/{host}:/sites/{team}:/drive`、`users/{UPN}/drive`。
+- **507 = 配额爆了，不是连不通**。Graph 体 `{"error":{"code":"quotaLimitReached"}}`；先 `GET /v1.0/{locator}?$select=id,name,driveType,quota` 看 `quota.state`（`exceeded`）/`remaining`。用户盘 `total` 被下调（如 10 GiB）而 `used` 远超它（如 2.27 TiB）会长期 507；**同租户里站点盘还能写就说明租户池没耗尽，问题在每用户配额**（OneDrive 许可默认 1 TB、管理员最高覆写 5 TB，被重置回默认即此症状；站点转只读、数据不丢）。判定许可/池状态 **Graph 拿不到**（`/users`、`/subscribedSkus`、`/admin/sharepoint/settings` 全 403），要去 SharePoint 管理中心看。**后台 `/admin/drives` 的 active 盘指向这种盘 = 新附件全挂**，先切盘再排查。
+- `graphErr()` 给 403/404/429/507 都补中文 hint；**新增状态码提示加在这里**，别在调用点各写一份。
+- 引用语义 `/od/{driveId}/{itemPath}`，`itemPath = [rootPath/]YYYYMM/{安全原名}_{uuid}.{ext}`，**存储名必须保留原名**（Graph 下载响应的 `Content-Disposition` 用的是云盘存储名，否则用户下到随机 uuid 名）。`rootPath` 只影响新上传落点，存量引用自带完整路径。
+- 音视频要能内联播：`/od` 按扩展名分流 —— 音视频走本站代理转发（自定 MIME + `Content-Disposition: inline` + `Accept-Ranges`，`Range`/`Content-Range` **必须透传**，206 原样返回），其余 302 预鉴权地址。
+- 测「路径穿越」别用 HTTP 客户端：fetch/undici 与 Next 路由会**先折叠 `..`**，看到的 200 无法区分「被拒」和「已规范化」。
+
 ## ImageViewer（`src/components/ui/ImageViewer.tsx`）
 - 平移按「可平移空间」（`panBounds`/`canPan`）判，不用 `zoom > 1` 当代理；位移必须在 `applyZoom`/`rotateBy` 后重新夹取。
 - react-hooks v7 immutability：`useCallback`/`useEffect` 内不许写 `useRef.current`（只有 `useLayoutEffect` 可以）。
@@ -28,6 +37,9 @@
 - 编辑器 = Milkdown Crepe；排版基准 = **前台 `.md-body--lg`**（15px），编辑时所见 = 发布后所得。
 - **覆盖 Crepe 主题必须用 4 层选择器**（`.md-editor .milkdown .ProseMirror X`）压过它的 3 层，否则要赌 CSS 加载顺序。Crepe `reset.css` 是「大标题文档」风（h1/h2/h3 = 2.625/2.25/2em、字重 400、上边距 24~32px、段落 `padding:4px 0`），对齐时字号/字重/行高/边距要**一起压**。**h5/h6 前台无规则**，编辑器里必须显式重置成 `inherit`；首尾元素补 `> :first-child/:last-child` 零边距。
 - 代码字体栈唯一来源 = `:root` 的 `--md-font-code`。已对齐 17 元素 × 25 属性；**未对齐**：表格（Crepe 表格是带拖拽手柄的交互 widget）、docs 编辑器（前台 13px vs 编辑器 15px）。
+- **详情页描述正文 = `parts.tsx` 的 `DescriptionBlock`**（唯一实现：裸 `md-body md-body--lg`，无卡片/底色/边框/小标题），article/post/twocol/banner 四模板共用 —— 改描述排版只改这一处，别再让某个模板单独渲染一份。
+- **编辑器里手敲 `[文本](/路径)` 不会变成链接**（会变成字面量文本）。两个原因叠加：① Crepe 只有 **图片** 输入规则（`insertImageInputRule`／`![alt](url)`），**没有 link 输入规则**（`preset-commonmark` 里无 `Mod-k`、link 只能经工具栏 `toggleLinkCommand` 或粘贴）；② 存下来的正文里它仍是 text 节点，序列化器（remark-stringify / `mdast-util-to-markdown`）会把文本里的 `[`→`\[`、`(`→`\(`，于是入库的是 `\[资金池]\(/fund)`，前台按字面量渲染（react-markdown 这边没问题：`[资金池](/fund)` 一定解析成站内 `<Link>`）。**要加链接就两条路**：选中文字 → 工具栏「链接」→ 输入 `/fund`（`sanitizeLinkHref` 对无 scheme 的相对路径原样放行）；或**粘贴**无 HTML 的纯文本 markdown（`plugin-clipboard` 的 `handlePaste` 在 `html.length===0` 时走 `parserCtx` 解析 → 真链接）。不要试图在渲染端「把转义还原成链接」——那会连内容里真想显示的字面方括号一起改掉。
+- 列表序号与项目符号色 = `--md-marker`（`var(--brand-400)`，暗色不单独覆写，随 brand-400 翻转）。**编辑器列表标记不走 `::marker`**：Crepe 用 `.milkdown-list-item-block li .label-wrapper`（项目符号是 svg、有序列表是数字），默认取 `--crepe-color-outline` = brand-200（淡到几乎看不见）→ 已加 `.md-editor .milkdown .ProseMirror .label-wrapper{, svg}` 两条取同一 token（4 层压 Crepe 的 3 层：(0,4,0) > (0,3,1)）。
 
 ## 打包器文件追踪
 - 追踪只静态分析 `path.join(process.cwd(), "<字面量>", 动态尾段)`；路径一经函数计算就退化成「追踪整个项目」，build 打 `Warning: Dynamic filesystem access`。规矩：**字面前缀留在真正调 `fs` 的地方**，越界靠「结果一定在 `public/<sub>/` 之下」结构排除（`safeRel` 拒 `..`/NUL/空、`\` 统一 `/`）。
@@ -42,5 +54,5 @@
 - **DB 抖动时鉴权页是「静默重定向」**：`auth.ts` 的 jwt 回调每次请求回查 DB，DB 不可达 → `auth()` 得未登录态 → 受保护页 `redirect()`。SSR 表现 = **HTTP 200 + `<meta id="__next-page-redirect" http-equiv="refresh" ...>`**（不是 307/500）。判据：同一 cookie 打 `/api/auth/session` 能否拿到 `role`。
 - **Supabase 会话池 `connection_limit=5`**：dev server 长驻占满时 `PrismaClient` 首连必报 `Can't reach database server`，而**裸 TCP 9ms 就通** → 校验脚本包退避重试（~8 次 × 1.2s）；脚本抓完数据 `await prisma.$disconnect()` 让路。
 - 铸管理员 cookie：`@auth/core/jwt` 的 `encode({ token:{id,username,role}, secret, salt:"authjs.session-token" })` —— salt **必须是 cookie 名**。涉及 `useAction` 的组件不能 `renderToStaticMarkup`，只能「铸 cookie + dev server fetch」。
-- 布局必须真机量测：`msedge.exe --headless=new --remote-debugging-port=<p> --user-data-dir=%TEMP%\x --no-proxy-server` + Node 内置 `WebSocket` 连 CDP。应用路由不能做探针（`src/app/_xxx` 不路由且根 layout 在 DB 不通时 500）→ 用 tsx `renderToStaticMarkup` + 内联 `.next/dev/static/chunks/*.css` + 本地 static server（**仅限不含 `useAction` 的纯展示组件**）。
+- 布局/样式**禁止浏览器与 CDP**（用户明确要求，headless、「只量一下不算 e2e」也不行）→ 样式类改动只做静态契约：① postcss 编 `globals.css` 断言新 class 真产出选择器；② `renderToStaticMarkup` 断言组件吐出的 class 串；③ 视觉一致性最终由人眼确认，报告里如实写「未做浏览器实测」。量测细节见 `pixel-hub-verify` skill。
 - **canonical 输出绝对 URL（被 metadataBase 拼过）且 `&` 转义成 `&amp;`** → 断言前 `new URL()` 归一成 path+search。**校验响应体首字节不能用 `fetch().text()`**（WHATWG 剥 U+FEFF）→ `Buffer.from(await r.arrayBuffer())`。放 `%TEMP%` 的脚本 require 基于脚本目录解析 → 用 `createRequire("E:/project/pixel_hub/package.json")`。
