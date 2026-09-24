@@ -82,7 +82,12 @@ export function AvPlayerBlock({ ctx }: { ctx: DetailCtx }) {
   ) : null;
 
   return (
-    <section className="mt-6">
+    // mt-6 是「与上一个区块拉开距离」；当播放卡正好是容器首块时不存在上一个块，这个间距就成了
+    // 凭空多出的 24px —— video 走 post 模板且不渲染 Gallery（`{!isVideo && <Gallery/>}`），
+    // 播放卡正是首块，于是比音频/图片（首块是 Gallery，无上边距）整块下沉。
+    // first:mt-0 只在「确实有前驱块」时保留间距：post 视频 / twocol 视频归零，banner（横幅之后）、
+    // article（封面/正文之后）不受影响。
+    <section className="mt-6 first:mt-0">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <h2 className="flex items-center gap-1.5 text-sm font-semibold text-neutral-900">
           <KindIcon size={14} aria-hidden />
