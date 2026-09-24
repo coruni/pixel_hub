@@ -47,3 +47,15 @@ export const BTN_DANGER_SM =
  */
 export const ACTION_TEXT =
   "inline-flex items-center gap-1.5 rounded-none py-1.5 text-sm text-neutral-500 transition hover:text-neutral-900 focus-visible:underline disabled:opacity-60";
+
+/**
+ * 详情页自建音视频播放器的控件样式（av-controls.tsx 与宿主 av-player.tsx 共用：
+ * 下载入口由宿主渲染、放进播放器控件位，必须与其余控件像素级一致）。
+ * 盒模型与色调分开：色调按「压在黑色画面上」/「落在暖白卡片里」两套，激活态整串替换避免同属性互相覆盖。
+ */
+export const AV_CTRL_BTN =
+  "grid h-9 w-9 shrink-0 place-items-center rounded-none transition focus-visible:ring-2 focus-visible:ring-brand-400";
+export const AV_CTRL_ON_DARK = "text-white/90 hover:bg-white/15 hover:text-white";
+export const AV_CTRL_ON_DARK_ACTIVE = "bg-white/20 text-white";
+export const AV_CTRL_ON_SURFACE = "text-neutral-600 hover:bg-brand-50 hover:text-brand-700";
+export const AV_CTRL_ON_SURFACE_ACTIVE = "bg-brand-100 text-brand-700";

@@ -195,6 +195,8 @@ export function MetaDownloadButton({
   small,
   name,
   kind = "file",
+  iconOnly,
+  className,
 }: {
   resourceId: string;
   url: string;
@@ -210,6 +212,10 @@ export function MetaDownloadButton({
   name?: string;
   /** file = 本站托管附件（走代理强制原名）；link = 作者外链（原样打开） */
   kind?: "file" | "link";
+  /** 只渲染图标按钮（播放器控件位）；外观（盒模型 + 色调）完全由 className 给出，无障碍名取 label */
+  iconOnly?: boolean;
+  /** 追加类名：iconOnly 时由调用方给完整外观 */
+  className?: string;
 }) {
   const [n, setN] = useState(count ?? 0);
   const [prevCount, setPrevCount] = useState(count);
@@ -229,15 +235,24 @@ export function MetaDownloadButton({
     kind === "file"
       ? `/api/dl?u=${encodeURIComponent(url)}&n=${encodeURIComponent(name ?? "")}`
       : url;
+  // 外观只有一处定义：iconOnly 由调用方给（播放器控件位），否则是既有的翠绿实底（逐字保持原样）
+  const lookCls = iconOnly
+    ? (className ?? "")
+    : `inline-flex items-center gap-1.5 rounded-none border border-emerald-600 bg-emerald-600 font-medium text-white transition hover:bg-emerald-500 disabled:opacity-60 ${
+        small ? "px-2.5 py-1 text-xs" : "px-5 py-2 text-sm"
+      }${className ? ` ${className}` : ""}`;
+  // 图标模式只出图标（无障碍名走 aria-label），文字模式出「图标 + 文案」
+  const face = (text: string, size: number) =>
+    iconOnly ? <Download size={16} aria-hidden /> : <><Download size={size} aria-hidden /> {text}</>;
   if (loginRequired && !authed) {
     return (
       <a
         href={`/login?callbackUrl=${encodeURIComponent(path)}`}
-        className={`inline-flex items-center gap-1.5 rounded-none border border-emerald-600 bg-emerald-600 font-medium text-white hover:bg-emerald-500 ${
-          small ? "px-2.5 py-1 text-xs" : "px-5 py-2 text-sm"
-        }`}
+        className={lookCls}
+        aria-label={iconOnly ? "登录后下载" : undefined}
+        title={iconOnly ? "登录后下载" : undefined}
       >
-        <Download size={small ? 13 : 15} aria-hidden /> 登录后下载
+        {face("登录后下载", small ? 13 : 15)}
       </a>
     );
   }
@@ -253,12 +268,14 @@ export function MetaDownloadButton({
           window.open(dlHref, "_blank", "noopener");
         })
       }
-      className={`inline-flex items-center gap-1.5 rounded-none border border-emerald-600 bg-emerald-600 font-medium text-white transition hover:bg-emerald-500 disabled:opacity-60 ${
-        small ? "px-2.5 py-1 text-xs" : "px-5 py-2 text-sm"
-      }`}
+      className={lookCls}
+      aria-label={iconOnly ? label : undefined}
+      title={iconOnly ? label : undefined}
     >
-      <Download size={small ? 13 : 15} aria-hidden /> {label}
-      {showCount ? ` ${n > 0 ? n : ""}`.trimEnd() : ""}
+      {face(
+        `${label}${showCount ? ` ${n > 0 ? n : ""}`.trimEnd() : ""}`.trimEnd(),
+        small ? 13 : 15,
+      )}
     </Button>
   );
 }

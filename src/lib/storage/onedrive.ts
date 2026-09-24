@@ -239,6 +239,8 @@ async function graphErr(res: Response, ctx: string): Promise<GraphError> {
   else if (res.status === 404)
     hint = "目标不存在：核对 locator / rootPath（可先用 Graph Explorer 验证该驱动器可达）";
   else if (res.status === 429) hint = "Graph 请求过频，稍后再试";
+  else if (res.status === 507)
+    hint = "云盘空间已满：该驱动器配额用尽（quota.state=exceeded），请清理文件或改选其他驱动器";
   const extra = detail && detail !== raw ? `（${truncate(detail, 160)}）` : truncate(detail, 160);
   return new GraphError(
     `${ctx}失败（HTTP ${res.status}）${hint ? `：${hint}` : ""}${extra ? extra : ""}`,

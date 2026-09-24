@@ -28,58 +28,92 @@ export default function DetailBanner({
 }) {
   const { detail } = ctx;
   const isVideo = ctx.meta.kind === "VIDEO";
+  const isMusic = ctx.meta.kind === "MUSIC";
   // 视频的封面已经挂在播放器的 poster 上，横幅再铺一遍就是同一张图出现两次；
   // 这里退化成一条深色标题带（横幅仍保留页面首屏的层级，只是不再重复封面）。
   const cover = isVideo ? undefined : detail.gallery[0];
   // 类型用图标徽标表示（不重复文字），分类仍用可点击的文字徽标
   const { Icon: TypeIcon, cls: typeCls } = typeBadge(detail.type);
 
+  // 类型徽标 + 分类徽标：两种横幅形态共用（窄屏会折行，故用 flex-wrap）
+  const badges = (
+    <div className="flex flex-wrap items-center gap-2">
+      {/* 类型：图标徽标（悬停/读屏提供类型名），与分类文字徽标同高 */}
+      <span
+        title={typeLabel(detail.type)}
+        className="grid h-[22px] w-[22px] place-items-center rounded-none border border-brand-600 bg-stone-900/85"
+      >
+        <TypeIcon size={13} className={typeCls} aria-hidden />
+        <span className="sr-only">{typeLabel(detail.type)}</span>
+      </span>
+      {detail.category && (
+        <Link
+          href={`/browse?cat=${detail.category.slug}`}
+          className="inline-flex h-[22px] items-center rounded-none border border-brand-600 bg-stone-900/85 px-2.5 text-[11px] font-medium text-white hover:bg-brand-600"
+        >
+          {detail.category.name}
+        </Link>
+      )}
+    </div>
+  );
+
   return (
     <div className="mx-auto max-w-6xl px-4 pt-8 pb-6 sm:px-6">
-      {/* 顶部横幅 */}
-      <div className="relative overflow-hidden rounded-none bg-neutral-900">
-        {cover ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={cover.bigUrl}
-            alt=""
-            className="h-72 w-full object-cover opacity-90 sm:h-80 md:h-[22rem]"
-          />
-        ) : isVideo ? (
-          <div className="h-40 w-full sm:h-44" />
-        ) : (
-          <div className="grid h-72 w-full place-items-center text-5xl font-bold text-white/20 sm:h-80 md:h-[22rem]">
-            {detail.title.slice(0, 1).toUpperCase()}
+      {isMusic ? (
+        /* 音频首屏：封面在这里只承担「这是哪张专辑」的识别作用，352px 巨型横幅会把播放器
+           挤到折叠线以下，故收成「方图 + 右侧标题」的紧凑形态，播放控件因此能进首屏。 */
+        <div className="relative overflow-hidden rounded-none bg-neutral-900">
+          <div className="flex items-center gap-4 p-4 sm:gap-6 sm:p-6">
+            <div className="h-24 w-24 shrink-0 overflow-hidden bg-neutral-800 sm:h-40 sm:w-40">
+              {cover ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={cover.bigUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <div className="grid h-full w-full place-items-center text-3xl font-bold text-white/20">
+                  {detail.title.slice(0, 1).toUpperCase()}
+                </div>
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              {badges}
+              <h1 className="mt-2 line-clamp-2 text-xl font-semibold leading-snug tracking-tight text-white sm:text-2xl">
+                {detail.title}
+              </h1>
+              {detail.summary && (
+                <p className="mt-1.5 line-clamp-2 text-sm leading-6 text-white/80">{detail.summary}</p>
+              )}
+            </div>
           </div>
-        )}
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,.6)_0%,rgba(0,0,0,.92)_55%, transparent_100%)]" />
-        <div className="absolute inset-x-0 bottom-0 p-5 sm:p-6">
-          <div className="flex flex-wrap items-center gap-2">
-            {/* 类型：图标徽标（悬停/读屏提供类型名），与分类文字徽标同高 */}
-            <span
-              title={typeLabel(detail.type)}
-              className="grid h-[22px] w-[22px] place-items-center rounded-none border border-brand-600 bg-stone-900/85"
-            >
-              <TypeIcon size={13} className={typeCls} aria-hidden />
-              <span className="sr-only">{typeLabel(detail.type)}</span>
-            </span>
-            {detail.category && (
-              <Link
-                href={`/browse?cat=${detail.category.slug}`}
-                className="inline-flex h-[22px] items-center rounded-none border border-brand-600 bg-stone-900/85 px-2.5 text-[11px] font-medium text-white hover:bg-brand-600"
-              >
-                {detail.category.name}
-              </Link>
+        </div>
+      ) : (
+        /* 顶部横幅 */
+        <div className="relative overflow-hidden rounded-none bg-neutral-900">
+          {cover ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={cover.bigUrl}
+              alt=""
+              className="h-72 w-full object-cover opacity-90 sm:h-80 md:h-[22rem]"
+            />
+          ) : isVideo ? (
+            <div className="h-40 w-full sm:h-44" />
+          ) : (
+            <div className="grid h-72 w-full place-items-center text-5xl font-bold text-white/20 sm:h-80 md:h-[22rem]">
+              {detail.title.slice(0, 1).toUpperCase()}
+            </div>
+          )}
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,.6)_0%,rgba(0,0,0,.92)_55%, transparent_100%)]" />
+          <div className="absolute inset-x-0 bottom-0 p-5 sm:p-6">
+            {badges}
+            <h1 className="mt-2.5 text-2xl font-semibold leading-snug tracking-tight text-white sm:text-3xl">
+              {detail.title}
+            </h1>
+            {detail.summary && (
+              <p className="mt-1.5 line-clamp-2 max-w-2xl text-sm leading-6 text-white/80">{detail.summary}</p>
             )}
           </div>
-          <h1 className="mt-2.5 text-2xl font-semibold leading-snug tracking-tight text-white sm:text-3xl">
-            {detail.title}
-          </h1>
-          {detail.summary && (
-            <p className="mt-1.5 line-clamp-2 max-w-2xl text-sm leading-6 text-white/80">{detail.summary}</p>
-          )}
         </div>
-      </div>
+      )}
 
       {/* 音视频播放（MUSIC/VIDEO；其余类型返回 null） */}
       <AvPlayerBlock ctx={ctx} />
