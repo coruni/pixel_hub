@@ -33,8 +33,16 @@ ENV NODE_ENV=production
 # tzdata 必须显式装：slim 镜像里没有 /usr/share/zoneinfo，缺它时 TZ 只是个无效环境变量。
 # 结算归属月、自动结算的「每日尝试时点」全按本机时区判定，装错会让「次月 1 日」在
 # UTC 下对应到北京时间当天 08:00，8 月最后一晚的贡献分被算进 9 月。
+#
+# 字体（fontconfig + 中文字体）只服务于**水印的兜底路径**：水印文字正常由站点字体
+# （public/fonts/*.woff2，与前台同源）解析成 SVG 轮廓，与运行环境无关；只有当用户输入的
+# 文字里含站点字体覆盖不到的字符（emoji、罕用字…）时，才会退到 librsvg 渲染 SVG <text>、
+# 走 fontconfig 找字族。slim 镜像里一个字体都没有，此时 librsvg **不报错、只输出空白**，
+# 表现为「开关打开了但图上什么都没有」，日志里看不出异常 —— 所以这套字体仍然要装。
+# 判定与降级见 src/lib/media/watermark.ts 的 watermarkAvailable()。
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends tzdata \
+  && apt-get install -y --no-install-recommends tzdata fontconfig fonts-noto-cjk \
+  && fc-cache -f \
   && rm -rf /var/lib/apt/lists/*
 ENV TZ=Asia/Shanghai
 COPY --from=build /app/.next ./.next

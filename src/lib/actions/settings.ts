@@ -8,7 +8,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { rateLimit } from "@/lib/rate-limit";
 import { makeKey, saveFile, delFile } from "@/lib/storage";
-import { MIB } from "@/lib/upload-config";
+import { MIB, WATERMARK_TEXT_MAX } from "@/lib/upload-config";
 import { getUploadLimits } from "@/lib/upload-limits";
 import { compressWith, compressConfigOf, outputExt } from "@/lib/media/compress";
 import { notifyAccountSecurity } from "@/lib/notify";
@@ -66,6 +66,41 @@ export async function updatePrivacyAction(
     data: { showFavorites, showFollowers, showFollowing },
   });
   revalidatePath(`/u/${user.username}`);
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+// ---- 图片水印：开关 + 自定义文字（默认关闭） ----
+// 水印是「上传时一次性烧进像素」的，改开关只影响之后的上传，存量图片不会重打 ——
+// 这点写在设置页提示里，否则用户会以为改了设置旧图也会变。
+
+const watermarkSchema = z.object({
+  watermarkImages: z.boolean(),
+  watermarkText: z.string().trim().max(WATERMARK_TEXT_MAX, `水印文字最长 ${WATERMARK_TEXT_MAX} 字`),
+});
+
+export async function updateWatermarkAction(
+  _prev: SettingsActionState,
+  fd: FormData,
+): Promise<SettingsActionState> {
+  const user = (await auth())?.user;
+  if (!user) return { error: "请先登录" };
+
+  const parsed = watermarkSchema.safeParse({
+    // checkbox 提交语义：勾选 = "on"，未勾选 = 缺失
+    watermarkImages: fd.get("watermarkImages") === "on",
+    watermarkText: fd.get("watermarkText") ?? "",
+  });
+  if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      watermarkImages: parsed.data.watermarkImages,
+      // 空串落 null：水印文字留空 = 用默认「@用户名」，不要在库里存一个空串表示「无文字」
+      watermarkText: parsed.data.watermarkText || null,
+    },
+  });
   revalidatePath("/settings");
   return { ok: true };
 }

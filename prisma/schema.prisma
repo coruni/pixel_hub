@@ -49,6 +49,9 @@ model User {
   inAppNotifyFollow Boolean @default(true) // 关注
   inAppNotifySystem Boolean @default(true) // 审核结果与系统公告
   autoSaveDraft Boolean @default(true) // 发布向导：边写边自动存草稿（用户可在设置里关掉，改为手动保存）
+  // ---- 图片水印（默认关闭）。开启后上传的图集/评论附图会被打上文字水印，原图同样改写 ----
+  watermarkImages Boolean @default(false) // 是否给上传的图片加水印
+  watermarkText   String? // 水印文字；空 = 用默认「@用户名」
 
   accounts       Account[]
   sessions       Session[]

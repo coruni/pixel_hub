@@ -26,6 +26,7 @@ import {
   outputMime,
   type ImageCompressConfig,
 } from "@/lib/media/compress";
+import { applyWatermark, resolveWatermark, type WatermarkSpec } from "@/lib/media/watermark";
 
 async function requiredUser() {
   const s = await auth();
@@ -336,13 +337,20 @@ async function saveCommentImage(
   file: File,
   maxBytes: number,
   cfg: ImageCompressConfig,
+  watermark: WatermarkSpec | null,
 ): Promise<{ key: string; width: number; height: number; size: number; mime: string } | null> {
   const buf = Buffer.from(await file.arrayBuffer());
   if (buf.byteLength > maxBytes)
     throw new Error(`单张图片不能超过 ${Math.round(maxBytes / MIB)}MB`);
   if (!sniffImage(buf)) throw new Error("不支持的图片格式");
+  // 水印字号按**输出**画幅定：原图可能远大于 1200，得先算 resize 后的尺寸再叠加，
+  // 否则水印在大图上会小得离谱（processImage 里同理，那里用的是同一套派生公式）。
+  const oriented = sharp(buf, { failOn: "none" }).rotate();
+  const meta = await oriented.metadata();
+  const outW = meta.width ? Math.min(meta.width, 1200) : 0;
+  const outH = meta.width ? Math.round(((meta.height ?? 0) * outW) / meta.width) : 0;
   const out = await compressWith(
-    sharp(buf, { failOn: "none" }).rotate().resize({ width: 1200, withoutEnlargement: true }),
+    applyWatermark(oriented.resize({ width: 1200, withoutEnlargement: true }), watermark, outW, outH),
     cfg,
   ).toBuffer({ resolveWithObject: true });
   const key = makeKey("comments", `.${outputExt(cfg.format)}`);
@@ -395,13 +403,26 @@ export async function addCommentAction(
     return { error: `附图最多 ${commentMaxCount} 张` };
   const commentMaxBytes = L.commentImageMaxMb * MIB;
   const compressCfg = compressConfigOf(L);
+  // 水印偏好（默认关闭）：与图集上传走同一处判断（resolveWatermark 内含字体环境自检）
+  const wmPref =
+    images.length > 0
+      ? await prisma.user.findUnique({
+          where: { id: user.id },
+          select: { username: true, watermarkImages: true, watermarkText: true },
+        })
+      : null;
+  const watermark = await resolveWatermark(
+    !!wmPref?.watermarkImages,
+    wmPref?.username ?? "",
+    wmPref?.watermarkText,
+  );
   let saved: { key: string; width: number; height: number; size: number; mime: string }[] = [];
   if (images.length > 0) {
     // Chevereto 上传接口一次请求仅接受单个文件：每张图各自走一次独立上传请求，
     // 用 Promise 并行发出多个「单文件」请求并逐个收集成败，互不阻断。
     const pics = images.slice(0, commentMaxCount);
     const settled = await Promise.allSettled(
-      pics.map((f) => saveCommentImage(f, commentMaxBytes, compressCfg)),
+      pics.map((f) => saveCommentImage(f, commentMaxBytes, compressCfg, watermark)),
     );
     saved = settled
       .filter(

@@ -12,6 +12,7 @@ import AvatarForm from "@/components/auth/avatar-form";
 import HeroForm from "@/components/auth/HeroForm";
 import NotificationsForm from "@/components/auth/NotificationsForm";
 import PublishForm from "@/components/auth/PublishForm";
+import WatermarkForm from "@/components/auth/WatermarkForm";
 import DraftsPanel from "@/components/auth/DraftsPanel";
 import { EmailForm, PasswordForm } from "@/components/auth/security-forms";
 import SettingsTabs from "@/components/auth/SettingsTabs";
@@ -61,12 +62,15 @@ export default async function SettingsPage({
 
   const me = session.user;
   const profile = await getProfile(me.username, me.id);
-  const [githubAccount, draftPref, draftCount] = await Promise.all([
+  const [githubAccount, prefs, draftCount] = await Promise.all([
     prisma.account.findFirst({
       where: { userId: me.id, provider: "github" },
       select: { providerAccountId: true },
     }),
-    prisma.user.findUnique({ where: { id: me.id }, select: { autoSaveDraft: true } }),
+    prisma.user.findUnique({
+      where: { id: me.id },
+      select: { autoSaveDraft: true, watermarkImages: true, watermarkText: true },
+    }),
     countDrafts(me.id),
   ]);
   const githubEnabled = Boolean(githubClientId(runtimeCfg) && githubClientSecret(runtimeCfg));
@@ -147,9 +151,16 @@ export default async function SettingsPage({
           <section className={sectionCls}>
             <h2 className={sectionTitle}>发布偏好</h2>
             <p className={sectionHint}>控制发布内容时草稿的留存方式</p>
-            <PublishForm
-              autoSaveDraft={draftPref?.autoSaveDraft ?? true}
-              draftCount={draftCount}
+            <PublishForm autoSaveDraft={prefs?.autoSaveDraft ?? true} draftCount={draftCount} />
+          </section>
+
+          <section className={sectionCls}>
+            <h2 className={sectionTitle}>图片水印</h2>
+            <p className={sectionHint}>给上传的图片押上署名，防止被搬运时丢掉出处</p>
+            <WatermarkForm
+              enabled={prefs?.watermarkImages ?? false}
+              text={prefs?.watermarkText ?? null}
+              username={me.username}
             />
           </section>
 

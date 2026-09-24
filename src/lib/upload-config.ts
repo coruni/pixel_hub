@@ -78,6 +78,12 @@ export const COUNT_RANGE = { min: 1 } as const;
 /** 评论附图数量上限范围（张）：单条评论附图，保留 0..20 的窄档位（0 = 禁止附图） */
 export const COMMENT_COUNT_RANGE = { min: 0, max: 20 } as const;
 
+/**
+ * 水印文字长度上限。放在这里而不是 media/watermark.ts：设置页的表单是客户端组件，
+ * 而 media/watermark.ts 依赖 sharp，客户端一旦 import 就会把原生模块拖进 bundle。
+ */
+export const WATERMARK_TEXT_MAX = 40;
+
 /** 压缩输出格式：webp（默认，体积最优）/ jpg（兼容性最好，无透明）/ png（无损或调色板量化） */
 export const IMAGE_FORMATS = ["webp", "jpg", "png"] as const;
 export type ImageOutputFormat = (typeof IMAGE_FORMATS)[number];

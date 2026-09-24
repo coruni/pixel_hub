@@ -77,6 +77,11 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // fontkit 是纯 JS 字体解析库（水印取字形轮廓用）：它的 ESM 产物没有 default 导出，
+  // 交给打包器按运行时条件挑文件容易踩 interop（Turbopack 实测报 "Export default doesn't exist"），
+  // 而且也没必要把整个字体库塞进服务端 bundle。标成外部包 → 运行时按 Node 规则 require，
+  // node_modules 随镜像一起交付（见 Dockerfile 的 COPY node_modules）。
+  serverExternalPackages: ["fontkit"],
   experimental: {
     // 图片直传走 Server Action，需要放宽默认 1MB 限制（multipart 还有额外开销）
     serverActions: {

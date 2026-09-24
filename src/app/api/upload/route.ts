@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { processImage, publicUrl } from "@/lib/media/process";
 import { compressConfigOf } from "@/lib/media/compress";
+import { resolveWatermark } from "@/lib/media/watermark";
 import { rateLimit } from "@/lib/rate-limit";
 import { sameOrigin } from "@/lib/origin";
 import { MIB } from "@/lib/upload-config";
@@ -40,6 +41,18 @@ export async function POST(req: NextRequest) {
   const L = await getUploadLimits();
   const maxBytes = L.galleryImageMaxMb * MIB;
 
+  // 图片水印：读一次用户偏好，整批复用（默认关闭）。username 也一并取 —— 默认水印文字是
+  // 「@用户名」，而 session 里的 username 是登录时写进 token 的，不依赖它更稳。
+  const me = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { username: true, watermarkImages: true, watermarkText: true },
+  });
+  const watermark = await resolveWatermark(
+    !!me?.watermarkImages,
+    me?.username ?? "",
+    me?.watermarkText,
+  );
+
   // 单次上传张数上限：客户端（向导按类型传入，如 ARTICLE 固定 1 张）只允许**收窄**，
   // 取 min(客户端值, 后台 galleryImageMaxCount)，避免客户端把上限放大；
   // 缺失/非法一律回退后台配置。后台图集张数已去掉 60 张天花板，这里不再有硬编码上界。
@@ -72,7 +85,7 @@ export async function POST(req: NextRequest) {
         results.push({ name, ok: false, error: "不支持的图片格式（仅 png/jpg/webp/gif/avif）" });
         continue;
       }
-      const p = await processImage(buf, compressConfigOf(L));
+      const p = await processImage(buf, compressConfigOf(L), watermark);
       const media = await prisma.media.create({
         data: {
           kind: "GALLERY",

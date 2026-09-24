@@ -73,3 +73,26 @@ export function compressWith(pipe: SharpPipe, cfg: ImageCompressConfig): SharpPi
       return pipe.webp({ quality, alphaQuality: 100 });
   }
 }
+
+/**
+ * 按「原始格式」重编码 —— 水印改写了原图像素时才需要（见 media/watermark.ts）。
+ *
+ * 与 compressWith 的区别：compressWith 输出的是**后台配置的**格式（默认 webp），
+ * 用在原图上会改变扩展名与 MIME，而 media.storageKey 的扩展名、`fileName` 的后缀、
+ * 云盘 key 全部由 `processImage` 推出来的原始格式决定 —— 换格式就得同步改四处，得不偿失。
+ * 因此这里固定保持 `ext` 对应格式，质量取高位：原图是给人下载的归档件，不按展示档压。
+ *
+ * alpha 语义与 compressWith 一致：png 走无损、webp 锁 alphaQuality，jpg 本身无 alpha。
+ */
+export function encodeOriginal(pipe: SharpPipe, ext: string): SharpPipe {
+  switch (ext) {
+    case "jpg":
+      return pipe.jpeg({ quality: 92, mozjpeg: true });
+    case "png":
+      return pipe.png({ compressionLevel: 9 });
+    case "avif":
+      return pipe.avif({ quality: 62 });
+    default:
+      return pipe.webp({ quality: 92, alphaQuality: 100 });
+  }
+}

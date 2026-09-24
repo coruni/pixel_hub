@@ -41,6 +41,31 @@
 - **编辑器里手敲 `[文本](/路径)` 不会变成链接**（会变成字面量文本）。两个原因叠加：① Crepe 只有 **图片** 输入规则（`insertImageInputRule`／`![alt](url)`），**没有 link 输入规则**（`preset-commonmark` 里无 `Mod-k`、link 只能经工具栏 `toggleLinkCommand` 或粘贴）；② 存下来的正文里它仍是 text 节点，序列化器（remark-stringify / `mdast-util-to-markdown`）会把文本里的 `[`→`\[`、`(`→`\(`，于是入库的是 `\[资金池]\(/fund)`，前台按字面量渲染（react-markdown 这边没问题：`[资金池](/fund)` 一定解析成站内 `<Link>`）。**要加链接就两条路**：选中文字 → 工具栏「链接」→ 输入 `/fund`（`sanitizeLinkHref` 对无 scheme 的相对路径原样放行）；或**粘贴**无 HTML 的纯文本 markdown（`plugin-clipboard` 的 `handlePaste` 在 `html.length===0` 时走 `parserCtx` 解析 → 真链接）。不要试图在渲染端「把转义还原成链接」——那会连内容里真想显示的字面方括号一起改掉。
 - 列表序号与项目符号色 = `--md-marker`（`var(--brand-400)`，暗色不单独覆写，随 brand-400 翻转）。**编辑器列表标记不走 `::marker`**：Crepe 用 `.milkdown-list-item-block li .label-wrapper`（项目符号是 svg、有序列表是数字），默认取 `--crepe-color-outline` = brand-200（淡到几乎看不见）→ 已加 `.md-editor .milkdown .ProseMirror .label-wrapper{, svg}` 两条取同一 token（4 层压 Crepe 的 3 层：(0,4,0) > (0,3,1)）。
 
+## 账务（贡献分 / PIX / 结算）
+- 命名：**贡献分** = 荣誉层（只增不减，决定等级与结算权重）；**PIX** = 资产层（提现/打赏会减少）；**元** 只在提现页与后台出现。
+- 唯一写入口 = `src/lib/points.ts` 的 `awardPoints()`（**永不抛错、P2002 静默**）；幂等键 = `@@unique([userId, reason, refId])`。**`refId` 必须把触发者编进去**（`interactionRefId("like", actorId, targetId)`），只写目标 id 会「全站对同一作品永远只加一次分」。
+- 自产自销拦截集合 = `NO_SELF_BENEFIT`（点赞/收藏/下载/评论/关注），**不含** PUBLISH/FEATURED/ADMIN_ADJUST/DAILY_LOGIN；判定走 `isSelfBenefit()`。**只拦本人（`actorId === userId`），小号互刷拦不住**；可刷面只剩 `FAVORITE_RECEIVED(5)` 与 `DOWNLOAD_RECEIVED(3)`，要收紧只能关掉这两项的 `settleEligible`。
+- **PUBLISH 分有两个发放点**：① `moderation.ts` 的 `approveResourceAction`（actorId = 审核人）；② `actions/resource.ts` 的 `createResourceAction` 直发分支（`directPublish` = `trusted || ADMIN || MODERATOR`，actorId = 本人）。共用幂等键 `(userId, "PUBLISH", resourceId)`。**该分支曾漏，2026-09-24 修复。**
+- **冻结名单唯一事实来源 = `cfg.risk.frozenUserIds`**；`UserPoint.frozen` 列**已删**。绕过冻结必须显式 `awardPoints({ bypassFrozen: true })`。
+- 下载防刷：主体去重 + 月配额**只停计分，绝不拦下载**（`download-record.ts`）。
+- **两个池别混**：激励池 P = `floor(本期收入 × ratePermille) + carryInFen`（**carryIn 原样并入，不再乘比例** —— 写成 `floor((收入+carryIn)×比例)` 会吞掉 `carryIn×(1−比例)`）；现金池 C = Σ收入 − Σ成本 − Σ已打款 − Σ退款。偿付闸门只认 `coin.ts` 的 `getSolvency()` 一处，前台 `/fund`、结算确认、提现申请、后台水位**必须共用**。
+- **结算分只看「当期新增」**（`periodScores()`：按 `PointLog.createdAt` 落自然月窗口 + `settleEligible[r]===true` 分组求和）；`minScore`（默认 50）拦的是**当月新增分**，每月清零。榜单/等级看累计分，两处口径别混。**跨期只结转钱、从不结转分**（`carryOutFen → carryInFen` 是纯金额；封顶砍掉的权重与没用完的分数一律作废）。
+- 两道闸门不可省：`minScore` 是**资格**门（不够分连 Σscore 都不进）；`minPayoutFen`（默认 500 分 = 5 元 = 500 PIX）是**最小发放额**门（不够则整期不发、全额结转）→ 「结算拿 1 PIX」结构上不可能，1 PIX 只能来自打赏。
+- 结算 = **月粒度 + 人工触发**（`period` 只有 `"month"`，`periodKey="YYYY-MM"`，本地时区自然月）。**结转只继承上一期**（`carryInOf` 读 `prevPeriodKey` 且要求 `status !== "DRAFT"`）→ **确认必须按月份先后**。状态机 `DRAFT → CONFIRMED → PAID`，已确认期一律**沿用落库快照、绝不重算**（改它等于事后篡改已公示数字）；未确认月份库里连 `IncentivePeriod` 行都没有。
+- **自动结算**（`src/lib/settle-auto.ts` + `instrumentation.ts` + `POST /api/cron/settle`）默认全关（`settlement.autoEnabled=false`）：① 只自动到「入账」，打款永远人工；② **必须按月串行补齐**，任一环中断就 `break`；③ 操作人写 `AUTO_SETTLE_ACTOR="system"`。`confirmPeriod` 撞 `@unique` 抛 P2002 → 当「别人做完了」。容器要 `TZ=Asia/Shanghai` + `tzdata`。
+- **封顶副作用**：单人 `capPermille=4000` 长期只有一两人达标 → 每期只发 40%、钱滞留现金池；溢出额**无条件**回流给剩余人 → 池子不够大时低分者也拿满（实测 50 分与 950 分各得 2000）。要改公平性得改 `distribute()` 的回流口径。
+- **记账纪律**：`LedgerEntry` **只记真钱进出**（结算分配不进台账）；`WITHDRAW_PAID` **不写 `CoinLedger`**（只 frozen−N、lifetimeWithdrawn+）。金额一律整数分，解析走 `parseYuanToFen()`（录入的 `amountYuan` 是**元**），禁止 `parseFloat*100`；`permilleText(6000) → "60%"`。
+- 默认 `coin.perYuan = 100` ⇒ `fenToCoin(amountFen,100) === amountFen`；**贡献分与 PIX 无固定兑换率**，只有单期一次性间接兑换（`PIX = floor(池子分 × 当月分 ÷ 全站当月分之和)`）。改 `perYuan` 会同时改入账 PIX 与偿付负债 → `fenToCoin` 与 `newLiabilityFen` 必须同源。
+- **密钥永不出服务端**：对外走 `publicPaymentConfig()` 的**结构投影**（白名单）。后台表单无密钥保存时提交 `KEEP_SECRET` 哨兵，服务端在 zod 校验**之前**换回库内真值 —— 顺序不能颠倒。
+- 后台配置页保存是**整份替换（WYSIWYG）**：表单必须提交完整文档，`safeIncentive()` 用 zod 兜住缺失字段。
+
+## 页面标题（metadata）与收录
+- **根 layout 的 `title.template`（`%s · 站名`）作用于子段页面**（`/browse` 传 `浏览` → `浏览 · 资源社区`），子段页面写 `title` **不要自己再拼站名**。唯一例外 `app/page.tsx`（拿不到模板，必须自己拼）。
+- **`/browse` 的 `page` 是死参数**：`FeedBrowser` 写死 `page = infinite ? 1 : intParam(...)`，而 `/browse` 开无限滚动 → `?page=3` 渲染的仍是第 1 页。所以 canonical **不能带 page**、title **不能带页码**。
+- `/browse` 的 title + description + canonical 都随分类变；`cat` **只有命中 `getCategories()` 的真实 slug 才算数**，无效 slug 回落「无分类」并把 canonical 收敛到 `/browse`。
+- **每个可收录列表页必须有 h1**（搜索态用 `<h1 className="sr-only">搜索</h1>`）。`ArchiveShell` 只被 `/browse` 与 `/tags/[slug]` 用，h1 走它的 `heading` 槽位；`FeedBrowser` **首页也在用**，h1 **绝不能**加进去。
+- description 要和 title 一起做（根 layout 只给**一个**默认描述）。`getCategories()` 是 `cache()` 的 → `generateMetadata` 与页面同请求只查一次库。
+
 ## 打包器文件追踪
 - 追踪只静态分析 `path.join(process.cwd(), "<字面量>", 动态尾段)`；路径一经函数计算就退化成「追踪整个项目」，build 打 `Warning: Dynamic filesystem access`。规矩：**字面前缀留在真正调 `fs` 的地方**，越界靠「结果一定在 `public/<sub>/` 之下」结构排除（`safeRel` 拒 `..`/NUL/空、`\` 统一 `/`）。
 
@@ -56,3 +81,34 @@
 - 铸管理员 cookie：`@auth/core/jwt` 的 `encode({ token:{id,username,role}, secret, salt:"authjs.session-token" })` —— salt **必须是 cookie 名**。涉及 `useAction` 的组件不能 `renderToStaticMarkup`，只能「铸 cookie + dev server fetch」。
 - 布局/样式**禁止浏览器与 CDP**（用户明确要求，headless、「只量一下不算 e2e」也不行）→ 样式类改动只做静态契约：① postcss 编 `globals.css` 断言新 class 真产出选择器；② `renderToStaticMarkup` 断言组件吐出的 class 串；③ 视觉一致性最终由人眼确认，报告里如实写「未做浏览器实测」。量测细节见 `pixel-hub-verify` skill。
 - **canonical 输出绝对 URL（被 metadataBase 拼过）且 `&` 转义成 `&amp;`** → 断言前 `new URL()` 归一成 path+search。**校验响应体首字节不能用 `fetch().text()`**（WHATWG 剥 U+FEFF）→ `Buffer.from(await r.arrayBuffer())`。放 `%TEMP%` 的脚本 require 基于脚本目录解析 → 用 `createRequire("E:/project/pixel_hub/package.json")`。
+
+## 图片水印（几何、字体与验证姿势）
+
+- **两种绘制模式**：`mode:"path"`（主路径，站点字体轮廓）与 `mode:"text"`（回退，SVG `<text>` + fontconfig）。
+  `resolveWatermark()` 决定用哪种：站点字体覆盖得住就 path（永远可用，与环境无关）；有缺字才 text，环境不支持则整条放弃。
+- **path 模式的几何**（Fusion Pixel：`unitsPerEm = 1200`，即 12px 网格 × 100 单位，CJK 1em / 拉丁 0.5em）：
+  字号 `clamp(round(图宽 × 0.028), 14, 96)`；层高 `2.2 × 字号`；内边距 `右 0.85em / 下 0.7em`，基线 `层高 − 下边距`。
+  **字宽不再估算**：`run.advanceWidth / unitsPerEm` 是精确 em 值，乘字号即像素宽。放不下就整体缩字（迭代两次收敛，`fontSize *= 图宽 / need`），不设字号下限。
+  字形只在 `<g>` 上做一次 `scale(s, -s)` 把字体单位（y 向上）翻到 SVG 的 y 向下，各字形的平移量仍写原始字体单位 —— 不必逐点换算。
+  `gravity:"southeast"` 让 sharp 自己算落点 → **不需要精确的底图尺寸**，宽高只用于字号缩放与「放不放得下」的判断。
+- **字体身份**：`public/fonts/fusion-pixel-12px-proportional-zh_hans.woff2`（`familyName = Fusion Pixel 12px P zh_hans`，sha256 前 16 位 `56e986127ad11064`），
+  与 `globals.css` 的 `@font-face` 同一文件。**换字体只需换这个文件**，两条链路一起变。
+- **怎么验**（无需浏览器、无需真实存储）：
+  1. 进程内探针：与 fontkit 独立算一遍期望包围盒比对（能抓出 y 翻转弄反、scale 算错、基线偏移）；
+     填充规则用 `口` 验（中心必须透明，否则说明 nonzero 缠绕方向被处理错了）；
+     确定性用「两次渲染逐字节一致」；窄图用「墨迹不越界」验「缩字而不是裁字」。
+  2. **HTTP 端到端**（`storageDriver=local` 时安全：产物落 `public/uploads/`，已 gitignore）：
+     铸 `authjs.session-token` cookie（`@auth/core/jwt` 的 `encode`，salt **必须等于 cookie 名**，token 里必须带 `pw = passwordHash.slice(-16)`，否则 jwt 回调会清空身份 → 401）
+     → `POST /api/upload?max=1`（FormData 字段 `files`，`sameOrigin()` 对不带 Origin 的客户端放行）
+     → 取回 `origUrl` 解码。
+     **最强的一条断言**：把产物右下角裁成 `覆盖层宽×高` 与「本地 `buildOverlay` 贴到同色底」**逐字节比** —— 位置、字号、字形、颜色一次全对上，这才算证明「运行时真的用了站点字体」。
+     反证：同一张图在关印状态下上传，整图必须**一个像素都没变**。
+  3. 收尾删 Media 行 + 目录**下全部**产物（只登记原图会留下 `big.webp/thumb.webp` 让 `rmdir` 失败）。
+  4. **改用户级开关做断言必须双边还原**：先存原值 → 断言 → 还原 → 再单独断言「已还原为原值」（`watermarkImages:false` / `watermarkText:null`）。写在 `finally` 里，否则中途失败就把线上账号的偏好改坏了。
+- **fontkit 的坑**：ESM 产物（`dist/module.mjs`）**只有具名导出** `create/open/openSync/registerFormat/defaultLanguage/setDefaultLanguage/logErrors`，**没有 default**；
+  CJS 产物把同样这些挂在 `module.exports` 上（Parcel `$parcel$exportWildcard`，**cjs-module-lexer 看不见**，所以 `import { create }` 也不保险）。
+  结论：`import * as` + `default ?? 命名空间`，外加 `next.config.ts` 的 `serverExternalPackages: ["fontkit"]`（也顺便不把字体库打进 server bundle）。
+  `fontkit` 不自带类型声明 → `src/types/fontkit.d.ts` 里手写最小声明。
+- **加载姿势**：`fontkit.create(fs.readFileSync(...))` 都是同步的 → `siteFont()` 做成**懒加载同步单例**（失败结果也缓存），`buildOverlay`/`applyWatermark` 保持同步签名，`process.ts` / `social.ts` 一行都不用改。
+  路径写成**字面量** `path.join(process.cwd(), "public/fonts/…woff2")`：产物追踪只对静态路径生效。运行镜像里 `public/` 由 `COPY --from=build /app/public ./public` 带过去。
+- Dockerfile 运行的 `fontconfig + fonts-noto-cjk` 现在**只服务回退路径**（用户输入含 emoji 等缺字字符时）。`public/fonts/*.woff2` pango/librsvg 读不了，所以回退路径用的是系统字体，不是站点字体。
