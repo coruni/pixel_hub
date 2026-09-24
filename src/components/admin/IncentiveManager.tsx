@@ -297,14 +297,15 @@ export default function IncentiveManager({
             maxLevels={LEVEL_BADGE_CLASSES.length}
             onChange={(next) => setDraft((d) => ({ ...d, levels: next }))}
           />
-          {/* 等级在这里第一次被当成「门槛」用：主页背景是最底层底图，只给够档的人开放 */}
+          {/* 等级在这里第一次被当成「门槛」用：主页背景是最底层底图，只给够档的人开放。
+              数值叶子**必须走 num()**：本页数值以 text 草稿为准（buildPayload 最后用 text 覆盖 groups），
+              用 setGroup 写数值会被 text 里的旧值盖回去 —— 症状是「选完点保存，刷新后弹回原值」。 */}
           <SelectRow
             id="inc-profile-bg-level"
             label="主页背景解锁等级"
             range="0 = 不限"
-            hint="达到该等级的用户才能在设置页上传个人主页背景（PC 与移动端各一张，铺满视口的底图）。等级本身不发钱，这里只是拿它当门槛。"
-            value={String(g("profile").bgMinLevel ?? 0)}
-            onChange={(v) => setGroup("profile", { bgMinLevel: toNum(v) })}
+            hint="达到该等级的用户才能在设置页上传个人主页背景（铺满视口的底图，仅桌面端展示）。等级本身不发钱，这里只是拿它当门槛。"
+            {...num("profile.bgMinLevel")}
             options={[
               { value: "0", label: "不限（全员可用）" },
               ...[...draft.levels]

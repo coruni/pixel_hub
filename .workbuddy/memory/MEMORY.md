@@ -57,7 +57,7 @@
 - 阈值/比例/分值**唯一落点** = `src/lib/points-config.ts`（后台 `/admin/incentive`）；业务模块**不许再写业务数值字面量**。加减 `PointReason` 时 `DEFAULT_SCORES` 的 `satisfies Record<PointReason, number>` 会立刻报错 —— 刻意的编译期护栏，别改宽松。
 - 唯一写入口 = `src/lib/points.ts` 的 `awardPoints()`；幂等键 `@@unique([userId, reason, refId])`，**`refId` 必须把触发者编进去**（`interactionRefId("like", actorId, targetId)`）。冻结名单唯一事实来源 = `cfg.risk.frozenUserIds`（`UserPoint.frozen` 列**已删**）。
 - **PUBLISH 分有两个发放点，缺一不可**（`moderation.ts` 的 `approveResourceAction` + `actions/resource.ts` 的 `createResourceAction` 直发分支）；**新增任何「把资源变成 PUBLISHED」的路径必须同步补**。`restoreResource` 与举报复核 `PENDING→PUBLISHED` **刻意不发**；存量直发资源**不追溯补分**。
-- 结算 = **月粒度 + 人工触发**，分只看**当期新增**（不是累计），**跨期只结转钱、从不结转分**，**确认必须按月份先后**；已确认期**沿用落库快照、绝不重算**。后台配置页保存是**整份替换（WYSIWYG）**，别改成增量写。
+- 结算 = **月粒度 + 人工触发**，分只看**当期新增**（不是累计），**跨期只结转钱、从不结转分**，**确认必须按月份先后**；已确认期**沿用落库快照、绝不重算**。后台配置页保存是**整份替换（WYSIWYG）**，别改成增量写。**`IncentiveManager` 里数值叶子只能走 `num()`**（它维护 `text` 字符串草稿、`buildPayload` 最后用 `text` 覆盖 `groups`）——用 `setGroup` 写数值会被 text 里的旧值盖回去，症状 = **保存后值弹回原样**（`useAction` 成功时不打 toast 只 refresh，看不出来是哪种失败）。
 
 ## 图片水印（`src/lib/media/watermark.ts`）
 - **只有两条链路打水印**：① `/api/upload` → `processImage()`（发布向导/后台改稿图集 + **Markdown 编辑器正文插图**）；② 评论附图 `social.ts` 的 `saveCommentImage()`。**明确不打**：头像 `uploadAvatarAction`、hero 横幅 `uploadHeroAction`、后台直传 `admin-media.ts`（原图直存）、附件大文件通道。新增图片入口先归类。

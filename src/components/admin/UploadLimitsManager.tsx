@@ -74,7 +74,7 @@ const IMAGE_MB_FIELDS: { key: ImageMbKey; label: string; hint: string }[] = [
   {
     key: "profileBgMaxMb",
     label: "主页背景（MB）",
-    hint: "个人主页铺满视口的底图，PC 与移动端各一张共用此档。只在用户达到等级门槛后可见。",
+    hint: "个人主页铺满视口的底图（仅桌面端展示）。只在用户达到等级门槛后可见。",
   },
 ];
 

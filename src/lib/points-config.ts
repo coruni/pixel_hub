@@ -296,7 +296,7 @@ const levelsSchema = z
   .default([...DEFAULT_LEVELS]);
 
 /**
- * 主页背景（个人主页最底层底图，PC / 移动端各一张）。
+ * 主页背景（个人主页最底层底图，**仅桌面端**一张）。
  * 门槛存**等级序号**而不是分数：等级名称与门槛都在上面可改，存分数会让「资深创作者」的定义漂移。
  */
 const profileSchema = z.object({
