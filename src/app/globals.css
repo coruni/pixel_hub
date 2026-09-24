@@ -28,6 +28,10 @@
   --md-link-hover: #8a4129; /* 亮：hover 再深一档（brand-800） */
   --md-code-bg: #f0e9dd; /* 亮=暖米（对齐暗色暖深棕语义），不再用冷 neutral 灰 */
   --md-border: #e5e5e5;
+  /* 代码字体栈唯一来源：前台 .md-body 与编辑器（--crepe-font-code）都引用它，
+     值是 Tailwind 默认 mono 栈，与改动前的前台渲染完全一致 */
+  --md-font-code: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
   /* 品牌主色：温暖橙（Claude 风赤陶橙）。用法同 Tailwind 色板：bg-brand-500 / text-brand-600 等 */
   --surface: #fffdf9; /* 卡片/面板暖白（比页面背景 #faf9f5 略亮一档） */
   --panel: #ffffff; /* 抽屉/弹层面板底：比 surface 再亮一档，与内容分离层级 */
@@ -236,6 +240,7 @@ summary {
   background: var(--md-code-bg);
   padding: 0.1rem 0.3rem;
   font-size: 0.85em;
+  font-family: var(--md-font-code);
   color: var(--md-text-lg); /* 与代码块 pre 同级实色，亮色下深于正文、暗色下亮于正文 */
 }
 .md-body pre {
@@ -419,8 +424,8 @@ summary {
   /* 像素站点字体优先，标题不做衬线分家 */
   --crepe-font-title: inherit;
   --crepe-font-default: inherit;
-  --crepe-font-code:
-    ui-monospace, SFMono-Regular, Menlo, Consolas, "Courier New", monospace;
+  /* 代码字体与前台同源（唯一来源见 :root 的 --md-font-code） */
+  --crepe-font-code: var(--md-font-code);
   font-family: inherit;
   min-height: inherit;
 }
@@ -436,6 +441,155 @@ summary {
 .md-editor .milkdown .ProseMirror {
   padding: 12px 14px;
   min-height: inherit;
+}
+
+/* ---------- 编辑器内容区 = 前台正文排版（所见即所得）----------
+   Crepe 自带的是「大标题文档」风格：h1/h2/h3 = 2.625/2.25/2em（三级标题近 28px）、
+   标题不加粗且上边距 24~32px、段落 padding 4px —— 与前台 .md-body 完全是两套。
+   这里把内容区压回前台正文规格，颜色一律取 --md-* token（与 .md-body 同源），
+   编辑器不再有自己的一套配色；测「编辑时看到的 = 发布后看到的」。
+   选择器固定 4 层（.md-editor .milkdown .ProseMirror X）压过 Crepe 主题的 3 层，不依赖 CSS 加载顺序。
+   基准取 .md-body--lg（资源详情正文 15px，编辑器主用途是写文章）；docs 编辑器前台走 .md-body（13px），
+   比这里小 2px，属于已知可接受差异。未同步：表格（Crepe 的表格是带选中态与拖拽手柄的交互 widget，
+   硬套边框会破坏其交互）。 */
+.md-editor .milkdown .ProseMirror {
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--md-text-lg);
+}
+/* 首尾元素不吃外边距（前台 .md-body 同样处理），否则编辑器顶部/底部比发布后多一段空白 */
+.md-editor .milkdown .ProseMirror > :first-child {
+  margin-top: 0;
+}
+.md-editor .milkdown .ProseMirror > :last-child {
+  margin-bottom: 0;
+}
+
+.md-editor .milkdown .ProseMirror p {
+  margin: 0.4rem 0;
+  padding: 0;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.md-editor .milkdown .ProseMirror h1,
+.md-editor .milkdown .ProseMirror h2,
+.md-editor .milkdown .ProseMirror h3,
+.md-editor .milkdown .ProseMirror h4 {
+  margin: 0.7rem 0 0.3rem;
+  padding: 0;
+  color: var(--md-heading);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.md-editor .milkdown .ProseMirror h1 {
+  font-size: 1.05rem;
+}
+.md-editor .milkdown .ProseMirror h2 {
+  font-size: 0.98rem;
+}
+.md-editor .milkdown .ProseMirror h3 {
+  font-size: 0.9rem;
+}
+/* 前台 .md-body 只给 h1~h4 定样式、字号仅到 h3：h4 随正文大小，h5/h6 更是完全没有规则
+   （走 Tailwind 重置 = 正文字号/字重/行高、零内外距、正文色）。这里照搬，
+   否则 4~6 级标题在编辑时比发布后大一圈、还多出加粗和标题色。 */
+.md-editor .milkdown .ProseMirror h4 {
+  font-size: inherit;
+}
+.md-editor .milkdown .ProseMirror h5,
+.md-editor .milkdown .ProseMirror h6 {
+  margin: 0;
+  padding: 0;
+  color: inherit;
+  font-weight: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.md-editor .milkdown .ProseMirror ul,
+.md-editor .milkdown .ProseMirror ol {
+  margin: 0.4rem 0;
+  padding-left: 1.25rem;
+  display: grid;
+  gap: 0.15rem;
+}
+.md-editor .milkdown .ProseMirror ul {
+  list-style: disc;
+}
+.md-editor .milkdown .ProseMirror ol {
+  list-style: decimal;
+}
+.md-editor .milkdown .ProseMirror li::marker {
+  color: var(--md-marker);
+}
+/* Crepe 的列表项内部是真段落（前台 li 内是纯文本），压掉首尾段落的 margin，
+   否则每一项上下各多 0.4rem，列表比前台松一大截 */
+.md-editor .milkdown .ProseMirror li > p:first-child {
+  margin-top: 0;
+}
+.md-editor .milkdown .ProseMirror li > p:last-child {
+  margin-bottom: 0;
+}
+
+.md-editor .milkdown .ProseMirror a {
+  color: var(--md-link);
+  text-underline-offset: 2px;
+}
+.md-editor .milkdown .ProseMirror a:hover {
+  color: var(--md-link-hover);
+}
+
+.md-editor .milkdown .ProseMirror strong {
+  color: var(--md-heading);
+}
+
+.md-editor .milkdown .ProseMirror code {
+  display: inline;
+  background: var(--md-code-bg);
+  padding: 0.1rem 0.3rem;
+  font-size: 0.85em;
+  line-height: inherit;
+  color: var(--md-text-lg);
+}
+
+.md-editor .milkdown .ProseMirror pre {
+  overflow-x: auto;
+  border: 1px solid var(--md-border);
+  background: var(--md-code-bg);
+  padding: 0.6rem 0.75rem;
+  color: var(--md-text-lg);
+  font-size: 0.85rem;
+}
+.md-editor .milkdown .ProseMirror pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+
+.md-editor .milkdown .ProseMirror blockquote {
+  margin: 0.4rem 0;
+  border-left: 2px solid var(--md-border);
+  padding: 0 0 0 0.6rem;
+  box-sizing: border-box;
+  color: var(--md-muted);
+}
+/* Crepe 用 40px 左内距 + ::before 圆角竖条模拟引用，前台是 2px 左边框，这里换掉 */
+.md-editor .milkdown .ProseMirror blockquote::before {
+  display: none;
+}
+
+.md-editor .milkdown .ProseMirror hr {
+  margin: 0.7rem 0;
+  height: auto;
+  padding: 0;
+  background: none;
+  /* 与前台一致：四边 solid，仅上边框 1px（Tailwind 重置给的就是这个组合） */
+  border-color: var(--md-border);
+  border-style: solid;
+  border-width: 0;
+  border-top-width: 1px;
 }
 
 /* ---------- 全屏编写 ----------
