@@ -22,11 +22,21 @@ COPY . .
 # 构建期也需要 DATABASE_URL（预渲染查库）；仅存在于构建阶段，不会进入最终镜像
 ARG DATABASE_URL
 ENV DATABASE_URL=$DATABASE_URL
+# 时区必须与结算归属月一致：periodRange()/monthKey() 都按**本机日历月**算窗口
+# （见 settle-allocate.ts 与 format.ts），容器默认 UTC 会让窗口边界整体错 8 小时。
+ENV TZ=Asia/Shanghai
 RUN npm run build
 
 FROM node:22-bookworm-slim AS run
 WORKDIR /app
 ENV NODE_ENV=production
+# tzdata 必须显式装：slim 镜像里没有 /usr/share/zoneinfo，缺它时 TZ 只是个无效环境变量。
+# 结算归属月、自动结算的「每日尝试时点」全按本机时区判定，装错会让「次月 1 日」在
+# UTC 下对应到北京时间当天 08:00，8 月最后一晚的贡献分被算进 9 月。
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends tzdata \
+  && rm -rf /var/lib/apt/lists/*
+ENV TZ=Asia/Shanghai
 COPY --from=build /app/.next ./.next
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json

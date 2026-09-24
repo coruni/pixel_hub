@@ -18,6 +18,7 @@ import {
   levelNameOf,
   levelOf,
   parseIncentive,
+  safeIncentive,
   tipPresets,
 } from "../src/lib/points-config";
 import { parseYuanToFen, fenToYuanText, formatYuan, parseGatewayMoney } from "../src/lib/money";
@@ -29,7 +30,15 @@ import {
   safePaymentConfig,
   validateSponsorAmount,
 } from "../src/lib/payment-config";
-import { allocate, isPeriodKey, periodRange, prevPeriodKey } from "../src/lib/settle-allocate";
+import {
+  allocate,
+  duePeriodKey,
+  isPeriodKey,
+  periodRange,
+  prevPeriodKey,
+  settleWindowKeys,
+  shiftPeriodKey,
+} from "../src/lib/settle-allocate";
 
 let pass = 0;
 let fail = 0;
@@ -189,6 +198,85 @@ check(
   Object.entries(LEDGER_KIND_META)
     .filter(([k]) => k.startsWith("COST_"))
     .every(([, v]) => v.direction === "OUT"),
+);
+
+// ---- A12 自动结算：归属月推导与考察窗口 ----
+// 这一段的断言**故意不复用被测公式**（照着实现再算一遍等于没测）：边界用显式字面量，
+// 全区间用「与当月相隔几个月」这个可独立验证的性质。顺序错 = 结转错，必须能反证。
+const periodIndex = (key: string): number => {
+  const [y, m] = key.split("-");
+  return Number(y) * 12 + (Number(m) - 1);
+};
+
+eq("9/1 延迟 0 天 → 结 8 月", duePeriodKey(new Date(2026, 8, 1), 0), "2026-08");
+eq("9/1 延迟 1 天 → 还只结 7 月", duePeriodKey(new Date(2026, 8, 1), 1), "2026-07");
+eq("9/2 延迟 1 天 → 结 8 月", duePeriodKey(new Date(2026, 8, 2), 1), "2026-08");
+eq("9/28 延迟 28 天 → 还只结 7 月", duePeriodKey(new Date(2026, 8, 28), 28), "2026-07");
+eq("9/29 延迟 28 天 → 结 8 月", duePeriodKey(new Date(2026, 8, 29), 28), "2026-08");
+eq("跨年：1/1 延迟 0 天 → 结上年 12 月", duePeriodKey(new Date(2026, 0, 1), 0), "2025-12");
+eq("跨年：1/1 延迟 1 天 → 结上年 11 月", duePeriodKey(new Date(2026, 0, 1), 1), "2025-11");
+eq("跨年：1/2 延迟 1 天 → 结上年 12 月", duePeriodKey(new Date(2026, 0, 2), 1), "2025-12");
+
+let dueBad = 0;
+let dueDetail = "";
+for (let y = 2024; y <= 2027; y += 1) {
+  for (let m = 0; m < 12; m += 1) {
+    const curKey = `${y}-${String(m + 1).padStart(2, "0")}`;
+    for (let day = 1; day <= 28; day += 1) {
+      for (let delay = 0; delay <= 28; delay += 1) {
+        const key = duePeriodKey(new Date(y, m, day), delay);
+        const back = periodIndex(curKey) - periodIndex(key);
+        const want = day <= delay ? 2 : 1;
+        // 反证：写成 monthKey(now)（back=0）或写成 back=3 都会在这里被抓住
+        if (back !== want || !isPeriodKey(key)) {
+          dueBad += 1;
+          if (!dueDetail) dueDetail = `${curKey}-${day} delay=${delay} → ${key}（相隔 ${back} 月，期望 ${want}）`;
+        }
+      }
+    }
+  }
+}
+check("归属月全区间：始终回退 1~2 个月且绝不等于本月", dueBad === 0, dueDetail);
+
+eq(
+  "考察窗口：整年升序",
+  settleWindowKeys("2026-01", "2026-12", 12).join(","),
+  "2026-01,2026-02,2026-03,2026-04,2026-05,2026-06,2026-07,2026-08,2026-09,2026-10,2026-11,2026-12",
+);
+eq(
+  "考察窗口：跨年升序",
+  settleWindowKeys("2025-11", "2026-02", 12).join(","),
+  "2025-11,2025-12,2026-01,2026-02",
+);
+eq(
+  "考察窗口：超上限时保留靠近应结月的一段",
+  settleWindowKeys("2026-01", "2026-12", 3).join(","),
+  "2026-10,2026-11,2026-12",
+);
+eq("考察窗口：区间为空返回空数组", settleWindowKeys("2026-05", "2026-04", 12).length, 0);
+eq("考察窗口：区间倒置（from 晚于 to）也为空", settleWindowKeys("2026-12", "2026-01", 12).length, 0);
+eq("位移：跨年向前", shiftPeriodKey("2026-01", -1), "2025-12");
+eq("位移：跨年向后", shiftPeriodKey("2025-12", 1), "2026-01");
+eq("位移：多位跨越（+12 个月）", shiftPeriodKey("2026-09", 12), "2027-09");
+eq("位移：非法月份返回 null", shiftPeriodKey("2026-13", 1), null);
+eq("位移：非法格式返回 null", shiftPeriodKey("2026-9", 1), null);
+
+// 存量配置兼容：老的 SiteSetting["incentive"] 里没有 auto* 字段，必须回落到「关闭」
+const legacyCfg = parseIncentive({
+  settlement: { ratePermille: 6000, minScore: 50, minPayoutFen: 500, capPermille: 4000, capIterations: 3, period: "month" },
+});
+eq("存量配置缺 auto 字段 → 自动结算默认关闭", legacyCfg.settlement.autoEnabled, false);
+eq("存量配置缺 auto 字段 → 延迟天数回落默认", legacyCfg.settlement.autoDelayDays, 1);
+eq("存量配置缺 auto 字段 → 时点回落默认", legacyCfg.settlement.autoHour, 5);
+eq("全新配置（null）→ 自动结算默认关闭", parseIncentive(null).settlement.autoEnabled, false);
+// 反证：范围守卫真的在拦（越界的时点/天数不能悄悄存进去）
+check("autoHour=99 越界被拒", safeIncentive({ settlement: { autoHour: 99 } }).ok === false);
+check("autoDelayDays=29 越界被拒", safeIncentive({ settlement: { autoDelayDays: 29 } }).ok === false);
+check("autoMaxBackfillMonths=0 越界被拒", safeIncentive({ settlement: { autoMaxBackfillMonths: 0 } }).ok === false);
+check("autoRetryHours=0 越界被拒", safeIncentive({ settlement: { autoRetryHours: 0 } }).ok === false);
+check(
+  "autoHour=23 合法（上界闭区间）",
+  safeIncentive({ settlement: { autoHour: 23 } }).ok === true,
 );
 
 console.log("=== B. 数据库不变量（无库则 SKIP） ===");
