@@ -22,6 +22,8 @@
 - `@import "tailwindcss"` 之后的规则**无层**，优先于任何 `@layer`：与 `* { scrollbar-width:thin }` 冲突时 Tailwind 任意值（中括号）写法被静默压掉 → 用无层普通 class（`.scrollbar-none`）。注释里别原样写中括号类名。
 - `overflow-x-auto` 会把 overflow-y 变 auto 并裁自身溢出：横向滚动 + 下划线 tab 的 `-mb-px` 挂在**滚动容器**上。
 - **改 class 后必须核 Tailwind 真产出了该类**（postcss 编 `globals.css` 再查选择器，见 skill）。覆盖第三方主题（Crepe）一律 4 层选择器压它的 3 层。
+- **`SidebarLayout` 外层容器 = `mx-auto max-w-7xl lg:pr-6`**（只加右侧，别改成 `px-6`）。主栏 children 自带 `px-4 sm:px-6`，而 rail 在 lg 下 `px-0` → 不加这 24px 时侧栏会贴着容器右边缘、比主栏内容多探出 24px；主栏是 `max-w-6xl` 时被两侧留白遮住，升到 7xl 后立刻暴露成「侧栏超出」。改宽度类前先看这里。
+- `.md-body table` 是 `display:block` + `overflow-x:auto`（**不是**裸 table）：列多 / 含长串的表格自带横向滚动，不会撑破正文容器、把整页拖出横向滚动条。**别改回纯 table** —— 那正是详情页整页横向滚动条的来源；`display:block` 下浏览器仍补匿名 table box，单元格布局与 `border-collapse` 照常生效（GitHub markdown-body 同款）。
 
 ## UI 文案（tip）
 - **前台与后台是两套标准**：「配置含义」只属后台（admin `hint` / `sectionHint` / 页首说明框）。前台只留三类 —— **约束**（门槛、金额范围）、**后果**（线下打款、冻结、收入为 0 则池子为 0）、**状态**（已确认 / 已打款）。
@@ -38,6 +40,7 @@
 - 四模板共用 `src/components/resource/detail/parts.tsx`；**描述正文唯一实现 = `DescriptionBlock`**（裸 `<section className="md-body md-body--lg">`，无卡片/底色/边框/小标题，四模板共用）——改描述排版只改这一处。
 - **音视频播放器 = 自建控件**（`detail/av-controls.tsx`）：全站禁止再用原生 `controls`；下载入口由 `av-player.tsx` 以 `downloadSlot` 注入控件行（用 `MetaDownloadButton` 的 `iconOnly` + `className`，它的**默认翠绿实底路径必须逐字保持**），控件类名统一在 `cls.ts` 的 `AV_CTRL_*`。
 - 模板差异（MUSIC/VIDEO 实走 `post`）、操作条、四处落位、`CollapsibleAside` 锁宽等细节见 `REFERENCE.md` —— **落位被纠正过两次，动之前先查**。
+- **四模板内容顶部间距统一 `pt-8`**：banner `pt-8 pb-6`、post `pt-8 pb-16`、twocol `py-8`、article `pt-8 pb-16`。`post` 曾是 `pt-6`，因为 MUSIC/VIDEO 实走 post 而与 banner/article 差一档（2026-09-25 用户报的「music 的 pt 与其他类型不一致」）→ 别再把它降回 `pt-6`。
 - **回退不要按目录**：`git checkout HEAD -- <dir>` 会带走该目录所有未提交改动；先 `git diff --stat`。
 
 ## 云盘 / IP 防刷
@@ -69,5 +72,6 @@
 ## 个人主页背景（`.profile-bg-pc`）—— 只列红线
 - **一张图、一个槽、仅桌面端**：字段 `User.profileBgPcKey`（迁移 `0009`），元素 `hidden sm:block`。**移动端那版是用户明确砍掉的（2026-09-24），不要再加回来**；`slot` 参数已废。
 - **门槛在激励配置**（`incentive.profile.bgMinLevel`，等级序号）、**尺寸上限在上传限制**（`profileBgMaxMb`）——两处刻意分开。唯一判定函数 = `upload-config.ts` 的 `profileBgUnlocked()`，前台/设置页/action 三处共用，**action 里必须重算**。
-- 遮罩只有 `globals.css` 的 `.profile-bg-pc` 一份，**设置页预览直接套这个类**（不要复刻渐变）；层是 `fixed inset-0 -z-10` + `aria-hidden`，不参与布局、不盖 hero。
+- 遮罩只有 `globals.css` 的 `.profile-bg-pc` 一份（**个人主页与资源详情页共用同一份**），**设置页预览直接套这个类**（不要复刻渐变）；层是 `fixed inset-0 -z-10` + `aria-hidden`，不参与布局、不盖 hero。
+- **资源详情页铺的是「作者的」背景**（2026-09-25 用户定的，不是浏览者自己的）。开关 = `User.profileBgOnResource`（迁移 `0010`，**默认 true**，作者在设置页自控）；铺的条件三个同时成立：作者设了图 + 开关开 + 作者**当前仍达等级**（重算，别信「当初传得上来」）。`getResourceDetail` 里这两个字段随 author 一次取出，**值是裸 storage key、页面侧还要 `publicUrl()`**（与同处已解析成 URL 的 `avatarKey` 口径不同）。
 - 细节与「必须临时造条件才能验」的姿势见 `REFERENCE.md`。

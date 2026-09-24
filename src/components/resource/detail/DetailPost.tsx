@@ -100,7 +100,7 @@ export default function DetailPost({
   const isVideo = ctx.meta.kind === "VIDEO";
 
   return (
-    <div className="mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-6">
+    <div className="mx-auto max-w-7xl px-4 pb-16 pt-8 sm:px-6">
       {/* 展厅：直接以作品开场（视频直接由播放器开场） */}
       {!isVideo && <Gallery media={detail.gallery} />}
 

@@ -376,6 +376,32 @@ export async function removeProfileBgAction(): Promise<void> {
   revalidatePath("/settings");
 }
 
+// ---- 资源详情页是否展示同款背景 ----
+//
+// **独立于上传动作**：改开关不该强迫用户重新选一遍图，所以它自带一个不含 file 的表单
+// （HTML 表单不能嵌套，它挂在上传 form 之外）。只写这一个布尔，绝不触碰 profileBgPcKey
+// —— 关掉开关不会把图删掉，重新打开就还在。
+export async function updateProfileBgOnResourceAction(
+  _prev: SettingsActionState,
+  fd: FormData,
+): Promise<SettingsActionState> {
+  const user = (await auth())?.user;
+  if (!user) return { error: "请先登录" };
+
+  const onResource = String(fd.get("onResource") ?? "") === "on";
+  try {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { profileBgOnResource: onResource },
+    });
+    revalidatePath("/settings");
+    return { ok: true };
+  } catch (e) {
+    console.error("[profile-bg-placement]", e);
+    return { error: "保存失败，请重试" };
+  }
+}
+
 // ---- 账号安全：改密码 / 换邮箱 ----
 
 const passwordSchema = z

@@ -34,7 +34,7 @@ export default function DetailArticle({
   const minutes = Math.max(1, Math.ceil(detail.description.replace(/\s/g, "").length / 300));
 
   return (
-    <div className="mx-auto max-w-6xl px-4 pb-16 pt-8 sm:px-6">
+    <div className="mx-auto max-w-7xl px-4 pb-16 pt-8 sm:px-6">
       {/* 类型徽标 + 分类 */}
       <div className="flex flex-wrap items-center gap-2">
         <span className="inline-flex items-center gap-1 rounded-none border border-brand-600 bg-stone-900/85 px-2.5 py-0.5 text-[11px] font-medium text-white">

@@ -347,6 +347,9 @@ export const getResourceDetail = cache(async (slug: string, viewerId?: string) =
           name: true,
           avatarKey: true,
           bio: true,
+          // 资源详情页也要铺作者的主页背景（开关 + 等级门槛在页面里判定），随 author 一次取出
+          profileBgPcKey: true,
+          profileBgOnResource: true,
           role: true,
           trusted: true,
           createdAt: true,
@@ -536,6 +539,10 @@ export const getResourceDetail = cache(async (slug: string, viewerId?: string) =
       name: resource.author.name,
       avatarKey: resource.author.avatarKey ? publicUrl(resource.author.avatarKey) : null,
       bio: resource.author.bio,
+      // 资源页背景用。注意口径：这两个是**未解析的存储 key / 布尔**，页面侧还要 publicUrl()，
+      // 与上面 avatarKey（已解析成 URL）不同 —— 别照着 avatarKey 的用法直接塞进 <img src>。
+      profileBgPcKey: resource.author.profileBgPcKey,
+      profileBgOnResource: resource.author.profileBgOnResource,
       role: resource.author.role,
       trusted: resource.author.trusted,
       createdAt: resource.author.createdAt,

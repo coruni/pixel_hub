@@ -6,7 +6,10 @@ import { getCollections, getRelated, getResourceDetail, type ResourceDetail } fr
 import { parseMeta } from "@/lib/meta";
 import { getTheme, detailTemplateFor } from "@/lib/site";
 import { getIncentive } from "@/lib/incentive";
-import { tipFormOf } from "@/lib/points-config";
+import { getPointBalance } from "@/lib/points";
+import { levelOf, tipFormOf } from "@/lib/points-config";
+import { publicUrl } from "@/lib/storage/url";
+import { profileBgUnlocked } from "@/lib/upload-config";
 import { sidebarVisible } from "@/lib/site-config";
 import SiteSidebar, { WidgetArea, type DetailWidgetCtx } from "@/components/sidebar/SiteSidebar";
 import SidebarLayout from "@/components/layout/SidebarLayout";
@@ -129,6 +132,21 @@ export default async function ResourcePage({ params }: PageProps) {
   // D9：NSFW 详情登录门 —— 已发布成人内容仅登录后可见，未登录一律 404（不进索引/不泄露图）
   if (detail.status === "PUBLISHED" && detail.nsfw && !meId) notFound();
 
+  // 作者的主页背景：三个条件同时成立才铺 —— ① 作者设了图 ② 开关打开（默认开）③ 作者**现在**仍达等级。
+  // 等级必须重算、不能信任「当初传得上来」：门槛与档位都在后台可改，作者也可能掉档；
+  // 判定复用前台与设置页同一个 profileBgUnlocked()，口径只有一份。
+  // 没设背景的作者（眼下是绝大多数）连这一次点数查询都不会发生 —— 短路在 getPointBalance 之前。
+  let bgKey: string | null = null;
+  if (detail.author.profileBgPcKey && detail.author.profileBgOnResource) {
+    const authorPoints = await getPointBalance(detail.authorId);
+    const unlocked = profileBgUnlocked(
+      levelOf(authorPoints, incentive.levels),
+      incentive.profile.bgMinLevel,
+      incentive.enabled,
+    );
+    if (unlocked) bgKey = detail.author.profileBgPcKey;
+  }
+
   // 相关推荐只对已发布内容计算（草稿/待审不需要）
   const related =
     detail.status === "PUBLISHED"
@@ -197,8 +215,8 @@ export default async function ResourcePage({ params }: PageProps) {
       <DetailPost ctx={ctx} middleSlot={middleSlot} />
     );
 
-  // 提醒条与各模板内容列同为 max-w-6xl 居中，宽度一致
-  const previewCls = "mx-auto max-w-6xl px-4 pt-8 sm:px-6";
+  // 提醒条与各模板内容列同为 max-w-7xl 居中（与导航栏、个人主页同宽），宽度一致
+  const previewCls = "mx-auto max-w-7xl px-4 pt-8 sm:px-6";
 
   return (
     <SidebarLayout
@@ -209,6 +227,15 @@ export default async function ResourcePage({ params }: PageProps) {
         ) : undefined
       }
     >
+      {/* 作者主页背景：铺满视口的最底层，fixed 脱离 grid 流、不参与布局。
+          与个人主页共用同一个遮罩类 .profile-bg-pc（左右两侧渐显、中间留白），仅桌面端渲染。 */}
+      {bgKey && (
+        <div
+          aria-hidden
+          className="profile-bg-pc pointer-events-none fixed inset-0 -z-10 hidden bg-cover bg-center bg-no-repeat sm:block"
+          style={{ backgroundImage: `url(${publicUrl(bgKey)})` }}
+        />
+      )}
       {detailLd && (
         <>
           <script
@@ -221,14 +248,14 @@ export default async function ResourcePage({ params }: PageProps) {
           />
         </>
       )}
-      {topSlot && <div className="mx-auto max-w-6xl px-4 pt-6 sm:px-6">{topSlot}</div>}
+      {topSlot && <div className="mx-auto max-w-7xl px-4 pt-6 sm:px-6">{topSlot}</div>}
       {isPreview && (
         <div className={previewCls}>
           <PendingBanner ctx={ctx} />
         </div>
       )}
       {body}
-      {bottomSlot && <div className="mx-auto max-w-6xl px-4 pb-12 sm:px-6">{bottomSlot}</div>}
+      {bottomSlot && <div className="mx-auto max-w-7xl px-4 pb-12 sm:px-6">{bottomSlot}</div>}
     </SidebarLayout>
   );
 }

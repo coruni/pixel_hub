@@ -129,6 +129,11 @@
   `DetailTwocol` 的 360px `<aside>` 尚未同步加固。
 - VIDEO 只有一个视频：`av-player` 里 `boxed = isAudio`；模板层对 VIDEO **整块不渲染 `<Gallery>`**（空数组会渲染「暂无预览图」）。
   落位：`DetailTwocol` 播放器进**主列**；`DetailBanner` 退化成深色标题带；`DetailArticle` 跳过封面 hero。
+- **页面宽度 = `max-w-7xl`**（2026-09-25 从 `max-w-6xl` 同步成全站宽度，与导航栏 / 个人主页 / browse 一致）。共 **7 处**，改宽度别只改一处：
+  `resources/[slug]/page.tsx` 的 `previewCls` / `topSlot` / `bottomSlot` 三个 `mx-auto max-w-7xl px-4 …`，
+  加四个模板各自的根容器（`DetailBanner:61` `pt-8 pb-6`、`DetailPost:103` `pb-16 pt-6`、`DetailTwocol:31` `py-8`、`DetailArticle:37` `pb-16 pt-8`）。
+  `resources/[slug]/edit/page.tsx`（编辑页表单）**仍是 6xl**，刻意窄；`error.tsx` / `not-found.tsx` 的 `mx-auto flex max-w-6xl flex-col` 也是刻意收窄的居中列，别动。
+- **正文里的宽内容防溢出**：`.md-body table` 走 `display:block + overflow-x:auto`（见 `MEMORY.md` 的 CSS 节）；`pre` 本来就有 `overflow-x:auto`、`img` 有 `max-width:100%`。
 - 回退**不要按目录**：`git checkout HEAD -- <dir>` 会带走该目录所有未提交改动；先 `git diff --stat`。
 
 ## 个人主页背景（`.profile-bg-pc` + 设置页表单）
@@ -142,5 +147,21 @@
   唯一判定函数 = `upload-config.ts` 的 `profileBgUnlocked(level, minLevel, incentiveEnabled)`；**总开关关掉时门槛失效**（否则全员上锁且无提升途径）。
   前台渲染、设置页表单、server action 三处共用它；action 里**必须重算**（客户端只是不渲染入口）。
 - **不做裁剪、不放大小图**：底图 cover 铺满，裁掉的恰好是遮罩留白区（裁剪器只会让用户困惑）；cover 交给 CSS，服务端只按后台格式重压。
+- **推荐规格 = 16:10（≥ 1920×1200，长边 2560 更清晰）**，前台表单与后台 hint 都写这个数。两条几何依据：
+  1. 遮罩**完全透明区间是 [24%, 76%]**（左右各 0–6% 全不透明、6–24% 渐隐、镜像）⇒ **中间 52% 的画幅在页面上根本看不见**，
+     所以内容要放左右两侧各 1/4 内，中间留空或放低对比内容。
+  2. `bg-cover` 只朝一个方向裁：图纸比例**比视口宽**时按高度贴满 → **左右被裁**（正好切在可见带上，最坏）；
+     比视口窄/高时才按宽度贴满、只裁上下。16:10 在 16:10 屏零裁切、16:9 屏只裁上下 10%、21:9 屏裁上下 33%，
+     左右全程完整；而常见的 16:9 图放到 16:10 屏上会裁掉两侧约 5% —— 那 5% 恰好是可见带。
+- **资源详情页也铺作者这张背景**（`resources/[slug]/page.tsx`，2026-09-25 加）：
+  - 判定写成 `if (作者有 key && 开关开) { 查一次点数 → profileBgUnlocked(...) }` —— 校验放在条件**内部**，
+    没设背景的作者**零额外查询**（眼下是绝大多数）；已经用上开关的只有他一个人的一个布尔。
+  - 复用同一个 `.profile-bg-pc` 类与同样的 `fixed inset-0 -z-10 hidden sm:block`；背景层放进 `SidebarLayout` 的
+    children 首位即可（`fixed` 不参与 grid 流），**不需要额外包 fragment**。
+  - 开关是**独立 action + 独立表单**（`updateProfileBgOnResourceAction`）：HTML 表单不能嵌套，它挂在上传 form
+    **之外**，`useActionState` + `plFormRef.current?.requestSubmit()` 勾选即提交；改开关**不碰 `profileBgPcKey`**
+    （关掉不删图，重新打开还在）。
+  - 验证造条件的姿势：给目标作者临时塞一张真实 key + 把该用户的 `UserPoint.balance` 拉满 —— 比改全局
+    `bgMinLevel` 更局部（一次只动一个用户的两个字段），还原时逐字段比对。
 - **验证姿势**：线上全站 0 分 / 0 档 ⇒ 没人解锁，渲染分支必须临时把 `bgMinLevel` 置 0 + 给一个账号塞图才能验；
   先存原值 → 断言 → `finally` 里还原（配置还原要连 `version` 一起还原并断言逐字节一致）。

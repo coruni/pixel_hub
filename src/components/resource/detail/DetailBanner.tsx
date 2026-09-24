@@ -58,7 +58,7 @@ export default function DetailBanner({
   );
 
   return (
-    <div className="mx-auto max-w-6xl px-4 pt-8 pb-6 sm:px-6">
+    <div className="mx-auto max-w-7xl px-4 pt-8 pb-6 sm:px-6">
       {isMusic ? (
         /* 音频首屏：封面在这里只承担「这是哪张专辑」的识别作用，352px 巨型横幅会把播放器
            挤到折叠线以下，故收成「方图 + 右侧标题」的紧凑形态，播放控件因此能进首屏。 */

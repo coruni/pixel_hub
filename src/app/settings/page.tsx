@@ -78,6 +78,7 @@ export default async function SettingsPage({
         watermarkImages: true,
         watermarkText: true,
         profileBgPcKey: true,
+        profileBgOnResource: true,
       },
     }),
     countDrafts(me.id),
@@ -129,6 +130,7 @@ export default async function SettingsPage({
               nextName={summary.next?.name ?? null}
               toNext={summary.toNext}
               pcKey={prefs?.profileBgPcKey ?? null}
+              onResource={prefs?.profileBgOnResource ?? true}
               maxMb={limits.profileBgMaxMb}
             />
           </section>
