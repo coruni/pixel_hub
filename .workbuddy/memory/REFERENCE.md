@@ -131,7 +131,9 @@
   落位：`DetailTwocol` 播放器进**主列**；`DetailBanner` 退化成深色标题带；`DetailArticle` 跳过封面 hero。
 - **页面宽度 = `max-w-7xl`**（2026-09-25 从 `max-w-6xl` 同步成全站宽度，与导航栏 / 个人主页 / browse 一致）。共 **7 处**，改宽度别只改一处：
   `resources/[slug]/page.tsx` 的 `previewCls` / `topSlot` / `bottomSlot` 三个 `mx-auto max-w-7xl px-4 …`，
-  加四个模板各自的根容器（`DetailBanner:61` `pt-8 pb-6`、`DetailPost:103` `pb-16 pt-6`、`DetailTwocol:31` `py-8`、`DetailArticle:37` `pb-16 pt-8`）。
+  加四个模板各自的根容器（`DetailBanner:61` `pt-8 pb-6`、`DetailPost:103` `pb-16 pt-8`、`DetailTwocol:31` `py-8`、`DetailArticle:37` `pb-16 pt-8`）。
+  **四模板内容顶部统一 `pt-8`**（2026-09-25 把 post 的 `pt-6` 提上来；MUSIC/VIDEO 实走 post，用户报的「music 的 pt 不一致」就是这个）——别再把它降回 `pt-6`。
+- **侧栏不相对于主栏多探出**：外框容器是 `mx-auto max-w-7xl lg:pr-6`（`SidebarLayout.tsx`）。**只加右侧**：主栏 children 自带 `px-4 sm:px-6`，rail 容器在 lg 下 `px-0`，不加这 24px 时侧栏会贴容器右边缘、比主栏内容多探出 24px（主栏 6xl 时被留白遮住，升 7xl 后暴露）。别改成 `px-6`（左侧会与 children 叠加成双倍）。
   `resources/[slug]/edit/page.tsx`（编辑页表单）**仍是 6xl**，刻意窄；`error.tsx` / `not-found.tsx` 的 `mx-auto flex max-w-6xl flex-col` 也是刻意收窄的居中列，别动。
 - **正文里的宽内容防溢出**：`.md-body table` 走 `display:block + overflow-x:auto`（见 `MEMORY.md` 的 CSS 节）；`pre` 本来就有 `overflow-x:auto`、`img` 有 `max-width:100%`。
 - 回退**不要按目录**：`git checkout HEAD -- <dir>` 会带走该目录所有未提交改动；先 `git diff --stat`。
