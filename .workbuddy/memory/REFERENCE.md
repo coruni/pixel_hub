@@ -129,6 +129,11 @@
   `DetailTwocol` 的 360px `<aside>` 尚未同步加固。
 - VIDEO 只有一个视频：`av-player` 里 `boxed = isAudio`；模板层对 VIDEO **整块不渲染 `<Gallery>`**（空数组会渲染「暂无预览图」）。
   落位：`DetailTwocol` 播放器进**主列**；`DetailBanner` 退化成深色标题带；`DetailArticle` 跳过封面 hero。
+- **播放卡的根 `<section>` 是 `mt-6 first:mt-0`，别改回裸 `mt-6`**（2026-09-25 用户报「视频播放多了个 mt-6 导致比别的下沉许多」）：
+  MUSIC/VIDEO 走 `post`，`{!isVideo && <Gallery/>}` 对 video 不渲染任何节点 ⇒ 播放卡成为模板根容器**首个子元素**，
+  原来无条件的 `mt-6` 就变成凭空多出的 24px（音频/图片首块是 `Gallery`，无上边距）。`first:mt-0` 只在「确有前驱块」时保留间距：
+  post 视频 / twocol 视频归零，banner（横幅之后）、article（封面/正文之后）不受影响。
+  Tailwind v4 产物 = `.first\:mt-0:first-child`，特异性 (0,2,0) > `.mt-6` 的 (0,1,0) ⇒ 不依赖 CSS 顺序。
 - **页面宽度 = `max-w-7xl`**（2026-09-25 从 `max-w-6xl` 同步成全站宽度，与导航栏 / 个人主页 / browse 一致）。共 **7 处**，改宽度别只改一处：
   `resources/[slug]/page.tsx` 的 `previewCls` / `topSlot` / `bottomSlot` 三个 `mx-auto max-w-7xl px-4 …`，
   加四个模板各自的根容器（`DetailBanner:61` `pt-8 pb-6`、`DetailPost:103` `pb-16 pt-8`、`DetailTwocol:31` `py-8`、`DetailArticle:37` `pb-16 pt-8`）。

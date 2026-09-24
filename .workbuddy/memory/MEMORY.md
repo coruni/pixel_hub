@@ -21,6 +21,7 @@
 - 单列 grid 必须显式 `grid-cols-1`（= `minmax(0,1fr)`）。裸 `grid gap-1` 的隐式 auto 轨道按 min-content 起算，行内 `truncate` 会撑爆卡片。
 - `@import "tailwindcss"` 之后的规则**无层**，优先于任何 `@layer`：与 `* { scrollbar-width:thin }` 冲突时 Tailwind 任意值（中括号）写法被静默压掉 → 用无层普通 class（`.scrollbar-none`）。注释里别原样写中括号类名。
 - `overflow-x-auto` 会把 overflow-y 变 auto 并裁自身溢出：横向滚动 + 下划线 tab 的 `-mb-px` 挂在**滚动容器**上。
+- **区块自带的 `mt-*` 是「与上一个块拉开距离」**：只要该块**可能成为容器首块**（前驱被条件渲染跳过，如 `{cond && <X/>}`），就必须写成 `mt-6 first:mt-0`。否则该分支下首块平白多一段上边距，而别的分支看着正常 —— 排查时容易反过来说成「别的块矮了」。实例 = `av-player` 播放卡（详见「详情页」节）。`first:` 变体特异性高于裸 `mt-6`，不依赖产物顺序。
 - **改 class 后必须核 Tailwind 真产出了该类**（postcss 编 `globals.css` 再查选择器，见 skill）。覆盖第三方主题（Crepe）一律 4 层选择器压它的 3 层。
 - **`SidebarLayout` 外层容器 = `mx-auto max-w-7xl lg:pr-6`**（只加右侧，别改成 `px-6`）。主栏 children 自带 `px-4 sm:px-6`，而 rail 在 lg 下 `px-0` → 不加这 24px 时侧栏会贴着容器右边缘、比主栏内容多探出 24px；主栏是 `max-w-6xl` 时被两侧留白遮住，升到 7xl 后立刻暴露成「侧栏超出」。改宽度类前先看这里。
 - `.md-body table` 是 `display:block` + `overflow-x:auto`（**不是**裸 table）：列多 / 含长串的表格自带横向滚动，不会撑破正文容器、把整页拖出横向滚动条。**别改回纯 table** —— 那正是详情页整页横向滚动条的来源；`display:block` 下浏览器仍补匿名 table box，单元格布局与 `border-collapse` 照常生效（GitHub markdown-body 同款）。
@@ -41,6 +42,7 @@
 - **音视频播放器 = 自建控件**（`detail/av-controls.tsx`）：全站禁止再用原生 `controls`；下载入口由 `av-player.tsx` 以 `downloadSlot` 注入控件行（用 `MetaDownloadButton` 的 `iconOnly` + `className`，它的**默认翠绿实底路径必须逐字保持**），控件类名统一在 `cls.ts` 的 `AV_CTRL_*`。
 - 模板差异（MUSIC/VIDEO 实走 `post`）、操作条、四处落位、`CollapsibleAside` 锁宽等细节见 `REFERENCE.md` —— **落位被纠正过两次，动之前先查**。
 - **四模板内容顶部间距统一 `pt-8`**：banner `pt-8 pb-6`、post `pt-8 pb-16`、twocol `py-8`、article `pt-8 pb-16`。`post` 曾是 `pt-6`，因为 MUSIC/VIDEO 实走 post 而与 banner/article 差一档（2026-09-25 用户报的「music 的 pt 与其他类型不一致」）→ 别再把它降回 `pt-6`。
+- **播放卡根 `<section>` = `mt-6 first:mt-0`，别改回裸 `mt-6`**：video 走 post 且不渲染 `Gallery` ⇒ 播放卡是容器**首个子元素**，裸 `mt-6` 会凭空多 24px（音频/图片首块是 `Gallery`，无上边距）→ 用户报「视频播放比别的下沉许多」。
 - **回退不要按目录**：`git checkout HEAD -- <dir>` 会带走该目录所有未提交改动；先 `git diff --stat`。
 
 ## 云盘 / IP 防刷
