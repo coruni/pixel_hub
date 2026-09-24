@@ -8,6 +8,7 @@
 //   commentImageMaxMb,      // 评论附图单张（1..100）
 //   avatarMaxMb,            // 头像（1..100）
 //   heroImageMaxMb,         // 主页横幅单张（1..100）
+//   profileBgMaxMb,         // 个人主页背景单张（1..100；仅桌面端渲染）
 //   galleryImageMaxCount,   // 图集/原图张数上限（只设下界 1，上不封顶）
 //   commentImageMaxCount,   // 评论附图张数上限
 //   imageFormat,            // 服务端压缩输出格式 webp|jpg|png（webp/png 保留 alpha）
@@ -77,6 +78,16 @@ export const MB_RANGE = {
 export const COUNT_RANGE = { min: 1 } as const;
 /** 评论附图数量上限范围（张）：单条评论附图，保留 0..20 的窄档位（0 = 禁止附图） */
 export const COMMENT_COUNT_RANGE = { min: 0, max: 20 } as const;
+
+/**
+ * 主页背景解锁判定。**门槛 0 = 不限**；激励总开关关掉时等级不存在，门槛随之失效（否则会给
+ * 全员上锁且无任何提升途径）。门槛值来自激励配置的 `profile.bgMinLevel`（等级序号，0 起）。
+ * 前台渲染与设置页表单必须共用这一个函数，避免两头口径漂移。
+ */
+export function profileBgUnlocked(level: number, minLevel: number, incentiveEnabled = true): boolean {
+  if (!incentiveEnabled) return true;
+  return minLevel <= 0 || level >= minLevel;
+}
 
 /**
  * 水印文字长度上限。放在这里而不是 media/watermark.ts：设置页的表单是客户端组件，
@@ -172,6 +183,8 @@ export type UploadLimits = {
   avatarMaxMb: number;
   /** 主页横幅（个人主页 hero，16:5 裁剪为 1600×500）：单张上限 */
   heroImageMaxMb: number;
+  /** 个人主页背景（仅桌面端渲染）：单张上限（1..100） */
+  profileBgMaxMb: number;
   /** 图集 / 原图：单个资源可上传的图片张数上限（IMAGE 类型预览图）；只设下界，无上界 */
   galleryImageMaxCount: number;
   /** 评论附图：单条评论可附带的图片张数上限 */
@@ -235,6 +248,7 @@ export const DEFAULT_UPLOAD_LIMITS: UploadLimits = {
   commentImageMaxMb: 5,
   avatarMaxMb: 5,
   heroImageMaxMb: 20,
+  profileBgMaxMb: 20,
   galleryImageMaxCount: 12,
   commentImageMaxCount: 3,
   imageFormat: DEFAULT_IMAGE_FORMAT,
@@ -315,6 +329,12 @@ export function parseUploadLimits(raw: unknown): UploadLimits {
     ),
     // 图集张数：只钳下界，大值原样保留（原先的 max 60 天花板已去掉）
     galleryImageMaxCount: clampIntMin(o.galleryImageMaxCount, COUNT_RANGE.min, 12),
+    profileBgMaxMb: clampInt(
+      o.profileBgMaxMb,
+      MB_RANGE.image.min,
+      MB_RANGE.image.max,
+      DEFAULT_UPLOAD_LIMITS.profileBgMaxMb,
+    ),
     commentImageMaxCount: clampInt(
       o.commentImageMaxCount,
       COMMENT_COUNT_RANGE.min,

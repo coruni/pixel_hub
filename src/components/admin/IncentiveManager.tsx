@@ -47,6 +47,7 @@ import {
   Row,
   Section,
   SegmentedRow,
+  SelectRow,
   SwitchRow,
   TextRow,
   ToggleRow,
@@ -56,6 +57,7 @@ import {
 const GROUPS = [
   "scores",
   "settleEligible",
+  "profile",
   "download",
   "coin",
   "withdraw",
@@ -294,6 +296,21 @@ export default function IncentiveManager({
             levels={draft.levels}
             maxLevels={LEVEL_BADGE_CLASSES.length}
             onChange={(next) => setDraft((d) => ({ ...d, levels: next }))}
+          />
+          {/* 等级在这里第一次被当成「门槛」用：主页背景是最底层底图，只给够档的人开放 */}
+          <SelectRow
+            id="inc-profile-bg-level"
+            label="主页背景解锁等级"
+            range="0 = 不限"
+            hint="达到该等级的用户才能在设置页上传个人主页背景（PC 与移动端各一张，铺满视口的底图）。等级本身不发钱，这里只是拿它当门槛。"
+            value={String(g("profile").bgMinLevel ?? 0)}
+            onChange={(v) => setGroup("profile", { bgMinLevel: toNum(v) })}
+            options={[
+              { value: "0", label: "不限（全员可用）" },
+              ...[...draft.levels]
+                .sort((a, b) => a.min - b.min)
+                .map((lv, i) => ({ value: String(i), label: `${lv.name}（${lv.min} 分）` })),
+            ]}
           />
         </Section>
 

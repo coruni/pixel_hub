@@ -10,6 +10,7 @@ import SettingsForm from "@/components/auth/settings-form";
 import PrivacyForm from "@/components/auth/privacy-form";
 import AvatarForm from "@/components/auth/avatar-form";
 import HeroForm from "@/components/auth/HeroForm";
+import ProfileBgForm from "@/components/auth/ProfileBgForm";
 import NotificationsForm from "@/components/auth/NotificationsForm";
 import PublishForm from "@/components/auth/PublishForm";
 import WatermarkForm from "@/components/auth/WatermarkForm";
@@ -19,6 +20,9 @@ import SettingsTabs from "@/components/auth/SettingsTabs";
 import { startGitHubBindAction, unbindGitHubAction } from "@/lib/actions/connections";
 import { countDrafts } from "@/lib/draft-store";
 import { getRuntimeConfig, githubClientId, githubClientSecret } from "@/lib/runtime-config";
+import { getIncentive } from "@/lib/incentive";
+import { getContributionSummary } from "@/lib/points";
+import { profileBgUnlocked } from "@/lib/upload-config";
 import { Button } from "@/components/ui/Button";
 
 export const metadata: Metadata = { title: "账户设置", robots: { index: false } };
@@ -62,17 +66,29 @@ export default async function SettingsPage({
 
   const me = session.user;
   const profile = await getProfile(me.username, me.id);
-  const [githubAccount, prefs, draftCount] = await Promise.all([
+  const [githubAccount, prefs, draftCount, summary, incentive] = await Promise.all([
     prisma.account.findFirst({
       where: { userId: me.id, provider: "github" },
       select: { providerAccountId: true },
     }),
     prisma.user.findUnique({
       where: { id: me.id },
-      select: { autoSaveDraft: true, watermarkImages: true, watermarkText: true },
+      select: {
+        autoSaveDraft: true,
+        watermarkImages: true,
+        watermarkText: true,
+        profileBgPcKey: true,
+      },
     }),
     countDrafts(me.id),
+    getContributionSummary(me.id),
+    getIncentive(),
   ]);
+
+  // 主页背景解锁判定：与前台渲染共用 profileBgUnlocked()，门槛值来自激励配置的 profile.bgMinLevel。
+  // 门槛可能指向一个被裁掉的档位 —— 那时只显示「达到更高等级」，不去编一个等级名。
+  const bgGateLevels = [...incentive.levels].sort((a, b) => a.min - b.min);
+  const bgUnlocked = profileBgUnlocked(summary.level, incentive.profile.bgMinLevel, incentive.enabled);
   const githubEnabled = Boolean(githubClientId(runtimeCfg) && githubClientSecret(runtimeCfg));
   const joined = profile
     ? new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "long", day: "numeric" }).format(
@@ -100,6 +116,20 @@ export default async function SettingsPage({
             <HeroForm
               heroImageKey={profile?.heroImageKey ?? null}
               heroMaxMb={limits.heroImageMaxMb}
+            />
+          </section>
+
+          <section className={sectionCls}>
+            <h2 className={sectionTitle}>主页背景</h2>
+            <p className={sectionHint}>铺满整个屏幕的最底层底图，不会盖住主页横幅。仅桌面端展示</p>
+            <ProfileBgForm
+              unlocked={bgUnlocked}
+              gateName={bgGateLevels[incentive.profile.bgMinLevel]?.name ?? null}
+              points={summary.points}
+              nextName={summary.next?.name ?? null}
+              toNext={summary.toNext}
+              pcKey={prefs?.profileBgPcKey ?? null}
+              maxMb={limits.profileBgMaxMb}
             />
           </section>
 

@@ -8,8 +8,10 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { rateLimit } from "@/lib/rate-limit";
 import { makeKey, saveFile, delFile } from "@/lib/storage";
-import { MIB, WATERMARK_TEXT_MAX } from "@/lib/upload-config";
+import { MIB, WATERMARK_TEXT_MAX, profileBgUnlocked } from "@/lib/upload-config";
 import { getUploadLimits } from "@/lib/upload-limits";
+import { getIncentive } from "@/lib/incentive";
+import { getContributionSummary } from "@/lib/points";
 import { compressWith, compressConfigOf, outputExt } from "@/lib/media/compress";
 import { notifyAccountSecurity } from "@/lib/notify";
 
@@ -276,6 +278,100 @@ export async function removeHeroAction(_fd?: FormData): Promise<void> {
     await prisma.user.update({ where: { id: user.id }, data: { heroImageKey: null } });
     await delFile(row.heroImageKey).catch(() => {});
   }
+  revalidatePath(`/u/${user.username}`);
+  revalidatePath("/settings");
+}
+
+// ---- 个人主页背景：铺满视口的**最底层**底图（不覆盖 hero，仅桌面端渲染）----
+//
+// 三处与头像/横幅不同，都是刻意的：
+//   ① **不做裁剪**。底图是 cover 铺满，被裁掉的恰好是遮罩留白的中间区，裁剪器只会让用户困惑；
+//      改成把遮罩直接套在设置页预览上，所见即所得（遮罩类见 globals.css 的 .profile-bg-pc）。
+//   ② **不放大小图**。cover 在 CSS 层完成，服务端只按后台格式重压，避免无谓的重采样损失。
+//   ③ **门槛在服务端重算**。客户端只是不渲染入口，绕过前端也必须传不上来 —— 与前台渲染
+//      共用 profileBgUnlocked()，口径只有一份。
+
+/** 服务端权威判定：等级不够直接拒绝，并把「还差哪一档」写进错误文案 */
+async function profileBgGate(userId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const [incentive, summary] = await Promise.all([getIncentive(), getContributionSummary(userId)]);
+  if (profileBgUnlocked(summary.level, incentive.profile.bgMinLevel, incentive.enabled)) {
+    return { ok: true };
+  }
+  // 门槛可能指向一个不存在的档位（管理员裁掉了等级）—— 那时只能说「尚未开放」，不能编一个名字
+  const need = [...incentive.levels].sort((a, b) => a.min - b.min)[incentive.profile.bgMinLevel]?.name;
+  return {
+    ok: false,
+    error: need ? `主页背景需达到「${need}」等级后开放` : "主页背景目前未对你开放",
+  };
+}
+
+export async function uploadProfileBgAction(
+  _prev: SettingsActionState,
+  fd: FormData,
+): Promise<SettingsActionState> {
+  const user = (await auth())?.user;
+  if (!user) return { error: "请先登录" };
+
+  const gate = await profileBgGate(user.id);
+  if (!gate.ok) return { error: gate.error };
+
+  const L = await getUploadLimits();
+  const maxBytes = L.profileBgMaxMb * MIB;
+
+  const file = fd.get("bg");
+  if (!(file instanceof File) || file.size === 0) return { error: "请选择图片文件" };
+  const buf = Buffer.from(await file.arrayBuffer());
+  if (buf.byteLength > maxBytes) return { error: `主页背景不能超过 ${L.profileBgMaxMb}MB` };
+  if (!sniffImage(buf)) return { error: "不支持的图片格式（仅 png/jpg/webp/gif）" };
+
+  const isGif = buf.length >= 6 && buf.subarray(0, 6).toString("latin1").startsWith("GIF8");
+  if (isGif) return { error: "主页背景不支持 GIF，请使用静态图" };
+
+  try {
+    const out = await compressWith(
+      sharp(buf, { failOn: "none" }).rotate(),
+      compressConfigOf(L),
+    ).toBuffer();
+    const key = makeKey("backgrounds", `.${outputExt(L.imageFormat)}`);
+    const url = await saveFile(key, out);
+
+    // 换图后清理旧文件（本地 key 或 chevereto 远端 URL 都尽力删）
+    const row = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { profileBgPcKey: true },
+    });
+    const old = row?.profileBgPcKey;
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { profileBgPcKey: url },
+    });
+    if (old && old !== url) await delFile(old).catch(() => {});
+
+    revalidatePath(`/u/${user.username}`);
+    revalidatePath("/settings");
+    return { ok: true };
+  } catch (e) {
+    console.error("[profile-bg]", e);
+    return { error: "背景图处理失败，请重试或更换图片" };
+  }
+}
+
+export async function removeProfileBgAction(): Promise<void> {
+  const user = (await auth())?.user;
+  if (!user) return;
+
+  const row = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { profileBgPcKey: true },
+  });
+  const old = row?.profileBgPcKey;
+  if (!old) return;
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { profileBgPcKey: null },
+  });
+  await delFile(old).catch(() => {});
   revalidatePath(`/u/${user.username}`);
   revalidatePath("/settings");
 }

@@ -1074,6 +1074,8 @@ export type UserProfile = {
   bio: string | null;
   avatarKey: string | null;
   heroImageKey: string | null;
+  /** 个人主页背景（铺满视口的最底层底图，仅桌面端渲染）；是否真的有资格渲染由 profileBgUnlocked 判定 */
+  profileBgPcKey: string | null;
   role: "USER" | "MODERATOR" | "ADMIN";
   trusted: boolean;
   createdAt: Date;
@@ -1109,6 +1111,7 @@ export const getProfile = cache(
         bio: true,
         avatarKey: true,
         heroImageKey: true,
+        profileBgPcKey: true,
         role: true,
         trusted: true,
         createdAt: true,
@@ -1141,6 +1144,7 @@ export const getProfile = cache(
       bio: user.bio,
       avatarKey: user.avatarKey,
       heroImageKey: user.heroImageKey,
+      profileBgPcKey: user.profileBgPcKey,
       role: user.role,
       trusted: user.trusted,
       createdAt: user.createdAt,

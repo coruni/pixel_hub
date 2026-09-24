@@ -295,12 +295,26 @@ const levelsSchema = z
   .max(LEVEL_BADGE_CLASSES.length)
   .default([...DEFAULT_LEVELS]);
 
+/**
+ * 主页背景（个人主页最底层底图，PC / 移动端各一张）。
+ * 门槛存**等级序号**而不是分数：等级名称与门槛都在上面可改，存分数会让「资深创作者」的定义漂移。
+ */
+const profileSchema = z.object({
+  /**
+   * 解锁等级序号（0 起，0 = 不限）。默认 2 = DEFAULT_LEVELS 的「资深创作者」。
+   * 判定统一走 upload-config.ts 的 `profileBgUnlocked()`，前台渲染与设置页共用同一口径。
+   * 注意：若 levels 被裁到不足 bgMinLevel+1 档，等于无人可解锁 —— 后台表单按下拉选，改档位时需一并调整。
+   */
+  bgMinLevel: intRange(0, 20).default(2),
+});
+
 export const incentiveSchema = z.object({
   /** 总开关：关闭后不计分、不展示等级与榜单（存量数据保留） */
   enabled: z.boolean().default(true),
   scores: scoresSchema,
   settleEligible: settleEligibleSchema,
   levels: levelsSchema,
+  profile: profileSchema,
   download: downloadSchema,
   coin: coinSchema,
   withdraw: withdrawSchema,
@@ -318,6 +332,7 @@ export type IncentiveConfig = z.infer<typeof incentiveSchema>;
 const GROUP_KEYS = [
   "scores",
   "settleEligible",
+  "profile",
   "download",
   "coin",
   "withdraw",

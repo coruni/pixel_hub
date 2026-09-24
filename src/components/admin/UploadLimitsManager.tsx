@@ -41,7 +41,12 @@ import { BTN_DANGER_SM, BTN_PRIMARY_SM, INPUT_SM, SELECT_SM } from "@/lib/ui/cls
 import { Button } from "@/components/ui/Button";
 
 /** 图片类体积字段：档位只有 1–100MB，用 MB 输入即自然，不配单位选择 */
-type ImageMbKey = "galleryImageMaxMb" | "commentImageMaxMb" | "avatarMaxMb" | "heroImageMaxMb";
+type ImageMbKey =
+  | "galleryImageMaxMb"
+  | "commentImageMaxMb"
+  | "avatarMaxMb"
+  | "heroImageMaxMb"
+  | "profileBgMaxMb";
 /** 概览卡覆盖的全部体积字段（含附件） */
 type MbKey = "attachmentMaxMb" | ImageMbKey;
 
@@ -65,6 +70,11 @@ const IMAGE_MB_FIELDS: { key: ImageMbKey; label: string; hint: string }[] = [
     key: "heroImageMaxMb",
     label: "主页横幅（MB）",
     hint: "个人主页顶部 16:5 横幅（导出 1600×500）的单张上限。横幅比头像宽得多，建议单独放宽。",
+  },
+  {
+    key: "profileBgMaxMb",
+    label: "主页背景（MB）",
+    hint: "个人主页铺满视口的底图，PC 与移动端各一张共用此档。只在用户达到等级门槛后可见。",
   },
 ];
 
@@ -100,6 +110,7 @@ const OVERVIEW_FIELDS: { key: MbKey; label: string; note: string; Icon: typeof F
   { key: "commentImageMaxMb", label: "评论附图", note: "单张上限", Icon: MessageCircle },
   { key: "avatarMaxMb", label: "头像", note: "单张上限", Icon: UserRound },
   { key: "heroImageMaxMb", label: "主页横幅", note: "单张上限", Icon: PanelTop },
+  { key: "profileBgMaxMb", label: "主页背景", note: "单张上限", Icon: ImageIcon },
 ];
 
 /** 压缩输出格式选项：value / 展示名 / 一句话说明（透明通道差异必须写明，避免选错格式丢透明） */
@@ -124,6 +135,7 @@ type Draft = {
   commentImageMaxMb: string;
   avatarMaxMb: string;
   heroImageMaxMb: string;
+  profileBgMaxMb: string;
   galleryImageMaxCount: string;
   commentImageMaxCount: string;
   imageFormat: ImageOutputFormat;
@@ -140,6 +152,7 @@ const toDraft = (l: UploadLimits): Draft => {
     commentImageMaxMb: String(l.commentImageMaxMb),
     avatarMaxMb: String(l.avatarMaxMb),
     heroImageMaxMb: String(l.heroImageMaxMb),
+    profileBgMaxMb: String(l.profileBgMaxMb),
     galleryImageMaxCount: String(l.galleryImageMaxCount),
     commentImageMaxCount: String(l.commentImageMaxCount),
     imageFormat: l.imageFormat,
@@ -208,6 +221,7 @@ export default function UploadLimitsManager({ limits }: { limits: UploadLimits }
         commentImageMaxMb: Number(draft.commentImageMaxMb),
         avatarMaxMb: Number(draft.avatarMaxMb),
         heroImageMaxMb: Number(draft.heroImageMaxMb),
+        profileBgMaxMb: Number(draft.profileBgMaxMb),
         galleryImageMaxCount: Number(draft.galleryImageMaxCount),
         commentImageMaxCount: Number(draft.commentImageMaxCount),
         imageFormat: draft.imageFormat,
@@ -220,7 +234,7 @@ export default function UploadLimitsManager({ limits }: { limits: UploadLimits }
     void confirmDialog({
       title: "恢复默认上传限制",
       message:
-        "将附件与图片上传限制恢复为站点默认值（附件 200MB + 内置后缀；图集/原图 20MB、评论附图 5MB、头像 5MB、主页横幅 20MB），图片压缩恢复为 webp + 质量 82，确定？",
+        "将附件与图片上传限制恢复为站点默认值（附件 200MB + 内置后缀；图集/原图 20MB、评论附图 5MB、头像 5MB、主页横幅 20MB、主页背景 20MB），图片压缩恢复为 webp + 质量 82，确定？",
       confirmLabel: "恢复默认",
       danger: true,
     }).then((ok) => {
@@ -236,7 +250,7 @@ export default function UploadLimitsManager({ limits }: { limits: UploadLimits }
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {OVERVIEW_FIELDS.map(({ key, label, note, Icon }) => (
           <div
             key={key}
@@ -266,7 +280,7 @@ export default function UploadLimitsManager({ limits }: { limits: UploadLimits }
               <div>
                 <h2 className="text-sm font-semibold text-neutral-900">图片上传限制</h2>
                 <p className="mt-1 text-xs leading-5 text-neutral-500">
-                  控制图集、评论附图、头像与主页横幅的单张原图大小，服务端会在上传时统一校验。
+                  控制图集、评论附图、头像、主页横幅与主页背景的单张原图大小，服务端会在上传时统一校验。
                 </p>
               </div>
             </div>

@@ -24,6 +24,7 @@ import {
 } from "@/lib/actions/social";
 import { formatCount } from "@/lib/format";
 import { publicUrl } from "@/lib/storage/url";
+import { profileBgUnlocked } from "@/lib/upload-config";
 import ResourceGrid from "@/components/resource/ResourceGrid";
 import Avatar from "@/components/ui/Avatar";
 import { FollowButton } from "@/components/social/interactions";
@@ -135,6 +136,12 @@ export default async function UserPage({
   ]);
   const levelName = incentive.enabled ? levelNameOf(pointBalance, incentive.levels) : null;
   const levelIndex = levelOf(pointBalance, incentive.levels);
+
+  // 主页背景：**最底层底图**（铺满视口、不覆盖 hero），达等级且有图才渲染。
+  // 门槛判定与设置页表单共用 profileBgUnlocked()；等级掉下来或管理员抬高门槛后，旧图会立即不再渲染
+  // ——「达到等级才开放」是一致口径，不做「传过就永久保留」的特例。
+  const bgUnlocked = profileBgUnlocked(levelIndex, incentive.profile.bgMinLevel, incentive.enabled);
+  const bgPcKey = bgUnlocked ? profile.profileBgPcKey : null;
 
   // 头部操作区。**hero / 无 hero 两套头部共用这一个节点** —— 打赏入口只补在其中一套里，
   // 另一套就会莫名缺按钮（两套头部的结构是一样的，别各写一遍）。
@@ -334,6 +341,17 @@ export default async function UserPage({
 
   return (
     <div className={`mx-auto max-w-7xl px-4 py-10 sm:px-6 ${profile.heroImageKey ? "pt-0" : "pt-10"}`}>
+      {/* 主页背景：铺满视口的最底层。用 fixed 而不是插在文档流里 —— 它必须是**全屏**的，
+          而这一层的外层是 max-w-7xl 容器，只有 fixed 能脱离它的宽度约束铺到屏幕两端。
+          只在 sm 及以上渲染：窄屏没有侧边留白，遮罩带会直接压到卡片下面。
+          -z-10 让它落在所有内容（含 hero）之下，且仍在 body 底色之上。 */}
+      {bgPcKey && (
+        <div
+          aria-hidden
+          className="profile-bg-pc pointer-events-none fixed inset-0 -z-10 hidden bg-cover bg-center bg-no-repeat sm:block"
+          style={{ backgroundImage: `url(${publicUrl(bgPcKey)})` }}
+        />
+      )}
       {/* 头部：可选 hero 横幅图。移动端背景向下延伸覆盖到统计行底部，整张图用 mask 渐变：
           内容区域压暗保证文字可读、无字间隙露出图像、最底部融出到 body，无硬切分割线 */}
       {profile.heroImageKey ? (

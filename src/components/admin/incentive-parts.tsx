@@ -132,6 +132,48 @@ export function NumRow({
   );
 }
 
+/**
+ * 下拉行：选项多到分段按钮放不下时用（如等级档位）。
+ * 与 NumRow 同宽同布局；值一律是字符串 —— 数字型字段（等级序号）由调用方自行转换。
+ */
+export function SelectRow({
+  id,
+  label,
+  range,
+  hint,
+  value,
+  onChange,
+  options,
+  disabled,
+}: {
+  id: string;
+  label: string;
+  range?: string;
+  hint?: ReactNode;
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+  disabled?: boolean;
+}) {
+  return (
+    <Row htmlFor={id} label={label} range={range} hint={hint}>
+      <select
+        id={id}
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+        className={`${INPUT_SM} w-full disabled:opacity-50`}
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </Row>
+  );
+}
+
 /** 开关行：整行是 label，点击即切换 */
 export function SwitchRow({
   id,

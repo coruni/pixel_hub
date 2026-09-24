@@ -98,7 +98,10 @@
      填充规则用 `口` 验（中心必须透明，否则说明 nonzero 缠绕方向被处理错了）；
      确定性用「两次渲染逐字节一致」；窄图用「墨迹不越界」验「缩字而不是裁字」。
   2. **HTTP 端到端**（`storageDriver=local` 时安全：产物落 `public/uploads/`，已 gitignore）：
-     铸 `authjs.session-token` cookie（`@auth/core/jwt` 的 `encode`，salt **必须等于 cookie 名**，token 里必须带 `pw = passwordHash.slice(-16)`，否则 jwt 回调会清空身份 → 401）
+     铸 `authjs.session-token` cookie（`@auth/core/jwt` 的 `encode`，salt **必须等于 cookie 名**）→
+     token payload 只给 `{ id, sub, username }` 就够：`src/lib/auth.ts` 的 jwt 回调是
+     `if (!row || row.bannedAt || (t.pw !== undefined && t.pw !== sig))` —— **不带 `pw` 反而免检**（身份每次请求从 DB 回查刷新）；
+     带了就必须等于 `passwordHash.slice(-16)`，不等会被清空身份 → 未登录态。
      → `POST /api/upload?max=1`（FormData 字段 `files`，`sameOrigin()` 对不带 Origin 的客户端放行）
      → 取回 `origUrl` 解码。
      **最强的一条断言**：把产物右下角裁成 `覆盖层宽×高` 与「本地 `buildOverlay` 贴到同色底」**逐字节比** —— 位置、字号、字形、颜色一次全对上，这才算证明「运行时真的用了站点字体」。
@@ -112,3 +115,32 @@
 - **加载姿势**：`fontkit.create(fs.readFileSync(...))` 都是同步的 → `siteFont()` 做成**懒加载同步单例**（失败结果也缓存），`buildOverlay`/`applyWatermark` 保持同步签名，`process.ts` / `social.ts` 一行都不用改。
   路径写成**字面量** `path.join(process.cwd(), "public/fonts/…woff2")`：产物追踪只对静态路径生效。运行镜像里 `public/` 由 `COPY --from=build /app/public ./public` 带过去。
 - Dockerfile 运行的 `fontconfig + fonts-noto-cjk` 现在**只服务回退路径**（用户输入含 emoji 等缺字字符时）。`public/fonts/*.woff2` pango/librsvg 读不了，所以回退路径用的是系统字体，不是站点字体。
+
+## 详情页落位（四模板）
+
+- 四模板共用 `parts.tsx`；`detailTemplate.byType` 后台可配（信息面板标题不能写死）。**MUSIC / VIDEO 实际走 `post` 模板**
+  （内置 byType 只给 GAME=banner、ARTICLE=article）—— banner 的音频紧凑首屏要后台配成 banner 才生效；post 下吃掉首屏的是 `Gallery` 的 `h-[50vh]` 主图。
+- 操作条 = 图标 + 文字（Heart/Star/Flag/Pencil，`size={15}`，`aria-hidden`）；无图标版已被否。
+  `ACTION_TEXT`（`src/lib/ui/cls.ts`）：无边框无底色、`gap-1.5 py-1.5 text-sm`；`FollowButton` 是全站唯一保留描边/实底的动作；行容器 `justify-end`。
+- **落位（纠正过两次）**：banner 在 `DownloadPanel` 之后、`DescriptionBlock` 之前，且在 `CollapsibleAside` **之外**；
+  post 在右栏底部、article 居中栏、twocol 在左列内。
+- `CollapsibleAside` 收起必须「不重排」：`overflow-hidden` + `<aside>` 两层，内层 `space-y-4 whitespace-nowrap lg:w-[340px]` 锁宽
+  （光裁剪挡不住列宽压 0 → 折行 → 撑开整行）。340 用文件顶部常量 + **完整类名字符串**集中（Tailwind 只扫字面量）。
+  `DetailTwocol` 的 360px `<aside>` 尚未同步加固。
+- VIDEO 只有一个视频：`av-player` 里 `boxed = isAudio`；模板层对 VIDEO **整块不渲染 `<Gallery>`**（空数组会渲染「暂无预览图」）。
+  落位：`DetailTwocol` 播放器进**主列**；`DetailBanner` 退化成深色标题带；`DetailArticle` 跳过封面 hero。
+- 回退**不要按目录**：`git checkout HEAD -- <dir>` 会带走该目录所有未提交改动；先 `git diff --stat`。
+
+## 个人主页背景（`.profile-bg-pc` + 设置页表单）
+
+- **只有一张图、一个上传槽**（`slot` 参数已废），字段 `User.profileBgPcKey`（迁移 `0009`）。**仅桌面端渲染**：
+  元素带 `hidden sm:block`；窄屏没有侧边留白，遮罩带会直接压到卡片上（用户 2026-09-24 明确砍掉移动端那版，不要再加回来）。
+- 遮罩只有一份 = `globals.css` 的 `.profile-bg-pc`（`to right` 横向渐变：贴屏幕边缘最清晰、向中间淡到 0，淡出终点 24% ≈ 视口 1920 时多探进内容区约 100px）。
+  **设置页预览直接套这个类**（遮罩百分比相对元素自身 ⇒ 小预览与真实视口带子比例一致），不要在表单里复刻一份渐变。
+- 层级：`aria-hidden` + `fixed inset-0 -z-10`，不参与布局、不盖 hero。外层是 `max-w-7xl` 容器，**只有 `fixed` 能铺到屏幕两端**。
+- **门槛在激励配置**（`points-config.ts` 的 `incentive.profile.bgMinLevel`，等级序号，默认 2 = 资深创作者），尺寸上限在**上传限制**（`profileBgMaxMb`，后台 `/admin/uploads`）——两处刻意分开。
+  唯一判定函数 = `upload-config.ts` 的 `profileBgUnlocked(level, minLevel, incentiveEnabled)`；**总开关关掉时门槛失效**（否则全员上锁且无提升途径）。
+  前台渲染、设置页表单、server action 三处共用它；action 里**必须重算**（客户端只是不渲染入口）。
+- **不做裁剪、不放大小图**：底图 cover 铺满，裁掉的恰好是遮罩留白区（裁剪器只会让用户困惑）；cover 交给 CSS，服务端只按后台格式重压。
+- **验证姿势**：线上全站 0 分 / 0 档 ⇒ 没人解锁，渲染分支必须临时把 `bgMinLevel` 置 0 + 给一个账号塞图才能验；
+  先存原值 → 断言 → `finally` 里还原（配置还原要连 `version` 一起还原并断言逐字节一致）。

@@ -39,6 +39,8 @@ export type SaveUploadLimitsInput = {
   avatarMaxMb?: number;
   /** 主页横幅（MB，个人主页 hero） */
   heroImageMaxMb?: number;
+  /** 个人主页背景（MB，PC / 移动端两张共用此档） */
+  profileBgMaxMb?: number;
   /** 图集/原图：单个资源图片张数上限（已去掉上界，仅保留 ≥1） */
   galleryImageMaxCount?: number;
   /** 评论附图：单条评论图片张数上限 */
@@ -91,6 +93,13 @@ export async function saveUploadLimitsAction(input: SaveUploadLimitsInput): Prom
       MB_RANGE.image.min,
       MB_RANGE.image.max,
       l.heroImageMaxMb,
+    );
+  if (typeof input.profileBgMaxMb === "number")
+    l.profileBgMaxMb = clampInt(
+      input.profileBgMaxMb,
+      MB_RANGE.image.min,
+      MB_RANGE.image.max,
+      l.profileBgMaxMb,
     );
 
   // 数量上限：图集张数只钳下界（已无上界），评论图允许 0（表示禁止附图）

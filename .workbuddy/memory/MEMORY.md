@@ -1,6 +1,6 @@
 # Pixel Hub —— 长期项目约定（常驻红线）
 
-> 只留「改错了会再踩一次」的规则。**细则按主题查同目录 `REFERENCE.md`**：上传体积/图片压缩、附件与音视频上传、云盘 Graph/OneDrive、Markdown 渲染与 Crepe 样式、打包器追踪、**账务（贡献分/PIX/结算）**、**页面标题与收录**、本机验证环境、水印几何与验证姿势。踩坑经过放 `.workbuddy/memory/YYYY-MM-DD.md`。
+> 只留「改错了会再踩一次」的规则。**细则按主题查同目录 `REFERENCE.md`**：上传体积/图片压缩、附件与音视频上传、云盘 Graph/OneDrive、Markdown 渲染与 Crepe 样式、**详情页落位（四模板）**、**个人主页背景**、打包器追踪、**账务（贡献分/PIX/结算）**、**页面标题与收录**、本机验证环境、水印几何与验证姿势。踩坑经过放 `.workbuddy/memory/YYYY-MM-DD.md`。
 
 ## 验证（流程全在 `pixel-hub-verify` skill，开工先加载）
 - **禁止浏览器与 CDP**（含 headless、「只量一下」）。可用：tsc/eslint 直调、`prisma/_*.ts(x)` 探针、SSR 契约、铸管理员 cookie 纯 HTTP 抓页面。
@@ -35,13 +35,9 @@
 - `Resource.commentCount` 对**每条评论（含回复）**都 `+1`，删一条只 `-1`；改成「连回复一起删」必须同步补扣。
 
 ## 详情页（用户明确要过，别改回去）
-- 四模板共用 `src/components/resource/detail/parts.tsx`；`detailTemplate.byType` 后台可配（信息面板标题不能写死）。**MUSIC / VIDEO 实际走 `post` 模板**（内置 byType 只给 GAME=banner、ARTICLE=article）—— banner 的音频紧凑首屏要后台配成 banner 才生效；post 下吃掉首屏的是 `Gallery` 的 `h-[50vh]` 主图。
-- **描述正文 = `parts.tsx` 的 `DescriptionBlock`，唯一实现**：裸 `<section className="md-body md-body--lg">`，无卡片/底色/边框/「描述」小标题，四模板共用。改描述排版只改这一处。
-- 操作条 = **图标 + 文字**（Heart/Star/Flag/Pencil，`size={15}`，`aria-hidden`）；无图标版已被否。`ACTION_TEXT`（`src/lib/ui/cls.ts`）：无边框无底色、`gap-1.5 py-1.5 text-sm`；`FollowButton` 是全站唯一保留描边/实底的动作；行容器 `justify-end`。
-- **落位**（纠正过两次）：banner 模板在 `DownloadPanel` 之后、`DescriptionBlock` 之前，且在 `CollapsibleAside` **之外**；post 在右栏底部、article 居中栏、twocol 在左列内。
-- **音视频播放器 = 自建控件**（`detail/av-controls.tsx`）：全站禁止再用原生 `controls`。下载入口不单独成行，由 `av-player.tsx` 以 `downloadSlot` 注入控件行（用 `MetaDownloadButton` 的 `iconOnly` + `className`；它的**默认翠绿实底路径必须逐字保持**）。控件类名统一在 `cls.ts` 的 `AV_CTRL_*`。
-- **`CollapsibleAside` 收起必须「不重排」**：`overflow-hidden` + `<aside>` 两层，内层 `space-y-4 whitespace-nowrap lg:w-[340px]` 锁宽（光裁剪挡不住列宽压 0 → 折行 → 撑开整行）。340 用文件顶部常量 + **完整类名字符串**集中（Tailwind 只扫字面量）。`DetailTwocol` 的 360px `<aside>` 尚未同步加固。
-- **VIDEO 只有一个视频**：`av-player` 里 `boxed = isAudio`；模板层对 VIDEO **整块不渲染 `<Gallery>`**（空数组会渲染「暂无预览图」）。落位：`DetailTwocol` 播放器进**主列**；`DetailBanner` 退化成深色标题带；`DetailArticle` 跳过封面 hero。
+- 四模板共用 `src/components/resource/detail/parts.tsx`；**描述正文唯一实现 = `DescriptionBlock`**（裸 `<section className="md-body md-body--lg">`，无卡片/底色/边框/小标题，四模板共用）——改描述排版只改这一处。
+- **音视频播放器 = 自建控件**（`detail/av-controls.tsx`）：全站禁止再用原生 `controls`；下载入口由 `av-player.tsx` 以 `downloadSlot` 注入控件行（用 `MetaDownloadButton` 的 `iconOnly` + `className`，它的**默认翠绿实底路径必须逐字保持**），控件类名统一在 `cls.ts` 的 `AV_CTRL_*`。
+- 模板差异（MUSIC/VIDEO 实走 `post`）、操作条、四处落位、`CollapsibleAside` 锁宽等细节见 `REFERENCE.md` —— **落位被纠正过两次，动之前先查**。
 - **回退不要按目录**：`git checkout HEAD -- <dir>` 会带走该目录所有未提交改动；先 `git diff --stat`。
 
 ## 云盘 / IP 防刷
@@ -64,11 +60,14 @@
 - 结算 = **月粒度 + 人工触发**，分只看**当期新增**（不是累计），**跨期只结转钱、从不结转分**，**确认必须按月份先后**；已确认期**沿用落库快照、绝不重算**。后台配置页保存是**整份替换（WYSIWYG）**，别改成增量写。
 
 ## 图片水印（`src/lib/media/watermark.ts`）
-- **单点实现**：文字 → SVG 覆盖层 → `applyWatermark()` 里 `composite(gravity:"southeast")`，原图/大图/缩略图三处共用。开关是**用户级偏好**（`User.watermarkImages` 默认 false、`User.watermarkText` 可空 = 兜底 `@用户名`），没有全局开关；两条上传链路统一走 `resolveWatermark()`。
-- **字体 = 前台那份 Fusion Pixel，用 fontkit 取字形轮廓渲成 SVG `<path>`**（`public/fonts/*.woff2`，与 `globals.css` 的 `@font-face` 同一文件）。**不装系统字体、不依赖 fontconfig**：同一份文件 ⇒ 本机与线上逐像素一致，也消掉了「容器缺字体、librsvg 静默出空白」那类事故。只有文字含站点字体覆盖不到的字符（emoji…）才回退 `<text>` + fontconfig，那时才需要镜像里的字体。
-- **fontkit 只有具名导出、没有 default**：`import fontkit from "fontkit"` 在 tsx 下能跑（CJS 合成 default），在 **Turbopack 下直接编译失败**（`Export default doesn't exist`）。必须 `import * as` + `default ?? 命名空间` 取 `create`，并在 `next.config.ts` 配 `serverExternalPackages: ["fontkit"]`。**这类坑 tsx 探针抓不到，只有真起 dev server 打接口才暴露。**
-- **样式必须是「深填充 + 浅描边」**：反过来（白字 + 深描边）在暖白底上只剩一圈细描边、字心与底色同色 = 空心字。两趟 `<path>`（先描边后填充），**不要用 `paint-order`**（librsvg 支持不稳）；描边宽度写**字体单位**（0.16em），它跟着 `<g>` 的 scale 缩到目标字号。
-- **放不下就缩字号**（轮廓模式有精确 advance 才做得到），**不设字号下限**：下限只会把「缩不下」变成「裁字」，而裁掉一半的署名比一行小字更糟。
-- **「原图逐字节保留」的唯一例外**：开印时原图按**原始格式**重编码（`encodeOriginal()`），否则 `compressWith` 会换成后台配置格式 → 扩展名/MIME/key 三处对不上；`media.size` 语义随之从「上传文件」变「落盘文件」。**GIF 原图不重编码**（会压成静帧）。极端宽高比（长条/全景）放不下覆盖层时**静默跳过该尺寸**，不让 sharp 报错把整次上传搞挂。
-- **`process.ts` 不要再拦一道 `watermarkAvailable()`**：那是 fontconfig 回退路径的检查，会把轮廓模式误伤成「莫名其妙不打水印」；可用性判断只归 `resolveWatermark()`。
-- 覆盖层几何、逐像素验证姿势、Dockerfile 与 fontkit 细节见 `REFERENCE.md`。
+- **只有两条链路打水印**：① `/api/upload` → `processImage()`（发布向导/后台改稿图集 + **Markdown 编辑器正文插图**）；② 评论附图 `social.ts` 的 `saveCommentImage()`。**明确不打**：头像 `uploadAvatarAction`、hero 横幅 `uploadHeroAction`、后台直传 `admin-media.ts`（原图直存）、附件大文件通道。新增图片入口先归类。
+- 开关是**用户级偏好**（`User.watermarkImages` 默认 false、`watermarkText` 可空 = 兜底 `@用户名`），取的是**当前登录者** → 管理员替人改稿时会带上自己的水印。
+- **字体 = 前台那份 Fusion Pixel**，fontkit 取字形轮廓渲成 SVG `<path>`（不装系统字体、不依赖 fontconfig ⇒ 本机与线上逐像素一致）。样式必须**深填充 + 浅描边**（反过来在暖白底上是空心字）；放不下**缩字号、不设下限**（下限会把「缩不下」变成「裁字」）。
+- 开印时原图按**原始格式**重编码（`encodeOriginal()`），`media.size` 语义随之变「落盘文件」；**GIF 不重编码**、极端宽高比静默跳过。`process.ts` **不要再拦一道 `watermarkAvailable()`**（那是 fontconfig 回退路径的检查，会误伤轮廓模式）。**fontkit 没有 default 导出** → 必须 `import * as` + `next.config.ts` 的 `serverExternalPackages`，tsx 探针抓不到这个坑、只有真起 dev server 才暴露。
+- 几何、字体身份、逐像素验证姿势见 `REFERENCE.md`。
+
+## 个人主页背景（`.profile-bg-pc`）—— 只列红线
+- **一张图、一个槽、仅桌面端**：字段 `User.profileBgPcKey`（迁移 `0009`），元素 `hidden sm:block`。**移动端那版是用户明确砍掉的（2026-09-24），不要再加回来**；`slot` 参数已废。
+- **门槛在激励配置**（`incentive.profile.bgMinLevel`，等级序号）、**尺寸上限在上传限制**（`profileBgMaxMb`）——两处刻意分开。唯一判定函数 = `upload-config.ts` 的 `profileBgUnlocked()`，前台/设置页/action 三处共用，**action 里必须重算**。
+- 遮罩只有 `globals.css` 的 `.profile-bg-pc` 一份，**设置页预览直接套这个类**（不要复刻渐变）；层是 `fixed inset-0 -z-10` + `aria-hidden`，不参与布局、不盖 hero。
+- 细节与「必须临时造条件才能验」的姿势见 `REFERENCE.md`。
