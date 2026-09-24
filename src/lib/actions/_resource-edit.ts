@@ -3,7 +3,7 @@
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { articleMetaSchema, avMetaSchema, gameMetaSchema, imageMetaSchema } from "@/lib/meta";
-import { randomTail, slugify } from "@/lib/slug";
+import { asciiSlug, randomTail } from "@/lib/slug";
 import { MAX_TAGS, resourceTextFields, urlLike } from "@/lib/resource-fields";
 import { ARTICLE_MEDIA_MAX, isSingleCoverType } from "@/lib/upload-config";
 import { TYPE_LABEL } from "@/lib/display";
@@ -191,12 +191,15 @@ export async function applyResourceEdit(
   }
 
   const have = new Set(existing.filter((l) => keep.has(l.tag.name)).map((l) => l.tag.name));
+  // 这里只做同步的 asciiSlug（汉字→拼音），**不发翻译请求** —— 本函数整体跑在调用方的 DB 事务里，
+  // 逐条翻译可能各等数秒超时，会把事务挂住。改稿新建的标签用拼音 slug，后续发布同名标签时
+  // 发布侧的 `findUnique({ where: { name } })` 兜底会命中并复用，不会产生同名词条。
   for (const name of desired) {
     if (have.has(name)) continue;
     const tag =
       (await tx.tag.findUnique({ where: { name } })) ??
       (await tx.tag
-        .create({ data: { name, slug: slugify(name) || `tag-${randomTail()}` } })
+        .create({ data: { name, slug: asciiSlug(name) || `tag-${randomTail()}` } })
         .catch(() => tx.tag.findUnique({ where: { name } })));
     if (!tag) continue;
     const link = await tx.tagOnResource

@@ -31,21 +31,23 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     prisma.tag.findMany({ where: { count: { gt: 0 } }, select: { slug: true }, take: 500 }),
   ]);
 
+  // slug 一律转义后再拼：存量标签里有中文 slug（slugify 曾刻意保留汉字），
+  // 未转义的汉字直接进 <loc> 会让搜索引擎拿到非法 URL。ASCII slug 经 encodeURIComponent 后不变。
   return [
     ...staticEntries,
     ...resources.map((r) => ({
-      url: `${base}/resources/${r.slug}`,
+      url: `${base}/resources/${encodeURIComponent(r.slug)}`,
       lastModified: r.updatedAt,
       changeFrequency: "weekly" as const,
       priority: 0.7,
     })),
     ...categories.map((c) => ({
-      url: `${base}/browse?cat=${c.slug}`,
+      url: `${base}/browse?cat=${encodeURIComponent(c.slug)}`,
       changeFrequency: "daily" as const,
       priority: 0.5,
     })),
     ...tags.map((t) => ({
-      url: `${base}/tags/${t.slug}`,
+      url: `${base}/tags/${encodeURIComponent(t.slug)}`,
       changeFrequency: "weekly" as const,
       priority: 0.4,
     })),

@@ -7,8 +7,7 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { imageMetaSchema, gameMetaSchema, articleMetaSchema, avMetaSchema } from "@/lib/meta";
-import { randomTail, uniqueSlug, slugify } from "@/lib/slug";
-import { translateToEnglish } from "@/lib/edge-translate";
+import { autoSlugBase, randomTail, uniqueSlug } from "@/lib/slug";
 import { revalidatePath } from "next/cache";
 import { resourceTextFields, urlLike } from "@/lib/resource-fields";
 import { applyResourceEdit, type ResourceEditState } from "@/lib/actions/_resource-edit";
@@ -186,8 +185,9 @@ export async function createResourceAction(
   const directPublish = user.trusted || user.role === "ADMIN" || user.role === "MODERATOR";
   const status = directPublish ? "PUBLISHED" : "PENDING";
 
-  // SEO slug：标题含中文时先经 Edge 微软翻译成英文再 slugify；接口失败回退原文（保留原行为）
-  const slug = await uniqueSlug((await translateToEnglish(title)) ?? title);
+  // SEO slug：中文标题先经 Edge 翻译成英文，接口不可用则退回拼音（见 autoSlugBase）——
+  // 落库 slug 恒为纯 ASCII，中文 slug 会让 redirect() 写响应头时抛 ERR_INVALID_CHAR
+  const slug = await uniqueSlug(await autoSlugBase(title));
 
   // —— 标签：去重 + 预翻译 slug ——
   // 放事务外先算好，避免把逐条翻译的网络请求（可能各等几秒超时）挂进 DB 事务。
@@ -199,12 +199,12 @@ export async function createResourceAction(
         .filter(Boolean),
     ),
   ].slice(0, 12);
-  // 标签 slug：含中文的名称同样先经 Edge 微软翻译成英文再 slugify，利于 SEO 与稳定外链；
-  // 纯符号名 slugify 为空时用随机串兜底（不走 uniqueSlug——它查的是 resource 表）
+  // 标签 slug：含中文的名称同样「翻译 → 拼音」，落库恒为纯 ASCII；
+  // 纯符号名（转不出字母/数字）用随机串兜底（不走 uniqueSlug——它查的是 resource 表）
   const tagEntries = await Promise.all(
     names.map(async (name) => ({
       name,
-      slugName: slugify((await translateToEnglish(name)) ?? name) || `tag-${randomTail()}`,
+      slugName: (await autoSlugBase(name)) || `tag-${randomTail()}`,
     })),
   );
 
@@ -295,7 +295,12 @@ export async function createResourceAction(
     // 免审直发的内容立即告知搜索引擎（after 在响应后执行，不拖慢跳转；未启用时内部跳过）
     queueIndexNowForResource(resource.id);
     revalidatePath("/", "layout");
-    redirect(`/resources/${slug}`);
+    // slug 可能含中文（标题含中文且翻译接口不可用时 slugify 会保留汉字），这里必须转义：
+    // Next 把 redirect() 目标**原样**写进 x-action-redirect 响应头（action-handler.js：
+    // res.setHeader('x-action-redirect', `${url};${type}`)），而 Node 的头值只接受 Latin-1，
+    // 汉字会让 setHeader 抛 ERR_INVALID_CHAR —— 资源已落库却整个 action 响应失败。
+    // 路由侧会解码 %XX，所以转义后的路径照样命中同一资源。
+    redirect(`/resources/${encodeURIComponent(slug)}`);
   }
   // 进入审核队列：作者收「已提交待审」回执，值班 staff 收「有待审投稿」提醒
   // （两者都靠推送，否则作者只能干等、管理员只能靠手动刷队列页）

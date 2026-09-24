@@ -35,8 +35,8 @@ function decodeHtml(s: string): string {
 
 /**
  * 标题若无中文直接返回 null（无需翻译）；含中文则经 Edge 微软翻译译成英文并返回。
- * 翻译接口不可用/超时/解析失败时吞掉错误并返回 null，由调用方回退原样标题，
- * 绝不让 slug 生成阻塞发布。
+ * 翻译接口不可用/超时/解析失败时吞掉错误并返回 null，由调用方回退**拼音**（见 slug.ts 的 autoSlugBase），
+ * 绝不让 slug 生成阻塞发布，也绝不让汉字落进 slug。
  */
 export async function translateToEnglish(text: string): Promise<string | null> {
   if (!CJK_RE.test(text)) return null;
@@ -55,7 +55,7 @@ export async function translateToEnglish(text: string): Promise<string | null> {
     translated = (data?.[0]?.translations?.[0]?.text ?? "").trim();
   } catch (e) {
     console.warn(
-      "[edge-translate] 翻译失败，slug 将回退标题原文：",
+      "[edge-translate] 翻译失败，slug 将回退拼音：",
       e instanceof Error ? e.message : e,
     );
     return null;

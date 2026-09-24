@@ -5,11 +5,12 @@ import { prisma } from "@/lib/db/prisma";
 import type { SP } from "@/lib/search-params";
 import FeedBrowser from "@/components/feed/FeedBrowser";
 import ArchiveShell from "@/components/feed/ArchiveShell";
+import { decodeSlug } from "@/lib/slug";
 
 type PageProps = { params: Promise<{ slug: string }>; searchParams: Promise<SP> };
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { slug } = await params;
+  const slug = decodeSlug((await params).slug);
   const tag = await prisma.tag.findUnique({ where: { slug } });
   // canonical 锚定到无参数形态：分页/筛选 query 不产生重复收录
   return {
@@ -21,7 +22,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function TagPage({ params, searchParams }: PageProps) {
-  const { slug } = await params;
+  const slug = decodeSlug((await params).slug);
   const [tag, sp] = await Promise.all([prisma.tag.findUnique({ where: { slug } }), searchParams]);
   if (!tag) notFound();
 

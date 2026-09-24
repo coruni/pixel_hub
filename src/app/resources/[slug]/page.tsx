@@ -20,6 +20,7 @@ import DetailArticle from "@/components/resource/detail/DetailArticle";
 import { PendingBanner, type DetailCtx } from "@/components/resource/detail/parts";
 import { TYPE_LABEL } from "@/lib/display";
 import { siteUrl } from "@/lib/site-url";
+import { decodeSlug } from "@/lib/slug";
 import { getSeoConfig, jsonLd, resolveSiteName } from "@/lib/seo-config";
 
 type PageProps = { params: Promise<{ slug: string }> };
@@ -72,7 +73,8 @@ function buildDetailLd(
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { slug } = await params;
+  // 页面 params 不解码（见 decodeSlug 说明），中文 slug 必须自己解一次
+  const slug = decodeSlug((await params).slug);
   // 仅「slug 完全不存在」时 404：页面有 loading 流式壳，等 page 里再 notFound() 状态码已是 200。
   // 注意不能按 status 判断——草稿/待审的作者预览也走这里
   const exists = await prisma.resource.findUnique({ where: { slug }, select: { id: true } });
@@ -110,7 +112,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function ResourcePage({ params }: PageProps) {
-  const { slug } = await params;
+  // 页面 params 不解码（见 decodeSlug 说明），中文 slug 必须自己解一次
+  const slug = decodeSlug((await params).slug);
   const session = await auth();
   const me = session?.user;
   const meId = typeof me?.id === "string" && me.id ? me.id : undefined;

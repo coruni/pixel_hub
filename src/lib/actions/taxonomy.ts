@@ -5,8 +5,7 @@
 // 否则日志页「编辑分类」同时混着新建/更新/删除，事后无法按动作筛出删除记录。
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db/prisma";
-import { slugify } from "@/lib/slug";
-import { translateToEnglish } from "@/lib/edge-translate";
+import { asciiSlug, autoSlugBase, randomTail } from "@/lib/slug";
 import { adminOnly, audit } from "@/lib/actions/_guards";
 
 type Result = { ok: true } | { ok: false; error: string };
@@ -40,12 +39,12 @@ export async function createCategoryAction(input: {
     if (parent.parentId) return { ok: false, error: "子分类不能再包含子分类" };
     parentId = parent.id;
   }
-  // slug 自动翻译：显式填写的 slug 原样采用；留空则把（含中文的）名称经 Edge 微软翻译成英文再 slugify，利于 SEO
+  // slug 自动生成：显式填写的 slug 也走 asciiSlug（汉字转拼音），留空则把名称「翻译 → 拼音」。
+  // 两条路径都保证落库 slug 纯 ASCII —— 汉字 slug 会让 URL 变成百分号编码态，
+  // 并让 Next 的 redirect() 在写响应头时抛 ERR_INVALID_CHAR（Node 头值只接受 Latin-1）。
   const explicit = typeof input.slug === "string" ? input.slug.trim() : "";
-  const slug = explicit
-    ? slugify(explicit)
-    : slugify((await translateToEnglish(name)) ?? name) || name;
-  if (!slug) return { ok: false, error: "slug 必填（字母/数字/中文）" };
+  const slug = explicit ? asciiSlug(explicit) : await autoSlugBase(name);
+  if (!slug) return { ok: false, error: "slug 必填（需含字母或数字）" };
   const hit = await prisma.category.findUnique({ where: { slug } });
   if (hit) return { ok: false, error: `slug「${slug}」已被占用` };
   await prisma.category.create({ data: { name, slug, parentId } });
@@ -81,22 +80,22 @@ export async function updateCategoryAction(input: {
   }
 
   // slug 仅当改动过该字段时才处理：
-  // - 传入空字符串 = 用户清空 slug，按（新）名称自动翻译重新生成；
-  // - 传入非空 = 原样采用并校验全局唯一；
+  // - 传入空字符串 = 用户清空 slug，按（新）名称「翻译 → 拼音」重新生成；
+  // - 传入非空 = 走 asciiSlug（汉字转拼音）并校验全局唯一；
   // - 未传（只改了名称、没碰 slug 字段）= 保留现有 slug，不重新生成。
   if (input.slug !== undefined) {
     const raw = input.slug.trim();
     if (!raw) {
       const base = data.name ?? existing.name;
-      const slug = slugify((await translateToEnglish(base)) ?? base) || base;
+      const slug = (await autoSlugBase(base)) || `cat-${randomTail()}`;
       if (slug !== existing.slug) {
         const clash = await prisma.category.findUnique({ where: { slug } });
         if (clash) return { ok: false, error: `自动生成的 slug「${slug}」已被分类「${clash.name}」占用` };
         data.slug = slug;
       }
     } else {
-      const slug = slugify(raw);
-      if (!slug) return { ok: false, error: "slug 仅含字母/数字/中文" };
+      const slug = asciiSlug(raw);
+      if (!slug) return { ok: false, error: "slug 需含字母或数字" };
       if (slug !== existing.slug) {
         const clash = await prisma.category.findUnique({ where: { slug } });
         if (clash) return { ok: false, error: `slug「${slug}」已被分类「${clash.name}」占用` };
@@ -197,21 +196,21 @@ export async function renameTagAction(input: {
   }
 
   // slug 仅当改动过该字段时才处理：
-  // - 显式清空（空串）= 按（新）名称自动翻译重新生成；
-  // - 非空 = 原样采用并校验全局唯一；
+  // - 显式清空（空串）= 按（新）名称「翻译 → 拼音」重新生成；
+  // - 非空 = 走 asciiSlug（汉字转拼音）并校验全局唯一；
   // - 未传（只改了名称、没碰 slug 字段）= 保留现有 slug，不重新生成。
   let nextSlug = t.slug;
   const rawSlug = input.slug?.trim();
   if (rawSlug !== undefined) {
     if (rawSlug === "") {
-      nextSlug = slugify((await translateToEnglish(rawName)) ?? rawName) || t.slug;
+      nextSlug = (await autoSlugBase(rawName)) || t.slug;
       if (nextSlug !== t.slug) {
         const bySlug = await prisma.tag.findFirst({ where: { slug: nextSlug, id: { not: t.id } } });
         if (bySlug) return { ok: false, error: `自动生成的 slug「${nextSlug}」已被标签「${bySlug.name}」占用` };
       }
     } else {
-      const s = slugify(rawSlug);
-      if (!s) return { ok: false, error: "slug 仅含字母/数字/中文" };
+      const s = asciiSlug(rawSlug);
+      if (!s) return { ok: false, error: "slug 需含字母或数字" };
       if (s !== t.slug) {
         const clash = await prisma.tag.findFirst({ where: { slug: s, id: { not: t.id } } });
         if (clash) return { ok: false, error: `slug「${s}」已被标签「${clash.name}」占用` };

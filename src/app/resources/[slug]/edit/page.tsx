@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { parseMeta } from "@/lib/meta";
 import { publicUrl } from "@/lib/storage";
+import { decodeSlug } from "@/lib/slug";
 import { getUploadLimits } from "@/lib/upload-limits";
 import { ResourceEditForm } from "@/components/admin/ResourceEditForm";
 import { updateResourceOwnerAction } from "@/lib/actions/resource";
@@ -16,7 +17,7 @@ export default async function EditOwnResourcePage({
 }: {
   params: Promise<{ slug: string }>;
 }) {
-  const { slug } = await params;
+  const slug = decodeSlug((await params).slug);
   const session = await auth();
   if (!session?.user) redirect(`/login?callbackUrl=${encodeURIComponent(`/resources/${slug}/edit`)}`);
 
@@ -39,7 +40,10 @@ export default async function EditOwnResourcePage({
     getUploadLimits(),
   ]);
   if (!resource) notFound();
-  if (resource.authorId !== session.user.id) redirect(`/resources/${slug}`);
+  // slug 可能含中文（标题含中文且翻译接口不可用时 slugify 会保留汉字）：页面级 redirect 同样会把
+  // 目标**原样**拼进响应头，Node 只接受 Latin-1 → setHeader 抛 ERR_INVALID_CHAR（整个页面 500）。
+  // 必须先转义；路由侧会解码 %XX，落到同一资源。
+  if (resource.authorId !== session.user.id) redirect(`/resources/${encodeURIComponent(slug)}`);
 
   const meta = parseMeta(resource.type, resource.meta);
 

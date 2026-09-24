@@ -75,3 +75,10 @@
 - 遮罩只有 `globals.css` 的 `.profile-bg-pc` 一份（**个人主页与资源详情页共用同一份**），**设置页预览直接套这个类**（不要复刻渐变）；层是 `fixed inset-0 -z-10` + `aria-hidden`，不参与布局、不盖 hero。
 - **资源详情页铺的是「作者的」背景**（2026-09-25 用户定的，不是浏览者自己的）。开关 = `User.profileBgOnResource`（迁移 `0010`，**默认 true**，作者在设置页自控）；铺的条件三个同时成立：作者设了图 + 开关开 + 作者**当前仍达等级**（重算，别信「当初传得上来」）。`getResourceDetail` 里这两个字段随 author 一次取出，**值是裸 storage key、页面侧还要 `publicUrl()`**（与同处已解析成 URL 的 `avatarKey` 口径不同）。
 - 细节与「必须临时造条件才能验」的姿势见 `REFERENCE.md`。
+
+## URL / 请求头（**新写入的 slug 恒为纯 ASCII**，存量中文 slug 仍要兼容）
+- **落库 slug 的唯一生成入口 = `src/lib/slug.ts` 的 `asciiSlug()`（同步，汉字整段转无声调拼音）与 `autoSlugBase()`（异步，**翻译 → 拼音 → 空串** 三级兜底）**。`slugify()` 保留汉字，只是 `asciiSlug` 内部的归一函数，**新代码不要直接拿它写库**。8 个写入点已全部改完（`resource.ts` 资源 slug + 标签 slugName、`taxonomy.ts` ×5、`_resource-edit.ts` ×1）。
+- 为什么必须 ASCII：① URL 变成 `/resources/pixel-hub%E6%9B%B4%E6%96%B0%E6%97%A5%E5%BF%97` 这种看不懂的编码态；② **Node 的响应头只接受 Latin-1**（`\t` `\x20-\x7E` `\x80-\xFF`），汉字 > U+00FF ⇒ Next 把 redirect 目标**原样**写头（server action = `x-action-redirect`，页面级 = `location`）时抛 `ERR_INVALID_CHAR`，**资源已落库却整条响应失败**。跳转到动态段一律 `encodeURIComponent`（已修 `actions/resource.ts`、`resources/[slug]/edit/page.tsx`）。
+- `_resource-edit.ts` 的标签创建**刻意不发翻译请求**（整个函数跑在调用方事务里）：只用同步 `asciiSlug`，改稿建出的标签是拼音 slug；发布侧 `findUnique({ where: { name } })` 兜底会复用，不会产生同名词条。
+- **存量中文 slug 必须继续可访问**（线上 124 个标签里 70 个是中文，多为繁体，由历史「翻译失败回退原文」产生）：**Next 16 的页面 params 不解码**（route handler 才解码），`params.slug` 到手仍是 `%E8%B6%85...`，直接查库 ⇒ 整页 404。唯一入口 = `decodeSlug()`，已接 `/resources/[slug]`（page + `generateMetadata`）、`/resources/[slug]/edit`、`/tags/[slug]`（page + `generateMetadata`）。**新增任何用 slug 查库的页面都要过这一道。** 只解一次，双重编码 URL 就该 404，别改成循环解。
+- `sitemap.ts` 拼 `<loc>` 必须 `encodeURIComponent`（裸汉字进 `<loc>` 是非法 URL）；`indexnow` / JSON-LD / canonical 走 `new URL()` 或 `absUrl()`，会自行编码，不用动。query 参数（`?cat=`）Next 正常解码；`generateMetadata` 与 page 是两次独立取参，**两处都要解**。
