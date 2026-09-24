@@ -224,3 +224,41 @@ export function prevPeriodKey(periodKey: string): string | null {
 export function isPeriodKey(v: string): boolean {
   return periodRange(v) !== null;
 }
+
+/** `"2026-09"` 前后移动 n 个月（n 为正=向后）；非法输入返回 null（月份范围与 periodRange 同口径） */
+export function shiftPeriodKey(periodKey: string, months: number): string | null {
+  const m = PERIOD_RE.exec(periodKey);
+  if (!m) return null;
+  const month = Number(m[2]);
+  if (month < 1 || month > 12) return null;
+  const d = new Date(Number(m[1]), month - 1 + months, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/**
+ * 自动结算的「当前应结的最后一期」：归属月 M 在「M 结束后再过 `delayDays` 天」才到期。
+ * 所以本月的 1 号到 `delayDays` 号之间，还只该结到**上上月**。
+ *
+ * 与 `periodRange` / `monthKey` 同一时区口径（本机日历月）—— 容器里必须设 TZ，
+ * 否则窗口边界与触发时点会整体错位。
+ */
+export function duePeriodKey(now: Date, delayDays: number): string {
+  const back = now.getDate() <= delayDays ? 2 : 1;
+  const d = new Date(now.getFullYear(), now.getMonth() - back, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/**
+ * `[fromKey, toKey]` 的升序月份列表，最多 `max` 项；超出时**保留靠近 `toKey` 的那一段**
+ * （补跑要先补最近的，久远的月份即使漏了也不该挤掉当期）。
+ * `YYYY-MM` 是定长零填充，字符串比较即时间序，不需要再解析日期。
+ */
+export function settleWindowKeys(fromKey: string, toKey: string, max: number): string[] {
+  const out: string[] = [];
+  let k: string | null = toKey;
+  while (k && k >= fromKey && out.length < Math.max(0, Math.trunc(max))) {
+    out.push(k);
+    k = prevPeriodKey(k);
+  }
+  return out.reverse();
+}

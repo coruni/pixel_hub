@@ -230,6 +230,22 @@ const settlementSchema = z.object({
   /** 封顶溢出后的最大迭代轮数（超过则余款结转） */
   capIterations: intRange(1, 10).default(3),
   period: z.enum(["month"]).default("month"),
+  // ---------- 自动结算 ----------
+  // 字段平铺在 settlement 下（而不是再套一层 auto 对象）：后台表单的草稿机制按
+  // 「组的直接子级」生成数值草稿（见 IncentiveManager 的 toDraft），套一层会让
+  // 嵌套数值拿不到字符串草稿、编辑时无法中途清空。
+  //
+  // 【边界】自动只做到「确认入账」，打款永远人工 —— 计划 §13「系统绝不自动打款」。
+  /** 默认关闭：开启前请确认收入录入节奏与回溯习惯，避免池子偏小后只能靠下期结转补 */
+  autoEnabled: z.boolean().default(false),
+  /** 归属月结束后第几天开始尝试（0 = 次月 1 日即可结） */
+  autoDelayDays: intRange(0, 28).default(1),
+  /** 每日尝试时点（本机时区 0–23 点）。到期后每天这个点试一次 */
+  autoHour: intRange(0, 23).default(5),
+  /** 上一轮失败后的最小重试间隔（小时）：资金不足是常态，不能每小时刷一次日志 */
+  autoRetryHours: intRange(1, 72).default(6),
+  /** 最多向前补跑几个月（含应结月）。停机数周后靠它追上进度 */
+  autoMaxBackfillMonths: intRange(1, 36).default(12),
 });
 
 const solvencySchema = z.object({

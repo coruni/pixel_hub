@@ -555,6 +555,80 @@ export default function IncentiveManager({
           >
             <p className="text-xs text-neutral-500">自然月</p>
           </Row>
+          <SwitchRow
+            id="inc-st-auto"
+            label="自动结算"
+            hint={
+              <>
+                开启后由服务器按下面的时点自动确认到期的结算期（等价于在这里点「确认结算」）。
+                <b className="font-medium text-neutral-600">只自动到入账这一步，打款永远是人工</b>
+                —— 提现队列不会被自动处理。默认关闭。
+                停机后想立刻追平历史缺口，可以带密钥调一次 /api/cron/settle，不必等定时器。
+              </>
+            }
+            checked={Boolean(g("settlement").autoEnabled)}
+            onChange={(v) => setGroup("settlement", { autoEnabled: v })}
+          />
+          <NumRow
+            id="inc-st-autodelay"
+            label="自动结算延迟"
+            range="0–28"
+            min={0}
+            max={28}
+            suffix="天"
+            disabled={!g("settlement").autoEnabled}
+            hint={
+              g("settlement").autoEnabled
+                ? "归属月结束后第几天开始结算。留几天是为了让上月收入先录完 —— 池子按「已到账收入」切，录晚了这期池子就偏小。"
+                : "需先打开上面的「自动结算」开关才生效；当前该值会被忽略。"
+            }
+            {...num("settlement.autoDelayDays")}
+          />
+          <NumRow
+            id="inc-st-autohour"
+            label="每日尝试时点"
+            range="0–23"
+            min={0}
+            max={23}
+            suffix="点"
+            disabled={!g("settlement").autoEnabled}
+            hint={
+              g("settlement").autoEnabled
+                ? "每天这个点之后才动手，给收入核对留一个固定窗口。到期当天没赶上，次日同一时点会继续。"
+                : "需先打开上面的「自动结算」开关才生效；当前该值会被忽略。"
+            }
+            {...num("settlement.autoHour")}
+          />
+          <NumRow
+            id="inc-st-autoretry"
+            label="失败重试间隔"
+            range="1–72"
+            min={1}
+            max={72}
+            suffix="小时"
+            disabled={!g("settlement").autoEnabled}
+            hint={
+              g("settlement").autoEnabled
+                ? "资金安全闸门拒绝（或执行异常）后，隔多久再试一次。超过这个间隔多试无益，只会刷日志。"
+                : "需先打开上面的「自动结算」开关才生效；当前该值会被忽略。"
+            }
+            {...num("settlement.autoRetryHours")}
+          />
+          <NumRow
+            id="inc-st-autobackfill"
+            label="最多补跑月数"
+            range="1–36"
+            min={1}
+            max={36}
+            suffix="个月"
+            disabled={!g("settlement").autoEnabled}
+            hint={
+              g("settlement").autoEnabled
+                ? "停机数周后向前追平的最大跨度。必须按月先后串行补 —— 跳过某一期，它的结转就永远进不了下一期。"
+                : "需先打开上面的「自动结算」开关才生效；当前该值会被忽略。"
+            }
+            {...num("settlement.autoMaxBackfillMonths")}
+          />
         </Section>
 
         {/* ---------- 资金安全 ---------- */}
