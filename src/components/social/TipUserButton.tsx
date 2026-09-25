@@ -10,7 +10,7 @@
 // 这里只保留按钮 + 组装提交参数。
 import { useState } from "react";
 import { Coins } from "lucide-react";
-import { ACTION_TEXT } from "@/lib/ui/cls";
+import { Button } from "@/components/ui/Button";
 import { sendUserTipAction } from "@/lib/actions/tip";
 import TipDialog from "./TipDialog";
 import type { TipForm } from "@/lib/points-config";
@@ -34,15 +34,16 @@ export default function TipUserButton({
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button
+      <Button
         type="button"
-        className={className ?? ACTION_TEXT}
+        variant={className ? undefined : "action"}
+        className={className}
         title={iconOnly ? LABEL : undefined}
         aria-label={iconOnly ? LABEL : undefined}
         onClick={() => setOpen(true)}
       >
         <Coins size={15} aria-hidden /> {!iconOnly && LABEL}
-      </button>
+      </Button>
       {open && (
         <TipDialog
           onClose={() => setOpen(false)}

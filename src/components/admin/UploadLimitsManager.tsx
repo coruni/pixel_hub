@@ -37,7 +37,7 @@ import {
 import { useAction } from "@/lib/hooks";
 import { confirmDialog } from "@/components/ui/feedback";
 import { resetUploadLimitsAction, saveUploadLimitsAction } from "@/lib/actions/uploads";
-import { BTN_DANGER_SM, BTN_PRIMARY_SM, INPUT_SM, SELECT_SM } from "@/lib/ui/cls";
+import { INPUT_SM, SELECT_SM } from "@/lib/ui/cls";
 import { Button } from "@/components/ui/Button";
 
 /** 图片类体积字段：档位只有 1–100MB，用 MB 输入即自然，不配单位选择 */
@@ -553,7 +553,7 @@ export default function UploadLimitsManager({ limits }: { limits: UploadLimits }
           type="button"
           disabled={pending || !!attachBad}
           onClick={save}
-          className={`${BTN_PRIMARY_SM} min-h-10 w-full justify-center px-4 sm:w-auto`}
+          variant="primary" className="min-h-10 w-full justify-center px-4 sm:w-auto"
         >
           {pending ? "保存中…" : (<><Save size={13} aria-hidden /> 保存</>)}
         </Button>
@@ -561,7 +561,7 @@ export default function UploadLimitsManager({ limits }: { limits: UploadLimits }
           type="button"
           disabled={pending}
           onClick={reset}
-          className={`${BTN_DANGER_SM} min-h-10 w-full justify-center px-4 sm:w-auto`}
+          variant="danger" className="min-h-10 w-full justify-center px-4 sm:w-auto"
         >
           {pending ? "恢复中…" : (<><RotateCcw size={13} aria-hidden /> 恢复默认</>)}
         </Button>

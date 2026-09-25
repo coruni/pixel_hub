@@ -147,7 +147,7 @@ export default function ProfileBgForm({
             <Button
               type="submit"
               formAction={removeProfileBgAction}
-              className="inline-flex items-center gap-1.5 rounded-none border border-brand-200 bg-surface px-3 py-1.5 text-sm text-neutral-600 hover:border-red-300 hover:text-red-600"
+              variant="dangerGhost" size="md"
             >
               <Trash2 size={14} aria-hidden /> 移除
             </Button>

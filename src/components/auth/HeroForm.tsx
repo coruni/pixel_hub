@@ -89,14 +89,14 @@ export default function HeroForm({
         <Button
           type="button"
           onClick={() => inputRef.current?.click()}
-          className="inline-flex items-center gap-1.5 rounded-none border border-brand-600 bg-brand-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-600"
+          variant="primary" size="md"
         >
           <Upload size={14} aria-hidden /> {heroImageKey ? "更换横幅" : "上传横幅"}
         </Button>
         <Button
           type="submit"
           disabled={pending || !cropped}
-          className="rounded-none border border-brand-200 bg-surface px-3 py-1.5 text-sm text-neutral-700 hover:border-brand-500 disabled:opacity-50"
+          variant="ghost" size="md"
         >
           {pending ? "保存中…" : "保存"}
         </Button>
@@ -104,7 +104,7 @@ export default function HeroForm({
           <Button
             type="submit"
             formAction={removeHeroAction}
-            className="inline-flex items-center gap-1.5 rounded-none border border-brand-200 bg-surface px-3 py-1.5 text-sm text-neutral-600 hover:border-red-300 hover:text-red-600"
+            variant="dangerGhost" size="md"
           >
             <Trash2 size={14} aria-hidden /> 移除
           </Button>

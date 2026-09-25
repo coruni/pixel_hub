@@ -26,9 +26,6 @@ import {
 import { useAction } from "@/lib/hooks";
 import { confirmDialog, toast } from "@/components/ui/feedback";
 import {
-  BTN_DANGER_SM,
-  BTN_GHOST_SM,
-  BTN_PRIMARY_SM,
   INPUT_SM,
   SELECT_SM,
 } from "@/lib/ui/cls";
@@ -187,7 +184,7 @@ export function CategoryManager({ rows }: { rows: CategoryRow[] }) {
                 return res;
               })
             }
-            className={BTN_PRIMARY_SM}
+            variant="primary"
           >
             {pending ? "创建中…" : (<><Plus size={13} /> 新建分类</>)}
           </Button>
@@ -196,7 +193,7 @@ export function CategoryManager({ rows }: { rows: CategoryRow[] }) {
             type="button"
             disabled={pending || selected.size === 0}
             onClick={batchDelete}
-            className={`${BTN_DANGER_SM} ml-auto`}
+            variant="danger" className="ml-auto"
           >
             {pending ? "删除中…" : (<><Trash2 size={12} /> 批量删除{selected.size > 0 ? `（${selected.size}）` : ""}</>)}
           </Button>
@@ -276,7 +273,7 @@ export function CategoryManager({ rows }: { rows: CategoryRow[] }) {
                           type="button"
                           disabled={pending || !dirty}
                           onClick={() => save(r)}
-                          className={BTN_GHOST_SM}
+                          variant="ghost"
                         >
                           {pending ? "保存中…" : (<><Save size={12} /> 保存</>)}
                         </Button>
@@ -289,7 +286,7 @@ export function CategoryManager({ rows }: { rows: CategoryRow[] }) {
                               setChildName("");
                               setChildSlug("");
                             }}
-                            className={BTN_GHOST_SM}
+                            variant="ghost"
                           >
                             <Plus size={12} /> 子分类
                           </Button>
@@ -313,7 +310,7 @@ export function CategoryManager({ rows }: { rows: CategoryRow[] }) {
                             if (!ok) return;
                             run(() => deleteCategoryAction({ id: r.id }));
                           }}
-                          className={BTN_DANGER_SM}
+                          variant="danger"
                         >
                           <Trash2 size={12} /> {pending ? "删除中…" : "删除"}
                         </Button>
@@ -347,7 +344,7 @@ export function CategoryManager({ rows }: { rows: CategoryRow[] }) {
                             type="button"
                             disabled={pending || !childName.trim()}
                             onClick={() => createChild(r.id)}
-                            className={BTN_PRIMARY_SM}
+                            variant="primary"
                           >
                             {pending ? "创建中…" : (<><Plus size={12} /> 创建</>)}
                           </Button>
@@ -355,7 +352,7 @@ export function CategoryManager({ rows }: { rows: CategoryRow[] }) {
                             type="button"
                             disabled={pending}
                             onClick={() => setNewChildFor(null)}
-                            className={BTN_GHOST_SM}
+                            variant="ghost"
                           >
                             取消
                           </Button>
@@ -456,7 +453,7 @@ export function TagManager({
               aria-label="搜索标签"
             />
           </div>
-          <Button type="submit" className={BTN_GHOST_SM}>
+          <Button type="submit" variant="ghost">
             搜索
           </Button>
           <input type="hidden" name="size" value={pageSize} />
@@ -465,7 +462,7 @@ export function TagManager({
           type="button"
           disabled={pending || selected.size === 0}
           onClick={batchDelete}
-          className={BTN_DANGER_SM}
+          variant="danger"
         >
           {pending ? "删除中…" : (<><Trash2 size={12} /> 批量删除{selected.size > 0 ? `（${selected.size}）` : ""}</>)}
         </Button>
@@ -549,7 +546,7 @@ export function TagManager({
                         type="button"
                         disabled={pending || !target}
                         onClick={() => merge(t)}
-                        className={BTN_GHOST_SM}
+                        variant="ghost"
                       >
                         {pending ? "合并中…" : (<><GitMerge size={13} /> 合并</>)}
                       </Button>
@@ -579,7 +576,7 @@ export function TagManager({
                             return res;
                           })
                         }
-                        className={BTN_GHOST_SM}
+                        variant="ghost"
                       >
                         {pending ? "保存中…" : (<><Save size={12} /> 保存</>)}
                       </Button>
@@ -596,7 +593,7 @@ export function TagManager({
                           if (!ok) return;
                           run(() => deleteTagAction({ id: t.id }));
                         }}
-                        className={BTN_DANGER_SM}
+                        variant="danger"
                       >
                         {pending ? "删除中…" : (<><Trash2 size={12} /> 删除</>)}
                       </Button>

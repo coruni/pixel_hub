@@ -10,7 +10,6 @@ import {
   setFavoriteCollectionAction,
 } from "@/lib/actions/social";
 import { Button } from "@/components/ui/Button";
-import { ACTION_TEXT } from "@/lib/ui/cls";
 import { useDownloadBump } from "@/components/resource/detail/download-count";
 
 // 关注按钮专用：唯一保留描边/实底的社交控件 —— 它是详情页唯一的主转化动作。
@@ -55,7 +54,8 @@ export function LikeButton({
           }
         })
       }
-      className={`${ACTION_TEXT} ${liked ? "font-medium text-red-600 hover:text-red-600" : ""}`}
+      variant="action"
+      className={liked ? "font-medium text-red-600 hover:text-red-600" : undefined}
     >
       <Heart size={15} aria-hidden className={liked ? "fill-current" : ""} />
       {liked ? "已赞" : "点赞"}
@@ -113,7 +113,8 @@ export function FavoriteButton({
             }
           })
         }
-        className={`${ACTION_TEXT} ${fav ? "font-medium text-amber-600 hover:text-amber-600" : ""}`}
+        variant="action"
+        className={fav ? "font-medium text-amber-600 hover:text-amber-600" : undefined}
       >
         <Star size={15} aria-hidden className={fav ? "fill-current" : ""} />
         {fav ? "已收藏" : "收藏"}

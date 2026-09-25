@@ -481,7 +481,7 @@ export default async function UserPage({
                 />
                 <Button
                   type="submit"
-                  className="rounded-none border border-brand-200 bg-surface px-2 py-1 text-xs text-neutral-600 hover:border-brand-500 hover:text-neutral-900"
+                  variant="ghost" size="xs"
                 >
                   ＋ 新建夹子
                 </Button>
@@ -503,7 +503,7 @@ export default async function UserPage({
                 />
                 <Button
                   type="submit"
-                  className="rounded-none border border-brand-200 bg-surface px-2 py-1 text-xs text-neutral-600 hover:border-brand-500 hover:text-neutral-900"
+                  variant="ghost" size="xs"
                 >
                   重命名
                 </Button>

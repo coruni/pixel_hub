@@ -97,11 +97,6 @@ const CARD =
   "w-full max-w-sm rounded-none border border-neutral-300 bg-surface p-5 shadow-xl";
 const TITLE = "text-sm font-semibold text-neutral-900";
 const MESSAGE = "mt-2 text-sm leading-6 break-words whitespace-pre-line text-neutral-600";
-const BTN_BASE =
-  "rounded-none px-3 py-1.5 text-xs font-medium transition focus-visible:ring-2 focus-visible:ring-brand-400 disabled:opacity-50";
-const BTN_CANCEL = `${BTN_BASE} border border-brand-200 bg-surface text-neutral-600 hover:border-brand-400 hover:text-brand-700`;
-const BTN_CONFIRM = `${BTN_BASE} border border-brand-700 bg-brand-600 text-white hover:bg-brand-700`;
-const BTN_DANGER = `${BTN_BASE} border border-red-600 bg-red-600 text-white hover:bg-red-500`;
 const INPUT =
   "w-full rounded-none border border-brand-200 bg-surface px-3 py-2 text-sm outline-none transition focus:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-400";
 
@@ -206,12 +201,12 @@ function FeedbackHost() {
             <div className="mt-5 flex justify-end gap-2">
               {state.confirm ? (
                 <>
-                  <Button type="button" autoFocus className={BTN_CANCEL} onClick={closeConfirm}>
+                  <Button type="button" autoFocus variant="ghost" onClick={closeConfirm}>
                     {state.confirm.opts.cancelLabel ?? "取消"}
                   </Button>
                   <Button
                     type="button"
-                    className={state.confirm.opts.danger ? BTN_DANGER : BTN_CONFIRM}
+                    variant={state.confirm.opts.danger ? "dangerSolid" : "primaryDark"}
                     onClick={acceptConfirm}
                   >
                     {state.confirm.opts.confirmLabel ?? "确认"}
@@ -219,10 +214,10 @@ function FeedbackHost() {
                 </>
               ) : (
                 <>
-                  <Button type="button" autoFocus className={BTN_CANCEL} onClick={closePrompt}>
+                  <Button type="button" autoFocus variant="ghost" onClick={closePrompt}>
                     {state.prompt?.opts.cancelLabel ?? "取消"}
                   </Button>
-                  <Button type="button" className={BTN_CONFIRM} onClick={acceptPrompt}>
+                  <Button type="button" variant="primaryDark" onClick={acceptPrompt}>
                     {state.prompt?.opts.confirmLabel ?? "确认"}
                   </Button>
                 </>

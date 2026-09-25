@@ -421,9 +421,6 @@ export function AttachmentListEditor({
       size: r.size.trim() || undefined,
     }));
 
-  const addBtn =
-    "inline-flex items-center gap-1.5 rounded-none border border-brand-200 bg-surface px-3 py-1.5 text-xs text-neutral-600 transition hover:border-brand-400 hover:text-neutral-900 disabled:opacity-50";
-
   return (
     <>
       {errors && errors.length > 0 && (
@@ -460,7 +457,7 @@ export function AttachmentListEditor({
           type="button"
           onClick={startAddLink}
           disabled={rows.length >= 20}
-          className={addBtn}
+          variant="ghost"
           aria-haspopup="dialog"
         >
           <Plus size={13} aria-hidden /> {addLinkLabel}

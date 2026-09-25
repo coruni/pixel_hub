@@ -191,7 +191,7 @@ export default function Comments({
               type="button"
               disabled={sending || !text.trim()}
               onClick={() => post(null, text)}
-              className="rounded-none border border-brand-600 bg-brand-500 px-4 py-1.5 text-sm font-medium text-white disabled:opacity-50 hover:bg-brand-600"
+              variant="primary" size="md"
             >
               发表评论
             </Button>

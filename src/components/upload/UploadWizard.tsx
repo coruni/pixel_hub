@@ -612,7 +612,7 @@ export default function UploadWizard({
         <Button
           type="submit"
           disabled={pending || uploading || attachBusy > 0}
-          className="rounded-none border border-brand-600 bg-brand-500 px-8 py-2 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-50"
+          variant="primary" size="md"
         >
           {pending
             ? "提交中…"

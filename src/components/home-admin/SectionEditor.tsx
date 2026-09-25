@@ -741,7 +741,7 @@ export default function SectionEditor({
         <Button
           type="button"
           onClick={onDone}
-          className="rounded-none px-3 py-1.5 text-xs text-neutral-500 hover:bg-neutral-200"
+          variant="plain"
         >
           取消
         </Button>
@@ -749,7 +749,7 @@ export default function SectionEditor({
           type="button"
           disabled={pending}
           onClick={save}
-          className="rounded-none border border-brand-600 bg-brand-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-brand-600 disabled:opacity-50"
+          variant="primary"
         >
           {pending ? "保存中…" : "保存板块"}
         </Button>

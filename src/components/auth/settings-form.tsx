@@ -54,7 +54,7 @@ export default function SettingsForm({ name, bio }: { name: string | null; bio: 
       <Button
         type="submit"
         disabled={pending}
-        className="rounded-none border border-brand-600 bg-brand-500 px-6 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50"
+        variant="primary" size="md"
       >
         {pending ? "保存中…" : "保存"}
       </Button>

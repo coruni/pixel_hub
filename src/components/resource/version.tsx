@@ -70,7 +70,7 @@ export function VersionForm({ resourceId, limits }: { resourceId: string; limits
       <Button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1 rounded-none border border-brand-200 bg-surface px-3 py-1 text-xs text-neutral-600 hover:border-brand-500 hover:text-neutral-900"
+        variant="ghost" size="xs"
       >
         <Plus size={12} aria-hidden /> 发布新版本
       </Button>
@@ -139,7 +139,7 @@ export function VersionForm({ resourceId, limits }: { resourceId: string; limits
             <Button
               type="submit"
               disabled={pending}
-              className="rounded-none border border-brand-600 bg-brand-500 px-4 py-1.5 text-xs font-semibold text-white hover:bg-brand-600 disabled:opacity-50"
+              variant="primary"
             >
               {pending ? "发布中…" : "发布版本"}
             </Button>

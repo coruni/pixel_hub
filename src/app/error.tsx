@@ -28,7 +28,7 @@ export default function PageError({
       <Button
         type="button"
         onClick={reset}
-        className="mt-6 inline-flex items-center gap-2 rounded-none border border-brand-600 bg-brand-500 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-brand-600"
+        variant="primary" size="md" className="mt-6"
       >
         <RotateCcw size={14} aria-hidden />
         重试

@@ -5,7 +5,7 @@
 // 单独成文件是为了让 IncentiveManager 只负责「配置分组与保存」，两边都留在可读行数内。
 import type { ReactNode } from "react";
 import { ArrowUp, Plus, Trash2, type LucideIcon } from "lucide-react";
-import { BTN_GHOST_SM, INPUT_SM } from "@/lib/ui/cls";
+import { INPUT_SM } from "@/lib/ui/cls";
 import { Button } from "@/components/ui/Button";
 
 /** 区块外壳：图标 + 标题 + 一句话说明 + 内容 */
@@ -401,7 +401,7 @@ export function LevelEditor({
                 aria-label={`第 ${i + 1} 档上移`}
                 disabled={i === 0}
                 onClick={() => swap(i, i - 1)}
-                className={`${BTN_GHOST_SM} h-8 w-8 justify-center p-0 disabled:opacity-30`}
+                variant="ghost" className="h-8 w-8 justify-center p-0 disabled:opacity-30"
               >
                 <ArrowUp size={13} aria-hidden />
               </Button>
@@ -410,7 +410,7 @@ export function LevelEditor({
                 aria-label={`删除第 ${i + 1} 档`}
                 disabled={levels.length <= 1}
                 onClick={() => onChange(levels.filter((_, idx) => idx !== i))}
-                className={`${BTN_GHOST_SM} h-8 w-8 justify-center p-0 text-red-600 disabled:opacity-30`}
+                variant="ghost" className="h-8 w-8 justify-center p-0 text-red-600 disabled:opacity-30"
               >
                 <Trash2 size={13} aria-hidden />
               </Button>
@@ -427,7 +427,7 @@ export function LevelEditor({
             const last = levels[levels.length - 1];
             onChange([...levels, { name: `新等级 ${levels.length + 1}`, min: (last?.min ?? 0) + 500 }]);
           }}
-          className={`${BTN_GHOST_SM} min-h-9`}
+          variant="ghost" className="min-h-9"
         >
           <Plus size={13} aria-hidden /> 添加档位
         </Button>

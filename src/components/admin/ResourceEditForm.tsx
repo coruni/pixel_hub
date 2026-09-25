@@ -9,7 +9,7 @@
 import { useActionState, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import MdEditor from "@/components/rte/MdEditor";
-import { BTN_GHOST_SM } from "@/lib/ui/cls";
+
 import { updateResourceAdminAction } from "@/lib/actions/admin-content";
 import type { ResourceEditState, EditableResourceType } from "@/lib/actions/_resource-edit";
 import type { ResourceMetaOutput } from "@/lib/meta";
@@ -28,6 +28,7 @@ import MediaPicker from "@/components/upload/media-picker";
 import { ArticleSection, GameSection, ImageSection } from "@/components/upload/wizard-sections";
 import { AvSection } from "@/components/upload/av-section";
 import { Button } from "@/components/ui/Button";
+import { ButtonLink } from "@/components/ui/ButtonLink";
 
 export type GalleryItem = {
   id: string;
@@ -362,16 +363,16 @@ export function ResourceEditForm({
         <Button
           type="submit"
           disabled={pending || uploading || attachBusy > 0}
-          className="rounded-none border border-brand-600 bg-brand-500 px-8 py-2 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-50"
+          variant="primary" size="md"
         >
           {pending ? "保存中…" : attachBusy > 0 ? "等待附件上传…" : "保存修改"}
         </Button>
         {attachBusy > 0 && (
           <span className="text-sm text-amber-600">附件上传中，完成后才能保存</span>
         )}
-        <Link href={backHref} className={BTN_GHOST_SM}>
+        <ButtonLink href={backHref} variant="ghost">
           {backLabel}
-        </Link>
+        </ButtonLink>
         {showPublicLink && (
           <Link href={publicHref} className="text-xs text-neutral-400 hover:text-brand-700">
             查看公开页

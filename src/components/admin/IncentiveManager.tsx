@@ -39,7 +39,7 @@ import {
 import { useAction } from "@/lib/hooks";
 import { confirmDialog } from "@/components/ui/feedback";
 import { resetIncentiveAction, saveIncentiveAction } from "@/lib/actions/incentive";
-import { BTN_DANGER_SM, BTN_PRIMARY_SM, INPUT_SM } from "@/lib/ui/cls";
+import { INPUT_SM } from "@/lib/ui/cls";
 import { Button } from "@/components/ui/Button";
 import {
   LevelEditor,
@@ -849,7 +849,7 @@ export default function IncentiveManager({
           type="button"
           disabled={pending}
           onClick={save}
-          className={`${BTN_PRIMARY_SM} min-h-10 w-full justify-center px-4 sm:w-auto`}
+          variant="primary" className="min-h-10 w-full justify-center px-4 sm:w-auto"
         >
           {pending ? "保存中…" : (<><Save size={13} aria-hidden /> 保存配置</>)}
         </Button>
@@ -857,7 +857,7 @@ export default function IncentiveManager({
           type="button"
           disabled={pending}
           onClick={reset}
-          className={`${BTN_DANGER_SM} min-h-10 w-full justify-center px-4 sm:w-auto`}
+          variant="danger" className="min-h-10 w-full justify-center px-4 sm:w-auto"
         >
           {pending ? "恢复中…" : (<><RotateCcw size={13} aria-hidden /> 恢复默认</>)}
         </Button>

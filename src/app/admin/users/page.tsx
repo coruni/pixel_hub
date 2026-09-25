@@ -10,7 +10,7 @@ import { ADMIN_PAGE_SIZE, STABLE_NEWEST, adminQuery } from "@/lib/admin/paging";
 import { TableFooter } from "@/components/admin/DataTable";
 import { UserActions } from "@/components/admin/buttons";
 import type { Metadata } from "next";
-import { BTN_FILTER, INPUT_FILTER } from "@/lib/ui/cls";
+import { INPUT_FILTER } from "@/lib/ui/cls";
 import { Button } from "@/components/ui/Button";
 
 export const metadata: Metadata = { title: "用户管理" };
@@ -113,7 +113,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
         </select>
         <Button
           type="submit"
-          className={BTN_FILTER}
+          variant="filter"
         >
           筛选
         </Button>

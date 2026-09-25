@@ -1,11 +1,11 @@
 // 详情页共享部件 —— 纯服务端展示片段，三种模板（post/banner/twocol）复用同一套数据。
 // 组件均为 server component；内部按钮（关注/点赞/收藏/举报）为客户端交互组件。
 import Link from "next/link";
+import { ButtonLink } from "@/components/ui/ButtonLink";
 import { Bot, CalendarDays, Download, Eye, Heart, Pencil, Star } from "lucide-react";
 import type { ResourceDetail } from "@/lib/queries";
 import type { parseMeta } from "@/lib/meta";
 import { formatCount, timeAgo } from "@/lib/format";
-import { ACTION_TEXT } from "@/lib/ui/cls";
 import { TYPE_LABEL } from "@/lib/display";
 import Comments from "@/components/social/Comments";
 import PresenceAvatar from "@/components/ui/PresenceAvatar";
@@ -129,7 +129,7 @@ export function AuthorStrip({ ctx }: { ctx: DetailCtx }) {
  * 一行「图标 + 文字」的动作条，收在行右端——读者的点赞/收藏是读完之后的顺手动作，
  * 固定在内容右端才符合「翻到哪、点到哪」的操作习惯；做成带框带底的按钮则会在图集下方
  * 堆出一整块视觉重量，把注意力从作品本身抢走。状态靠颜色 + 文案（点赞 ↔ 已赞）双通道表达，
- * 不依赖颜色单通道。动作项样式见 `ACTION_TEXT`。
+ * 不依赖颜色单通道。动作项样式见 Button 的 `action` 变体。
  */
 export function ActionBar({ ctx }: { ctx: DetailCtx }) {
   const { detail, meId, authed, isAuthor, isStaff } = ctx;
@@ -155,19 +155,19 @@ export function ActionBar({ ctx }: { ctx: DetailCtx }) {
           </>
         ) : (
           <>
-            <Link href={loginHref} className={ACTION_TEXT}>
+            <ButtonLink href={loginHref} variant="action">
               <Heart size={15} aria-hidden /> 点赞
-            </Link>
-            <Link href={loginHref} className={ACTION_TEXT}>
+            </ButtonLink>
+            <ButtonLink href={loginHref} variant="action">
               <Star size={15} aria-hidden /> 收藏
-            </Link>
+            </ButtonLink>
           </>
         )}
         {meId && !isAuthor && <ReportButton resourceId={detail.id} resourceTitle={detail.title} />}
         {isAuthor && (
-          <Link href={`/resources/${detail.slug}/edit`} className={ACTION_TEXT}>
+          <ButtonLink href={`/resources/${detail.slug}/edit`} variant="action">
             <Pencil size={15} aria-hidden /> 编辑
-          </Link>
+          </ButtonLink>
         )}
       </div>
       {!isStaff && !detail.allowComments && !isAuthor && (

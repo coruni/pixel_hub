@@ -16,9 +16,6 @@ function FieldError({ msg }: { msg?: string[] }) {
   return <p className="mt-1 text-xs text-red-500">{msg[0]}</p>;
 }
 
-const submitBtn =
-  "rounded-none border border-brand-600 bg-brand-500 px-6 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50";
-
 export function PasswordForm() {
   const [state, formAction, pending] = useActionState<SettingsActionState, FormData>(
     changePasswordAction,
@@ -69,7 +66,7 @@ export function PasswordForm() {
       {state.ok && <p className="text-sm text-emerald-600">✓ 密码已更新</p>}
       {state.error && <p className="text-sm text-red-500">{state.error}</p>}
 
-      <Button type="submit" disabled={pending} className={submitBtn}>
+      <Button type="submit" disabled={pending} variant="primary" size="md">
         {pending ? "提交中…" : "修改密码"}
       </Button>
     </form>
@@ -114,7 +111,7 @@ export function EmailForm({ currentEmail }: { currentEmail: string | null }) {
       {state.ok && <p className="text-sm text-emerald-600">✓ 邮箱已更新</p>}
       {state.error && <p className="text-sm text-red-500">{state.error}</p>}
 
-      <Button type="submit" disabled={pending} className={submitBtn}>
+      <Button type="submit" disabled={pending} variant="primary" size="md">
         {pending ? "提交中…" : "修改邮箱"}
       </Button>
     </form>

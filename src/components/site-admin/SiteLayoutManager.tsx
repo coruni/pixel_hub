@@ -173,7 +173,7 @@ export default function SiteLayoutManager({
                 onClick={() =>
                   run(() => updateSidebarFlagsAction({ showOn: { [activeArea]: true } }))
                 }
-                className="rounded-none border border-amber-400 bg-amber-100 px-2.5 py-1 font-medium text-amber-800 transition hover:bg-amber-200 disabled:opacity-50"
+                variant="warn" size="xs"
               >
                 开启该页侧边栏
               </Button>

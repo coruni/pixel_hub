@@ -11,7 +11,7 @@ import { ADMIN_PAGE_SIZE, STABLE_NEWEST, adminQuery } from "@/lib/admin/paging";
 import { TableFooter } from "@/components/admin/DataTable";
 import { ContentActions } from "@/components/admin/buttons";
 import type { Prisma, ResourceType } from "@prisma/client";
-import { BTN_FILTER, INPUT_FILTER } from "@/lib/ui/cls";
+import { INPUT_FILTER } from "@/lib/ui/cls";
 import { Button } from "@/components/ui/Button";
 
 export const metadata: Metadata = { title: "内容库" };
@@ -157,7 +157,7 @@ export default async function ContentPage({ searchParams }: { searchParams: Prom
         </select>
         <Button
           type="submit"
-          className={BTN_FILTER}
+          variant="filter"
         >
           筛选
         </Button>

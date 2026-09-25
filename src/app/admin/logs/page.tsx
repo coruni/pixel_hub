@@ -8,7 +8,7 @@ import { intParam, str, type SP } from "@/lib/search-params";
 import { ADMIN_PAGE_SIZE, STABLE_NEWEST, adminQuery } from "@/lib/admin/paging";
 import { TableFooter } from "@/components/admin/DataTable";
 import ClearLogsButton from "@/components/admin/logs-clear";
-import { BTN_FILTER, INPUT_FILTER } from "@/lib/ui/cls";
+import { INPUT_FILTER } from "@/lib/ui/cls";
 import { Button } from "@/components/ui/Button";
 // 动作标签与筛选语义与「清空日志」action 共用一份（见 src/lib/admin/logs.ts）
 import { DELETE_FILTER, LOG_ACTION_LABELS, LOG_ACTIONS, logWhere } from "@/lib/admin/logs";
@@ -98,7 +98,7 @@ export default async function LogsPage({ searchParams }: { searchParams: Promise
             </option>
           ))}
         </select>
-        <Button type="submit" className={BTN_FILTER}>
+        <Button type="submit" variant="filter">
           筛选
         </Button>
         {(action || adminId) && (

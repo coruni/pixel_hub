@@ -9,7 +9,8 @@
 // 【为什么不用原生 confirm】与全站一致：拒绝 window.alert / confirm，用遵循像素语言的定制浮层。
 import { useEffect, useState, type ReactNode } from "react";
 import { X } from "lucide-react";
-import { ACTION_TEXT, BTN_PRIMARY_SM, INPUT_SM } from "@/lib/ui/cls";
+import { INPUT_SM } from "@/lib/ui/cls";
+import { Button } from "@/components/ui/Button";
 import { toast } from "@/components/ui/feedback";
 import { useAction, type ActionResult } from "@/lib/hooks";
 import { formatCoin } from "@/lib/money";
@@ -145,17 +146,17 @@ export default function TipDialog({
         )}
 
         <div className="mt-4 flex items-center justify-end gap-2">
-          <button type="button" className={ACTION_TEXT} onClick={onClose}>
+          <Button type="button" variant="action" onClick={onClose}>
             取消
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             disabled={pending || !valid}
             onClick={submit}
-            className={BTN_PRIMARY_SM}
+            variant="primary"
           >
             {pending ? "提交中…" : `打赏 ${coin} ${form.symbol}`}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

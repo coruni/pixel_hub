@@ -394,7 +394,7 @@ export default function HeroCropper({
           <Button
             type="button"
             onClick={onCancel}
-            className="rounded-none border border-brand-200 bg-surface px-4 py-2 text-sm text-neutral-600 hover:border-brand-500"
+            variant="ghost" size="md"
           >
             取消
           </Button>
@@ -402,7 +402,7 @@ export default function HeroCropper({
             type="button"
             onClick={confirm}
             disabled={!img || busy}
-            className="inline-flex items-center gap-1.5 rounded-none border border-brand-600 bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50"
+            variant="primary" size="md"
           >
             <Check size={14} aria-hidden /> {busy ? "处理中…" : "确认裁剪"}
           </Button>

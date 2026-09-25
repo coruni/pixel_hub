@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { resetDocAction, saveDocAction } from "@/lib/actions/docs";
 import MdEditor from "@/components/rte/MdEditor";
 import { confirmDialog } from "@/components/ui/feedback";
-import { BTN_PRIMARY_SM } from "@/lib/ui/cls";
+
 import { Button } from "@/components/ui/Button";
 
 const btnGhost =
@@ -66,7 +66,7 @@ export default function DocsEditor({
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-3">
-        <Button type="button" onClick={save} disabled={pending} className={BTN_PRIMARY_SM}>
+        <Button type="button" onClick={save} disabled={pending} variant="primary">
           {pending ? "保存中…" : "保存"}
         </Button>
         {isCustom && (

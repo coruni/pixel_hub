@@ -7,8 +7,6 @@ import { clearDraftsAction, deleteDraftAction } from "@/lib/actions/draft";
 import { confirmDialog } from "@/components/ui/feedback";
 import { Button } from "@/components/ui/Button";
 
-const b = "rounded-none px-3 py-1.5 text-xs font-medium transition disabled:opacity-50";
-
 /** 删除单条草稿（列表行内小按钮） */
 export function DraftDelete({ id }: { id: string }) {
   const router = useRouter();
@@ -62,7 +60,7 @@ export function DraftsClearAll() {
           router.refresh();
         });
       }}
-      className={`${b} border border-red-200 text-red-500 hover:border-red-400 hover:bg-red-50`}
+      variant="danger"
     >
       {pending ? "清理中…" : "清空全部"}
     </Button>

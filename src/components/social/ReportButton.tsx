@@ -5,7 +5,6 @@ import { Flag } from "lucide-react";
 import { reportResourceAction } from "@/lib/actions/report";
 import { REASONS } from "@/lib/report-options";
 import { Button } from "@/components/ui/Button";
-import { ACTION_TEXT } from "@/lib/ui/cls";
 
 const PANEL_W = 288;
 
@@ -87,7 +86,8 @@ export default function ReportButton({
         aria-expanded={open}
         aria-haspopup="dialog"
         onClick={togglePanel}
-        className={`${ACTION_TEXT} hover:text-red-500`}
+        variant="action"
+        className="hover:text-red-500"
       >
         <Flag size={15} aria-hidden /> 举报
       </Button>
@@ -134,7 +134,7 @@ export default function ReportButton({
               <Button
                 type="button"
                 onClick={() => setPos(null)}
-                className="rounded-none px-3 py-1.5 text-xs text-neutral-500 hover:bg-neutral-100"
+                variant="plain"
               >
                 取消
               </Button>
@@ -142,7 +142,7 @@ export default function ReportButton({
                 type="button"
                 onClick={submit}
                 disabled={busy}
-                className="rounded-none border border-red-600 bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-500 disabled:opacity-50"
+                variant="dangerSolid"
               >
                 提交举报
               </Button>

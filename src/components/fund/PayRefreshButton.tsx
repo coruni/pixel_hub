@@ -5,8 +5,8 @@
 // 它服务端调上游 `act=order` 查单并补记，而不是让用户去联系站长。
 import { useState } from "react";
 import { RefreshCw } from "lucide-react";
-import { BTN_GHOST_SM } from "@/lib/ui/cls";
 import { toast } from "@/components/ui/feedback";
+import { Button } from "@/components/ui/Button";
 import { useRouter } from "next/navigation";
 
 export default function PayRefreshButton({ outTradeNo }: { outTradeNo: string }) {
@@ -42,9 +42,9 @@ export default function PayRefreshButton({ outTradeNo }: { outTradeNo: string })
   };
 
   return (
-    <button type="button" onClick={refresh} disabled={pending} className={BTN_GHOST_SM}>
+    <Button type="button" onClick={refresh} disabled={pending} variant="ghost">
       <RefreshCw size={13} aria-hidden />
       {pending ? "查询中…" : "我已支付，刷新状态"}
-    </button>
+    </Button>
   );
 }

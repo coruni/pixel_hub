@@ -2,7 +2,7 @@
 
 import { useAction } from "@/lib/hooks";
 import { confirmDialog, promptDialog } from "@/components/ui/feedback";
-import { BTN_DANGER_SM, BTN_GHOST_SM } from "@/lib/ui/cls";
+
 import {
   approveResourceAction,
   rejectResourceAction,
@@ -15,9 +15,6 @@ import {
 } from "@/lib/actions/moderation";
 import { Button } from "@/components/ui/Button";
 
-const OK =
-  "rounded-none px-3 py-1.5 text-xs font-medium bg-emerald-600 text-white transition hover:bg-emerald-500 disabled:opacity-50";
-
 export function QueueActions({ resourceId }: { resourceId: string }) {
   const { run, pending } = useAction();
   return (
@@ -26,7 +23,7 @@ export function QueueActions({ resourceId }: { resourceId: string }) {
         type="button"
         disabled={pending}
         onClick={() => run(() => approveResourceAction(resourceId))}
-        className={OK}
+        variant="success"
       >
         {pending ? "处理中…" : "通过"}
       </Button>
@@ -70,7 +67,7 @@ export function ContentActions({ resourceId, status }: { resourceId: string; sta
           if (!ok) return;
           run(() => setResourceRemoved(resourceId));
         }}
-        className={BTN_DANGER_SM}
+        variant="danger"
       >
         {pending ? "处理中…" : "下架"}
       </Button>
@@ -81,7 +78,7 @@ export function ContentActions({ resourceId, status }: { resourceId: string; sta
         type="button"
         disabled={pending}
         onClick={() => run(() => restoreResource(resourceId))}
-        className={BTN_GHOST_SM}
+        variant="ghost"
       >
         {pending ? "处理中…" : "恢复上架"}
       </Button>
@@ -126,7 +123,7 @@ export function ReportActions({
           }
           dismiss();
         }}
-        className={BTN_GHOST_SM}
+        variant="ghost"
       >
         {pending ? "处理中…" : paused ? "驳回举报·恢复上架" : "驳回举报"}
       </Button>
@@ -145,11 +142,7 @@ export function ReportActions({
           }
           confirm();
         }}
-        className={`rounded-none px-3 py-1.5 text-xs font-medium transition disabled:opacity-50 ${
-          removed
-            ? "border border-brand-200 text-neutral-500 hover:bg-neutral-100"
-            : "bg-red-600 text-white hover:bg-red-500"
-        }`}
+        variant={removed ? "ghost" : "dangerSolid"}
       >
         {pending
           ? "处理中…"
@@ -182,11 +175,7 @@ export function UserActions({
         type="button"
         disabled={pending || banned}
         onClick={() => run(() => setUserTrusted(userId, !trusted))}
-        className={`rounded-none px-3 py-1.5 text-xs font-medium transition disabled:opacity-50 ${
-          trusted
-            ? "border border-brand-200 text-neutral-600 hover:bg-neutral-100"
-            : "bg-emerald-600 text-white hover:bg-emerald-500"
-        }`}
+        variant={trusted ? "ghost" : "success"}
       >
         {pending ? "处理中…" : trusted ? "取消免审" : "设为免审"}
       </Button>
@@ -221,11 +210,7 @@ export function UserActions({
           if (reason === null) return;
           run(() => setUserBanned(userId, true, reason || undefined));
         }}
-        className={`rounded-none px-3 py-1.5 text-xs font-medium transition disabled:opacity-50 ${
-          banned
-            ? "bg-neutral-200 text-neutral-600 hover:bg-neutral-300"
-            : "border border-red-300 text-red-600 hover:bg-red-50"
-        }`}
+        variant={banned ? "ghost" : "danger"}
       >
         {pending ? "处理中…" : banned ? "解封" : "封禁"}
       </Button>

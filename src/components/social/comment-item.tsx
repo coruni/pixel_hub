@@ -142,7 +142,7 @@ export default function CommentItem({
             type="button"
             disabled={sending || !reply.text.trim()}
             onClick={() => onPost(reply.target ? reply.target.parent : c.id, reply.text)}
-            className="rounded-none border border-brand-600 bg-brand-500 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+            variant="primary"
           >
             {reply.target ? `回复 @${reply.target.to}` : "回复"}
           </Button>
@@ -150,7 +150,7 @@ export default function CommentItem({
             <Button
               type="button"
               onClick={() => onReplyChange({ ...reply, target: null })}
-              className="rounded-none border border-brand-200 bg-surface px-3 py-1.5 text-xs text-neutral-500 hover:border-brand-500"
+              variant="filter"
             >
               取消定向
             </Button>

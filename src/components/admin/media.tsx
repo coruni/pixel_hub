@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import { useAction } from "@/lib/hooks";
 import { confirmDialog } from "@/components/ui/feedback";
-import { BTN_DANGER_SM } from "@/lib/ui/cls";
+
 import { deleteMediaAction, uploadMediaAction } from "@/lib/actions/admin-media";
 import { Button } from "@/components/ui/Button";
 
@@ -24,7 +24,7 @@ export function MediaDeleteButton({ mediaId, used }: { mediaId: string; used: bo
         if (!ok) return;
         run(() => deleteMediaAction(mediaId));
       }}
-      className={BTN_DANGER_SM}
+      variant="danger"
     >
       {pending ? "删除中…" : "删除"}
     </Button>

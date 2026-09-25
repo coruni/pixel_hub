@@ -7,7 +7,7 @@ import { Trash2 } from "lucide-react";
 import { confirmDialog, toast } from "@/components/ui/feedback";
 import { useAction } from "@/lib/hooks";
 import { clearAuditLogsAction } from "@/lib/actions/logs";
-import { BTN_DANGER_SM } from "@/lib/ui/cls";
+
 import { Button } from "@/components/ui/Button";
 
 export default function ClearLogsButton({
@@ -54,7 +54,7 @@ export default function ClearLogsButton({
       type="button"
       onClick={onClick}
       disabled={pending || matched === 0}
-      className={BTN_DANGER_SM}
+      variant="danger"
     >
       <Trash2 size={12} aria-hidden />
       {pending

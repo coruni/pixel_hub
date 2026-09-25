@@ -8,7 +8,7 @@ import { pushIndexNowAction, updateSeoConfigAction } from "@/lib/actions/seo";
 import type { SeoConfig } from "@/lib/seo-config";
 import { isValidIndexNowKey, newIndexNowKey } from "@/lib/indexnow-key";
 import { SquareCheckbox } from "@/components/admin/SquareCheckbox";
-import { BTN_GHOST_SM, BTN_PRIMARY_SM, INPUT, LABEL_STRONG } from "@/lib/ui/cls";
+import { INPUT, LABEL_STRONG } from "@/lib/ui/cls";
 import { Button } from "@/components/ui/Button";
 
 const VERIFICATION_FIELDS: { key: keyof SeoConfig["verifications"]; label: string; hint: string }[] =
@@ -342,7 +342,7 @@ export default function SeoManager({
               <Button
                 type="button"
                 onClick={() => set({ indexnowKey: newIndexNowKey() })}
-                className={`${BTN_GHOST_SM} shrink-0 justify-center`}
+                variant="ghost" className="shrink-0 justify-center"
               >
                 <Sparkles size={13} aria-hidden />
                 生成密钥
@@ -372,7 +372,7 @@ export default function SeoManager({
               <Button
                 type="button"
                 onClick={copyKeyFileUrl}
-                className={`${BTN_GHOST_SM} shrink-0 justify-center`}
+                variant="ghost" className="shrink-0 justify-center"
               >
                 {copied ? (
                   <>
@@ -397,7 +397,7 @@ export default function SeoManager({
               type="button"
               onClick={push}
               disabled={pending}
-              className={`${BTN_PRIMARY_SM} justify-center`}
+              variant="primary" className="justify-center"
             >
               <Send size={13} aria-hidden />
               立即推送首页与最近内容
@@ -419,7 +419,7 @@ export default function SeoManager({
       </section>
 
       <div className="flex items-center gap-3">
-        <Button type="button" onClick={save} disabled={pending} className={BTN_PRIMARY_SM}>
+        <Button type="button" onClick={save} disabled={pending} variant="primary">
           {pending ? "保存中…" : "保存配置"}
         </Button>
         {message?.kind === "ok" && (

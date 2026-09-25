@@ -4,11 +4,11 @@
 // 面板本身在 `TipDialog` —— 与「直接打赏作者」共用同一套 UI 与校验，只换 `onSubmit`。
 //
 // 【为什么不新起一行】打赏与点赞/收藏/关注是同一层的「读完顺手做的事」，
-// 所以它沿用 `ACTION_TEXT` 的「图标 + 文字」形态，留在 ActionBar 那一行里（计划 §8）。
+// 所以它沿用 Button 的 `action` 变体（图标 + 文字，与 ACTION_TEXT 同源），留在 ActionBar 那一行里（计划 §8）。
 // 面板做成自包含的浮层：ActionBar 是 `justify-end` 的单行容器，任何内联展开都会把整行推歪。
 import { useState } from "react";
 import { Coins } from "lucide-react";
-import { ACTION_TEXT } from "@/lib/ui/cls";
+import { Button } from "@/components/ui/Button";
 import { sendTipAction } from "@/lib/actions/tip";
 import TipDialog from "./TipDialog";
 import type { TipForm } from "@/lib/points-config";
@@ -20,9 +20,9 @@ export default function TipButton({
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button type="button" className={ACTION_TEXT} onClick={() => setOpen(true)}>
+      <Button type="button" variant="action" onClick={() => setOpen(true)}>
         <Coins size={15} aria-hidden /> 打赏
-      </button>
+      </Button>
       {open && (
         <TipDialog
           onClose={() => setOpen(false)}

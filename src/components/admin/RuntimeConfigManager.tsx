@@ -8,7 +8,7 @@ import { updateRuntimeConfigAction } from "@/lib/actions/runtime-config";
 import SubTabs from "@/components/admin/SubTabs";
 import type { RuntimeConfig } from "@/lib/runtime-config";
 import { SquareCheckbox } from "@/components/admin/SquareCheckbox";
-import { BTN_PRIMARY_SM, INPUT, LABEL_STRONG } from "@/lib/ui/cls";
+import { INPUT, LABEL_STRONG } from "@/lib/ui/cls";
 import { Button } from "@/components/ui/Button";
 
 const DRIVERS = [
@@ -711,7 +711,7 @@ export default function RuntimeConfigManager({
 
       <div className="flex items-center gap-3">
 
-        <Button type="button" onClick={save} disabled={pending} className={BTN_PRIMARY_SM}>
+        <Button type="button" onClick={save} disabled={pending} variant="primary">
           {pending ? "保存中…" : "保存配置"}
         </Button>
         {message?.kind === "ok" && (

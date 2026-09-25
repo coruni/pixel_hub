@@ -16,7 +16,7 @@ import {
 } from "@/components/admin/media-orphan";
 import { SquareCheckbox } from "@/components/admin/SquareCheckbox";
 import type { Metadata } from "next";
-import { BTN_FILTER, INPUT_FILTER } from "@/lib/ui/cls";
+import { INPUT_FILTER } from "@/lib/ui/cls";
 import { Button } from "@/components/ui/Button";
 
 export const metadata: Metadata = { title: "媒体库" };
@@ -165,7 +165,7 @@ export default async function MediaPage({ searchParams }: { searchParams: Promis
         </label>
         <Button
           type="submit"
-          className={BTN_FILTER}
+          variant="filter"
         >
           筛选
         </Button>

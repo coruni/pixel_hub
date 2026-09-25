@@ -23,7 +23,7 @@ import {
 } from "@/lib/actions/drives";
 import { useAction } from "@/lib/hooks";
 import { confirmDialog, toast } from "@/components/ui/feedback";
-import { BTN_DANGER_SM, BTN_GHOST_SM, BTN_PRIMARY_SM, INPUT_SM, LABEL_STRONG } from "@/lib/ui/cls";
+import { INPUT_SM, LABEL_STRONG } from "@/lib/ui/cls";
 import { Button } from "@/components/ui/Button";
 
 export type DriveRow = {
@@ -145,7 +145,7 @@ function LocatorPicker({
               setKind(k.id);
               if (k.id !== kind) setValue("");
             }}
-            className={kind === k.id ? BTN_PRIMARY_SM : BTN_GHOST_SM}
+            variant={kind === k.id ? "primary" : "ghost"}
           >
             {k.label}
           </Button>
@@ -255,7 +255,7 @@ export function DriveManager({
                   return r;
                 })
               }
-              className={BTN_PRIMARY_SM}
+              variant="primary"
             >
               {pending ? "登记中…" : (<><Plus size={13} /> 登记</>)}
             </Button>
@@ -330,7 +330,7 @@ export function DriveManager({
                               return r2;
                             })
                           }
-                          className={BTN_GHOST_SM}
+                          variant="ghost"
                         >
                           {pending ? "保存中…" : (<><Save size={12} /> 保存</>)}
                         </Button>
@@ -338,7 +338,7 @@ export function DriveManager({
                           type="button"
                           disabled={pending}
                           onClick={() => setEditingId(null)}
-                          className={BTN_GHOST_SM}
+                          variant="ghost"
                         >
                           取消
                         </Button>
@@ -394,7 +394,7 @@ export function DriveManager({
                                 }),
                               )
                             }
-                            className={BTN_PRIMARY_SM}
+                            variant="primary"
                           >
                             {pending ? "切换中…" : (<><Star size={12} /> 设为活跃</>)}
                           </Button>
@@ -416,7 +416,7 @@ export function DriveManager({
                               }),
                             )
                           }
-                          className={BTN_GHOST_SM}
+                          variant="ghost"
                         >
                           {pending ? "处理中…" : (r.enabled ? "停用" : "启用")}
                         </Button>
@@ -438,7 +438,7 @@ export function DriveManager({
                                 return res;
                               });
                             }}
-                            className={BTN_GHOST_SM}
+                            variant="ghost"
                           >
                             {pending ? "测试中…" : (<><PlugZap size={12} /> 测试连通</>)}
                           </Button>
@@ -456,7 +456,7 @@ export function DriveManager({
                             });
                             setEditingId(r.id);
                           }}
-                          className={BTN_GHOST_SM}
+                          variant="ghost"
                         >
                           <Pencil size={12} /> 编辑
                         </Button>
@@ -473,7 +473,7 @@ export function DriveManager({
                             if (!ok) return;
                             run(() => deleteDriveAction({ id: r.id }));
                           }}
-                          className={BTN_DANGER_SM}
+                          variant="danger"
                         >
                           {pending ? "删除中…" : (<><Trash2 size={12} /> 删除</>)}
                         </Button>

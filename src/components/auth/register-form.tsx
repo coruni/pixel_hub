@@ -161,7 +161,7 @@ export default function RegisterForm({ codeRequired }: { codeRequired: boolean }
           <Button
             type="submit"
             disabled={pending}
-            className="w-full rounded-none border border-brand-600 bg-brand-500 py-2.5 text-sm font-medium text-white transition hover:bg-brand-600 disabled:opacity-60"
+            variant="primary" size="block"
           >
             {pending ? "创建中…" : "注册并登录"}
           </Button>

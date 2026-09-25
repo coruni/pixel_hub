@@ -15,9 +15,6 @@ type Item = Awaited<ReturnType<typeof loadListPageAction>>["items"][number];
 /** 追加方式：button=点按钮取下一页；infinite=滚近底部自动取（与 /browse 的无限滚动同一套手感） */
 export type LoadMoreMode = "button" | "infinite";
 
-const btnCls =
-  "inline-flex items-center gap-1.5 rounded-none border border-brand-200 bg-surface px-5 py-2 text-sm text-neutral-700 transition hover:border-brand-400 hover:text-brand-700 disabled:opacity-50";
-
 /** 首页 list 板块的后续页：按板块相同筛选取下一页并追加渲染 */
 export default function ListMore({
   type,
@@ -85,7 +82,7 @@ export default function ListMore({
 
       {hasMore && !infinite && (
         <div className="mt-5 flex justify-center">
-          <Button type="button" disabled={pending} onClick={loadNext} className={btnCls}>
+          <Button type="button" disabled={pending} onClick={loadNext} variant="ghost" size="md">
             {pending ? "加载中…" : more.length > 0 ? "下一页" : "加载更多"}
             <ChevronDown size={14} aria-hidden />
           </Button>
@@ -102,7 +99,7 @@ export default function ListMore({
             <Loader label="加载中…" />
           ) : (
             err && (
-              <Button type="button" onClick={loadNext} className={btnCls}>
+              <Button type="button" onClick={loadNext} variant="ghost" size="md">
                 重试
               </Button>
             )

@@ -6,7 +6,7 @@ import { createContext, useContext, useMemo, useState } from "react";
 import { SquareCheckbox } from "@/components/admin/SquareCheckbox";
 import { useAction } from "@/lib/hooks";
 import { confirmDialog } from "@/components/ui/feedback";
-import { BTN_DANGER_SM, BTN_GHOST_SM } from "@/lib/ui/cls";
+
 import { bulkDeleteOrphanMediaAction } from "@/lib/actions/admin-media";
 import { Button } from "@/components/ui/Button";
 
@@ -58,11 +58,11 @@ export function MediaOrphanToolbar() {
         type="button"
         disabled={pending || n === ctx.ids.length}
         onClick={ctx.selectAll}
-        className={BTN_GHOST_SM}
+        variant="ghost"
       >
         全选本页
       </Button>
-      <Button type="button" disabled={pending || n === 0} onClick={ctx.clear} className={BTN_GHOST_SM}>
+      <Button type="button" disabled={pending || n === 0} onClick={ctx.clear} variant="ghost">
         清空选择
       </Button>
       <Button
@@ -78,7 +78,7 @@ export function MediaOrphanToolbar() {
           if (!ok) return;
           run(() => bulkDeleteOrphanMediaAction(ctx.selected), { refresh: true });
         }}
-        className={BTN_DANGER_SM}
+        variant="danger"
       >
         {pending ? "清理中…" : `清理选中（${n}）`}
       </Button>
