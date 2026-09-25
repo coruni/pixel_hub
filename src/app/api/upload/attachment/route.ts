@@ -121,7 +121,9 @@ export async function POST(req: NextRequest) {
         await recordDriveOk(target.cloud.id).catch(() => {});
       } else {
         const key = makeKey("files", `.${ext}`);
-        url = await saveFile(key, buf);
+        // 附件类型五花八门（压缩包/音视频/文档），key 扩展名说不清时以客户端声明为准；
+        // 驱动侧会过滤 text/html、svg 这类可执行文档类型，不信任客户端原样写入。
+        url = await saveFile(key, buf, file.type || undefined);
       }
     } catch (e) {
       if (target.cloud)

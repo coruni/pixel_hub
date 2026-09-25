@@ -18,7 +18,8 @@
     "db:seed:av": "tsx prisma/seed-av-demo.ts",
     "db:seed:av:clean": "tsx prisma/seed-av-demo.ts --clean",
     "search:reindex": "tsx prisma/search-reindex.ts",
-    "points:backfill": "tsx prisma/backfill-points.ts"
+    "points:backfill": "tsx prisma/backfill-points.ts",
+    "s3:fix-content-type": "tsx prisma/fix-s3-content-type.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",

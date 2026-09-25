@@ -148,7 +148,9 @@ export async function uploadMediaAction(
   const ext = file.name.match(/\.[a-z0-9]+$/i)?.[0]?.toLowerCase() ?? "";
   const key = makeKey("uploads", ext || ".bin");
   try {
-    const url = await saveFile(key, buf);
+    // 客户端声明的类型只在通过驱动侧校验（形状 + 危险类型黑名单）时生效，
+    // 否则回退按 key 扩展名推断 —— 见 storage/mime.ts
+    const url = await saveFile(key, buf, file.type || undefined);
     await prisma.media.create({
       data: {
         kind: "ORIGINAL",

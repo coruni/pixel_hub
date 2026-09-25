@@ -9,10 +9,12 @@
 // 而远端驱动（chevereto/s3）下三次往返是这里最贵的一段，能重叠就重叠。
 import sharp from "sharp";
 import { makeKey, saveFile, publicUrl } from "@/lib/storage";
+import { mimeFromExt } from "@/lib/storage/mime";
 import {
   compressWith,
   encodeOriginal,
   outputExt,
+  outputMime,
   thumbQuality,
   type ImageCompressConfig,
 } from "@/lib/media/compress";
@@ -41,19 +43,19 @@ const EXT_BY_FORMAT: Record<string, string> = {
   gif: "gif",
   avif: "avif",
 };
-const MIME_BY_EXT: Record<string, string> = {
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  png: "image/png",
-  webp: "image/webp",
-  gif: "image/gif",
-  avif: "image/avif",
-};
 
-/** 单阶段落盘并附带阶段上下文：失败时错误信息含「哪一步 + 底层原因」，便于日志快捷定位 */
-async function saveStage(stage: string, key: string, buf: Buffer): Promise<string> {
+/**
+ * 单阶段落盘并附带阶段上下文：失败时错误信息含「哪一步 + 底层原因」，便于日志快捷定位。
+ * contentType 必传：s3 驱动不带类型时对象会落成 octet-stream，直链访问图片直接变下载。
+ */
+async function saveStage(
+  stage: string,
+  key: string,
+  buf: Buffer,
+  contentType: string,
+): Promise<string> {
   try {
-    return await saveFile(key, buf);
+    return await saveFile(key, buf, contentType);
   } catch (e) {
     const reason = e instanceof Error ? e.message : String(e);
     throw new Error(`图片保存失败（${stage}）：${reason}`);
@@ -77,9 +79,10 @@ export async function processImage(
   const height = meta.height ?? 0;
   const format = (meta.format ?? "png") as string;
   const origExt = EXT_BY_FORMAT[format] ?? "png";
-  const mime = MIME_BY_EXT[origExt] ?? "image/png";
+  const mime = mimeFromExt(origExt) ?? "image/png";
   // 压缩产物的扩展名随配置格式变化（存储驱动按 key 扩展名识别 content-type）
   const outExt = outputExt(cfg.format);
+  const outMime = outputMime(cfg.format);
 
   // 水印：偏好（开没开、写什么）由调用点经 resolveWatermark() 解析后传入 —— 那里已经判过
   // 「站点字体能不能覆盖这段文字、要不要退到系统字体、环境支持不支持」。本层只保留一件
@@ -115,9 +118,9 @@ export async function processImage(
       ? originalPipe.toBuffer().then((buf) => {
           // size 的语义随水印从「上传文件」变成「落盘文件」，取真实写出的字节数
           size = buf.byteLength;
-          return saveStage("原图", origKey, buf);
+          return saveStage("原图", origKey, buf, mime);
         })
-      : saveStage("原图", origKey, input),
+      : saveStage("原图", origKey, input, mime),
     compressWith(
       applyWatermark(
         oriented.clone().resize({ width: bigW, withoutEnlargement: true }),
@@ -148,8 +151,8 @@ export async function processImage(
   // 2) 大图与缩略图彼此独立，并发落盘：把两次串行往返压成一次等待。
   //    单请求墙钟时间直接决定会不会被反代（Cloudflare 100s）掐成 524，这里是主要可压的一段。
   const [bigUrl, thumbUrl] = await Promise.all([
-    saveStage("大图", bigKey, big),
-    saveStage("缩略图", thumbKey, thumb),
+    saveStage("大图", bigKey, big, outMime),
+    saveStage("缩略图", thumbKey, thumb, outMime),
   ]);
 
   // 3) LQIP

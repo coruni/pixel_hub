@@ -12,7 +12,7 @@ import { MIB, WATERMARK_TEXT_MAX, profileBgUnlocked } from "@/lib/upload-config"
 import { getUploadLimits } from "@/lib/upload-limits";
 import { getIncentive } from "@/lib/incentive";
 import { getContributionSummary } from "@/lib/points";
-import { compressWith, compressConfigOf, outputExt } from "@/lib/media/compress";
+import { compressWith, compressConfigOf, outputExt, outputMime } from "@/lib/media/compress";
 import { notifyAccountSecurity } from "@/lib/notify";
 
 export type SettingsActionState = {
@@ -183,7 +183,8 @@ export async function uploadAvatarAction(
             .resize(256, 256, { fit: "cover", position: "attention" }),
           compressConfigOf(L),
         ).toBuffer();
-    const url = await saveFile(key, out);
+    // 类型显式带上：GIF 走原始字节（image/gif），其余是后台配置的输出格式
+    const url = await saveFile(key, out, isGif ? "image/gif" : outputMime(L.imageFormat));
 
     // 换头像后清理旧文件（本站存储的 key；chevereto 远端 URL 也尽力删）
     const row = await prisma.user.findUnique({
@@ -333,7 +334,7 @@ export async function uploadProfileBgAction(
       compressConfigOf(L),
     ).toBuffer();
     const key = makeKey("backgrounds", `.${outputExt(L.imageFormat)}`);
-    const url = await saveFile(key, out);
+    const url = await saveFile(key, out, outputMime(L.imageFormat));
 
     // 换图后清理旧文件（本地 key 或 chevereto 远端 URL 都尽力删）
     const row = await prisma.user.findUnique({

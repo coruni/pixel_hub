@@ -2,8 +2,14 @@
 // 调用方（process.ts / 媒体库删除）只依赖本接口，driver 由 STORAGE_DRIVER 环境变量决定。
 export interface StorageDriver {
   name: "local" | "s3" | "chevereto";
-  /** 写入并返回公开可访问 URL */
-  put(key: string, buf: Buffer): Promise<string>;
+  /**
+   * 写入并返回公开可访问 URL。
+   *
+   * `contentType` 可选但**强烈建议传**：远端对象存储（s3）不按扩展名猜类型，
+   * 缺省会把对象落成 `binary/octet-stream`，浏览器直链访问就是下载而非预览。
+   * 传 null/undefined 时驱动按 key 扩展名兜底（见 ./mime）。
+   */
+  put(key: string, buf: Buffer, contentType?: string | null): Promise<string>;
   /** 读取（chevereto 远端图不支持按 key 读原字节时抛错即可，当前管线不依赖 get） */
   get(key: string): Promise<Buffer>;
   /** 字节数（同上，尽力而为） */

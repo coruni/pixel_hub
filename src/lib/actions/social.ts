@@ -355,7 +355,8 @@ async function saveCommentImage(
     cfg,
   ).toBuffer({ resolveWithObject: true });
   const key = makeKey("comments", `.${outputExt(cfg.format)}`);
-  const url = await saveFile(key, out.data);
+  // 显式带上类型：s3 驱动不带 ContentType 时对象会落成 octet-stream，直链访问变下载
+  const url = await saveFile(key, out.data, outputMime(cfg.format));
   return {
     key: url,
     width: out.info.width,

@@ -9,6 +9,7 @@ import {
   DeleteObjectCommand,
 } from "@aws-sdk/client-s3";
 import type { StorageDriver } from "./types";
+import { resolveContentType } from "./mime";
 import {
   getRuntimeConfig,
   s3Bucket as cfgBucket,
@@ -59,7 +60,7 @@ function s3(cfg: S3Cfg): S3Client {
 
 export const s3Driver: StorageDriver = {
   name: "s3",
-  async put(key, buf) {
+  async put(key, buf, contentType) {
     const cfg = await s3Cfg();
     if (!cfg.bucket) throw new Error("S3 存储未配置：请在后台「站点配置」填写 Bucket");
     await s3(cfg).send(
@@ -67,6 +68,10 @@ export const s3Driver: StorageDriver = {
         Bucket: cfg.bucket,
         Key: key,
         Body: buf,
+        // 必须显式带 ContentType：S3 不会按扩展名猜类型，缺省落成 binary/octet-stream，
+        // 直链访问图片/PDF 会变成「下载」而不是预览。调用方没给（或给的类型不可信）时
+        // 按 key 扩展名兜底 —— 见 ./mime。
+        ContentType: resolveContentType(contentType, key),
         // 公开桶直链可读；私有桶需把公开访问基址指向 CDN
         ACL: cfg.aclPrivate ? undefined : "public-read",
       }),

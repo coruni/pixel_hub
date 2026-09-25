@@ -3,6 +3,7 @@
 // 删除为尽力而为：从 URL 解析 image id 调 DELETE /api/1/image/{id}，失败仅记日志（远端可在 chevereto 媒体库自行清理）。
 import type { StorageDriver } from "./types";
 import { isUrl } from "./types";
+import { resolveContentType } from "./mime";
 import { cheveretoApiKey, cheveretoBase, getRuntimeConfig } from "@/lib/runtime-config";
 
 async function cfg() {
@@ -15,24 +16,15 @@ async function cfg() {
 
 type CheveretoImage = { url?: string; id?: string };
 
-/** key 由 processImage 生成、必带扩展名；chevereto(PHP) 依赖 multipart 的文件名与类型识别上传 */
-const MIME_BY_EXT: Record<string, string> = {
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  png: "image/png",
-  webp: "image/webp",
-  gif: "image/gif",
-  avif: "image/avif",
-};
-
 export const cheveretoDriver: StorageDriver = {
   name: "chevereto",
-  async put(key, buf) {
+  async put(key, buf, contentType) {
     const { base, apiKey } = await cfg();
     if (!base || !apiKey)
       throw new Error("chevereto 存储未配置：请在后台「站点配置」填写站点地址与 API Key");
+    // key 由 processImage 生成、必带扩展名；chevereto(PHP) 依赖 multipart 的文件名与类型识别上传
     const ext = (key.split(".").pop() ?? "").toLowerCase();
-    const mime = MIME_BY_EXT[ext] ?? "application/octet-stream";
+    const mime = resolveContentType(contentType, key);
     const form = new FormData();
     // 必须带文件名与 Content-Type：缺 filename 时部分 chevereto 版本报 400
     form.append("source", new Blob([new Uint8Array(buf)], { type: mime }), `image.${ext || "bin"}`);

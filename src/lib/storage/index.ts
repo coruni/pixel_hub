@@ -29,9 +29,13 @@ export function makeKey(dir: string, ext: string): string {
   return `${dir}/${yyyymm}/${randomUUID()}${ext}`;
 }
 
-/** 写入并返回公开 URL（chevereto 返回远端 URL，其余返回本地/CDN 路径） */
-export async function saveFile(key: string, buf: Buffer): Promise<string> {
-  return (await getDriver()).put(key, buf);
+/**
+ * 写入并返回公开 URL（chevereto 返回远端 URL，其余返回本地/CDN 路径）。
+ * `contentType` 建议由调用方传真实 MIME：s3 驱动不带类型时会落成 octet-stream，
+ * 直链访问变成下载；不传则按 key 扩展名推断（见 ./mime）。
+ */
+export async function saveFile(key: string, buf: Buffer, contentType?: string | null): Promise<string> {
+  return (await getDriver()).put(key, buf, contentType);
 }
 
 export async function loadFile(key: string): Promise<Buffer> {
