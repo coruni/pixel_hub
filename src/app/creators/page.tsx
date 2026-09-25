@@ -37,7 +37,7 @@ export default async function CreatorsPage({
 
   if (!cfg.enabled) {
     return (
-      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
+      <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
         <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">创作者榜</h1>
         <div className="mt-6 grid place-items-center rounded-none border-2 border-dashed border-brand-300 py-16 text-sm text-neutral-500">
           激励体系当前未开启。
@@ -74,7 +74,7 @@ export default async function CreatorsPage({
         : "text-neutral-400";
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
+    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">创作者榜</h1>

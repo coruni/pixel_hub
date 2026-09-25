@@ -66,7 +66,7 @@ export default async function FundPage({
   ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
+    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
       <div className="max-w-3xl">
         <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">
           资金池与收支公示
