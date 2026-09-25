@@ -95,10 +95,22 @@ export default function UploadWizard({
   initialDraft?: { id: string; payload: DraftPayload; updatedAt: string } | null;
 }) {
   const d = initialDraft?.payload ?? null;
-  // 草稿恢复：类型直接落到草稿里的类型，省掉再选一次模式
-  const [type, setType] = useState<WizardType | null>(d?.type ?? null);
-  const [files, setFiles] = useState<Uploaded[]>(d ? (d.media as Uploaded[]) : []);
-  const [coverId, setCoverId] = useState<string>(d?.coverId ?? "");
+  // 草稿恢复：类型直接落到草稿里的类型，省掉再选一次模式。
+  // 兼容旧草稿：GAME 以前可能保存过多张预览图，切换为单封面语义时只保留封面。
+  const draftType = d?.type ?? null;
+  const draftFiles = d ? (d.media as Uploaded[]) : [];
+  const draftCoverId = d?.coverId ?? "";
+  const draftMedia =
+    draftType && isSingleCoverType(draftType)
+      ? (() => {
+          const cover = draftFiles.find((f) => f.ok && f.id === draftCoverId) ?? draftFiles.find((f) => f.ok);
+          return cover ? [cover] : [];
+        })()
+      : draftFiles;
+  const draftCover = draftMedia.find((f) => f.id === draftCoverId)?.id ?? draftMedia[0]?.id ?? "";
+  const [type, setType] = useState<WizardType | null>(draftType);
+  const [files, setFiles] = useState<Uploaded[]>(draftMedia);
+  const [coverId, setCoverId] = useState<string>(draftCover);
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState<string | null>(null);
   /** 图片批量上传进度：显示「第 n / 共 m」与整体百分比 */
@@ -139,6 +151,12 @@ export default function UploadWizard({
 
   function applyType(t: WizardType) {
     setType(t);
+    if (!isSingleCoverType(t)) return;
+    // 从 IMAGE 切到 GAME/ARTICLE 时，旧的多张预览图只保留当前封面，避免提交时被服务端拒绝。
+    const cover = files.find((f) => f.ok && f.id === coverId) ?? files.find((f) => f.ok);
+    const next = cover ? [cover] : [];
+    setFiles(next);
+    setCoverId(cover?.id ?? "");
   }
 
   const persist = useCallback(
@@ -566,7 +584,7 @@ export default function UploadWizard({
         />
       )}
 
-      {/* 图片上传（文章 / 音乐 / 视频为单张封面） */}
+      {/* 图片上传（游戏 / 文章 / 音乐 / 视频为单张封面，不使用预览图组） */}
       <MediaPicker
         files={files}
         coverId={coverId}
@@ -601,10 +619,8 @@ export default function UploadWizard({
             ? "提交中…"
             : attachBusy > 0
               ? "等待附件上传…"
-              : !isArticle && files.length === 0
-                ? singleCover
-                  ? "先上传封面"
-                  : "先上传图片"
+              : !singleCover && files.length === 0
+                ? "先上传图片"
                 : "提交发布"}
         </Button>
         {attachBusy > 0 && (

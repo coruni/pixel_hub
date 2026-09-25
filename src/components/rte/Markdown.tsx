@@ -1,11 +1,28 @@
 import Link from "next/link";
 import ReactMarkdown, { type Components } from "react-markdown";
+import type { HTMLAttributes, ReactNode } from "react";
 
 const EXTERNAL = /^https?:\/\//i;
 
 /** 裸写的换行标签：<br> / <br/> / <br />（大小写不限） */
 const BR_TAG = /<br\s*\/?>/i;
 const BR_SPLIT = /<br\s*\/?>/gi;
+
+type HeadingProps = HTMLAttributes<HTMLHeadingElement> & { children?: ReactNode };
+
+function headingRenderer(Tag: "h1" | "h2" | "h3" | "h4" | "h5" | "h6", nextIndex: () => number) {
+  return function Heading({ children, className, ...props }: HeadingProps) {
+    return (
+      <Tag
+        {...props}
+        id={`article-heading-${nextIndex()}`}
+        className={["scroll-mt-24", className].filter(Boolean).join(" ")}
+      >
+        {children}
+      </Tag>
+    );
+  };
+}
 
 type MdNode = { type: string; value?: unknown; children?: MdNode[] };
 
@@ -52,7 +69,15 @@ function convert(node: MdNode): void {
  * - 其余(锚点/#hash、mailto:)维持默认同页打开
  */
 export default function Markdown({ children }: { children: string }) {
+  let headingIndex = 0;
+  const nextHeadingIndex = () => headingIndex++;
   const components: Components = {
+    h1: headingRenderer("h1", nextHeadingIndex),
+    h2: headingRenderer("h2", nextHeadingIndex),
+    h3: headingRenderer("h3", nextHeadingIndex),
+    h4: headingRenderer("h4", nextHeadingIndex),
+    h5: headingRenderer("h5", nextHeadingIndex),
+    h6: headingRenderer("h6", nextHeadingIndex),
     a({ href = "", children }) {
       if (EXTERNAL.test(href)) {
         return (

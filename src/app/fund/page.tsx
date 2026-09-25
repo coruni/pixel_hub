@@ -71,10 +71,10 @@ export default async function FundPage({
         <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">
           资金池与收支公示
         </h1>
-        <p className="mt-1 text-sm leading-6 text-neutral-500">
+        {/* <p className="mt-1 text-sm leading-6 text-neutral-500">
           公益站的信任不是靠一页「关于我们」建立的，是靠每一笔收支都能被外人核对建立的。
           本页所有数字都来自台账与结算记录，没有一个是估算出来的。
-        </p>
+        </p> */}
       </div>
 
       <div className="mt-6 space-y-6">
@@ -119,11 +119,10 @@ export default async function FundPage({
                   <Link
                     key={key}
                     href={`/fund?m=${key}`}
-                    className={`rounded-none border px-2.5 py-1 text-xs tabular-nums transition ${
-                      key === monthKeyParam
+                    className={`rounded-none border px-2.5 py-1 text-xs tabular-nums transition ${key === monthKeyParam
                         ? "border-brand-600 bg-brand-500 text-white"
                         : "border-brand-200 bg-surface text-neutral-600 hover:border-brand-500"
-                    }`}
+                      }`}
                   >
                     {key}
                   </Link>
@@ -162,7 +161,6 @@ export default async function FundPage({
             <span>
               赞助只影响上面这些数字（收入与水位），
               <strong className="font-medium">不影响任何人的贡献分、等级或代币余额</strong>
-              —— 花钱买不到地位，这是本站的底线。
             </span>
           </div>
           <div className="mt-3 grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
@@ -196,8 +194,7 @@ export default async function FundPage({
                 </li>
               </ul>
               <p className="mt-3 text-[11px] leading-4 text-neutral-400">
-                每一项的实际支出都逐笔记在「成本」里。收入不足时，创作者结算会顺延到收入到账后再处理，
-                而不是靠压缩内容或加广告硬撑。
+                每一项的实际支出都逐笔记在「成本」里。收入不足时，创作者结算会顺延到收入到账后再处理。
               </p>
             </div>
           </div>

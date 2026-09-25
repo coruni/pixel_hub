@@ -220,8 +220,8 @@ export async function applyResourceEdit(
   }
   const coverRaw = String(fd.get("coverId") ?? "").trim();
 
-  // 图集类（游戏 / 图片）必须留至少一张预览图；封面类（文章 / 音乐 / 视频）允许删空 ——
-  // 封面是可选项（向导对这三类不标必填），删空后前台按无封面占位渲染（queries 里 cover 为 null）。
+  // IMAGE 保留预览图组；游戏 / 文章 / 音乐 / 视频只保留一张封面，并允许删空 ——
+  // 封面是可选项（向导对这些类型不标必填），删空后前台按无封面占位渲染（queries 里 cover 为 null）。
   // 若把封面类也要求非空，就会出现「封面删不掉」：点 X 移除后保存被这里挡回。
   if (!isSingleCoverType(type) && mediaIds.length === 0)
     return { fieldErrors: { mediaIds: ["请至少保留一张图片"] } };

@@ -81,6 +81,7 @@ export type SidebarWidgetKind =
   | "custom"
   | "authorWorks"
   | "sameCategory"
+  | "articleToc"
   | "ad";
 
 export const SIDEBAR_WIDGET_KINDS: SidebarWidgetKind[] = [
@@ -96,11 +97,12 @@ export const SIDEBAR_WIDGET_KINDS: SidebarWidgetKind[] = [
   "custom",
   "authorWorks",
   "sameCategory",
+  "articleToc",
   "ad",
 ];
 
 /** 仅详情页侧边栏有渲染上下文的 widget kind（配到其它页不渲染） */
-export const DETAIL_ONLY_KINDS: SidebarWidgetKind[] = ["authorWorks", "sameCategory"];
+export const DETAIL_ONLY_KINDS: SidebarWidgetKind[] = ["authorWorks", "sameCategory", "articleToc"];
 
 export const SIDEBAR_KIND_META: Record<
   SidebarWidgetKind,
@@ -145,6 +147,11 @@ export const SIDEBAR_KIND_META: Record<
     label: "同分类推荐",
     desc: "仅详情页生效：同分类其它内容，不足补同类型热门",
     defaultTitle: "同分类推荐",
+  },
+  articleToc: {
+    label: "文章目录",
+    desc: "仅文章详情页生效：从正文标题生成锚点目录，标题不足时自动隐藏",
+    defaultTitle: "文章目录",
   },
   ad: {
     label: "广告位",
@@ -230,6 +237,7 @@ const sameCategoryCfg = z.object({
   // 热度时间窗口：仅统计近期发布的同分类内容（all=累计全时间）
   period: z.enum(["all", "week", "month"]).default("all"),
 });
+const articleTocCfg = z.object({});
 const adCfg = z.object({
   mode: z.enum(["image", "html"]).default("image"),
   image: safeUrlSchema(2000), // 图片 URL 或站内 /uploads 路径
@@ -252,6 +260,7 @@ export const sidebarConfigSchemas: Record<SidebarWidgetKind, z.ZodTypeAny> = {
   custom: customCfg,
   authorWorks: authorWorksCfg,
   sameCategory: sameCategoryCfg,
+  articleToc: articleTocCfg,
   ad: adCfg,
 };
 
@@ -273,6 +282,7 @@ export type SidebarWidgetConfig =
   | { items: { level: NoticeLevel; text: string }[] } // notice
   | { content: string; links: { label: string; href: string }[] } // custom
   | { count: number; period: HotPeriod } // authorWorks / sameCategory
+  | Record<string, never> // articleToc
   | {
       mode: "image" | "html";
       image: string;
@@ -536,9 +546,18 @@ export function widgetTitle(w: SidebarWidget): string {
   return w.title || SIDEBAR_KIND_META[w.kind].defaultTitle || SIDEBAR_KIND_META[w.kind].label;
 }
 
-/** 某类页面是否应展示侧边栏：该页开关开启 且 该页至少有一个启用的 widget */
-export function sidebarVisible(theme: Theme, page: SidebarPageKey): boolean {
-  return theme.sidebar.showOn[page] && theme.sidebar.widgetsByPage[page].some((w) => w.enabled);
+/**
+ * 某类页面是否可能展示侧边栏。
+ *
+ * 必须把登录条件纳入判断：侧栏真正渲染时会过滤 requireAuth 模块，游客如果只剩这类模块，
+ * 这里仍返回 true 就会让 SidebarLayout 提前创建一个空的右栏 grid 列。
+ * 这里判断的是「配置上可能有内容」，实际模块查询为空时由 renderSiteSidebar 再做最终兜底。
+ */
+export function sidebarVisible(theme: Theme, page: SidebarPageKey, authed = true): boolean {
+  return (
+    theme.sidebar.showOn[page] &&
+    theme.sidebar.widgetsByPage[page].some((w) => w.enabled && (!w.requireAuth || authed))
+  );
 }
 
 function clampWidth(v: unknown): number {
@@ -580,6 +599,13 @@ export const DEFAULT_SIDEBAR_WIDGETS: SidebarWidget[] = [
 
 /** 详情页默认：两个上下文组件 + 热门兜底 */
 export const DEFAULT_DETAIL_WIDGETS: SidebarWidget[] = [
+  {
+    id: "sw-detail-article-toc",
+    kind: "articleToc",
+    title: null,
+    enabled: true,
+    config: {},
+  },
   {
     id: "sw-detail-author-works",
     kind: "authorWorks",

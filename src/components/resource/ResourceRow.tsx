@@ -26,7 +26,7 @@ export default function ResourceRow({ item }: { item: FeedCard }) {
             className="h-full w-full object-cover"
           />
         ) : (
-          <CoverPlaceholder iconSize={16} />
+          <CoverPlaceholder />
         )}
       </span>
       <span className="min-w-0 flex-1">

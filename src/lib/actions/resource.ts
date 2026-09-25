@@ -164,7 +164,7 @@ export async function createResourceAction(
   }
   const coverRaw = String(fd.get("coverId") ?? "").trim();
   const coverId = coverRaw || mediaIds[0] || "";
-  // 图集类（游戏 / 图片）必须有图；封面类（文章 / 音乐 / 视频）封面可选 —— 与向导「封面不标必填」一致
+  // IMAGE 是预览图组；游戏 / 文章 / 音乐 / 视频只保留一张封面，封面可选（正文或挂载内容本身可独立成立）。
   if (!isSingleCoverType(type) && mediaIds.length === 0)
     return { fieldErrors: { mediaIds: ["请至少上传一张图片"] } };
 

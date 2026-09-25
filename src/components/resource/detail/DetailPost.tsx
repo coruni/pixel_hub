@@ -95,7 +95,7 @@ export default function DetailPost({
   const a = detail.author;
   // 视频不铺独立封面：封面只作为播放器的 poster 出现（见 av-player），
   // 再单独铺一遍同一张图，看着就是「封面 / 播放器」两块分开的东西。
-  // 注意别用空数组代替——Gallery 收到空数组会渲染「暂无预览图」占位框，又是多余一块。
+  // 无封面时 Gallery 使用站点默认封面；视频仍不单独渲染 Gallery，避免播放器上方重复出现封面。
   const isVideo = ctx.meta.kind === "VIDEO";
 
   return (

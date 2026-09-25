@@ -5,6 +5,7 @@ import {
   Info,
   Layers,
   LayoutGrid,
+  ListTree,
   Megaphone,
   MessageSquare,
   RectangleHorizontal,
@@ -37,6 +38,7 @@ export function KindIcon({ kind, size = 15 }: { kind: SidebarWidgetKind; size?: 
     custom: FileText,
     authorWorks: Layers,
     sameCategory: FolderTree,
+    articleToc: ListTree,
     ad: RectangleHorizontal,
   };
   const Icon = map[kind] ?? TrendingUp;

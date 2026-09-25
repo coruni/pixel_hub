@@ -9,6 +9,7 @@
 import { Clock, ExternalLink, FileAudio, FileVideo, Film, Link2, MonitorPlay, Music2, User } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { AV_IFRAME_SANDBOX } from "@/lib/av";
+import { DEFAULT_COVER_URL } from "@/lib/default-cover";
 import { AV_CTRL_BTN, AV_CTRL_ON_DARK, AV_CTRL_ON_SURFACE } from "@/lib/ui/cls";
 import { MetaDownloadButton } from "@/components/social/interactions";
 import AvControls from "./av-controls";
@@ -63,7 +64,7 @@ export function AvPlayerBlock({ ctx }: { ctx: DetailCtx }) {
   const fileName = meta.url.split("/").pop()?.split("?")[0] ?? `${detail.slug}`;
   const format = formatOf(meta.url, meta.mode);
   // 封面同时当视频 poster（视频只有一个画面，见 memory：模板层不再单独渲染 Gallery）
-  const coverUrl = detail.gallery[0]?.bigUrl;
+  const coverUrl = detail.gallery[0]?.bigUrl ?? DEFAULT_COVER_URL;
   // 下载入口直接嵌进播放器控件行（图标按钮，色调与相邻控件一致）。
   // 只有站内托管的文件才给下载；外链交给「前往来源」，不把外站文件当本站资源。
   const downloadSlot = localFile ? (

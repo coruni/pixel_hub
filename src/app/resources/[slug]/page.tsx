@@ -10,8 +10,7 @@ import { getPointBalance } from "@/lib/points";
 import { levelOf } from "@/lib/points-config";
 import { publicUrl } from "@/lib/storage/url";
 import { profileBgUnlocked } from "@/lib/upload-config";
-import { sidebarVisible } from "@/lib/site-config";
-import SiteSidebar, { WidgetArea, type DetailWidgetCtx } from "@/components/sidebar/SiteSidebar";
+import { renderSiteSidebar, WidgetArea, type DetailWidgetCtx } from "@/components/sidebar/SiteSidebar";
 import SidebarLayout from "@/components/layout/SidebarLayout";
 import DetailPost from "@/components/resource/detail/DetailPost";
 import DetailBanner from "@/components/resource/detail/DetailBanner";
@@ -173,7 +172,6 @@ export default async function ResourcePage({ params }: PageProps) {
   };
 
   const template = detailTemplateFor(theme, detail.type);
-  const showSidebar = sidebarVisible(theme, "detail") && detail.status === "PUBLISHED";
   const isPreview = detail.status !== "PUBLISHED";
 
   // 结构化数据仅对可收录内容输出（预览/草稿与 NSFW 均已 noindex）
@@ -189,7 +187,13 @@ export default async function ResourcePage({ params }: PageProps) {
     type: detail.type,
     authorUsername: detail.author.username,
     categorySlug: detail.category?.slug ?? null,
+    description: detail.description,
   };
+  // 先解析真实侧栏内容再交给布局，游客只剩登录专属模块时不会占用空右栏。
+  const rail =
+    !isPreview
+      ? await renderSiteSidebar({ theme, page: "detail", detail: detailCtx, authed: !!meId })
+      : null;
   const hasSlot = (area: "detailTop" | "detailMiddle" | "detailBottom") =>
     theme.slots[area].some((w) => w.enabled);
   const topSlot =
@@ -222,11 +226,7 @@ export default async function ResourcePage({ params }: PageProps) {
   return (
     <SidebarLayout
       railWidth={theme.sidebar.width}
-      rail={
-        showSidebar ? (
-          <SiteSidebar theme={theme} page="detail" detail={detailCtx} authed={!!meId} />
-        ) : undefined
-      }
+      rail={rail ?? undefined}
     >
       {/* 作者主页背景：铺满视口的最底层，fixed 脱离 grid 流、不参与布局。
           与个人主页共用同一个遮罩类 .profile-bg-pc（左右两侧渐显、中间留白），仅桌面端渲染。 */}

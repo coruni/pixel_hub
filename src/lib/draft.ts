@@ -158,7 +158,7 @@ export function draftReadyHint(p: DraftPayload): string | null {
   if (p.description.trim().length < 10) return "还差描述";
   if (p.type === "GAME" && !p.externalUrl.trim()) return "还差下载外链";
   if ((p.type === "MUSIC" || p.type === "VIDEO") && !p.avUrl.trim()) return "还差来源地址";
-  // 封面类（文章/音乐/视频）封面可选，不据此拦发布；图集类仍需至少一张图
+  // 封面类（游戏/文章/音乐/视频）封面可选，不据此拦发布；IMAGE 仍需至少一张预览图
   if (!isSingleCoverType(p.type) && !p.coverId && p.media.length === 0) return "还差图片";
   return null;
 }

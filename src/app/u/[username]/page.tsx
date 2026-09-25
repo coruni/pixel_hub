@@ -31,10 +31,9 @@ import { FollowButton } from "@/components/social/interactions";
 import TipUserButton from "@/components/social/TipUserButton";
 import { Button } from "@/components/ui/Button";
 
-/** 昵称行图标按钮：方形图标位（h-9，与顶部导航的 NAV_ICON_BTN 同口径），
- *  编辑 / 打赏共用；无障碍名称由调用方的 title + aria-label 承担 */
+/** 昵称后的纯图标操作：不占额外背景与内边距，仅保留可见焦点和触控尺寸。 */
 const iconBtn =
-  "grid h-9 w-9 shrink-0 place-items-center rounded-none border border-brand-200 bg-surface text-neutral-700 transition hover:border-brand-500 hover:text-neutral-900 focus-visible:ring-2 focus-visible:ring-brand-400";
+  "inline-grid h-7 w-7 shrink-0 place-items-center rounded-none bg-transparent p-0 text-neutral-500 transition hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400";
 
 export async function generateMetadata({
   params,
@@ -145,43 +144,37 @@ export default async function UserPage({
   const bgUnlocked = profileBgUnlocked(levelIndex, incentive.profile.bgMinLevel, incentive.enabled);
   const bgPcKey = bgUnlocked ? profile.profileBgPcKey : null;
 
-  // 头部操作区。**hero / 无 hero 两套头部共用这一个节点** —— 操作项只补在其中一套里，
-  // 另一套就会莫名缺按钮（两套头部的结构是一样的，别各写一遍）。
-  //
-  // 位置：贴在同一行昵称之后、用 `ml-auto` 推到行尾 —— 单独占一列会把头部拉成「头像 / 资料 / 按钮」
-  // 三段，昵称行右侧反而空出一大截。因此头部只留 头像 + 资料 两列。
-  // 编辑 / 打赏统一收敛成图标按钮（外观见 `iconBtn`），文案改由 title + aria-label 承担。
+  // 头部操作区。编辑 / 打赏紧跟昵称末尾，作为纯图标随昵称行自然换行；
+  // 关注按钮独立放在资料区最右侧，不参与昵称长度计算。
   const tipForm = tipFormOf(incentive);
   const nameActions = (
-    <div className="ml-auto flex shrink-0 items-center gap-2">
+    <span className="inline-flex shrink-0 items-center gap-0.5 align-middle">
       {profile.isViewer ? (
         <Link href="/settings" className={iconBtn} title="编辑资料" aria-label="编辑资料">
           <Pencil size={15} aria-hidden />
         </Link>
-      ) : me ? (
-        <>
-          <FollowButton targetUserId={profile.id} initialFollowing={profile.following} />
-          {/* 直接打赏作者（不挂作品）：本人看不到（不能给自己打赏），
-              激励体系或打赏关闭时 tipForm 为 undefined，按钮整体不渲染 */}
-          {tipForm && (
-            <TipUserButton
-              userId={profile.id}
-              username={profile.username}
-              iconOnly
-              className={iconBtn}
-              {...tipForm}
-            />
-          )}
-        </>
       ) : (
-        <Link
-          href={`/login?callbackUrl=${encodeURIComponent(`/u/${profile.username}`)}`}
-          className="rounded-none border border-brand-600 bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600"
-        >
-          ＋ 关注
-        </Link>
+        tipForm && (
+          <TipUserButton
+            userId={profile.id}
+            username={profile.username}
+            iconOnly
+            className={iconBtn}
+            {...tipForm}
+          />
+        )
       )}
-    </div>
+    </span>
+  );
+  const followAction = profile.isViewer ? null : me ? (
+    <FollowButton targetUserId={profile.id} initialFollowing={profile.following} />
+  ) : (
+    <Link
+      href={`/login?callbackUrl=${encodeURIComponent(`/u/${profile.username}`)}`}
+      className="shrink-0 rounded-none border border-brand-600 bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600"
+    >
+      ＋ 关注
+    </Link>
   );
 
   // tab 可见性：本人始终可见；其余访客按对方的隐私开关（收藏默认仅本人，粉丝/关注默认公开）
@@ -376,9 +369,10 @@ export default async function UserPage({
             />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="truncate text-2xl font-semibold tracking-tight text-neutral-900">
+                <h1 className="min-w-0 break-words text-2xl font-semibold tracking-tight text-neutral-900">
                   {profile.name ?? profile.username}
                 </h1>
+                {nameActions}
                 <span className="text-sm text-neutral-400">@{profile.username}</span>
                 {roleBadge[profile.role] && (
                   <span
@@ -388,7 +382,6 @@ export default async function UserPage({
                   </span>
                 )}
                 {levelName && <LevelBadge level={levelIndex} name={levelName} />}
-                {nameActions}
               </div>
               <p className="mt-1.5 text-sm leading-6 text-neutral-600">
                 {profile.bio || "这个人很懒，还没写简介。"}
@@ -397,6 +390,7 @@ export default async function UserPage({
                 <CalendarDays size={12} aria-hidden /> {joined} 加入
               </p>
             </div>
+            {followAction && <div className="ml-auto shrink-0 pt-1">{followAction}</div>}
           </div>
           {statsRow}
         </section>
@@ -412,9 +406,10 @@ export default async function UserPage({
           />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="truncate text-2xl font-semibold tracking-tight text-neutral-900">
+              <h1 className="min-w-0 break-words text-2xl font-semibold tracking-tight text-neutral-900">
                 {profile.name ?? profile.username}
               </h1>
+              {nameActions}
               <span className="text-sm text-neutral-400">@{profile.username}</span>
               {roleBadge[profile.role] && (
                 <span
@@ -424,7 +419,6 @@ export default async function UserPage({
                 </span>
               )}
               {levelName && <LevelBadge level={levelIndex} name={levelName} />}
-              {nameActions}
             </div>
             <p className="mt-1.5 text-sm leading-6 text-neutral-600">
               {profile.bio || "这个人很懒，还没写简介。"}
@@ -433,6 +427,7 @@ export default async function UserPage({
               <CalendarDays size={12} aria-hidden /> {joined} 加入
             </p>
           </div>
+          {followAction && <div className="ml-auto shrink-0 pt-1">{followAction}</div>}
         </div>
       )}
       {!profile.heroImageKey && statsRow}

@@ -6,6 +6,7 @@ import { Keyboard } from "swiper/modules";
 import type { Swiper as SwiperClass } from "swiper";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import ImageViewer from "@/components/ui/ImageViewer";
+import CoverPlaceholder from "@/components/resource/CoverPlaceholder";
 import { Button } from "@/components/ui/Button";
 import "swiper/css";
 
@@ -40,8 +41,8 @@ export default function Gallery({ media }: { media: GalleryMedia[] }) {
 
   if (media.length === 0) {
     return (
-      <div className="grid aspect-[3/2] place-items-center rounded-none border border-brand-200 bg-neutral-100 text-sm text-neutral-400">
-        暂无预览图
+      <div className="relative aspect-[3/2] overflow-hidden rounded-none border border-brand-200 bg-neutral-100">
+        <CoverPlaceholder />
       </div>
     );
   }

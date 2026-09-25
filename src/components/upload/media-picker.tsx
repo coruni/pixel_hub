@@ -7,7 +7,7 @@ import { useFileDrop } from "@/lib/hooks/use-file-drop";
 import { useFilePaste } from "@/lib/hooks/use-file-paste";
 import type { UploadProgress } from "@/lib/upload-image-client";
 
-/** 预览图/插图选择：上传、设封面、移除（最多 maxCount 张，默认 12）；单张上限由宿主配置传入 */
+/** 图片选择：IMAGE 使用预览图组；游戏/文章等单封面类型只上传一张封面。 */
 export default function MediaPicker({
   files,
   coverId,
@@ -28,7 +28,7 @@ export default function MediaPicker({
   coverId: string;
   uploading: boolean;
   isArticle: boolean;
-  /** 只允许一张封面的类型（文章 / 音乐 / 视频）：标题与必填标记不同 */
+  /** 只允许一张封面的类型（游戏 / 文章 / 音乐 / 视频）：标题与必填标记不同 */
   singleCover?: boolean;
   maxMb: number;
   maxCount?: number;

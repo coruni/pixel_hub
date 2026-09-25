@@ -328,7 +328,7 @@ export function ResourceEditForm({
         />
       )}
 
-      {/* 图片上传（与发布向导同一组件；文章/音乐/视频为单张封面） */}
+      {/* 图片上传（与发布向导同一组件；游戏/文章/音乐/视频为单张封面） */}
       <MediaPicker
         files={files}
         coverId={coverId}

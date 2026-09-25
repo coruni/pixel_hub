@@ -12,6 +12,7 @@ import { type DetailWidgetCtx } from "./shell";
 import { renderAuthorWorks, renderHot, renderRandom, renderSameCategory } from "./widgets/feed";
 import { renderCategories, renderComments, renderCreators, renderTags } from "./widgets/lists";
 import { renderAbout, renderAd, renderCustom, renderNotice, renderStats } from "./widgets/misc";
+import { renderArticleToc } from "./widgets/article-toc";
 
 // 站点级侧边栏：按页面分组（home/archive/detail）渲染 theme 里启用的 widgets 成可 sticky 的右栏。
 // 开关位置见 lib/site-config.ts 的 sidebarVisible；sticky 由 theme.sidebar.sticky 控制。
@@ -19,32 +20,47 @@ import { renderAbout, renderAd, renderCustom, renderNotice, renderStats } from "
 
 export type { DetailWidgetCtx };
 
-export default async function SiteSidebar({
-  theme,
-  page,
-  detail,
-  authed,
-}: {
+export type SiteSidebarProps = {
   theme: Theme;
   page: SidebarPageKey;
   detail?: DetailWidgetCtx;
   authed?: boolean;
-}) {
+};
+
+/**
+ * 先把侧栏实际渲染出来，再交给 SidebarLayout。
+ *
+ * 不能只把 `<SiteSidebar />` React 节点传给布局：React 节点本身始终是 truthy，
+ * 即使游客因 requireAuth 过滤后没有任何模块，外层 grid 仍会提前保留一列空白。
+ * 返回最终 ReactNode 让父布局能可靠判断「是否真的有侧栏」。
+ */
+export async function renderSiteSidebar({
+  theme,
+  page,
+  detail,
+  authed,
+}: SiteSidebarProps): Promise<ReactNode | null> {
+  if (!theme.sidebar.showOn[page]) return null;
+
   const widgets = theme.sidebar.widgetsByPage[page].filter(
     (w) => w.enabled && !(w.requireAuth && !authed),
   );
   if (widgets.length === 0) return null;
 
-  const nodes = await renderWidgets(widgets, detail, authed);
+  const nodes = await renderWidgets(widgets, detail);
   if (!nodes) return null;
 
   return (
     <aside
-      className={`min-w-0 space-y-4 mt-8 ${theme.sidebar.sticky ? "sticky top-16 h-fit" : "h-fit"}`}
+      className={`mt-8 min-w-0 space-y-4 ${theme.sidebar.sticky ? "sticky top-16 h-fit" : "h-fit"}`}
     >
       {nodes}
     </aside>
   );
+}
+
+export default async function SiteSidebar(props: SiteSidebarProps) {
+  return renderSiteSidebar(props);
 }
 
 /**
@@ -67,7 +83,7 @@ export async function WidgetArea({
   );
   if (widgets.length === 0) return null;
 
-  const nodes = await renderWidgets(widgets, detail, authed);
+  const nodes = await renderWidgets(widgets, detail);
   if (!nodes) return null;
 
   return <div className="space-y-4">{nodes}</div>;
@@ -78,7 +94,6 @@ export async function WidgetArea({
 async function renderWidgets(
   widgets: SidebarWidget[],
   detail?: DetailWidgetCtx,
-  authed?: boolean,
 ): Promise<ReactNode | null> {
   const primaries: ReactNode[] = [];
   const mores: ReactNode[] = [];
@@ -145,6 +160,8 @@ async function renderWidget(w: SidebarWidget, detail?: DetailWidgetCtx): Promise
       return renderAuthorWorks(w, detail);
     case "sameCategory":
       return renderSameCategory(w, detail);
+    case "articleToc":
+      return renderArticleToc(w, detail);
     case "ad":
       return renderAd(w);
     default:

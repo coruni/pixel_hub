@@ -128,6 +128,8 @@ export default function WidgetEditor({
         return { count, period };
       case "sameCategory":
         return { count, period };
+      case "articleToc":
+        return {};
       case "ad":
         return { ...ad, image: ad.image.trim(), link: ad.link.trim(), alt: ad.alt.trim() };
       case "notice":

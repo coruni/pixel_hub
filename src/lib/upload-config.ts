@@ -201,8 +201,8 @@ export const ARTICLE_MEDIA_MAX = 1;
 /** 音乐 / 视频同样固定 1 张封面：卡片与详情页只需要一张主视觉，其余图放正文 */
 export const AV_COVER_MAX = 1;
 
-/** 只允许一张封面的类型（文章 / 音乐 / 视频）——发布与改稿共用同一判定，避免两处漂移 */
-export const SINGLE_COVER_TYPES: readonly string[] = ["ARTICLE", "MUSIC", "VIDEO"];
+/** 只允许一张封面的类型（游戏 / 文章 / 音乐 / 视频）——发布与改稿共用同一判定，避免两处漂移 */
+export const SINGLE_COVER_TYPES: readonly string[] = ["GAME", "ARTICLE", "MUSIC", "VIDEO"];
 
 export function isSingleCoverType(type: string): boolean {
   return SINGLE_COVER_TYPES.includes(type);

@@ -12,6 +12,8 @@ export type DetailWidgetCtx = {
   type: ContentType;
   authorUsername: string;
   categorySlug: string | null;
+  /** 文章目录从正文标题生成；其它详情类型也传入但不会读取 */
+  description: string;
 };
 
 /** 组件外壳：小标题 + 内容 */
