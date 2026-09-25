@@ -172,3 +172,81 @@
     `bgMinLevel` 更局部（一次只动一个用户的两个字段），还原时逐字段比对。
 - **验证姿势**：线上全站 0 分 / 0 档 ⇒ 没人解锁，渲染分支必须临时把 `bgMinLevel` 置 0 + 给一个账号塞图才能验；
   先存原值 → 断言 → `finally` 里还原（配置还原要连 `version` 一起还原并断言逐字节一致）。
+
+## slug 与 URL 编码（新写入恒为纯 ASCII，存量中文 slug 仍要可达）
+
+- **落库 slug 的唯一生成入口 = `src/lib/slug.ts`**：`asciiSlug()`（同步，汉字整段转无声调拼音）与 `autoSlugBase()`（异步，**翻译 → 拼音 → 空串** 三级兜底）。
+  `slugify()` 保留汉字，只是 `asciiSlug` 内部的归一函数，**新代码不要直接拿它写库**。8 个写入点已全部改完
+  （`resource.ts` 资源 slug + 标签 slugName、`taxonomy.ts` ×5、`_resource-edit.ts` ×1）。
+- 为什么必须 ASCII：① URL 变成 `/resources/pixel-hub%E6%9B%B4%E6%96%B0%E6%97%A5%E5%BF%97` 这种看不懂的编码态；
+  ② **Node 的响应头只接受 Latin-1**（`\t` `\x20-\x7E` `\x80-\xFF`），汉字 > U+00FF ⇒ Next 把 redirect 目标**原样**写头
+  （server action = `x-action-redirect`，页面级 = `location`）时抛 `ERR_INVALID_CHAR`，**资源已落库却整条响应失败**。
+  跳转到动态段一律 `encodeURIComponent`（已修 `actions/resource.ts`、`resources/[slug]/edit/page.tsx`）。
+- `_resource-edit.ts` 的标签创建**刻意不发翻译请求**（整个函数跑在调用方事务里）：只用同步 `asciiSlug`，改稿建出的标签是拼音 slug；
+  发布侧 `findUnique({ where: { name } })` 兜底会复用，不会产生同名词条。
+- **存量中文 slug 必须继续可访问**（线上 124 个标签里 70 个是中文、多为繁体，源于历史「翻译失败回退原文」）：
+  **Next 16 的页面 `params` 不解码**（route handler 才解码），`params.slug` 到手仍是 `%E8%B6%85...`，直接查库 ⇒ 整页 404。
+  唯一入口 = `decodeSlug()`，已接 `/resources/[slug]`（page + `generateMetadata`）、`/resources/[slug]/edit`、`/tags/[slug]`（page + `generateMetadata`）。
+  **新增任何用 slug 查库的页面都要过这一道**。只解一次，双重编码 URL 就该 404，别改成循环解。
+- `sitemap.ts` 拼 `<loc>` 必须 `encodeURIComponent`（裸汉字进 `<loc>` 是非法 URL）；`indexnow` / JSON-LD / canonical 走 `new URL()` / `absUrl()`，会自行编码。
+  query 参数（`?cat=`）Next 正常解码；`generateMetadata` 与 page 是两次独立取参，**两处都要解**。
+- 存量 70 个中文标签 slug **刻意不迁移**（迁移会改 URL）；是否迁由用户定。
+
+## 邮件与外链 origin（`src/lib/request-origin.ts`）
+
+- 唯一入口 = `requestSiteUrl()`：邮件链接（找回密码 `password-reset.ts`、通知 `mail-notify.ts`）与 `api/pay/create` 的回调地址。
+  全部判定收在纯函数 `originFromHeaders()` 里（`next/headers` 那层只负责取头 + 非请求上下文回退 `siteUrl()`），便于探针断言。
+- **端口策略：经代理的公网地址一律不带端口。** 反代/容器会把**上游内部端口**塞进转发头（宝塔 nginx、Caddy、Cloudflare Tunnel 都可能写
+  `X-Forwarded-Host: site.com:3000`、`X-Forwarded-Port: 3000`），而邮件是发给**远端收件人**的 ——
+  浏览器打开 `https://site.com:3000/...` 必然 `ERR_CONNECTION_REFUSED`。这就是「邮件模板里链接带端口」的根因。
+  公网域名下端口只可能是 80/443，协议由 `x-forwarded-proto` 表达 ⇒ 剥离。
+- **判据 = 「有没有反代痕迹」**：任一转接头出现（`x-forwarded-host` / `x-forwarded-proto` / `proto` / `x-forwarded-port` / `x-forwarded-for` / `x-real-ip`）
+  即视为经代理 ⇒ 端口不可信，一律丢。两个例外保留端口：
+  ① **回环主机**（`localhost` / `127.*` / `0.0.0.0` / `[::1]`）—— 本地 `next dev` 跑在 :3000，剥掉后预览链接点不开，同机反代还会把端口挪进 `x-forwarded-port`；
+  ② **零转发头的直连** —— 此时 `host` 头就是用户地址栏里的地址，端口是他自己敲的。
+  私网地址（`10.` / `192.168.` / `172.16-31.`）**不带端口**：收件人在公网，LAN 端口同样不可达。
+- 历史坑：先「剥掉 host 的端口、再按 `x-forwarded-port` 补回」的写法会把同一个内部端口装回去（`e0437ef` 引入，2026-09-25 修）。**别退回那个判据。**
+- 多值头（CDN 追加自身）取逗号分隔的第一项；协议顺序 `x-forwarded-proto` → `proto` → `http`；无 host 头回退 env 基址。
+  无中括号的 IPv6 字面量（`::1`）会被端口正则啃掉尾巴 ⇒ `hostname.endsWith(":")` 时也回退。
+- `mail-template.ts` 的页眉域名取 `new URL(linkUrl).hostname`（本身不含端口），无需再处理。
+
+## CSS / 布局细则（`MEMORY.md` 只留红线，长解释在这）
+
+- **单列 grid 必须显式 `grid-cols-1`**（= `minmax(0,1fr)`）：裸 `grid gap-1` 的隐式 auto 轨道按 min-content 起算，行内 `truncate`（`white-space:nowrap`）会把卡片撑爆。
+- **无层规则优先于任何 `@layer`**：`@import "tailwindcss"` 之后写的规则没有 layer，优先级高于 `@layer`；与 `* { scrollbar-width:thin }` 这类全局规则冲突时，
+  Tailwind 的任意值（中括号）写法会被**静默压掉** ⇒ 这种场景改用无层普通 class（`.scrollbar-none`）。注释里也别原样写中括号类名。
+- **`overflow-x-auto` 会把 overflow-y 一起变成 auto 并裁自身溢出**：横向滚动 + 下划线 tab 的 `-mb-px` 必须挂在**滚动容器**上，挂内层会被裁掉。
+- **`first:` 变体特异性高于裸 `mt-6`** ⇒ `mt-6 first:mt-0` 的归零不依赖产物顺序。
+- 改 class 后**必须核 Tailwind 真产出了该类**：用 postcss 编 `globals.css` 再 grep 选择器（`node node_modules/postcss-cli/...`）。覆盖第三方主题（Crepe）一律 4 层选择器压它的 3 层（(0,4,0) > (0,3,1)）。
+- `.md-body table` 是 `display:block` + `overflow-x:auto`（GitHub markdown-body 同款）：`display:block` 下浏览器仍补匿名 table box，单元格布局与 `border-collapse` 照常生效。**别改回纯 table** —— 那正是详情页整页横向滚动条的来源。
+- `SidebarLayout` 外层容器见「详情页落位」节。
+
+## UI 文案（前台 / 后台两套标准）
+
+- 「配置含义」只属后台：admin 的 `hint` / `sectionHint` / 页首说明框。
+- 前台只留三类：**约束**（门槛、金额范围）、**后果**（线下打款、冻结、收入为 0 则池子为 0）、**状态**（已确认 / 已打款）。
+- 前台**禁止**：配置数值复述（「安全水位 10% 可用」）、实现说明（「以提交时的比例为准」）、「可在后台配置」、内部术语
+  （`偿付闸门` → 「顺延到收入到账后再处理」）、设计理由、对外提「密钥」。
+- 中文 UI 文案**不要写反引号**（会原样渲染，曾写进 `/creators`）；图标按钮的 `title` 是**无障碍名称**，删不得。
+- 同一句话别在一个页面出现两次（页首说明 + 区块 info 块是常见来源）；跨页重复可接受。
+- 无限滚动哨兵（`feed/FeedInfinite.tsx`）删文案后**必须保留容器高度**，否则哨兵直接消失、加载更多失效。
+
+## 破坏性操作 / 确认弹窗 / 评论楼层树
+
+- **全站禁止原生 `confirm` / `alert` / `prompt`**：统一用 `src/components/ui/feedback.tsx` 的 `confirmDialog()` / `toast()`（全局惰性 host，零 Provider 侵入）。
+- 删除类标准动作：`confirmDialog({ danger: true })` → 用户确认 → 调 action → 按返回结果 `toast`。
+  **action 的失败原因要能直接 toast**（返回值带 `error?: string`，别只回 `ok: false`）；确认后立刻进「进行中」态（`disabled` + 「删除中…」）再发请求；`finally` 里无论成败都 `router.refresh()`。
+- **评论楼层树的根判定必须与 `rootIdOf` 同口径**：根 = 无父 **或** 父已被删。用 `filter(c => !c.parentId)` 会让「父被删的回复」既不是根、也不在任何根的 replies 里 ⇒ 整条被静默吞掉。
+  正确写法：`rootIds = Set(rootIdOf(c) === c.id)`，replies 循环 `if (rootIds.has(c.id)) continue`。
+- `Resource.commentCount` 对**每条评论（含回复）**都 `+1`，删一条只 `-1`；改成「连回复一起删」必须同步补扣。
+
+## 验证纪律（`MEMORY.md` 验证节的补充）
+
+- 存量 3 条 `no-unused-vars` warning：`admin/media/page.tsx:enumParam`、`auth/PublishForm.tsx:draftCount`、`sidebar/SiteSidebar.tsx:authed` —— 别改也别新增。
+- **本机 shell 残缺**：`npm` / `npm run` 退 127；缺 `ls/grep/head/tail/sleep/dirname`；`rm` 是坏 shim。
+  → 查文件用 Read、搜内容用 Grep、批量文件操作用 node 一行脚本；npm/npx 走 `node node_modules/<pkg>/…`（如 `node node_modules/tsx/dist/cli.mjs`、`node node_modules/typescript/bin/tsc`）。
+- **断言类**：metadata canonical 是**绝对 URL** 且 `&` 转义成 `&amp;` ⇒ 先 `new URL()` 归一再比；查 BOM 不能用 `fetch().text()`（会剥 U+FEFF）⇒ `Buffer.from(await r.arrayBuffer())`。
+  **新写/改写的回归断言必须反证一次**（把实现改回旧写法，断言如期变红），否则全绿是假信号。
+- 探针 `_` 前缀放 `prisma/`、**用完立即删**（删前 `copyFileSync` 到 `%TEMP%`）；HTTP 层脚本不进仓库，跑完连铸出来的 admin cookie 一起删。
+  **本环境会自动提交工作区改动**（英文 commit message、作者是用户）⇒ 交付前 `git ls-files "prisma/_*"` + `git status --short` 逐行确认，绝不用 `git add -A`。
+- **含反引号的长文本别塞进 `node -e "…"`**：双引号里的反引号会被 command substitution **真正执行**（曾凭空造出 `1`、`=20` 垃圾文件；也把 schema 行改坏过）⇒ 追加记忆/日志/文档一律用 Write / Edit 工具。
