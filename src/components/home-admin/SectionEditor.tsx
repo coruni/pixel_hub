@@ -37,6 +37,8 @@ const field = LABEL_STRONG;
 type TypeFilter = "ALL" | ContentType;
 type SortKey = "latest" | "popular" | "downloads";
 type Display = "card" | "list";
+type HeroSecondaryDisplay = "card" | "list";
+type HeroSecondarySize = "sm" | "md";
 
 const strArr = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : []);
 
@@ -79,6 +81,12 @@ export default function SectionEditor({
   const [display, setDisplay] = useState<Display>(cfg.display === "list" ? "list" : "card");
   const [ratio, setRatio] = useState<CardRatio>(
     (CARD_RATIO_KEYS as string[]).includes(String(cfg.ratio)) ? (cfg.ratio as CardRatio) : "auto",
+  );
+  const [secondaryDisplay, setSecondaryDisplay] = useState<HeroSecondaryDisplay>(
+    cfg.secondaryDisplay === "list" ? "list" : "card",
+  );
+  const [secondarySize, setSecondarySize] = useState<HeroSecondarySize>(
+    cfg.secondarySize === "md" ? "md" : "sm",
   );
   const [paged, setPaged] = useState(kind === "list" && cfg.paged === true);
   // 追加方式：仅在 paged=true（开启了加载更多）时生效；存量数据没有该键，回落 button
@@ -126,7 +134,12 @@ export default function SectionEditor({
   function buildConfig(): HomeSectionConfig {
     switch (kind) {
       case "hero":
-        return { featuredIds: picked.map((p) => p.id), period };
+        return {
+          featuredIds: picked.map((p) => p.id),
+          secondaryDisplay,
+          secondarySize,
+          period,
+        };
       case "categories":
         return { slugs: cats };
       case "list":
@@ -647,6 +660,44 @@ export default function SectionEditor({
                   : "最多 24 个资源组成专题；不挑则自动兜底近期最热。"}
               </p>
             </div>
+            {kind === "hero" && (
+              <>
+                <div>
+                  <label className={field} htmlFor={`hsd-${row.id}`}>
+                    副推样式
+                  </label>
+                  <select
+                    id={`hsd-${row.id}`}
+                    value={secondaryDisplay}
+                    onChange={(e) => setSecondaryDisplay(e.target.value as HeroSecondaryDisplay)}
+                    className={input}
+                  >
+                    <option value="card">小卡片网格</option>
+                    <option value="list">紧凑列表</option>
+                  </select>
+                  <p className="mt-1 text-[11px] text-neutral-400">
+                    只影响第 2 个及后续主推内容，第 1 个始终保持大图主推。
+                  </p>
+                </div>
+                <div>
+                  <label className={field} htmlFor={`hss-${row.id}`}>
+                    副推尺寸
+                  </label>
+                  <select
+                    id={`hss-${row.id}`}
+                    value={secondarySize}
+                    onChange={(e) => setSecondarySize(e.target.value as HeroSecondarySize)}
+                    className={input}
+                  >
+                    <option value="sm">小</option>
+                    <option value="md">中</option>
+                  </select>
+                  <p className="mt-1 text-[11px] text-neutral-400">
+                    列表模式控制缩略图大小，卡片模式控制卡片高度。
+                  </p>
+                </div>
+              </>
+            )}
             <div>
               <label className={field} htmlFor={`pr-${row.id}`}>
                 兜底热门时间窗口

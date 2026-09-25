@@ -39,6 +39,8 @@ export default async function HomeRenderer({
             title={s.title}
             cfg={{
               featuredIds: (cfg.featuredIds as string[]) ?? [],
+              secondaryDisplay: cfg.secondaryDisplay === "list" ? "list" : "card",
+              secondarySize: cfg.secondarySize === "md" ? "md" : "sm",
               period: (cfg.period as "all" | "week" | "month") ?? "all",
             }}
           />

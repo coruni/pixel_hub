@@ -33,7 +33,7 @@ export const HOME_KIND_META: Record<
   HomeSectionKind,
   { label: string; desc: string; defaultTitle: string | null }
 > = {
-  hero: { label: "主推精选", desc: "大图主推区，可手动挑选要展示的资源", defaultTitle: null },
+  hero: { label: "主推精选", desc: "第一个资源固定大图主推，后续副推可调小卡片/列表与尺寸", defaultTitle: null },
   categories: {
     label: "分类导航",
     desc: "分类直达入口；可按大类筛选，或手动挑选特定分类",
@@ -84,6 +84,9 @@ export function homeKindLabel(kind: HomeSectionKind): string {
 // ---------- 各类板块的 config ----------
 const heroCfg = z.object({
   featuredIds: z.array(z.string()).max(8).default([]), // 手动挑选的资源 id；为空则自动展示近期热门
+  // 第一个资源始终是大图主推；后续副推允许在后台切换为小卡片或紧凑列表，并调节尺寸。
+  secondaryDisplay: z.enum(["card", "list"]).default("card"),
+  secondarySize: z.enum(["sm", "md"]).default("sm"),
   // 未挑选时的兜底热门时间窗口：all=累计全时间；week/month=仅近期发布
   period: z.enum(["all", "week", "month"]).default("all"),
 });
@@ -171,7 +174,12 @@ export const homeConfigSchemas: Record<HomeSectionKind, z.ZodTypeAny> = {
 };
 
 export type HomeSectionConfig =
-  | { featuredIds: string[]; period: "all" | "week" | "month" } // hero
+  | {
+      featuredIds: string[];
+      secondaryDisplay: "card" | "list";
+      secondarySize: "sm" | "md";
+      period: "all" | "week" | "month";
+    } // hero
   | { slugs: string[] } // categories
   | {
       type: ContentTypeFilter;
@@ -244,7 +252,13 @@ export type DefaultSectionSpec = {
 };
 
 export const DEFAULT_SECTIONS: DefaultSectionSpec[] = [
-  { kind: "hero", title: null, order: 10, enabled: true, config: { featuredIds: [], period: "all" } },
+  {
+    kind: "hero",
+    title: null,
+    order: 10,
+    enabled: true,
+    config: { featuredIds: [], secondaryDisplay: "card", secondarySize: "sm", period: "all" },
+  },
   // 分类入口统一由侧栏「分类直达」承担，首页默认不再重复展示整块分类列表（可在后台按需开启）
   { kind: "categories", title: "按分类探索", order: 20, enabled: false, config: { slugs: [] } },
   { kind: "feed", title: null, order: 30, enabled: true, config: { showTags: false } },

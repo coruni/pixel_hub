@@ -40,7 +40,12 @@ export default async function HeroBlock({
   cfg,
 }: {
   title: string | null;
-  cfg: { featuredIds: string[]; period?: "all" | "week" | "month" };
+  cfg: {
+    featuredIds: string[];
+    secondaryDisplay?: "card" | "list";
+    secondarySize?: "sm" | "md";
+    period?: "all" | "week" | "month";
+  };
 }) {
   const ids = cfg.featuredIds.slice(0, 8);
   let items: FeedItem[];
@@ -62,6 +67,10 @@ export default async function HeroBlock({
 
   const [big, ...rest] = items;
   const small = rest.slice(0, 3);
+  const secondaryDisplay = cfg.secondaryDisplay ?? "card";
+  const secondarySize = cfg.secondarySize ?? "sm";
+  const secondaryHeight = secondarySize === "md" ? "h-44 sm:h-56" : "h-36 sm:h-44";
+  const listThumb = secondarySize === "md" ? "h-24 w-36 sm:h-28 sm:w-44" : "h-20 w-32 sm:h-24 sm:w-36";
 
   return (
     <section className="pt-8">
@@ -119,42 +128,80 @@ export default async function HeroBlock({
             </div>
           </Link>
 
-          {/* 副推（如有） */}
-          {small.length > 0 && (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {small.map((item) => (
-                <Link
-                  key={item.id}
-                  href={`/resources/${item.slug}`}
-                  className="group relative block h-36 overflow-hidden rounded-none border border-brand-200 bg-neutral-900 sm:h-44"
-                >
-                  {item.cover ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={item.cover.url}
-                      alt={item.title}
-                      loading="lazy"
-                      decoding="async"
-                      className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
-                    />
-                  ) : (
-                    <div className="absolute inset-0 bg-stone-700" />
-                  )}
-                  <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,.85)_0%,rgba(0,0,0,.85)_38%,transparent_38%)]" />
-                  <div className="absolute left-2 top-2">
-                    <TypeBadge type={item.type} />
-                  </div>
-                  <div className="absolute inset-x-0 bottom-0 p-3">
-                    <p className="truncate text-sm font-medium text-white">{item.title}</p>
-                    <p className="mt-0.5 truncate text-[11px] text-white/70">
-                      {item.author.name ?? item.author.username}
-                      {item.category ? ` · ${item.category.name}` : ""}
-                    </p>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
+          {/* 副推（如有）：第一个主推保持大图，后续可在后台切换小卡片/紧凑列表与尺寸 */}
+          {small.length > 0 &&
+            (secondaryDisplay === "list" ? (
+              <div className="grid gap-2">
+                {small.map((item) => (
+                  <Link
+                    key={item.id}
+                    href={`/resources/${item.slug}`}
+                    className="group flex min-w-0 items-center gap-3 rounded-none border border-brand-200 bg-surface p-2 transition hover:border-brand-500"
+                  >
+                    <span className={`relative shrink-0 overflow-hidden rounded-none bg-neutral-900 ${listThumb}`}>
+                      {item.cover ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={item.cover.url}
+                          alt={item.title}
+                          loading="lazy"
+                          decoding="async"
+                          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+                        />
+                      ) : (
+                        <span className="absolute inset-0 bg-stone-700" />
+                      )}
+                      <span className="absolute left-1.5 top-1.5">
+                        <TypeBadge type={item.type} />
+                      </span>
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-medium text-neutral-800 group-hover:text-neutral-950">
+                        {item.title}
+                      </span>
+                      <span className="mt-1 block truncate text-xs text-neutral-400">
+                        {item.author.name ?? item.author.username}
+                        {item.category ? ` · ${item.category.name}` : ""}
+                      </span>
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {small.map((item) => (
+                  <Link
+                    key={item.id}
+                    href={`/resources/${item.slug}`}
+                    className={`group relative block overflow-hidden rounded-none border border-brand-200 bg-neutral-900 ${secondaryHeight}`}
+                  >
+                    {item.cover ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={item.cover.url}
+                        alt={item.title}
+                        loading="lazy"
+                        decoding="async"
+                        className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 bg-stone-700" />
+                    )}
+                    <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,.85)_0%,rgba(0,0,0,.85)_38%,transparent_38%)]" />
+                    <div className="absolute left-2 top-2">
+                      <TypeBadge type={item.type} />
+                    </div>
+                    <div className="absolute inset-x-0 bottom-0 p-3">
+                      <p className="truncate text-sm font-medium text-white">{item.title}</p>
+                      <p className="mt-0.5 truncate text-[11px] text-white/70">
+                        {item.author.name ?? item.author.username}
+                        {item.category ? ` · ${item.category.name}` : ""}
+                      </p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ))}
         </div>
       </div>
     </section>

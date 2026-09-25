@@ -83,8 +83,11 @@ function cfgSummary(row: ManagerRow): string {
   switch (row.kind) {
     case "hero": {
       const pl = periodLabel[String(c.period ?? "all")];
-      if (n(c.featuredIds)) return `已挑选 ${n(c.featuredIds)} 个资源`;
-      return pl ? `未挑选 · 自动展示${pl}最热` : "未挑选 · 自动展示近期最热";
+      const secondary = c.secondaryDisplay === "list" ? "列表" : "小卡片";
+      const size = c.secondarySize === "md" ? "中尺寸" : "小尺寸";
+      const suffix = ` · 副推${secondary}/${size}`;
+      if (n(c.featuredIds)) return `已挑选 ${n(c.featuredIds)} 个资源${suffix}`;
+      return pl ? `未挑选 · 自动展示${pl}最热${suffix}` : `未挑选 · 自动展示近期最热${suffix}`;
     }
     case "categories":
       return n(c.slugs) ? `已挑选 ${n(c.slugs)} 个分类` : "展示全部分类";
