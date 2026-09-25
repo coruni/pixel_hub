@@ -132,14 +132,14 @@ export default function ProfileBgForm({
           <Button
             type="button"
             onClick={() => inputRef.current?.click()}
-            className="inline-flex items-center gap-1.5 rounded-none border border-brand-200 bg-surface px-3.5 py-2 text-sm text-neutral-700 hover:border-brand-500 hover:text-neutral-900"
+            className="inline-flex items-center gap-1.5 rounded-none border border-brand-200 bg-surface px-3 py-1.5 text-sm text-neutral-700 hover:border-brand-500 hover:text-neutral-900"
           >
             <Upload size={14} aria-hidden /> {pcKey ? "更换" : "选择图片"}
           </Button>
           <Button
             type="submit"
             disabled={pending || !picked}
-            className="rounded-none border border-brand-600 bg-brand-500 px-3.5 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
+            className="rounded-none border border-brand-600 bg-brand-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
           >
             {pending ? "保存中…" : "保存"}
           </Button>
@@ -147,7 +147,7 @@ export default function ProfileBgForm({
             <Button
               type="submit"
               formAction={removeProfileBgAction}
-              className="inline-flex items-center gap-1.5 rounded-none border border-brand-200 bg-surface px-3.5 py-2 text-sm text-neutral-600 hover:border-red-300 hover:text-red-600"
+              className="inline-flex items-center gap-1.5 rounded-none border border-brand-200 bg-surface px-3 py-1.5 text-sm text-neutral-600 hover:border-red-300 hover:text-red-600"
             >
               <Trash2 size={14} aria-hidden /> 移除
             </Button>

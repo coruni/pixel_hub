@@ -17,7 +17,7 @@ import { useDownloadBump } from "@/components/resource/detail/download-count";
 // 点赞/收藏/举报/编辑已统一走 ACTION_TEXT（详情页操作条，见 parts.tsx 的 ActionBar）：
 // 图标 + 文字、无边框无底色，图标 aria-hidden，状态靠文案 + 颜色双通道。
 const baseBtn =
-  "inline-flex items-center gap-1.5 rounded-none border px-3.5 py-2 text-sm transition disabled:opacity-60";
+  "inline-flex items-center gap-1.5 rounded-none border px-3 py-1.5 text-sm transition disabled:opacity-60";
 
 export function LikeButton({
   resourceId,

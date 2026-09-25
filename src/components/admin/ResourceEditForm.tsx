@@ -186,6 +186,11 @@ export function ResourceEditForm({
     }
   }, []);
 
+  // 「返回」目标本身就是资源的公开页时（作者自己的编辑页正是如此，backHref = /resources/[slug]），
+  // 再渲染「查看公开页」就是两个指向同一 URL 的入口 —— 只保留返回按钮那一个。
+  const publicHref = `/resources/${resource.slug}`;
+  const showPublicLink = backHref !== publicHref;
+
   return (
     <form
       action={formAction}
@@ -367,12 +372,11 @@ export function ResourceEditForm({
         <Link href={backHref} className={BTN_GHOST_SM}>
           {backLabel}
         </Link>
-        <Link
-          href={`/resources/${resource.slug}`}
-          className="text-xs text-neutral-400 hover:text-brand-700"
-        >
-          查看公开页
-        </Link>
+        {showPublicLink && (
+          <Link href={publicHref} className="text-xs text-neutral-400 hover:text-brand-700">
+            查看公开页
+          </Link>
+        )}
         {state.error && <span className="text-sm text-red-500">{state.error}</span>}
         {state.ok && <span className="text-sm text-emerald-600">✓ 已保存</span>}
       </div>

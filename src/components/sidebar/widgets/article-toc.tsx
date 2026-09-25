@@ -1,7 +1,7 @@
-import Link from "next/link";
-import { ChevronDown, List } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { extractArticleHeadings, type ArticleHeading } from "@/lib/markdown-headings";
 import { WidgetShell } from "../shell";
+import { TocLink } from "./toc-link";
 import type { SidebarWidget } from "@/lib/site-config";
 import type { DetailWidgetCtx } from "../shell";
 
@@ -22,16 +22,15 @@ function buildTree(headings: ArticleHeading[]): TocNode[] {
   return roots;
 }
 
-function TocLink({ heading, inSummary = false }: { heading: TocNode; inSummary?: boolean }) {
+/** 只向客户端组件传递可序列化的原始值，避免序列化整棵子树。 */
+function TocHeadingLink({ heading, inSummary = false }: { heading: TocNode; inSummary?: boolean }) {
   return (
-    <Link
+    <TocLink
       href={`#${heading.id}`}
-      onClick={inSummary ? (event) => event.stopPropagation() : undefined}
-      className="flex min-w-0 items-start gap-1.5 text-xs leading-5 text-neutral-600 transition hover:text-brand-700"
-    >
-      {heading.level === 2 && <List size={11} className="mt-1 shrink-0 text-brand-500" aria-hidden />}
-      <span className="line-clamp-2">{heading.text}</span>
-    </Link>
+      text={heading.text}
+      level={heading.level}
+      inSummary={inSummary}
+    />
   );
 }
 
@@ -48,14 +47,14 @@ function TocNodes({ nodes }: { nodes: TocNode[] }) {
                   className="mt-1 shrink-0 text-neutral-400 transition-transform group-open:rotate-180"
                   aria-hidden
                 />
-                <TocLink heading={heading} inSummary />
+                <TocHeadingLink heading={heading} inSummary />
               </summary>
               <div className="mt-1 pl-3">
                 <TocNodes nodes={heading.children} />
               </div>
             </details>
           ) : (
-            <TocLink heading={heading} />
+            <TocHeadingLink heading={heading} />
           )}
         </li>
       ))}
