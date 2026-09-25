@@ -115,7 +115,7 @@ export default function WidgetEditor({
       case "tags":
         return { count, slugs: cats };
       case "creators":
-        return { count };
+        return { count, sort: creatorSort, period };
       case "stats":
         return {};
       case "about":
