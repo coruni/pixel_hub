@@ -13,9 +13,6 @@ import UserHoverCard from "@/components/ui/UserHoverCard";
 import Markdown from "@/components/rte/Markdown";
 import { FavoriteButton, LikeButton, FollowButton } from "@/components/social/interactions";
 import ReportButton from "@/components/social/ReportButton";
-import TipButton from "@/components/social/TipButton";
-import TipUserButton from "@/components/social/TipUserButton";
-import type { TipForm } from "@/lib/points-config";
 import { VersionDownloadButton, VersionForm } from "@/components/resource/version";
 import { getUploadLimits } from "@/lib/upload-limits";
 
@@ -28,11 +25,6 @@ export type DetailCtx = {
   isStaff: boolean;
   myCollections?: { id: string; name: string }[];
   related?: import("@/lib/queries").FeedCard[];
-  /**
-   * 打赏参数（来自激励配置的 `tipFormOf`）。`undefined` = 打赏开关关闭，
-   * 此时完全不出打赏入口 —— 不要渲染出一个点了没反应的按钮。
-   */
-  tip?: TipForm;
 };
 
 /** 类型展示名：统一取 TYPE_LABEL，新增类型无需再改这里 */
@@ -120,31 +112,12 @@ export function FollowControl({
   );
 }
 
-/**
- * 作者维度打赏（不挂作品）。三个模板的作者区都用它，条件只写这一处：
- * 未登录 / 打赏关闭 / 本人看自己 → 不出入口（与作品打赏同一套口径）。
- */
-export function AuthorTipButton({ ctx, className }: { ctx: DetailCtx; className?: string }) {
-  if (!ctx.authed || ctx.isAuthor || !ctx.tip) return null;
-  return (
-    <TipUserButton
-      userId={ctx.detail.authorId}
-      username={ctx.detail.author.username}
-      className={className}
-      {...ctx.tip}
-    />
-  );
-}
-
-/** 作者名片 + 关注 + 打赏作者 */
+/** 作者名片 + 关注 */
 export function AuthorStrip({ ctx }: { ctx: DetailCtx }) {
   return (
     <div className="flex items-center justify-between rounded-none border border-brand-200 bg-surface p-3">
       <AuthorIdentity a={ctx.detail.author} />
-      <div className="flex items-center gap-3">
-        <FollowControl ctx={ctx} />
-        <AuthorTipButton ctx={ctx} />
-      </div>
+      <FollowControl ctx={ctx} />
     </div>
   );
 }
@@ -190,10 +163,6 @@ export function ActionBar({ ctx }: { ctx: DetailCtx }) {
           </>
         )}
         {meId && !isAuthor && <ReportButton resourceId={detail.id} resourceTitle={detail.title} />}
-        {/* 打赏：与点赞/收藏同形态留在同一行（计划 §8）；作者不给自己打赏，未登录不给入口 */}
-        {authed && !isAuthor && ctx.tip && detail.status === "PUBLISHED" && (
-          <TipButton resourceId={detail.id} {...ctx.tip} />
-        )}
         {isAuthor && (
           <Link href={`/resources/${detail.slug}/edit`} className={ACTION_TEXT}>
             <Pencil size={15} aria-hidden /> 编辑

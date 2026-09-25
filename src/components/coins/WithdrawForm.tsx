@@ -172,9 +172,9 @@ export default function WithdrawForm({
         </label>
       </div>
 
-      <p className="mt-3 text-[11px] leading-4 text-neutral-400">
+      {/* <p className="mt-3 text-[11px] leading-4 text-neutral-400">
         收款信息只有站长能看到，不进日志、不进任何公开页面；本站不代扣代缴，税务请自行确认。
-      </p>
+      </p> */}
 
       <button
         type="button"

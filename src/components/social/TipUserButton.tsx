@@ -2,10 +2,9 @@
 
 // 作者维度打赏按钮：**不挂作品**（`TipRecord.resourceId = null`），钱直接给这个人。
 //
-// 【为什么和作品打赏并存】作品打赏回答的是「这件东西值多少」，作者打赏回答的是「这个人值多少」——
-// 站上有大量没有下载物的内容（外链游戏、嵌入视频、纯欣赏的图），读者想谢的是作者，
-// 硬塞一件作品当载体反而别扭。两者收款方相同，所以按钮文案必须能区分：
-// 作品那条叫「打赏」，作者这条叫「打赏作者」。
+// 【全站唯一的打赏入口】作品维度的打赏入口已从资源详情页撤掉，打赏只在个人主页头部出现 ——
+// 收款方本来就是同一个人，两个入口只会让人犹豫按哪个。`TipButton` 与服务端 action 保留，
+// 只是当前没有 UI 入口。
 //
 // 【为什么不复用 TipButton】它俩只有提交目标不同，面板已在 `TipDialog` 收敛，
 // 这里只保留按钮 + 组装提交参数。
@@ -16,16 +15,21 @@ import { sendUserTipAction } from "@/lib/actions/tip";
 import TipDialog from "./TipDialog";
 import type { TipForm } from "@/lib/points-config";
 
+const LABEL = "打赏作者";
+
 export default function TipUserButton({
   userId,
   username,
   className,
+  iconOnly,
   ...form
 }: TipForm & {
   userId: string;
   username: string;
-  /** 覆盖按钮样式（个人主页头部用描边按钮，详情页作者行用 `ACTION_TEXT`） */
+  /** 覆盖按钮样式（图标态由调用方给完整外观） */
   className?: string;
+  /** 只渲染图标按钮；外观完全由 className 给出，无障碍名取「打赏作者」 */
+  iconOnly?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -33,9 +37,11 @@ export default function TipUserButton({
       <button
         type="button"
         className={className ?? ACTION_TEXT}
+        title={iconOnly ? LABEL : undefined}
+        aria-label={iconOnly ? LABEL : undefined}
         onClick={() => setOpen(true)}
       >
-        <Coins size={15} aria-hidden /> 打赏作者
+        <Coins size={15} aria-hidden /> {!iconOnly && LABEL}
       </button>
       {open && (
         <TipDialog

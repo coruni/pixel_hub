@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { CalendarDays, Eye, MessageSquare, Sparkles, ThumbsUp } from "lucide-react";
+import { CalendarDays, Eye, MessageSquare, Pencil, Sparkles, ThumbsUp } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { getIncentive } from "@/lib/incentive";
@@ -31,9 +31,10 @@ import { FollowButton } from "@/components/social/interactions";
 import TipUserButton from "@/components/social/TipUserButton";
 import { Button } from "@/components/ui/Button";
 
-/** 头部描边按钮：与 FollowButton 的「已关注」态同规格，打赏不抢主转化的视觉权重 */
-const outlinedBtn =
-  "inline-flex items-center gap-1.5 rounded-none border border-brand-200 bg-surface px-3.5 py-2 text-sm text-neutral-700 transition hover:border-brand-500 hover:text-neutral-900";
+/** 昵称行图标按钮：方形图标位（h-9，与顶部导航的 NAV_ICON_BTN 同口径），
+ *  编辑 / 打赏共用；无障碍名称由调用方的 title + aria-label 承担 */
+const iconBtn =
+  "grid h-9 w-9 shrink-0 place-items-center rounded-none border border-brand-200 bg-surface text-neutral-700 transition hover:border-brand-500 hover:text-neutral-900 focus-visible:ring-2 focus-visible:ring-brand-400";
 
 export async function generateMetadata({
   params,
@@ -143,17 +144,18 @@ export default async function UserPage({
   const bgUnlocked = profileBgUnlocked(levelIndex, incentive.profile.bgMinLevel, incentive.enabled);
   const bgPcKey = bgUnlocked ? profile.profileBgPcKey : null;
 
-  // 头部操作区。**hero / 无 hero 两套头部共用这一个节点** —— 打赏入口只补在其中一套里，
+  // 头部操作区。**hero / 无 hero 两套头部共用这一个节点** —— 操作项只补在其中一套里，
   // 另一套就会莫名缺按钮（两套头部的结构是一样的，别各写一遍）。
+  //
+  // 位置：贴在同一行昵称之后、用 `ml-auto` 推到行尾 —— 单独占一列会把头部拉成「头像 / 资料 / 按钮」
+  // 三段，昵称行右侧反而空出一大截。因此头部只留 头像 + 资料 两列。
+  // 编辑 / 打赏统一收敛成图标按钮（外观见 `iconBtn`），文案改由 title + aria-label 承担。
   const tipForm = tipFormOf(incentive);
-  const headerActions = (
-    <div className="flex flex-wrap items-center gap-3">
+  const nameActions = (
+    <div className="ml-auto flex shrink-0 items-center gap-2">
       {profile.isViewer ? (
-        <Link
-          href="/settings"
-          className="rounded-none border border-brand-200 bg-surface px-4 py-2 text-sm text-neutral-700 hover:border-brand-500 hover:text-neutral-900"
-        >
-          编辑资料
+        <Link href="/settings" className={iconBtn} title="编辑资料" aria-label="编辑资料">
+          <Pencil size={15} aria-hidden />
         </Link>
       ) : me ? (
         <>
@@ -164,7 +166,8 @@ export default async function UserPage({
             <TipUserButton
               userId={profile.id}
               username={profile.username}
-              className={outlinedBtn}
+              iconOnly
+              className={iconBtn}
               {...tipForm}
             />
           )}
@@ -382,12 +385,8 @@ export default async function UserPage({
                     {roleBadge[profile.role].label}
                   </span>
                 )}
-                {profile.trusted && (
-                  <span className="rounded-none border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600">
-                    免审发布
-                  </span>
-                )}
                 {levelName && <LevelBadge level={levelIndex} name={levelName} />}
+                {nameActions}
               </div>
               <p className="mt-1.5 text-sm leading-6 text-neutral-600">
                 {profile.bio || "这个人很懒，还没写简介。"}
@@ -396,7 +395,6 @@ export default async function UserPage({
                 <CalendarDays size={12} aria-hidden /> {joined} 加入
               </p>
             </div>
-            {headerActions}
           </div>
           {statsRow}
         </section>
@@ -422,12 +420,8 @@ export default async function UserPage({
                   {roleBadge[profile.role].label}
                 </span>
               )}
-              {profile.trusted && (
-                <span className="rounded-none border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600">
-                  免审发布
-                </span>
-              )}
               {levelName && <LevelBadge level={levelIndex} name={levelName} />}
+              {nameActions}
             </div>
             <p className="mt-1.5 text-sm leading-6 text-neutral-600">
               {profile.bio || "这个人很懒，还没写简介。"}
@@ -436,7 +430,6 @@ export default async function UserPage({
               <CalendarDays size={12} aria-hidden /> {joined} 加入
             </p>
           </div>
-          {headerActions}
         </div>
       )}
       {!profile.heroImageKey && statsRow}

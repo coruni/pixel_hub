@@ -7,7 +7,7 @@ import { parseMeta } from "@/lib/meta";
 import { getTheme, detailTemplateFor } from "@/lib/site";
 import { getIncentive } from "@/lib/incentive";
 import { getPointBalance } from "@/lib/points";
-import { levelOf, tipFormOf } from "@/lib/points-config";
+import { levelOf } from "@/lib/points-config";
 import { publicUrl } from "@/lib/storage/url";
 import { profileBgUnlocked } from "@/lib/upload-config";
 import { sidebarVisible } from "@/lib/site-config";
@@ -170,8 +170,6 @@ export default async function ResourcePage({ params }: PageProps) {
     isStaff: me?.role === "ADMIN" || me?.role === "MODERATOR",
     myCollections,
     related,
-    // 打赏入口只在「体系开启 + 打赏开启」时给出；具体到作者本人/未发布内容由 ActionBar 判定
-    tip: tipFormOf(incentive),
   };
 
   const template = detailTemplateFor(theme, detail.type);

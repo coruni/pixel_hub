@@ -8,7 +8,6 @@ import { AvPlayerBlock } from "./av-player";
 import {
   ActionBar,
   AuthorIdentity,
-  AuthorTipButton,
   CommentBlock,
   FollowControl,
   DescriptionBlock,
@@ -159,7 +158,6 @@ export default function DetailPost({
           <div className="flex items-center gap-3">
             <AuthorIdentity a={a} />
             <FollowControl ctx={ctx} variant="primary" />
-            <AuthorTipButton ctx={ctx} />
           </div>
           <div className="flex w-full justify-end">
             <ActionBar ctx={ctx} />

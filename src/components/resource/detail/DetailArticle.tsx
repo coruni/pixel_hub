@@ -5,7 +5,6 @@ import { formatCount, timeAgo } from "@/lib/format";
 import {
   ActionBar,
   AuthorIdentity,
-  AuthorTipButton,
   CommentBlock,
   DescriptionBlock,
   FollowControl,
@@ -74,7 +73,6 @@ export default function DetailArticle({
           <span>约 {minutes} 分钟</span>
         </span>
         <div className="ml-auto flex items-center gap-3">
-          <AuthorTipButton ctx={ctx} />
           <FollowControl ctx={ctx} />
         </div>
       </div>
