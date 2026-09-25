@@ -651,12 +651,12 @@ export default function SectionEditor({
               <HeroPick
                 value={picked}
                 onChange={setPicked}
-                max={kind === "hero" ? 8 : 24}
+                max={kind === "hero" ? 5 : 24}
                 placeholder={kind === "featured" ? "搜索已上架资源标题，组成专题…" : undefined}
               />
               <p className="mt-1 text-xs text-neutral-400">
                 {kind === "hero"
-                  ? "挑选 1–8 个资源；不挑则自动展示近期最热，首图作主推、其余作副推。"
+                  ? "挑选 1–5 个资源；不挑则自动展示近期最热，首图作主推、其余作副推。"
                   : "最多 24 个资源组成专题；不挑则自动兜底近期最热。"}
               </p>
             </div>

@@ -53,13 +53,13 @@ const VARIANTS: Record<ButtonVariant, string> = {
   // —— 内联重复样式收敛（来自各表单现状，逐字一致）——
   // 登录/注册/找回/重置：w-full 主提交
   submitFull:
-    "w-full rounded-none border border-brand-600 bg-brand-500 py-2.5 text-sm font-medium text-white transition hover:bg-brand-600 disabled:opacity-60",
+    "w-full rounded-none border border-brand-600 bg-brand-500 py-2 text-sm font-medium text-white transition hover:bg-brand-600 disabled:opacity-60",
   // 发布向导 / 后台内容保存：px-8 大字主提交
   submitHero:
-    "rounded-none border border-brand-600 bg-brand-500 px-8 py-2 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-50",
+    "rounded-none border border-brand-600 bg-brand-500 px-6 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-50",
   // 设置保存 / 安全表单提交：px-6 常规主提交
   submit:
-    "rounded-none border border-brand-600 bg-brand-500 px-6 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50",
+    "rounded-none border border-brand-600 bg-brand-500 px-5 py-1.5 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50",
   // 首页板块/侧栏组件行内小主按钮
   primaryXs:
     "rounded-none border border-brand-600 bg-brand-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-brand-600 disabled:opacity-50",

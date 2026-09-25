@@ -47,10 +47,10 @@ export default async function HeroBlock({
     period?: "all" | "week" | "month";
   };
 }) {
-  const ids = cfg.featuredIds.slice(0, 8);
+  const ids = cfg.featuredIds.slice(0, 5);
   let items: FeedItem[];
   if (ids.length > 0) {
-    const r = await getFeed({ ids, pageSize: 8 });
+    const r = await getFeed({ ids, pageSize: 5 });
     const byId = new Map(r.items.map((i) => [i.id, i]));
     items = ids.flatMap((id) => (byId.get(id) ? [byId.get(id)!] : []));
   } else {
@@ -58,7 +58,7 @@ export default async function HeroBlock({
     items = (
       await getFeed({
         sort: "popular",
-        pageSize: 4,
+        pageSize: 5,
         period: cfg.period && cfg.period !== "all" ? cfg.period : undefined,
       })
     ).items;
@@ -66,7 +66,9 @@ export default async function HeroBlock({
   if (items.length === 0) return null;
 
   const [big, ...rest] = items;
-  const small = rest.slice(0, 3);
+  // 主推(首图) + 副推 共 5 个：首图固定大图主推，其余 4 个进 4 列副推网格
+  // （pc 一行 4 个、移动 2 个）；超出部分自然截断。
+  const small = rest.slice(0, 4);
   const secondaryDisplay = cfg.secondaryDisplay ?? "card";
   const secondarySize = cfg.secondarySize ?? "sm";
   const secondaryHeight = secondarySize === "md" ? "h-44 sm:h-56" : "h-36 sm:h-44";
@@ -168,7 +170,7 @@ export default async function HeroBlock({
                 ))}
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                 {small.map((item) => (
                   <Link
                     key={item.id}
