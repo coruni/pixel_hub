@@ -8,7 +8,7 @@ import { formatCount, timeAgo } from "@/lib/format";
 import { ACTION_TEXT } from "@/lib/ui/cls";
 import { TYPE_LABEL } from "@/lib/display";
 import Comments from "@/components/social/Comments";
-import Avatar from "@/components/ui/Avatar";
+import PresenceAvatar from "@/components/ui/PresenceAvatar";
 import UserHoverCard from "@/components/ui/UserHoverCard";
 import Markdown from "@/components/rte/Markdown";
 import { FavoriteButton, LikeButton, FollowButton } from "@/components/social/interactions";
@@ -65,7 +65,8 @@ export function AuthorIdentity({
   return (
     <UserHoverCard user={a}>
       <Link href={`/u/${a.username}`} className="flex items-center gap-2.5">
-        <Avatar
+        <PresenceAvatar
+          userId={a.id}
           name={a.name}
           username={a.username}
           avatarKey={a.avatarKey}

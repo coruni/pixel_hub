@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { timeAgo } from "@/lib/format";
-import Avatar from "@/components/ui/Avatar";
+import PresenceAvatar from "@/components/ui/PresenceAvatar";
 import UserHoverCard from "@/components/ui/UserHoverCard";
 import CommentHoverCard from "./CommentHoverCard";
 import type { CommentImage, CommentShape } from "./comment-types";
@@ -62,7 +62,8 @@ export default function CommentItem({
             href={`/u/${c.author.username}`}
             aria-label={`${c.author.name ?? c.author.username} 的主页`}
           >
-            <Avatar
+            <PresenceAvatar
+              userId={c.authorId}
               name={c.author.name}
               username={c.author.username}
               avatarKey={c.author.avatarKey}
@@ -207,7 +208,8 @@ function ReplyItem({
             href={`/u/${rp.author.username}`}
             aria-label={`${rp.author.name ?? rp.author.username} 的主页`}
           >
-            <Avatar
+            <PresenceAvatar
+              userId={rp.authorId}
               name={rp.author.name}
               username={rp.author.username}
               avatarKey={rp.author.avatarKey}

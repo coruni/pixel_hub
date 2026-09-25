@@ -2,6 +2,7 @@ import type { HoverCardUser } from "@/components/ui/UserHoverCard";
 
 /** 评论作者（喂 UserHoverCard 的用户信息卡） */
 export type CommentAuthor = HoverCardUser & {
+  id?: string;
   username: string;
   name: string | null;
   avatarKey?: string | null;

@@ -132,6 +132,7 @@ export async function getPublishedCountByCategory(): Promise<Map<string, number>
 export type CreatorSort = "followers" | "points";
 
 export type CreatorRow = {
+  id: string;
   username: string;
   name: string | null;
   avatarKey: string | null;
@@ -237,6 +238,7 @@ export async function getTopCreators(
     const u = byId.get(id);
     if (!u) continue; // 期间被删号
     out.push({
+      id,
       username: u.username,
       name: u.name,
       avatarKey: u.avatarKey,

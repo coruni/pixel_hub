@@ -16,6 +16,7 @@ import { recordDownload } from "@/lib/download-record";
 import { awardPoints, interactionRefId } from "@/lib/points";
 import { notifyByEmail } from "@/lib/mail-notify";
 import { createNotification } from "@/lib/notify";
+import { publishCommentChanged, publishCommentNew } from "@/lib/realtime/publish";
 import { audit } from "@/lib/actions/_guards";
 import { MIB } from "@/lib/upload-config";
 import { getUploadLimits } from "@/lib/upload-limits";
@@ -521,6 +522,8 @@ export async function addCommentAction(
       refId: interactionRefId("cmt", user.id, resource.id),
     }),
   );
+  // 实时推送放在事务提交之后：正文不随推送下发，观看端收到信号后自行拉增量（见 use-comment-polling）
+  publishCommentNew(resource.id);
   return { ok: true };
 }
 
@@ -557,6 +560,8 @@ export async function deleteCommentAction(
   if (deleted && comment.authorId !== user.id) {
     await audit(user.id, "DELETE_COMMENT", "COMMENT", commentId, `by ${user.role}`);
   }
+  // 删除改变了评论树结构（回复会上移成独立评论），增量端点表达不了 → 通知观看端全量刷新
+  if (deleted) publishCommentChanged(comment.resourceId);
   return { ok: true };
 }
 

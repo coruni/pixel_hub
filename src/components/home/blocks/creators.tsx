@@ -3,7 +3,7 @@ import BlockShell from "@/components/home/BlockShell";
 import { getTopCreators, type CreatorSort } from "@/lib/home";
 import { creatorMetaText } from "@/lib/format";
 import type { RankPeriod } from "@/lib/points";
-import Avatar from "@/components/ui/Avatar";
+import PresenceAvatar from "@/components/ui/PresenceAvatar";
 
 export default async function CreatorsBlock({
   title,
@@ -28,7 +28,8 @@ export default async function CreatorsBlock({
             href={`/u/${c.username}`}
             className="flex items-center gap-3 rounded-none border border-brand-200 bg-surface p-3 transition hover:border-brand-500"
           >
-            <Avatar
+            <PresenceAvatar
+              userId={c.id}
               name={c.name}
               username={c.username}
               avatarKey={c.avatarKey}

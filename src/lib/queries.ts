@@ -511,6 +511,7 @@ export const getResourceDetail = cache(async (slug: string, viewerId?: string) =
   ) => {
     const s = statsMap.get(id);
     return {
+      id,
       username: a.username,
       name: a.name,
       avatarKey: a.avatarKey ? publicUrl(a.avatarKey) : null,
@@ -1348,7 +1349,7 @@ export function getRecentComments(limit: number) {
       id: true,
       content: true,
       createdAt: true,
-      author: { select: { username: true, name: true, avatarKey: true, lastSeenAt: true } },
+      author: { select: { id: true, username: true, name: true, avatarKey: true, lastSeenAt: true } },
       resource: { select: { slug: true, title: true } },
     },
   });

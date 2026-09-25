@@ -20,6 +20,7 @@ import {
 import { timeAgo } from "@/lib/format";
 import { markAllNotificationsReadAction } from "@/lib/actions/notify";
 import { NotificationDelete, NotificationsClearAll } from "@/components/social/notify-actions";
+import NotificationLive from "@/components/social/NotificationLive";
 import NotificationCardLink from "@/components/social/notification-card-link";
 import { Button } from "@/components/ui/Button";
 
@@ -118,6 +119,7 @@ export default async function NotificationsPage({
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
+      <NotificationLive />
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">
           通知

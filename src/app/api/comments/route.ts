@@ -94,6 +94,7 @@ export async function GET(req: NextRequest) {
             }
           : null,
       author: {
+        id: c.authorId,
         username: c.author.username,
         name: c.author.name,
         avatarKey: c.author.avatarKey ? publicUrl(c.author.avatarKey) : null,

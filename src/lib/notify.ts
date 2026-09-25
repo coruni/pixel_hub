@@ -6,6 +6,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { notifyByEmail, notifySecurityEmail } from "@/lib/mail-notify";
+import { publishNotificationChanged } from "@/lib/realtime/publish";
 
 export type NotifyType = "LIKE" | "COMMENT" | "FOLLOW" | "MODERATION" | "SECURITY" | "SYSTEM";
 
@@ -105,6 +106,7 @@ export async function createNotification(
               createdAt: new Date(), // 重新置顶，最近点赞者作为展示头像/名字
             },
           });
+          publishNotificationChanged(userId);
           return;
         }
       }
@@ -120,6 +122,7 @@ export async function createNotification(
         message: input.message ?? null,
       },
     });
+    publishNotificationChanged(userId);
   } catch (e) {
     console.error("[notify]", type, userId, e);
   }

@@ -7,11 +7,7 @@ First, run the development server:
 ```bash
 npm run dev
 # or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run dev:next  # 仅启动 Next；实时通道会降级为 HTTP 轮询
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
@@ -38,9 +34,10 @@ docker build --build-arg DATABASE_URL="postgresql://..." -t pixel_hub .
 docker run -p 3000:3000 --env-file .env pixel_hub
 ```
 
-自托管的两个注意点：
+自托管的三个注意点：
 
 1. `public/uploads/`（本地存储驱动落盘处）**必须挂成卷**，否则容器重建即丢失所有上传文件。
    也可以改用 S3 / Chevereto 驱动把文件放到站外，见后台「站点配置 → 存储」。
 2. 反向代理要按大文件上传放宽限制：`client_max_body_size`（配合后台的附件体积上限）
    与 `proxy_read_timeout`（GB 级上传是长连接，容易被代理先掐断）。
+3. 实时通道使用同端口的 `ws://.../api/ws`，反向代理必须转发 `Upgrade` / `Connection: upgrade`。如果代理不支持 WebSocket，前台会自动降级为 HTTP 轮询，不影响主流程。

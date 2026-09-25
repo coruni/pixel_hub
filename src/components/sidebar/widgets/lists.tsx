@@ -5,7 +5,7 @@ import { getTopCreators } from "@/lib/home";
 import { widgetTitle, type SidebarWidget } from "@/lib/site-config";
 import { creatorMetaText, timeAgo } from "@/lib/format";
 import { isOnline } from "@/lib/online";
-import Avatar from "@/components/ui/Avatar";
+import PresenceAvatar from "@/components/ui/PresenceAvatar";
 import { WidgetShell } from "../shell";
 
 /** 名单类侧边栏组件：分类入口 / 标签云 / 人气创作者 / 最新评论 */
@@ -88,7 +88,8 @@ export async function renderCreators(w: SidebarWidget) {
               href={`/u/${c.username}`}
               className="group flex items-center gap-2.5 rounded-none px-2 py-1.5 transition hover:bg-brand-50"
             >
-              <Avatar
+              <PresenceAvatar
+                userId={c.id}
                 name={c.name}
                 username={c.username}
                 avatarKey={c.avatarKey}
@@ -121,7 +122,8 @@ export async function renderComments(w: SidebarWidget) {
       <ul className="space-y-2.5">
         {rows.map((c) => (
           <li key={c.id} className="flex items-start gap-2">
-            <Avatar
+            <PresenceAvatar
+              userId={c.author.id}
               name={c.author.name}
               username={c.author.username}
               avatarKey={c.author.avatarKey}

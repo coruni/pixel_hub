@@ -6,7 +6,7 @@ import { getTopByPoints, type RankPeriod } from "@/lib/points";
 import { levelNameOf, levelOf, permilleText } from "@/lib/points-config";
 import { listPeriods, payoutCounts } from "@/lib/settle";
 import { formatYuan } from "@/lib/money";
-import Avatar from "@/components/ui/Avatar";
+import PresenceAvatar from "@/components/ui/PresenceAvatar";
 import LevelBadge from "@/components/ui/LevelBadge";
 import { formatCount, dayKey } from "@/lib/format";
 
@@ -126,7 +126,8 @@ export default async function CreatorsPage({
                 >
                   {i + 1}
                 </span>
-                <Avatar
+                <PresenceAvatar
+                  userId={c.userId}
                   name={c.name}
                   username={c.username}
                   avatarKey={c.avatarKey}

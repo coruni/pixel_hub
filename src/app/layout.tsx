@@ -4,6 +4,7 @@ import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import PageTracker from "@/components/layout/PageTracker";
 import PresencePing from "@/components/layout/PresencePing";
+import RealtimeBridge from "@/components/layout/RealtimeBridge";
 import { auth } from "@/lib/auth";
 import { siteUrl } from "@/lib/site-url";
 import { getSeoConfig, jsonLd, resolveSiteName } from "@/lib/seo-config";
@@ -74,6 +75,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         )}
         <PageTracker />
         <PresencePing signedIn={Boolean(session?.user)} />
+        <RealtimeBridge signedIn={Boolean(session?.user)} />
         <Navbar />
         <main className="flex-1">{children}</main>
         <Footer

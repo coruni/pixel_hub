@@ -16,6 +16,8 @@ import { logoutAction } from "@/lib/actions";
 import Avatar from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { NAV_CONTROL_H } from "@/lib/ui/cls";
+import { refreshUnread } from "@/lib/realtime/client";
+import { useRealtimeConnected, useUnreadCount } from "@/lib/realtime/use-realtime";
 
 export type MenuUser = {
   name: string | null;
@@ -37,35 +39,29 @@ export default function UserMenu({
   showCoins?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(unread);
   const boxRef = useRef<HTMLDivElement>(null);
+  // 未读角标：服务端渲染给初值，之后由实时通道推送（WS 连不上时退回低频轮询）
+  const liveUnread = useUnreadCount();
+  const connected = useRealtimeConnected();
+  const unreadCount = liveUnread ?? unread;
 
-  // 未读角标：初值来自服务端（导航时已是最新），之后每 60s（页面可见时）自动校正一次，
-  // 让角标不至于「必须刷新页面才更新」——通知本来就是越及时越有用。
   useEffect(() => {
-    let alive = true;
-    const tick = async () => {
+    // 实时通道在线时只留一条 5 分钟兜底轮询（防丢事件）；连不上时按原来的 60s 轮询。
+    const interval = connected ? 5 * 60_000 : 60_000;
+    const tick = () => {
       if (document.visibilityState !== "visible") return;
-      try {
-        const res = await fetch("/api/notifications/unread", { cache: "no-store" });
-        if (!res.ok) return;
-        const data = (await res.json()) as { unread?: number };
-        if (alive && typeof data.unread === "number") setUnreadCount(data.unread);
-      } catch {
-        // 角标拉取失败静默：等下一次心跳，不影响任何主流程
-      }
+      void refreshUnread();
     };
-    const timer = window.setInterval(tick, 60_000);
+    const timer = window.setInterval(tick, interval);
     const onVisible = () => {
-      if (document.visibilityState === "visible") void tick();
+      if (document.visibilityState === "visible") void refreshUnread();
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => {
-      alive = false;
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, []);
+  }, [connected]);
 
   useEffect(() => {
     if (!open) return;

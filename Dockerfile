@@ -50,5 +50,9 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/public ./public
 COPY --from=build /app/prisma ./prisma
+# 自定义服务器（实时 WebSocket 通道）：npm start 跑的是 node server.js，
+# 它不经过 Next 编译器，必须原样进镜像；server/ 是配套的纯 JS 实时总线。
+COPY --from=build /app/server.js ./server.js
+COPY --from=build /app/server ./server
 EXPOSE 3000
 CMD ["npm", "run", "start"]

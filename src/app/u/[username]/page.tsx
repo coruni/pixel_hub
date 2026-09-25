@@ -26,7 +26,7 @@ import { formatCount } from "@/lib/format";
 import { publicUrl } from "@/lib/storage/url";
 import { profileBgUnlocked } from "@/lib/upload-config";
 import ResourceGrid from "@/components/resource/ResourceGrid";
-import Avatar from "@/components/ui/Avatar";
+import PresenceAvatar from "@/components/ui/PresenceAvatar";
 import { FollowButton } from "@/components/social/interactions";
 import TipUserButton from "@/components/social/TipUserButton";
 import { Button } from "@/components/ui/Button";
@@ -92,7 +92,8 @@ function UserRow({ u, following, meId }: UserRowArgs) {
   return (
     <li className="flex items-center gap-3 rounded-none p-2 transition hover:bg-brand-50">
       <Link href={`/u/${u.username}`} className="flex min-w-0 flex-1 items-center gap-3">
-        <Avatar
+        <PresenceAvatar
+          userId={u.id}
           name={u.name}
           username={u.username}
           avatarKey={u.avatarKey}
@@ -365,7 +366,8 @@ export default async function UserPage({
             style={{ backgroundImage: `url(${publicUrl(profile.heroImageKey)})` }}
           />
           <div className="flex flex-wrap items-center gap-5 pb-6 pt-2 sm:pb-8 sm:pt-3">
-            <Avatar
+            <PresenceAvatar
+              userId={profile.id}
               name={profile.name}
               username={profile.username}
               avatarKey={profile.avatarKey}
@@ -400,7 +402,8 @@ export default async function UserPage({
         </section>
       ) : (
         <div className="flex flex-wrap items-center gap-5">
-          <Avatar
+          <PresenceAvatar
+            userId={profile.id}
             name={profile.name}
             username={profile.username}
             avatarKey={profile.avatarKey}
