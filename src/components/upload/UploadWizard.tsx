@@ -103,9 +103,9 @@ export default function UploadWizard({
   const draftMedia =
     draftType && isSingleCoverType(draftType)
       ? (() => {
-          const cover = draftFiles.find((f) => f.ok && f.id === draftCoverId) ?? draftFiles.find((f) => f.ok);
-          return cover ? [cover] : [];
-        })()
+        const cover = draftFiles.find((f) => f.ok && f.id === draftCoverId) ?? draftFiles.find((f) => f.ok);
+        return cover ? [cover] : [];
+      })()
       : draftFiles;
   const draftCover = draftMedia.find((f) => f.id === draftCoverId)?.id ?? draftMedia[0]?.id ?? "";
   const [type, setType] = useState<WizardType | null>(draftType);
@@ -412,9 +412,9 @@ export default function UploadWizard({
       className="mx-auto max-w-3xl px-4 py-10 sm:px-6"
     >
       <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">发布资源</h1>
-      <p className="mt-2 rounded-none border border-brand-200 bg-brand-50/60 px-3 py-2 text-xs leading-5 text-brand-800">
+      {/* <p className="mt-2 rounded-none border border-brand-200 bg-brand-50/60 px-3 py-2 text-xs leading-5 text-brand-800">
         免审用户直接上架，其他人等审核通过。
-      </p>
+      </p> */}
 
       <input type="hidden" name="type" value={type} />
       <input type="hidden" name="mediaIds" value={JSON.stringify(ids)} />
@@ -430,11 +430,10 @@ export default function UploadWizard({
             type="button"
             onClick={() => applyType(t.k)}
             aria-pressed={type === t.k}
-            className={`inline-flex items-center gap-1.5 rounded-none border px-3 py-1.5 text-xs transition ${
-              type === t.k
-                ? "border-brand-600 bg-brand-500 text-white"
-                : "border-brand-200 bg-surface text-neutral-500 hover:border-brand-400 hover:text-neutral-800"
-            }`}
+            className={`inline-flex items-center gap-1.5 rounded-none border px-3 py-1.5 text-xs transition ${type === t.k
+              ? "border-brand-600 bg-brand-500 text-white"
+              : "border-brand-200 bg-surface text-neutral-500 hover:border-brand-400 hover:text-neutral-800"
+              }`}
           >
             <t.Icon size={13} aria-hidden />
             {t.label}
@@ -554,9 +553,9 @@ export default function UploadWizard({
           downloads={
             d
               ? downloadsOf(d).map((r) => ({
-                  name: r.name || r.url,
-                  url: r.url,
-                }))
+                name: r.name || r.url,
+                url: r.url,
+              }))
               : undefined
           }
           fieldErrors={state.fieldErrors}
