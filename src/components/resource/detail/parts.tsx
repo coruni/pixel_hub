@@ -11,6 +11,7 @@ import Comments from "@/components/social/Comments";
 import PresenceAvatar from "@/components/ui/PresenceAvatar";
 import UserHoverCard from "@/components/ui/UserHoverCard";
 import Markdown from "@/components/rte/Markdown";
+import MarkdownImages from "@/components/rte/MarkdownImages";
 import { FavoriteButton, LikeButton, FollowButton } from "@/components/social/interactions";
 import ReportButton from "@/components/social/ReportButton";
 import { VersionDownloadButton, VersionForm } from "@/components/resource/version";
@@ -339,12 +340,14 @@ export async function VersionSection({ ctx }: { ctx: DetailCtx }) {
 
 /** 长描述正文（Markdown 富文本，见 DESIGN 描述=富文本）。
  *  排版即文章正文本身：不套卡片（无边框/底色/内距），也不带小标题 —— 与 DetailArticle
- *  的正文逐字一致，四个模板共用这一处实现。 */
+ *  的正文逐字一致，四个模板共用这一处实现。
+ *  正文里的图片统一走「点击看大图」：MarkdownImages 承载排版 <section>（DOM 与改造前一致）
+ *  并在捕获阶段接管点击，交给全站 ImageViewer 打开，可在同正文多张图之间前后切换。 */
 export function DescriptionBlock({ ctx }: { ctx: DetailCtx }) {
   return (
-    <section className="md-body md-body--lg">
-      <Markdown>{ctx.detail.description}</Markdown>
-    </section>
+    <MarkdownImages className="md-body md-body--lg">
+      <Markdown zoomable>{ctx.detail.description}</Markdown>
+    </MarkdownImages>
   );
 }
 

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import ReactMarkdown, { type Components } from "react-markdown";
-import type { HTMLAttributes, ReactNode } from "react";
+import type { ComponentProps, HTMLAttributes, ReactNode } from "react";
 
 const EXTERNAL = /^https?:\/\//i;
 
@@ -60,6 +60,30 @@ function convert(node: MdNode): void {
 
 
 /**
+ * 可缩放图片（zoomable 模式下的 img 渲染器）：外面包一层 <button>，
+ * 由 <MarkdownImages> 委托点击后打开 ImageViewer。
+ *
+ * 为什么包 <button> 而不是给 <img> 挂 onClick：Tab 聚焦 + Enter/Space 与 focus-visible
+ * 直接可用，且与评论图片（同样用 button 包图）保持同一套可访问性做法；
+ * 图标/图片按钮必须带可读名称，所以把 alt 带进 aria-label。
+ */
+function ZoomableImage({ src, alt, title }: ComponentProps<"img">) {
+  if (typeof src !== "string" || !src) return null;
+  const name = alt?.trim();
+  return (
+    <button
+      type="button"
+      data-zoomable
+      aria-label={name ? `查看大图：${name}` : "查看大图"}
+      className="inline-flex max-w-full cursor-zoom-in rounded-none focus-visible:ring-2 focus-visible:ring-brand-400"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt={alt ?? ""} title={title} />
+    </button>
+  );
+}
+
+/**
  * 全站统一的 Markdown 渲染（可在服务端或客户端组件中使用；react-markdown 为纯渲染、无 hooks）。
  * 安全：react-markdown 默认不渲染原始 HTML；javascript: 等危险协议会被其默认 transform 剥离。
  *
@@ -67,8 +91,17 @@ function convert(node: MdNode): void {
  * - 站内绝对路径(/…)链接 → next/link，走客户端导航
  * - http(s) 外链 → 新窗口 + rel=noopener noreferrer
  * - 其余(锚点/#hash、mailto:)维持默认同页打开
+ *
+ * zoomable：正文图片变为「点击查看大图」入口（需外层套 <MarkdownImages> 才生效，
+ * 二者是一对——单独的图片按钮点了没反应，所以默认关闭，只由需要查看器的正文开启）。
  */
-export default function Markdown({ children }: { children: string }) {
+export default function Markdown({
+  children,
+  zoomable = false,
+}: {
+  children: string;
+  zoomable?: boolean;
+}) {
   let headingIndex = 0;
   const nextHeadingIndex = () => headingIndex++;
   const components: Components = {
@@ -91,6 +124,7 @@ export default function Markdown({ children }: { children: string }) {
       }
       return <a href={href}>{children}</a>;
     },
+    ...(zoomable ? { img: ZoomableImage } : {}),
   };
 
   return (
