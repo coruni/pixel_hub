@@ -265,7 +265,20 @@ export function MetaDownloadButton({
           await incrementDownloadAction(resourceId);
           if (showCount) setN((x) => x + 1);
           bump?.();
-          window.open(dlHref, "_blank", "noopener");
+          // file：经本站 /api/dl 代理，服务端已设 Content-Disposition: attachment。
+          // 用隐藏锚点 .click() 在当前上下文触发下载 —— 浏览器按 attachment 直接存盘，
+          // 不新开标签页，也避免媒体被新标签页内联播放（原 window.open(...,"_blank") 的副作用）。
+          // link：作者外链，保留新标签页打开。
+          if (kind === "link") {
+            window.open(dlHref, "_blank", "noopener");
+            return;
+          }
+          const a = document.createElement("a");
+          a.href = dlHref;
+          a.rel = "noopener";
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
         })
       }
       className={lookCls}

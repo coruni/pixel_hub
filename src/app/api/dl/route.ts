@@ -121,7 +121,7 @@ export async function GET(req: NextRequest) {
   type Target =
     | { kind: "local"; sub: string; rel: string }
     | { kind: "redirect"; url: string }
-    | { kind: "external"; url: string };
+    | { kind: "external"; url: string; s3?: boolean };
   let target: Target | null = null;
 
   try {
@@ -148,7 +148,7 @@ export async function GET(req: NextRequest) {
       if (GRAPH_HOSTS.some((h) => host === h || host.endsWith("." + h))) {
         target = { kind: "redirect", url: parsed.toString() };
       } else if (hosts.s3.includes(host) || hosts.chevereto === host) {
-        target = { kind: "external", url: parsed.toString() };
+        target = { kind: "external", url: parsed.toString(), s3: hosts.s3.includes(host) };
       }
     }
   } catch {
@@ -187,20 +187,35 @@ export async function GET(req: NextRequest) {
         },
       });
     }
-    // 外链（S3 / chevereto）：流式转发并强制原始文件名（不落本地、不缓冲整文件）
-    const upstream = await fetch(target.url, { redirect: "follow" });
-    if (!upstream.ok || !upstream.body) return new Response("upstream error", { status: 502 });
-    const fallback = decodeURIComponent(new URL(target.url).pathname.split("/").pop() ?? "file");
-    return new Response(upstream.body, {
-      headers: {
-        "Content-Disposition": cdHeader(name, fallback),
-        "Content-Type": upstream.headers.get("content-type") ?? "application/octet-stream",
-        ...(upstream.headers.get("content-length")
-          ? { "Content-Length": upstream.headers.get("content-length") as string }
-          : {}),
-        "Cache-Control": "private, max-age=300",
-      },
-    });
+    // 外链分支（S3 / chevereto）。
+    if (target.kind === "external") {
+      // S3：直接 302 到对象 URL —— 浏览器直连对象存储下载，服务端不再转发字节（省掉双倍带宽）。
+      // 借 S3 原生 `response-content-disposition` 查询参数保留原始文件名，浏览器按 attachment 直下。
+      // （SSRF 防护不变：target.url 只可能来自上方白名单校验过的 S3 / chevereto 主机）
+      if (target.s3 && name) {
+        const sep = target.url.includes("?") ? "&" : "?";
+        const disp = `attachment; filename*=UTF-8''${encodeURIComponent(name)}`;
+        const loc = `${target.url}${sep}response-content-disposition=${encodeURIComponent(disp)}`;
+        return new Response(null, {
+          status: 302,
+          headers: { Location: loc, "Cache-Control": "private, no-store" },
+        });
+      }
+      // 其余外链（chevereto 等不支持响应头覆盖参数）：保留服务端流式转发 + 原始文件名
+      const upstream = await fetch(target.url, { redirect: "follow" });
+      if (!upstream.ok || !upstream.body) return new Response("upstream error", { status: 502 });
+      const fallback = decodeURIComponent(new URL(target.url).pathname.split("/").pop() ?? "file");
+      return new Response(upstream.body, {
+        headers: {
+          "Content-Disposition": cdHeader(name, fallback),
+          "Content-Type": upstream.headers.get("content-type") ?? "application/octet-stream",
+          ...(upstream.headers.get("content-length")
+            ? { "Content-Length": upstream.headers.get("content-length") as string }
+            : {}),
+          "Cache-Control": "private, max-age=300",
+        },
+      });
+    }
   } catch (e) {
     console.error("[dl]", e);
     return new Response("download failed", { status: 500 });
