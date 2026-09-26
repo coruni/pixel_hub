@@ -861,9 +861,15 @@ summary {
 
    左右各一条可见带，**贴屏幕边缘最清晰，向屏幕中间淡出到 0**。
    带子的淡出终点取 24%（视口 1920 时 max-w-7xl 的边落在 16.7%），也就是向内容区里多探约 100px
-   —— 淡出发生在正文旁边而不是硬停在容器边上，两边像素对称。 */
+   —— 淡出发生在正文旁边而不是硬停在容器边上，两边像素对称。
+
+   形状自 2026-09 起可在后台改（激励配置 → 装饰 → 主页背景遮罩，存 incentive.decoration.bgMask）。
+   本文件保留的这份是**默认值与兜底**：渲染点没挂内联变量时用它。 */
 .profile-bg-pc {
-  -webkit-mask-image: linear-gradient(
+  /* 遮罩默认值。具体值可由后台配置（incentive.decoration.bgMask）覆盖 —— 渲染点会在同一个元素上
+     写内联的 --profile-bg-mask，内联自定义属性优先级高于本声明，所以选择器不用动。
+     这段必须与 points-config.ts 的 PROFILE_BG_MASK_DEFAULT 一致。 */
+  --profile-bg-mask: linear-gradient(
     to right,
     rgba(0, 0, 0, 1) 0%,
     rgba(0, 0, 0, 1) 6%,
@@ -874,16 +880,7 @@ summary {
     rgba(0, 0, 0, 1) 94%,
     rgba(0, 0, 0, 1) 100%
   );
-  mask-image: linear-gradient(
-    to right,
-    rgba(0, 0, 0, 1) 0%,
-    rgba(0, 0, 0, 1) 6%,
-    rgba(0, 0, 0, 0.55) 14%,
-    rgba(0, 0, 0, 0) 24%,
-    rgba(0, 0, 0, 0) 76%,
-    rgba(0, 0, 0, 0.55) 86%,
-    rgba(0, 0, 0, 1) 94%,
-    rgba(0, 0, 0, 1) 100%
-  );
+  -webkit-mask-image: var(--profile-bg-mask);
+  mask-image: var(--profile-bg-mask);
 }
 

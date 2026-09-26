@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { CSSProperties } from "react";
 import { useActionState, useRef, useState } from "react";
 import { Lock, Trash2, Upload } from "lucide-react";
 import {
@@ -16,8 +17,11 @@ import { Button } from "@/components/ui/Button";
 // 个人主页背景：单个上传槽（仅桌面端展示）。
 //
 // 刻意**不做裁剪**：底图是 cover 铺满，被裁掉的部分恰好落在遮罩留白的中间区，裁剪器只会让用户
-// 困惑。改为把前台的遮罩类（.profile-bg-pc）直接套在预览上 —— 所见即所得，两边共用 globals.css
-// 里那一份渐变，不在这里复刻。
+// 困惑。改为把前台的遮罩类（.profile-bg-pc）直接套在预览上 —— 所见即所得。
+//
+// 遮罩值由服务端按后台配置算好传进来（incentive.decoration.bgMask，已过 safeBgMask 校验），
+// 这里挂成内联的 --profile-bg-mask —— 类本身读取该变量，前台两个渲染点也是同一套写法，
+// 所以预览与真实主页看到的形状必然一致，不需要在客户端复刻任何渐变。
 //
 // 遮罩百分比是相对元素自身的，所以小尺寸预览与真实视口的带子比例一致，可以当准样板看。
 
@@ -30,6 +34,7 @@ export default function ProfileBgForm({
   pcKey,
   onResource,
   maxMb,
+  bgMask,
 }: {
   /** 是否已达解锁等级（服务端用 profileBgUnlocked 算好；这里只管显示） */
   unlocked: boolean;
@@ -42,6 +47,8 @@ export default function ProfileBgForm({
   /** 是否把这张背景一并铺到本人发布的资源详情页（默认铺） */
   onResource: boolean;
   maxMb: number;
+  /** 主页背景的遮罩值（已校验；与前台两个渲染点同一份配置） */
+  bgMask: string;
 }) {
   const [state, formAction, pending] = useActionState<SettingsActionState, FormData>(
     uploadProfileBgAction,
@@ -98,7 +105,12 @@ export default function ProfileBgForm({
           <div className="aspect-[16/9] w-full overflow-hidden rounded-none border border-brand-200 bg-brand-50">
             <div
               className="profile-bg-pc h-full w-full bg-cover bg-center bg-no-repeat"
-              style={shown ? { backgroundImage: `url(${shown})` } : undefined}
+              style={
+                {
+                  backgroundImage: shown ? `url(${shown})` : undefined,
+                  "--profile-bg-mask": bgMask,
+                } as CSSProperties
+              }
             >
               {!shown && (
                 <div className="grid h-full place-items-center text-xs text-neutral-400">暂无</div>

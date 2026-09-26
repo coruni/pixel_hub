@@ -32,8 +32,11 @@ import {
   LEVEL_BADGE_CLASSES,
   POINT_REASONS,
   PERMILLE_BASE,
+  PROFILE_BG_MASK_DEFAULT,
+  PROFILE_BG_MASK_MAX,
   pointReasonLabel,
   permilleText,
+  safeBgMask,
   type IncentiveConfig,
   type IncentiveLevel,
 } from "@/lib/points-config";
@@ -50,6 +53,7 @@ import {
   SegmentedRow,
   SelectRow,
   SwitchRow,
+  TextAreaRow,
   TextRow,
   ToggleRow,
 } from "./incentive-parts";
@@ -166,6 +170,12 @@ export default function IncentiveManager({
   const rate = numOf("settlement.ratePermille");
   const buffer = numOf("solvency.bufferPermille");
   const forCosts = Math.max(0, PERMILLE_BASE - rate - buffer);
+
+  // 遮罩是自由文本，填成非渐变时前台会**静默**退回内置遮罩（不报错、不影响其他配置）。
+  // 静默是刻意的（配置坏掉不能让全站 500），但代价是「保存了却没生效」很难自己发现 ——
+  // 所以在这里当场用前台同一个 safeBgMask() 判一次，把结果直接摆在输入框下面。
+  const bgMaskDraft = String(g("decoration").bgMask ?? "");
+  const bgMaskUsable = safeBgMask(bgMaskDraft) === bgMaskDraft.trim();
 
   return (
     <div className="space-y-5">
@@ -324,7 +334,7 @@ export default function IncentiveManager({
         <Section
           icon={Palette}
           title="装饰"
-          desc="昵称特效色的总开关。清单（有哪些色）与每款的解锁等级写在 src/lib/decorations.ts，不在这里配置——昵称色值必须是 Tailwind 字面量类名，后台无法新增，做成配置只会得到「配置里有、源码里没有」的假选项。装饰只按等级门槛开放，不消耗贡献分。"
+          desc="昵称特效色总开关，以及主页背景的遮罩形状。昵称色的清单（有哪些色）与每款的解锁等级写在 src/lib/decorations.ts，不在这里配置——色值必须是 Tailwind 字面量类名，后台无法新增，做成配置只会得到「配置里有、源码里没有」的假选项。装饰只按等级门槛开放，不消耗贡献分。"
           className="lg:col-span-2"
         >
           <SwitchRow
@@ -333,6 +343,61 @@ export default function IncentiveManager({
             hint="关闭后：用户不能再设置昵称颜色，存量配色也立即停止渲染。"
             checked={Boolean(g("decoration").nicknameEnabled)}
             onChange={(v) => setGroup("decoration", { nicknameEnabled: v })}
+          />
+          <TextAreaRow
+            id="inc-deco-bgmask"
+            label="主页背景遮罩"
+            range={`≤${PROFILE_BG_MASK_MAX} 字符`}
+            rows={3}
+            maxLength={PROFILE_BG_MASK_MAX}
+            value={bgMaskDraft}
+            onChange={(v) => setGroup("decoration", { bgMask: v })}
+            hint={
+              <>
+                <p>
+                  填 CSS 的 mask-image 值（只填一条即可，-webkit- 前缀由样式表负责）。
+                  背景层铺满整个视口、压在正文之下，这条遮罩决定「哪几块看得见」：
+                  个人主页与资源详情页的作者背景<b className="font-medium text-neutral-600">共用这一个值</b>
+                  ，改一处两处都变。
+                </p>
+                <p className="mt-1.5">
+                  <b className="font-medium text-neutral-600">中间那段必须完全透明</b>
+                  （rgba(0, 0, 0, 0)），否则背景会透到正文卡片底下。
+                  默认值是「左右两条可见带、贴屏幕边缘最清晰、向中间淡出到 0」，
+                  也就是此前写死在 globals.css 的 .profile-bg-pc 里的那条渐变。
+                </p>
+                <p className="mt-1.5">
+                  只放行 linear-gradient / radial-gradient / conic-gradient（可加 repeating- 前缀）。
+                  url()、var() 一律不接受 —— 前者能发起外部请求，后者是注入面，而遮罩是纯装饰，
+                  不需要这些能力。填了不合格的值不会报错，只是前台退回默认遮罩（下方会当场提示）。
+                </p>
+                <p className="mt-1.5">
+                  百分比是相对元素自身宽度的，所以带子会随窗口宽度按比例缩放。
+                  视口 1920 时 max-w-7xl 的边落在 16.7%，默认的淡出终点 24% 意味着向内容区里多探约 100px。
+                </p>
+              </>
+            }
+            footer={
+              bgMaskUsable ? (
+                <p className="mt-1.5 text-[11px] leading-4 text-neutral-400">
+                  {bgMaskDraft.trim() === PROFILE_BG_MASK_DEFAULT
+                    ? "当前为内置默认值。"
+                    : "值可用，保存后立即生效。"}
+                </p>
+              ) : (
+                <p className="mt-1.5 border border-amber-300 bg-amber-50/70 px-3 py-2 text-[11px] leading-4 text-amber-700">
+                  当前值不会被采用，实际生效的是内置遮罩：需要一条以 linear-gradient( / radial-gradient( /
+                  conic-gradient( 开头、以 ) 结尾的值，且只含字母、数字、空格与 . , % ( ) # _ - 这些字符。
+                  <button
+                    type="button"
+                    onClick={() => setGroup("decoration", { bgMask: PROFILE_BG_MASK_DEFAULT })}
+                    className="ml-1 underline decoration-dotted underline-offset-2 transition hover:text-amber-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                  >
+                    填入默认值
+                  </button>
+                </p>
+              )
+            }
           />
         </Section>
 

@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { auth } from "@/lib/auth";
@@ -7,7 +8,7 @@ import { parseMeta } from "@/lib/meta";
 import { getTheme, detailTemplateFor } from "@/lib/site";
 import { getIncentive } from "@/lib/incentive";
 import { getPointBalance } from "@/lib/points";
-import { levelOf } from "@/lib/points-config";
+import { levelOf, safeBgMask } from "@/lib/points-config";
 import { publicUrl } from "@/lib/storage/url";
 import { profileBgUnlocked } from "@/lib/upload-config";
 import { renderSiteSidebar, WidgetArea, type DetailWidgetCtx } from "@/components/sidebar/SiteSidebar";
@@ -148,6 +149,9 @@ export default async function ResourcePage({ params }: PageProps) {
     );
     if (unlocked) bgUrl = publicUrl(detail.author.profileBgPcKey);
   }
+  // 遮罩形状与个人主页**共用同一个后台配置**（incentive.decoration.bgMask）—— 同一张图铺在两个页面，
+  // 形状必须一致，否则作者在设置页预览到的和他资源页看到的是两回事。填坏只退回内置遮罩。
+  const bgMask = safeBgMask(incentive.decoration.bgMask);
 
   // 相关推荐只对已发布内容计算（草稿/待审不需要）
   const related =
@@ -234,7 +238,7 @@ export default async function ResourcePage({ params }: PageProps) {
         <div
           aria-hidden
           className="profile-bg-pc pointer-events-none fixed inset-0 -z-10 hidden bg-cover bg-center bg-no-repeat sm:block"
-          style={{ backgroundImage: `url(${bgUrl})` }}
+          style={{ backgroundImage: `url(${bgUrl})`, "--profile-bg-mask": bgMask } as CSSProperties}
         />
       )}
       {detailLd && (

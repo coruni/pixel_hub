@@ -27,6 +27,7 @@ import { getIncentive } from "@/lib/incentive";
 import { getContributionSummary } from "@/lib/points";
 import { profileBgUnlocked } from "@/lib/upload-config";
 import { NAME_COLORS, decorationUnlocked } from "@/lib/decorations";
+import { safeBgMask } from "@/lib/points-config";
 import { Button } from "@/components/ui/Button";
 
 export const metadata: Metadata = { title: "账户设置", robots: { index: false } };
@@ -179,6 +180,7 @@ export default async function SettingsPage({
                 pcKey={prefs?.profileBgPcKey ?? null}
                 onResource={prefs?.profileBgOnResource ?? true}
                 maxMb={limits.profileBgMaxMb}
+                bgMask={safeBgMask(incentive.decoration.bgMask)}
               />
             </div>
           </section>
@@ -353,8 +355,8 @@ export default async function SettingsPage({
       {bindMsg && (
         <p
           className={`mb-4 rounded-none border px-3 py-2 text-xs ${bind === "ok"
-              ? "border-brand-600 bg-brand-50 text-neutral-800"
-              : "border-red-300 bg-red-50 text-red-600"
+            ? "border-brand-600 bg-brand-50 text-neutral-800"
+            : "border-red-300 bg-red-50 text-red-600"
             }`}
         >
           {bindMsg}
@@ -376,6 +378,9 @@ export default async function SettingsPage({
       {/* 头像：独立在 tab 之外常驻，tab 只切换资料/通知/安全等板块 */}
       <section className={`${sectionCls} mt-6`}>
         <h2 className={sectionTitle}>头像</h2>
+        <p className={sectionHint}>
+          用户头像设置
+        </p>
         <AvatarForm
           name={profile?.name ?? null}
           username={me.username}

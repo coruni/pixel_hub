@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
@@ -6,7 +7,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { getIncentive } from "@/lib/incentive";
 import { getPointBalance } from "@/lib/points";
-import { levelNameOf, levelOf, tipFormOf } from "@/lib/points-config";
+import { levelNameOf, levelOf, safeBgMask, tipFormOf } from "@/lib/points-config";
 import LevelBadge from "@/components/ui/LevelBadge";
 import {
   getFeed,
@@ -152,6 +153,9 @@ export default async function UserPage({
   const bgPcKey = bgUnlocked ? profile.profileBgPcKey : null;
 
   const bgUrl = bgPcKey ? publicUrl(bgPcKey) : null;
+  // 遮罩形状由后台配置（incentive.decoration.bgMask）。渲染前过一道形状校验：填坏只退回内置遮罩，
+  // 不会让整份激励配置失效；默认值就是此前硬编码在 .profile-bg-pc 里的那条渐变。
+  const bgMask = safeBgMask(incentive.decoration.bgMask);
 
   // 头部操作区。编辑 / 打赏紧跟昵称末尾，作为纯图标随昵称行自然换行；
   // 关注按钮独立放在资料区最右侧，不参与昵称长度计算。
@@ -355,7 +359,7 @@ export default async function UserPage({
         <div
           aria-hidden
           className="profile-bg-pc pointer-events-none fixed inset-0 -z-10 hidden bg-cover bg-center bg-no-repeat sm:block"
-          style={{ backgroundImage: `url(${bgUrl})` }}
+          style={{ backgroundImage: `url(${bgUrl})`, "--profile-bg-mask": bgMask } as CSSProperties}
         />
       )}
       {/* 头部：可选 hero 横幅图。移动端背景向下延伸覆盖到统计行底部，整张图用 mask 渐变：
