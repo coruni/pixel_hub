@@ -97,8 +97,8 @@ export default async function SettingsPage({
   const githubEnabled = Boolean(githubClientId(runtimeCfg) && githubClientSecret(runtimeCfg));
   const joined = profile
     ? new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "long", day: "numeric" }).format(
-        profile.createdAt,
-      )
+      profile.createdAt,
+    )
     : null;
 
   const info: { k: string; v: string }[] = [
@@ -117,12 +117,11 @@ export default async function SettingsPage({
         <>
           <section className={sectionCls}>
             <h2 className={sectionTitle}>主页横幅</h2>
-            <div className="mt-4">
-              <HeroForm
-                heroImageKey={profile?.heroImageKey ?? null}
-                heroMaxMb={limits.heroImageMaxMb}
-              />
-            </div>
+            <p className={sectionHint}>主页横幅不建议和主页被背景一起使用</p>
+            <HeroForm
+              heroImageKey={profile?.heroImageKey ?? null}
+              heroMaxMb={limits.heroImageMaxMb}
+            />
           </section>
 
           <section className={sectionCls}>
@@ -315,11 +314,10 @@ export default async function SettingsPage({
     <div className="mx-auto max-w-xl px-4 py-10 sm:px-6">
       {bindMsg && (
         <p
-          className={`mb-4 rounded-none border px-3 py-2 text-xs ${
-            bind === "ok"
+          className={`mb-4 rounded-none border px-3 py-2 text-xs ${bind === "ok"
               ? "border-brand-600 bg-brand-50 text-neutral-800"
               : "border-red-300 bg-red-50 text-red-600"
-          }`}
+            }`}
         >
           {bindMsg}
         </p>
