@@ -16,6 +16,9 @@ export type CommentImage = { url: string; width: number | null; height: number |
  */
 export const ROOT_PAGE_SIZE = 10;
 export const REPLIES_PAGE_SIZE = 5;
+/** 评论与子评论回复的 Markdown 源码长度上限，与 social.ts 的 schema 同口径。 */
+export const COMMENT_MAX = 2000;
+export const COMMENT_WARN_AT = 200;
 
 /** 分页状态：page 从 1 开始，total 是该层总数，hasMore 表示后面还有页 */
 export type PagingMeta = {

@@ -11,10 +11,12 @@ import MdEditor from "@/components/rte/MdEditor";
 import { useFileDrop } from "@/lib/hooks/use-file-drop";
 import { useFilePaste } from "@/lib/hooks/use-file-paste";
 import { confirmDialog, toast } from "@/components/ui/feedback";
-import CommentItem, { commentInputCls, type ReplyState } from "./comment-item";
+import CommentItem, { type ReplyState } from "./comment-item";
 import { CommentsPager } from "./CommentPager";
 import { flashComment, useCommentPolling } from "./use-comment-polling";
 import {
+  COMMENT_MAX,
+  COMMENT_WARN_AT,
   totalPagesOf,
   type CommentImage,
   type CommentShape,
@@ -23,11 +25,6 @@ import {
 import { Button } from "@/components/ui/Button";
 
 export type { CommentAuthor, CommentImage, CommentShape } from "./comment-types";
-
-/** 评论正文长度上限，与 social.ts 的 commentSchema.max(2000) 同口径（按 Markdown 源码字符数） */
-const COMMENT_MAX = 2000;
-/** 剩余多少字开始提示 */
-const COMMENT_WARN_AT = 200;
 
 /** 评论编辑器：关掉图片块（不提供上传入口）、表格、工具栏与块操作柄，只保留基础 Markdown 语法。
  *  ImageBlock 关闭后斜杠菜单的 Image 项自动消失；BlockEdit 关闭会连同 / 斜杠菜单一起去掉
@@ -260,6 +257,17 @@ export default function Comments({
     }
   }
 
+  // 子评论回复也使用同一套 Markdown 编辑器与快捷提交规则。
+  function onReplyComposerKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+      e.preventDefault();
+      const parentId = reply.target?.parent ?? reply.openFor;
+      if (parentId && !sending && reply.text.trim() && reply.text.length <= COMMENT_MAX) {
+        void post(parentId, reply.text);
+      }
+    }
+  }
+
   async function remove(commentId: string) {
     // 删的是根楼层时提醒回复的去向：回复不会一起消失，会上移成独立评论
     // （口径见 comments-paging 的 rootFloorWhere）。这里取该根的总回复数，不是当前页的条数。
@@ -440,10 +448,10 @@ export default function Comments({
             reply={reply}
             sending={sending}
             deletingId={deletingId}
-            inputCls={commentInputCls}
             repliesPending={repliesPendingId === c.id}
             onReplyChange={setReply}
             onPost={post}
+            onReplyComposerKeyDown={onReplyComposerKeyDown}
             onDelete={remove}
             onNavigate={navigateToComment}
             onRepliesPage={goRepliesPage}

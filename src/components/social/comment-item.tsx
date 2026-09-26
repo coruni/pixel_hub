@@ -5,17 +5,26 @@ import { timeAgo } from "@/lib/format";
 import PresenceAvatar from "@/components/ui/PresenceAvatar";
 import UserHoverCard from "@/components/ui/UserHoverCard";
 import CommentHoverCard from "./CommentHoverCard";
-import type { CommentImage, CommentReply, CommentShape } from "./comment-types";
-import { totalPagesOf } from "./comment-types";
+import {
+  COMMENT_MAX,
+  COMMENT_WARN_AT,
+  totalPagesOf,
+  type CommentImage,
+  type CommentReply,
+  type CommentShape,
+} from "./comment-types";
 import { RepliesPager } from "./CommentPager";
 import { Button } from "@/components/ui/Button";
 import Markdown from "@/components/rte/Markdown";
+import MdEditor from "@/components/rte/MdEditor";
+import { CrepeFeature } from "@milkdown/crepe";
 
 /** 单个根楼层 + 楼中楼回复列表。回复框状态由 Comments 统一持有（同屏只开一个）。 */
-
-/** 楼中楼回复框仍是单行 input（不支持 Markdown），沿用原样式 */
-export const commentInputCls =
-  "w-full rounded-none border border-brand-200 bg-surface px-3.5 py-2.5 text-sm outline-none transition focus:border-brand-500";
+const COMMENT_FEATURES: Partial<Record<CrepeFeature, boolean>> = {
+  [CrepeFeature.ImageBlock]: false,
+  [CrepeFeature.Table]: false,
+  [CrepeFeature.BlockEdit]: false,
+};
 
 /** 评论正文排版：编辑器的 15px 是文章级字号，评论用 14px 更贴合列表节奏 */
 const COMMENT_MD_CLS = "md-body text-sm leading-6 text-neutral-700";
@@ -76,10 +85,10 @@ export default function CommentItem({
   reply,
   sending,
   deletingId,
-  inputCls,
   repliesPending,
   onReplyChange,
   onPost,
+  onReplyComposerKeyDown,
   onDelete,
   onNavigate,
   onRepliesPage,
@@ -93,11 +102,11 @@ export default function CommentItem({
   sending: boolean;
   /** 全树共用一个「正在删除」id：该条（含其回复）的删除按钮禁用并改文案，避免确认后重复点击 */
   deletingId?: string | null;
-  inputCls: string;
   /** 该根楼层正在切换回复页 */
   repliesPending: boolean;
   onReplyChange: (next: ReplyState) => void;
   onPost: (parentId: string | null, text: string) => void;
+  onReplyComposerKeyDown: (e: React.KeyboardEvent<HTMLDivElement>) => void;
   onDelete: (commentId: string) => Promise<void>;
   onNavigate: (commentId: string, fallbackRootId: string) => void;
   onRepliesPage: (rootId: string, page: number) => void;
@@ -167,31 +176,48 @@ export default function CommentItem({
       )}
 
       {replyOpen && (
-        <div className="mt-2 flex gap-2 pl-10">
-          <input
-            value={reply.text}
-            onChange={(e) => onReplyChange({ ...reply, text: e.target.value })}
-            placeholder={reply.target ? `回复 @${reply.target.to}…` : "写下回复…"}
-            className={`${inputCls} flex-1`}
-            aria-label={reply.target ? `回复 @${reply.target.to}` : "写下回复"}
-          />
-          <Button
-            type="button"
-            disabled={sending || !reply.text.trim()}
-            onClick={() => onPost(reply.target ? reply.target.parent : c.id, reply.text)}
-            variant="primary"
-          >
-            {reply.target ? `回复 @${reply.target.to}` : "回复"}
-          </Button>
-          {reply.target && (
-            <Button
-              type="button"
-              onClick={() => onReplyChange({ ...reply, target: null })}
-              variant="filter"
-            >
-              取消定向
-            </Button>
-          )}
+        <div className="mt-2 pl-10">
+          <div onKeyDown={onReplyComposerKeyDown}>
+            <MdEditor
+              key={`${c.id}:${reply.target?.parent ?? "root"}`}
+              defaultValue=""
+              onChange={(text) => onReplyChange({ ...reply, text })}
+              minHeight="5rem"
+              ariaLabel={reply.target ? `回复 @${reply.target.to}` : "写下回复"}
+              placeholder={reply.target ? `回复 @${reply.target.to}… 支持 Markdown` : "写下回复… 支持 Markdown"}
+              features={COMMENT_FEATURES}
+              toolbar={false}
+              compact
+            />
+            {reply.text.length > COMMENT_MAX - COMMENT_WARN_AT && (
+              <p
+                className={`mt-1 text-right text-xs ${
+                  reply.text.length > COMMENT_MAX ? "text-red-500" : "text-amber-600"
+                }`}
+              >
+                {reply.text.length}/{COMMENT_MAX}
+              </p>
+            )}
+            <div className="mt-2 flex flex-wrap justify-end gap-2">
+              <Button
+                type="button"
+                disabled={sending || !reply.text.trim() || reply.text.length > COMMENT_MAX}
+                onClick={() => onPost(reply.target ? reply.target.parent : c.id, reply.text)}
+                variant="primary"
+              >
+                {reply.target ? `回复 @${reply.target.to}` : "回复"}
+              </Button>
+              {reply.target && (
+                <Button
+                  type="button"
+                  onClick={() => onReplyChange({ ...reply, text: "", target: null })}
+                  variant="filter"
+                >
+                  取消定向
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -206,7 +232,7 @@ export default function CommentItem({
               canDel={viewerId === rp.authorId || !!isStaff}
               deleting={deletingId === rp.id}
               onReplyTo={(parent, to) =>
-                onReplyChange({ openFor: c.id, text: reply.text, target: { parent, to } })
+                onReplyChange({ openFor: c.id, text: "", target: { parent, to } })
               }
               onDelete={onDelete}
               onNavigate={onNavigate}

@@ -3,7 +3,9 @@ import { Search } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { getCategories } from "@/lib/queries";
 import { str, type SP } from "@/lib/search-params";
+import { getSeoConfig, resolveSiteName } from "@/lib/seo-config";
 import FeedBrowser from "@/components/feed/FeedBrowser";
+import BrowseTitleSync from "@/components/feed/BrowseTitleSync";
 import ArchiveShell from "@/components/feed/ArchiveShell";
 import { Button } from "@/components/ui/Button";
 
@@ -54,12 +56,17 @@ export async function generateMetadata({
 
 export default async function BrowsePage({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = await searchParams;
-  const u = (await auth())?.user;
+  const [session, seo] = await Promise.all([auth(), getSeoConfig()]);
+  const u = session?.user;
   const q = str(sp, "q")?.trim() ?? "";
   const cat = await resolveCat(sp);
+  const pageTitle = q ? "搜索" : cat ? `${cat.name} · 浏览` : "浏览";
+  const fullTitle = `${pageTitle} · ${resolveSiteName(seo)}`;
   return (
-    <ArchiveShell
-      heading={
+    <>
+      <BrowseTitleSync title={fullTitle} />
+      <ArchiveShell
+        heading={
         q ? (
           <div className="mx-auto max-w-7xl px-4 pt-8 sm:px-6">
             {/* 搜索态页面 noindex，且可见标题已由搜索框与结果行承担：这里只补一个语义 h1 */}
@@ -93,9 +100,10 @@ export default async function BrowsePage({ searchParams }: { searchParams: Promi
             </h1>
           </div>
         )
-      }
-    >
-      <FeedBrowser base="/browse" searchParams={sp} authed={!!u} userId={u?.id} infinite />
-    </ArchiveShell>
+        }
+      >
+        <FeedBrowser base="/browse" searchParams={sp} authed={!!u} userId={u?.id} infinite />
+      </ArchiveShell>
+    </>
   );
 }
