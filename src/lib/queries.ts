@@ -102,6 +102,12 @@ export type FeedParams = {
    * 调用方若来自客户端，必须先过 parseFeedCursor 校验。
    */
   cursor?: FeedCursor;
+  /**
+   * 是否连带取 `tags` 关联。默认 false —— 卡片不渲染标签，只有服务端打分逻辑
+   * （getRelated / getRecommendations）需要它。多带这个关联会让每条资源多 join 一次
+   * 多对多表，实测占首页查询耗时的三成以上，见 feedTagsSelect 的注释。
+   */
+  withTags?: boolean;
   /** D9：显式覆盖 NSFW 可见性；缺省按当前登录态（登录可见全站，游客只见 SFW） */
   includeNsfw?: boolean;
 };
@@ -141,7 +147,11 @@ type FeedRow = {
   loginRequired: boolean;
   nsfw: boolean;
   category: { slug: string; name: string } | null;
-  tags: { tag: { slug: string; name: string } }[];
+  /**
+   * 可选：只有 `withTags: true` 的调用才取这个关联（见 feedTagsSelect）。
+   * 卡片路径不带 → toFeedItem 落到空数组。
+   */
+  tags?: { tag: { slug: string; name: string } }[];
   author: { username: string; name: string | null; nameColor: string | null };
   coverMedia: {
     thumbKey: string | null;
@@ -172,6 +182,18 @@ const feedSelect = {
   coverMedia: { select: coverSelect },
   author: { select: { username: true, name: true, nameColor: true } },
   category: { select: { slug: true, name: true } },
+} satisfies Prisma.ResourceSelect;
+
+/**
+ * `tags` 关联**不放进 feedSelect**，只在真正需要时按需拼上。
+ *
+ * 为什么：卡片（ResourceCard / ResourceRow）从头到尾不渲染标签，`FeedCard.tags` 唯一的
+ * 消费方是服务端的打分逻辑（getRelated 的 relatedScore、getRecommendations 的
+ * scoreCandidates / itemSim）。而多带一个 `tags` 关联意味着每条资源都要 join 一次多对多表，
+ * 实测在首页页大小（32 条）上占整条查询耗时的 30%，在推荐候选池（250×2 条）上占 45% ——
+ * 全是白烧的。默认不带，需要打分的调用点显式传 `withTags: true`。
+ */
+const feedTagsSelect = {
   tags: { select: { tag: { select: { slug: true, name: true } } } },
 } satisfies Prisma.ResourceSelect;
 
@@ -192,6 +214,7 @@ function toFeedItem(r: FeedRow): FeedItem {
     loginRequired: r.loginRequired,
     nsfw: r.nsfw,
     category: r.category ? { slug: r.category.slug, name: r.category.name } : null,
+    // 未取 tags 时（绝大多数调用）这里是空数组；只有 withTags 路径会带上真实标签
     tags: r.tags?.map((t) => ({ slug: t.tag.slug, name: t.tag.name })) ?? [],
     author: {
       username: r.author.username,
@@ -230,6 +253,8 @@ export async function getFeed(
   // D9：游客（含搜索引擎）只见 SFW；登录后全站可见
   const allowNsfw = params.includeNsfw ?? (await viewerAuthed());
   const pageSize = Math.max(1, Math.min(48, params.pageSize ?? 24));
+  // tags 关联按需开启（默认不带）：只有打分路径需要，卡片路径白烧 join，见 feedTagsSelect
+  const select = params.withTags ? { ...feedSelect, ...feedTagsSelect } : feedSelect;
 
   const where: Prisma.ResourceWhereInput = {
     status: params.includeStatuses ? { in: params.includeStatuses } : "PUBLISHED",
@@ -302,7 +327,7 @@ export async function getFeed(
     if (pageIds.length === 0) return { items: [], page, hasMore: false, nextCursor: null };
     const fetched = await prisma.resource.findMany({
       where: { id: { in: pageIds } },
-      select: feedSelect,
+      select,
     });
     const byId = new Map(fetched.map((r) => [r.id, r]));
     const rows = pageIds
@@ -340,7 +365,7 @@ export async function getFeed(
     take: pageSize + 1,
     // 游标模式不带 skip：窗口由 where 里的 keyset 条件决定
     ...(params.cursor ? {} : { skip: (page - 1) * pageSize }),
-    select: feedSelect,
+    select,
   });
   const hasMore = rows.length > pageSize;
   const pageRows = hasMore ? rows.slice(0, pageSize) : rows;
@@ -599,6 +624,7 @@ export async function getRelated(resource: RelatedSeed): Promise<FeedCard[]> {
         categorySlug: resource.category.slug,
         sort: "popular",
         pageSize: LIMIT * 2,
+        withTags: true, // relatedScore 要按共享标签打分
       }),
     );
   }
@@ -608,11 +634,16 @@ export async function getRelated(resource: RelatedSeed): Promise<FeedCard[]> {
         tagSlugs: resource.tags.map((t) => t.slug),
         sort: "popular",
         pageSize: LIMIT * 2,
+        withTags: true, // relatedScore 要按共享标签打分
       }),
     );
   }
   // 同类型热门池兜底（分类/标签池不足时补足多样性）；三个候选池并行取数，仍按原顺序合并。
-  poolRequests.push(getFeed({ type: resource.type, sort: "popular", pageSize: LIMIT * 2 }));
+  // 这个池同样要进 relatedScore，所以也得带 tags —— 漏掉它会让兜底池的共享标签权重恒为 0，
+  // 打分悄悄偏向其它两个池，是那种「不报错但排序变了」的隐性 bug。
+  poolRequests.push(
+    getFeed({ type: resource.type, sort: "popular", pageSize: LIMIT * 2, withTags: true }),
+  );
   const pools = await Promise.all(poolRequests);
   for (const { items } of pools) push(items);
 

@@ -90,7 +90,11 @@ export default async function HeroBlock({
               <img
                 src={big.cover.url}
                 alt={big.title}
+                // 首屏主推图是首页 LCP 元素：必须 eager 且**显式提权**。
+                // 只写 eager 只表示「不懒加载」，浏览器仍按普通图片排队；fetchPriority="high"
+                // 才会把它提到图片队列最前，与字体/首屏 JS 竞争带宽时优先发。
                 loading="eager"
+                fetchPriority="high"
                 decoding="async"
                 className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-[1.02]"
               />

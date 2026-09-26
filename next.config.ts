@@ -99,8 +99,63 @@ const nextConfig: NextConfig = {
     ];
   },
   // 全站安全响应头（H1 修复）。source 覆盖所有路径。
+  //
+  // 静态资源缓存头**必须单独声明**：上面的 `/:path*` 规则会先命中，而它只带安全头、
+  // 没有 Cache-Control —— 结果是 `public/uploads` 与 `public/covers` 下的封面/缩略图
+  // 全部走 Next 默认的 `public, max-age=0`，每次访问（含返回首页、翻页、滚动重挂）
+  // 都要发一次条件请求回源。图片是首页最大的字节来源，这一项直接决定二次访问的体感。
+  //
+  // 注意 Next 的 headers() 是「多条规则累加」而不是覆盖：同一条路径同时命中
+  // 安全头规则与下面的缓存规则时，两者会合并成同一组响应头，不需要在安全头里重复写。
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      {
+        // 上传产物（封面 original/big/thumb）与内置封面：内容按 key 寻址、key 永不复用，
+        // 因此可以 immutable 长缓存 —— 改图必然换 key、换 key 必然是新的 URL。
+        // 1 年是惯例上限；max-age 与 s-maxage 同值，CDN 与浏览器一致。
+        // 若将来出现「同 key 覆写」（例如原地重压），必须先把这里降回 max-age=0+ETag。
+        source: "/uploads/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, s-maxage=31536000, immutable",
+          },
+        ],
+      },
+      {
+        source: "/covers/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, s-maxage=31536000, immutable",
+          },
+        ],
+      },
+      {
+        // seed 素材是随仓库发布的演示内容，同样按文件名寻址；但它是「可能被替换」的资产
+        // （重新生成 seed 会覆盖同名文件），所以不给 immutable，只给 30 天缓存 + 允许重验证。
+        source: "/seed/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=2592000" }],
+      },
+      {
+        // 字体：woff2 文件名带内容特征、且由 globals.css 引用，长缓存安全。
+        source: "/fonts/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, s-maxage=31536000, immutable",
+          },
+        ],
+      },
+      {
+        // Next 自己的构建产物：文件名含内容哈希，官方推荐就是 immutable。
+        // public 目录下的静态文件不在此规则内（见上），但 _next/static 需要显式声明，
+        // 否则在自定义服务器（server.js）下同样会退化成 max-age=0。
+        source: "/_next/static/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      },
+    ];
   },
 };
 
