@@ -9,7 +9,7 @@ import { prisma } from "@/lib/db/prisma";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
 import { sendMail } from "@/lib/mailer";
 import { renderMailHtml } from "@/lib/mail-template";
-import { getSeoConfig, resolveSiteName } from "@/lib/seo-config";
+import { getSeoConfig, resolveHomeTitle } from "@/lib/seo-config";
 import { requestSiteUrl } from "@/lib/request-origin";
 
 // ---------- 请求重置（忘记密码页） ----------
@@ -49,7 +49,7 @@ export async function requestPasswordResetAction(
 
   // 链接用"当前请求"的公网域名（CDN/反代兼容），勿回退到 .env 静态域名
   const link = `${await requestSiteUrl()}/reset-password?token=${token}`;
-  const name = resolveSiteName(await getSeoConfig());
+  const name = resolveHomeTitle(await getSeoConfig());
   const mail = await sendMail(
     parsed.data.email,
     `【${name}】找回密码`,

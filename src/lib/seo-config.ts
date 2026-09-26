@@ -137,17 +137,21 @@ export function jsonLd(data: unknown): string {
   return JSON.stringify(data).replace(/</g, "\\u003c");
 }
 
-/** 站点名解析：后台「首页标题」即站点名（唯一来源），未配置时回退内置文案 —— 站点展示统一入口 */
-export function resolveSiteName(seo: SeoConfig): string {
+/** 站点名解析：后台「首页标题」即站点名（唯一来源），未配置时回退内置文案 */
+function siteNameOf(seo: SeoConfig): string {
   return seo.homeTitle || FALLBACK_SITE_NAME;
 }
 
 /**
- * 首页 `<title>` 的主体（不含站点名后缀，后缀由 root layout 的 template 拼接）。
- * 口径：站点名即「首页标题」；配了 homeSubtitle 则拼成「站点名 - 副标题」。
- * 两者都没配时回退内置文案——保证首页标题永不空白。
+ * 主标题 = 站点名（后台「首页标题」，未配置回退内置文案）。
+ * 它同时是子页面 `title.template` 的后缀，因此**不含副标题**。
  */
 export function resolveHomeTitle(seo: SeoConfig): string {
-  const title = resolveSiteName(seo);
+  return siteNameOf(seo);
+}
+
+/** 首页专属 `<title>`：「主标题 - 副标题」（未配副标题时只有主标题） */
+export function resolveHomePageTitle(seo: SeoConfig): string {
+  const title = resolveHomeTitle(seo);
   return seo.homeSubtitle ? `${title} - ${seo.homeSubtitle}` : title;
 }

@@ -1,7 +1,7 @@
 import nodemailer from "nodemailer";
 import { siteUrl } from "@/lib/site-url";
 import { getRuntimeConfig } from "@/lib/runtime-config";
-import { getSeoConfig, resolveSiteName } from "@/lib/seo-config";
+import { getSeoConfig, resolveHomeTitle } from "@/lib/seo-config";
 
 // 邮件发送：SMTP 配置（后台「站点配置」或旧 .env）齐备才真正发信；否则静默降级
 //（开发环境返回链接由页面展示，方便联调）。
@@ -52,7 +52,7 @@ export async function sendMail(
       auth: { user: cfg.user, pass: cfg.pass },
     });
     await transport.sendMail({
-      from: `${resolveSiteName(await getSeoConfig())} <${cfg.from}>`,
+      from: `${resolveHomeTitle(await getSeoConfig())} <${cfg.from}>`,
       to,
       subject,
       text,

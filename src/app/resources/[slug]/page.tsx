@@ -21,7 +21,7 @@ import { PendingBanner, type DetailCtx } from "@/components/resource/detail/part
 import { TYPE_LABEL } from "@/lib/display";
 import { siteUrl } from "@/lib/site-url";
 import { decodeSlug } from "@/lib/slug";
-import { getSeoConfig, jsonLd, resolveSiteName } from "@/lib/seo-config";
+import { getSeoConfig, jsonLd, resolveHomeTitle } from "@/lib/seo-config";
 
 type PageProps = { params: Promise<{ slug: string }> };
 
@@ -102,7 +102,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     alternates: { canonical: `/resources/${r.slug}` },
     openGraph: {
       // 页级 openGraph 不与根布局合并，siteName 需自带
-      siteName: resolveSiteName(seo),
+      siteName: resolveHomeTitle(seo),
       title: r.title,
       description,
       type: "article",
@@ -192,7 +192,7 @@ export default async function ResourcePage({ params }: PageProps) {
   const seo = await getSeoConfig();
   const detailLd =
     seo.structuredData && !isPreview && !detail.nsfw
-      ? buildDetailLd(detail, resolveSiteName(seo))
+      ? buildDetailLd(detail, resolveHomeTitle(seo))
       : null;
 
   // 详情页正文槽位（上/中/下，仅已发布内容；中部节点传给模板插在描述与评论之间）

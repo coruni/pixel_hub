@@ -8,7 +8,7 @@ import { rateLimit, clientIp } from "@/lib/rate-limit";
 import { sendMail, smtpConfigured } from "@/lib/mailer";
 import { renderMailHtml } from "@/lib/mail-template";
 import { issueRegisterCode } from "@/lib/register-code";
-import { getSeoConfig, resolveSiteName } from "@/lib/seo-config";
+import { getSeoConfig, resolveHomeTitle } from "@/lib/seo-config";
 
 export type SendCodeState = { ok?: boolean; error?: string };
 
@@ -33,7 +33,7 @@ export async function sendRegisterCodeAction(
   if (!(await smtpConfigured())) return { error: "站点未配置邮件服务，请联系管理员" };
 
   const code = await issueRegisterCode(email);
-  const name = resolveSiteName(await getSeoConfig());
+  const name = resolveHomeTitle(await getSeoConfig());
   const mail = await sendMail(
     email,
     `【${name}】注册验证码`,

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { NAV_ICON_MAP } from "@/lib/nav-icons";
 import { siteLogo } from "@/lib/site-url";
-import { getSeoConfig, resolveSiteName } from "@/lib/seo-config";
+import { getSeoConfig, resolveHomeTitle } from "@/lib/seo-config";
 import { prisma } from "@/lib/db/prisma";
 import { publicUrl } from "@/lib/storage";
 import { getTheme } from "@/lib/site";
@@ -21,7 +21,7 @@ const iconSize = 15;
 
 export default async function Navbar() {
   const [session, seo] = await Promise.all([auth(), getSeoConfig()]);
-  const name = resolveSiteName(seo);
+  const name = resolveHomeTitle(seo);
   const u = session?.user;
   const isStaff = u?.role === "ADMIN" || u?.role === "MODERATOR";
   const theme = await getTheme();

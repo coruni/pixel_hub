@@ -3,7 +3,7 @@ import { Search } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { getCategories } from "@/lib/queries";
 import { str, type SP } from "@/lib/search-params";
-import { getSeoConfig, resolveSiteName } from "@/lib/seo-config";
+import { getSeoConfig, resolveHomeTitle } from "@/lib/seo-config";
 import FeedBrowser from "@/components/feed/FeedBrowser";
 import BrowseTitleSync from "@/components/feed/BrowseTitleSync";
 import ArchiveShell from "@/components/feed/ArchiveShell";
@@ -61,7 +61,7 @@ export default async function BrowsePage({ searchParams }: { searchParams: Promi
   const q = str(sp, "q")?.trim() ?? "";
   const cat = await resolveCat(sp);
   const pageTitle = q ? "搜索" : cat ? `${cat.name} - 浏览` : "浏览";
-  const fullTitle = `${pageTitle} - ${resolveSiteName(seo)}`;
+  const fullTitle = `${pageTitle} - ${resolveHomeTitle(seo)}`;
   return (
     <>
       <BrowseTitleSync title={fullTitle} />

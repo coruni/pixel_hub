@@ -7,24 +7,22 @@ import SidebarLayout from "@/components/layout/SidebarLayout";
 import { getTheme } from "@/lib/site";
 import type { SP } from "@/lib/search-params";
 
-import { getSeoConfig, resolveHomeTitle, resolveSiteName } from "@/lib/seo-config";
+import { getSeoConfig, resolveHomePageTitle, resolveHomeTitle } from "@/lib/seo-config";
 
 // 首页与 root layout 同段，title.template **不作用于它**（已实抓 HTML 验证：
 // 只给主体时 <title> 就是主体本身，没有站点名后缀）→ 站点名必须在这里手拼。
 // 而 /browse 等子页面 template 生效，那边**不能**再手拼（会拼成「A - B - 站点名 - 站点名」）。
 export async function generateMetadata(): Promise<Metadata> {
   const seo = await getSeoConfig();
-  const name = resolveSiteName(seo);
-  const title = resolveHomeTitle(seo);
+  // 首页标题是唯一带副标题的页面：「主标题 - 副标题」
+  const pageTitle = resolveHomePageTitle(seo);
   return {
-    title: {
-      absolute: `${title} - ${name}`,
-    },
+    title: { absolute: pageTitle },
     // 首页描述：后台默认描述优先，其次副标题，最后内置文案
     description:
       seo.defaultDescription ||
       seo.homeSubtitle ||
-      `分享与发现图片、游戏等数字资源的${name}平台`,
+      `分享与发现图片、游戏等数字资源的${resolveHomeTitle(seo)}平台`,
   };
 }
 

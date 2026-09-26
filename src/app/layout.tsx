@@ -10,13 +10,14 @@ import GlobalProfileBgLoader from "@/components/layout/GlobalProfileBgLoader";
 import { auth } from "@/lib/auth";
 import { fromDbColorMode } from "@/lib/color-mode";
 import { siteUrl } from "@/lib/site-url";
-import { getSeoConfig, jsonLd, resolveSiteName } from "@/lib/seo-config";
+import { getSeoConfig, jsonLd, resolveHomeTitle } from "@/lib/seo-config";
 
 export async function generateMetadata(): Promise<Metadata> {
   const seo = await getSeoConfig();
-  const name = resolveSiteName(seo);
+  // 主标题：后台「首页标题」即站点名，同时充当子页面 title.template 的后缀
+  const title = resolveHomeTitle(seo);
   const description =
-    seo.defaultDescription || `分享与发现图片、游戏等数字资源的${name}平台`;
+    seo.defaultDescription || `分享与发现图片、游戏等数字资源的${title}平台`;
   // 站长平台验证码仅在后台配置了对应项时输出；msvalidate.01 同时覆盖 Bing 与 Yahoo
   const verification: Metadata["verification"] = {
     ...(seo.verifications.google ? { google: seo.verifications.google } : {}),
@@ -29,16 +30,16 @@ export async function generateMetadata(): Promise<Metadata> {
     },
   };
   return {
-    title: { default: name, template: `%s - ${name}` },
+    title: { default: title, template: `%s - ${title}` },
     description,
     // meta keywords：Google 忽略，百度/Yandex 仍参考；未配置不输出
     keywords: seo.keywords || undefined,
     metadataBase: new URL(siteUrl()),
     openGraph: {
       type: "website",
-      siteName: name,
+      siteName: title,
       locale: seo.ogLocale,
-      title: { default: name, template: `%s - ${name}` },
+      title,
       description,
     },
     twitter: { card: "summary_large_image" },
@@ -54,12 +55,12 @@ const themeInitScript = `try{var e=document.documentElement,m=e.getAttribute("da
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const [session, seo] = await Promise.all([auth(), getSeoConfig()]);
-  const name = resolveSiteName(seo);
+  const title = resolveHomeTitle(seo);
   const websiteLd = seo.structuredData
     ? jsonLd({
         "@context": "https://schema.org",
         "@type": "WebSite",
-        name,
+        name: title,
         url: siteUrl(),
         inLanguage: "zh-CN",
         potentialAction: {
@@ -93,7 +94,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <Navbar />
         <main className="flex-1">{children}</main>
         <Footer
-          name={name}
+          name={title}
           footerText={seo.footerText}
           icp={seo.icp}
           contactEmail={seo.contactEmail}
