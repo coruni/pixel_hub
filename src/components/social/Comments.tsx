@@ -21,12 +21,14 @@ const COMMENT_MAX = 2000;
 /** 剩余多少字开始提示 */
 const COMMENT_WARN_AT = 200;
 
-/** 评论编辑器：关掉图片块（不提供上传入口）、表格与工具栏，只保留基础 Markdown 语法。
- *  ImageBlock 关闭后斜杠菜单的 Image 项自动消失；手打 ![alt](url) 仍可生成行内图，
- *  该风险在渲染层用图片域名白名单兜底（见 comment-item / Markdown）。 */
+/** 评论编辑器：关掉图片块（不提供上传入口）、表格、工具栏与块操作柄，只保留基础 Markdown 语法。
+ *  ImageBlock 关闭后斜杠菜单的 Image 项自动消失；BlockEdit 关闭会连同 / 斜杠菜单一起去掉
+ *  （评论框只有 6rem 高，块操作柄会溢到框外，且靠手打语法足够）。
+ *  手打 ![alt](url) 仍可生成行内图，该风险在渲染层用图片域名白名单兜底。 */
 const COMMENT_FEATURES: Partial<Record<CrepeFeature, boolean>> = {
   [CrepeFeature.ImageBlock]: false,
   [CrepeFeature.Table]: false,
+  [CrepeFeature.BlockEdit]: false,
 };
 
 /** 资源评论区：主楼发布框（带附图）+ 评论树 + 15s 增量轮询 */
@@ -204,7 +206,7 @@ export default function Comments({
             onChange={setText}
             minHeight="6rem"
             ariaLabel="发表评论"
-            placeholder="友善发言，说说你的看法… 支持 Markdown 基础语法，输入 / 唤出块类型"
+            placeholder="友善发言，说说你的看法… 支持 Markdown 基础语法"
             features={COMMENT_FEATURES}
             toolbar={false}
             compact
