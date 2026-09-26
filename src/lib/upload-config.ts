@@ -90,6 +90,50 @@ export function profileBgUnlocked(level: number, minLevel: number, incentiveEnab
 }
 
 /**
+ * 主页背景遮罩的默认值（mask-image 的完整值）。
+ *
+ * 背景层铺满视口、固定在最底层，**中段必须完全透明**，否则会压到正文卡片下面。
+ * 这条 mask 决定的就是「左右两条可见带」的形状：贴屏幕边缘最清晰，向屏幕中间淡出到 0。
+ *
+ * 【必须与 globals.css 的 `.profile-bg-pc` 保持一致】那边把它声明成 `--profile-bg-mask` 的默认值，
+ * 用途是「用户没自定义 / 自定义值被清掉」时兜底。这里同时是设置页的 placeholder 与
+ * 「恢复默认」的目标值 —— 改一处必须同步改另一处。
+ */
+export const PROFILE_BG_MASK_DEFAULT =
+  "linear-gradient(to right, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 1) 6%, rgba(0, 0, 0, 0.55) 14%, rgba(0, 0, 0, 0) 24%, rgba(0, 0, 0, 0) 76%, rgba(0, 0, 0, 0.55) 86%, rgba(0, 0, 0, 1) 94%, rgba(0, 0, 0, 1) 100%)";
+
+/** 遮罩值长度上限（只做防呆；默认值约 250 字符，正常改法不会接近它） */
+export const PROFILE_BG_MASK_MAX = 600;
+
+/**
+ * 遮罩值形状校验：不合格一律返回内置默认遮罩（**不抛错、也不返回 null**）。
+ *
+ * 为什么渲染前还要判一次：用户可能填进带 url() 的值，库里也可能躺着旧版本的脏值 ——
+ * 渲染点不能因此崩掉、更不能漏出外部请求，所以一律经这道收口。
+ *
+ * 只放行渐变写法（字母/数字/空格/.,%()#_-），挡掉 url() / image-set() / var() / @ / ; / { } / < >：
+ * 前者能发起外部请求，后者是注入面。遮罩是纯装饰，不需要这些能力。
+ */
+export function safeBgMask(raw: string | null | undefined): string {
+  const v = (raw ?? "").trim();
+  if (!v || v.length > PROFILE_BG_MASK_MAX) return PROFILE_BG_MASK_DEFAULT;
+  if (!/^(repeating-)?(linear|radial|conic)-gradient\(/i.test(v)) return PROFILE_BG_MASK_DEFAULT;
+  if (!v.endsWith(")")) return PROFILE_BG_MASK_DEFAULT;
+  if (/var\(/i.test(v)) return PROFILE_BG_MASK_DEFAULT;
+  if (!/^[a-zA-Z0-9\s.,%()#_-]+$/.test(v)) return PROFILE_BG_MASK_DEFAULT;
+  return v;
+}
+
+/**
+ * 用户填的遮罩值能不能存（空串 = 用默认，也算合法）。
+ * 与 safeBgMask 是同一个判定的两种用法：渲染要拿到「实际该用的值」，表单只要「合不合法」。
+ */
+export function isValidBgMask(raw: string | null | undefined): boolean {
+  const v = (raw ?? "").trim();
+  return v === "" || safeBgMask(v) === v;
+}
+
+/**
  * 水印文字长度上限。放在这里而不是 media/watermark.ts：设置页的表单是客户端组件，
  * 而 media/watermark.ts 依赖 sharp，客户端一旦 import 就会把原生模块拖进 bundle。
  */

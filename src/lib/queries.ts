@@ -357,6 +357,7 @@ export const getResourceDetail = cache(async (slug: string, viewerId?: string) =
           // 资源详情页也要铺作者的主页背景（开关 + 等级门槛在页面里判定），随 author 一次取出
           profileBgPcKey: true,
           profileBgOnResource: true,
+          profileBgMask: true,
           role: true,
           trusted: true,
           createdAt: true,
@@ -444,6 +445,7 @@ export const getResourceDetail = cache(async (slug: string, viewerId?: string) =
       // 与上面 avatarKey（已解析成 URL）不同 —— 别照着 avatarKey 的用法直接塞进 <img src>。
       profileBgPcKey: resource.author.profileBgPcKey,
       profileBgOnResource: resource.author.profileBgOnResource,
+      profileBgMask: resource.author.profileBgMask,
       role: resource.author.role,
       trusted: resource.author.trusted,
       createdAt: resource.author.createdAt,
@@ -968,6 +970,8 @@ export type UserProfile = {
   heroImageKey: string | null;
   /** 个人主页背景（铺满视口的最底层底图，仅桌面端渲染）；是否真的有资格渲染由 profileBgUnlocked 判定 */
   profileBgPcKey: string | null;
+  /** 该用户自定义的背景遮罩（原始值，渲染前经 safeBgMask 收口）；null = 用内置默认 */
+  profileBgMask: string | null;
   /** 昵称特效色 key；实际渲染走 components/ui/Nickname（读激励配置开关） */
   nameColor: string | null;
   role: "USER" | "MODERATOR" | "ADMIN";
@@ -1006,6 +1010,7 @@ export const getProfile = cache(
         avatarKey: true,
         heroImageKey: true,
         profileBgPcKey: true,
+        profileBgMask: true,
         nameColor: true,
         role: true,
         trusted: true,
@@ -1040,6 +1045,7 @@ export const getProfile = cache(
       avatarKey: user.avatarKey,
       heroImageKey: user.heroImageKey,
       profileBgPcKey: user.profileBgPcKey,
+      profileBgMask: user.profileBgMask,
       nameColor: user.nameColor,
       role: user.role,
       trusted: user.trusted,

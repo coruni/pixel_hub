@@ -7,7 +7,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { getIncentive } from "@/lib/incentive";
 import { getPointBalance } from "@/lib/points";
-import { levelNameOf, levelOf, safeBgMask, tipFormOf } from "@/lib/points-config";
+import { levelNameOf, levelOf, tipFormOf } from "@/lib/points-config";
 import LevelBadge from "@/components/ui/LevelBadge";
 import {
   getFeed,
@@ -25,7 +25,7 @@ import {
 } from "@/lib/actions/social";
 import { formatCount } from "@/lib/format";
 import { publicUrl } from "@/lib/storage/url";
-import { profileBgUnlocked } from "@/lib/upload-config";
+import { profileBgUnlocked, safeBgMask } from "@/lib/upload-config";
 import Nickname from "@/components/ui/Nickname";
 import ResourceGrid from "@/components/resource/ResourceGrid";
 import PresenceAvatar from "@/components/ui/PresenceAvatar";
@@ -153,9 +153,9 @@ export default async function UserPage({
   const bgPcKey = bgUnlocked ? profile.profileBgPcKey : null;
 
   const bgUrl = bgPcKey ? publicUrl(bgPcKey) : null;
-  // 遮罩形状由后台配置（incentive.decoration.bgMask）。渲染前过一道形状校验：填坏只退回内置遮罩，
-  // 不会让整份激励配置失效；默认值就是此前硬编码在 .profile-bg-pc 里的那条渐变。
-  const bgMask = safeBgMask(incentive.decoration.bgMask);
+  // 遮罩形状是**该主页主人自己的**设置（User.profileBgMask，在设置页填）。渲染前过一道形状校验：
+  // 填坏 / 库里躺着旧脏值都只退回内置默认遮罩，不会漏出外部请求，也不会让页面崩。
+  const bgMask = safeBgMask(profile.profileBgMask);
 
   // 头部操作区。编辑 / 打赏紧跟昵称末尾，作为纯图标随昵称行自然换行；
   // 关注按钮独立放在资料区最右侧，不参与昵称长度计算。

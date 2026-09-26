@@ -9,7 +9,14 @@ import { toDbColorMode } from "@/lib/color-mode";
 import { prisma } from "@/lib/db/prisma";
 import { rateLimit } from "@/lib/rate-limit";
 import { makeKey, saveFile, delFile } from "@/lib/storage";
-import { MIB, WATERMARK_POSITIONS, WATERMARK_TEXT_MAX, profileBgUnlocked } from "@/lib/upload-config";
+import {
+  MIB,
+  PROFILE_BG_MASK_DEFAULT,
+  WATERMARK_POSITIONS,
+  WATERMARK_TEXT_MAX,
+  isValidBgMask,
+  profileBgUnlocked,
+} from "@/lib/upload-config";
 import { getUploadLimits } from "@/lib/upload-limits";
 import { getIncentive } from "@/lib/incentive";
 import { getContributionSummary } from "@/lib/points";
@@ -431,6 +438,46 @@ export async function updateProfileBgOnResourceAction(
     return { ok: true };
   } catch (e) {
     console.error("[profile-bg-placement]", e);
+    return { error: "保存失败，请重试" };
+  }
+}
+
+// ---- 背景遮罩形状（用户自定义）----
+//
+// 同样**独立于上传动作**：调形状不该逼用户重选一遍图。
+// 空串 = 回到内置默认，存 null 而不是把默认值抄一份进库 —— 这样以后调默认值，
+// 没自定义过的用户会跟着一起变；抄进库的那些则永远停在旧值上，事后无法区分。
+export async function updateProfileBgMaskAction(
+  _prev: SettingsActionState,
+  fd: FormData,
+): Promise<SettingsActionState> {
+  const user = (await auth())?.user;
+  if (!user) return { error: "请先登录" };
+
+  const gate = await profileBgGate(user.id);
+  if (!gate.ok) return { error: gate.error };
+
+  const raw = String(fd.get("bgMask") ?? "").trim();
+  // 存之前就拒：用户此刻就在输入框旁边，能立刻改。渲染侧的 safeBgMask 只负责兜住存量脏值，
+  // 不该被当成「反正填错了也不会坏」的借口。
+  if (!isValidBgMask(raw)) {
+    return {
+      error: "遮罩值不可用：需要一条以 linear-gradient( / radial-gradient( / conic-gradient( 开头的值",
+    };
+  }
+
+  try {
+    // 与内置默认**逐字相同**就存 null（= 继续跟随默认），而不是把默认值抄一份进库：
+    // 否则站点日后调整默认形状时，这些用户会永远停在旧值上，事后也分不清「他就是要这个」还是「他只是没改」。
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { profileBgMask: !raw || raw === PROFILE_BG_MASK_DEFAULT ? null : raw },
+    });
+    revalidatePath(`/u/${user.username}`);
+    revalidatePath("/settings");
+    return { ok: true };
+  } catch (e) {
+    console.error("[profile-bg-mask]", e);
     return { error: "保存失败，请重试" };
   }
 }

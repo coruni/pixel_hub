@@ -6,22 +6,32 @@ import { useActionState, useRef, useState } from "react";
 import { Lock, Trash2, Upload } from "lucide-react";
 import {
   removeProfileBgAction,
+  updateProfileBgMaskAction,
   updateProfileBgOnResourceAction,
   uploadProfileBgAction,
   type SettingsActionState,
 } from "@/lib/actions/settings";
 import { publicUrl } from "@/lib/storage/url";
+import {
+  PROFILE_BG_MASK_DEFAULT,
+  PROFILE_BG_MASK_MAX,
+  isValidBgMask,
+  safeBgMask,
+} from "@/lib/upload-config";
+import { INPUT } from "@/lib/ui/cls";
 import { SquareCheckbox } from "@/components/admin/SquareCheckbox";
 import { Button } from "@/components/ui/Button";
 
-// 个人主页背景：单个上传槽（仅桌面端展示）。
+// 个人主页背景：单个上传槽 + 遮罩形状（都仅桌面端展示）。
 //
 // 刻意**不做裁剪**：底图是 cover 铺满，被裁掉的部分恰好落在遮罩留白的中间区，裁剪器只会让用户
 // 困惑。改为把前台的遮罩类（.profile-bg-pc）直接套在预览上 —— 所见即所得。
 //
-// 遮罩值由服务端按后台配置算好传进来（incentive.decoration.bgMask，已过 safeBgMask 校验），
-// 这里挂成内联的 --profile-bg-mask —— 类本身读取该变量，前台两个渲染点也是同一套写法，
-// 所以预览与真实主页看到的形状必然一致，不需要在客户端复刻任何渐变。
+// 预览挂的是内联的 --profile-bg-mask，前台两个渲染点也是同一套写法（类读变量、变量内联覆盖），
+// 所以预览与真实主页看到的形状必然一致，不需要在这里复刻任何渐变。
+//
+// 遮罩是**用户自己的**设置（User.profileBgMask），不是站点级配置：每个人背景图不同，
+// 该留白多少只有本人知道。留空 = 用内置默认（库里存 null，见 actions/settings.ts）。
 //
 // 遮罩百分比是相对元素自身的，所以小尺寸预览与真实视口的带子比例一致，可以当准样板看。
 
@@ -47,8 +57,8 @@ export default function ProfileBgForm({
   /** 是否把这张背景一并铺到本人发布的资源详情页（默认铺） */
   onResource: boolean;
   maxMb: number;
-  /** 主页背景的遮罩值（已校验；与前台两个渲染点同一份配置） */
-  bgMask: string;
+  /** 该用户已保存的遮罩值（**原始值**，未经校验：库里可能躺着旧脏值，要让用户看见并改掉）；null = 未自定义 */
+  bgMask: string | null;
 }) {
   const [state, formAction, pending] = useActionState<SettingsActionState, FormData>(
     uploadProfileBgAction,
@@ -61,6 +71,11 @@ export default function ProfileBgForm({
     {},
   );
   const plFormRef = useRef<HTMLFormElement>(null);
+  // 遮罩同样自带一个 form：调形状不该逼用户重选图（保存按钮在没选图时是禁用的）。
+  const [mkState, mkAction, mkPending] = useActionState<SettingsActionState, FormData>(
+    updateProfileBgMaskAction,
+    {},
+  );
   const [preview, setPreview] = useState<string | null>(null);
   const [picked, setPicked] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -74,6 +89,19 @@ export default function ProfileBgForm({
     setPicked(false);
     setPreview(null);
   }
+
+  // 遮罩草稿：预填**生效值**（未自定义时就是内置默认），这样用户是在一条能用的渐变上改数字，
+  // 而不是从空白开始写 CSS。保存时若与默认值一致，服务端会存回 null（继续跟随默认）。
+  const [maskDraft, setMaskDraft] = useState(bgMask ?? PROFILE_BG_MASK_DEFAULT);
+  const [seenMask, setSeenMask] = useState(bgMask);
+  if (seenMask !== bgMask) {
+    setSeenMask(bgMask);
+    setMaskDraft(bgMask ?? PROFILE_BG_MASK_DEFAULT);
+  }
+  const maskUsable = isValidBgMask(maskDraft);
+  // 与「服务端已保存的值」比对，用来区分「刚保存成功」和「改了还没存」——
+  // 只靠 mkState.ok 会在用户继续打字后仍然挂着「✓ 已更新」，等于骗人。
+  const maskDirty = maskDraft.trim() !== (bgMask ?? PROFILE_BG_MASK_DEFAULT).trim();
 
   if (!unlocked) {
     return (
@@ -108,7 +136,7 @@ export default function ProfileBgForm({
               style={
                 {
                   backgroundImage: shown ? `url(${shown})` : undefined,
-                  "--profile-bg-mask": bgMask,
+                  "--profile-bg-mask": safeBgMask(maskDraft),
                 } as CSSProperties
               }
             >
@@ -118,7 +146,7 @@ export default function ProfileBgForm({
             </div>
           </div>
           <p className="mt-1.5 text-[11px] leading-4 text-neutral-400">
-            预览已套用主页上的实际遮罩：左右两侧可见，中间隐去。仅桌面端展示。
+            预览已套用你当前的遮罩设置，与主页上看到的形状一致。仅桌面端展示。
           </p>
           <p className="mt-1 text-[11px] leading-4 text-neutral-400">
             建议 16:10 横图（≥ 1920×1200，长边 2560 更清晰），主体放左右两侧。
@@ -191,6 +219,66 @@ export default function ProfileBgForm({
           <p className="mt-1.5 text-xs text-red-500">{plState.error}</p>
         )}
       </form>
+
+      {/* 遮罩形状：只在已经有背景图时出现 —— 没图时调形状看不到任何变化，只会让人困惑。 */}
+      {pcKey && (
+        <form action={mkAction} className="mt-4 border-t border-brand-200 pt-3.5">
+          <label htmlFor="bg-mask" className="block text-sm text-neutral-800">
+            遮罩形状
+          </label>
+          <p className="mt-1 text-[11px] leading-4 text-neutral-400">
+            控制背景「哪几块看得见」。默认是左右两条带、中间留白给正文；
+            中间那段必须保持完全透明（rgba(0, 0, 0, 0)），否则会透到正文卡片底下。
+            百分比相对屏幕宽度，所以窄窗口下带子会按比例变窄。
+          </p>
+          <textarea
+            id="bg-mask"
+            name="bgMask"
+            rows={3}
+            maxLength={PROFILE_BG_MASK_MAX}
+            spellCheck={false}
+            value={maskDraft}
+            onChange={(e) => setMaskDraft(e.target.value)}
+            aria-invalid={!maskUsable}
+            aria-describedby="bg-mask-status"
+            className={`${INPUT} mt-2 text-[11px] leading-5`}
+          />
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <Button type="submit" variant="primary" size="md" disabled={mkPending || !maskUsable}>
+              {mkPending ? "保存中…" : "保存遮罩"}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="md"
+              disabled={maskDraft === PROFILE_BG_MASK_DEFAULT}
+              onClick={() => setMaskDraft(PROFILE_BG_MASK_DEFAULT)}
+            >
+              填回默认值
+            </Button>
+          </div>
+          <p id="bg-mask-status" className="mt-1.5 text-[11px] leading-4">
+            {!maskUsable ? (
+              <span className="text-amber-700">
+                值不可用，保存会被拒绝：需要一条以 linear-gradient( / radial-gradient( /
+                conic-gradient( 开头、以 ) 结尾的值。
+              </span>
+            ) : mkState.error ? (
+              <span className="text-red-500">{mkState.error}</span>
+            ) : mkState.ok && !maskDirty ? (
+              <span className="text-emerald-600">✓ 已更新</span>
+            ) : maskDirty ? (
+              <span className="text-neutral-400">有未保存的修改。</span>
+            ) : (
+              <span className="text-neutral-400">
+                {maskDraft.trim() === PROFILE_BG_MASK_DEFAULT
+                  ? "当前为默认形状。"
+                  : "已保存为自定义形状。"}
+              </span>
+            )}
+          </p>
+        </form>
+      )}
     </>
   );
 }

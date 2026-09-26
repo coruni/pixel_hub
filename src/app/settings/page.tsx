@@ -27,7 +27,6 @@ import { getIncentive } from "@/lib/incentive";
 import { getContributionSummary } from "@/lib/points";
 import { profileBgUnlocked } from "@/lib/upload-config";
 import { NAME_COLORS, decorationUnlocked } from "@/lib/decorations";
-import { safeBgMask } from "@/lib/points-config";
 import { Button } from "@/components/ui/Button";
 
 export const metadata: Metadata = { title: "账户设置", robots: { index: false } };
@@ -86,6 +85,7 @@ export default async function SettingsPage({
         colorMode: true,
         profileBgPcKey: true,
         profileBgOnResource: true,
+        profileBgMask: true,
         nameColor: true,
       },
     }),
@@ -180,7 +180,7 @@ export default async function SettingsPage({
                 pcKey={prefs?.profileBgPcKey ?? null}
                 onResource={prefs?.profileBgOnResource ?? true}
                 maxMb={limits.profileBgMaxMb}
-                bgMask={safeBgMask(incentive.decoration.bgMask)}
+                bgMask={prefs?.profileBgMask ?? null}
               />
             </div>
           </section>

@@ -308,46 +308,10 @@ const profileSchema = z.object({
   bgMinLevel: intRange(0, 20).default(2),
 });
 
-// ---------- 主页背景遮罩 ----------
-
 /**
- * 主页背景遮罩的默认值（mask-image 的完整值）。
+ * 装饰（昵称特效色）。
  *
- * 背景层铺满视口、固定在最底层，**中段必须完全透明**，否则会压到正文卡片下面。
- * 这条 mask 决定的就是「左右两条可见带」的形状：贴屏幕边缘最清晰，向屏幕中间淡出到 0。
- *
- * 【必须与 globals.css 的 `.profile-bg-pc` 保持一致】那边把它声明成 `--profile-bg-mask` 的默认值，
- * 用途是「渲染点没挂变量 / 变量被清掉」时兜底；这里是后台表单的初值。改一处必须同步改另一处。
- */
-export const PROFILE_BG_MASK_DEFAULT =
-  "linear-gradient(to right, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 1) 6%, rgba(0, 0, 0, 0.55) 14%, rgba(0, 0, 0, 0) 24%, rgba(0, 0, 0, 0) 76%, rgba(0, 0, 0, 0.55) 86%, rgba(0, 0, 0, 1) 94%, rgba(0, 0, 0, 1) 100%)";
-
-/** 遮罩值长度上限（只做防呆；默认值约 250 字符，正常改法不会接近它） */
-export const PROFILE_BG_MASK_MAX = 600;
-
-/**
- * 后台填的遮罩值在**渲染前**再过一道形状校验，不合格一律退回内置遮罩。
- *
- * 为什么不在 zod 里 refine：配置是**整份替换**的，一个字段不合格会让 safeParse 整体失败，
- * 把管理员的其他设置一起回落默认 —— 代价太大。这里只让「坏值失效」，影响止步于背景。
- *
- * 只放行渐变写法（字母/数字/空格/.,%()#_-），挡掉 url() / image-set() / var() / @ / ; / { } / < >：
- * 前者能发起外部请求，后者是注入面。遮罩是纯装饰，不需要这些能力。
- */
-export function safeBgMask(raw: string | null | undefined): string {
-  const v = (raw ?? "").trim();
-  if (!v || v.length > PROFILE_BG_MASK_MAX) return PROFILE_BG_MASK_DEFAULT;
-  if (!/^(repeating-)?(linear|radial|conic)-gradient\(/i.test(v)) return PROFILE_BG_MASK_DEFAULT;
-  if (!v.endsWith(")")) return PROFILE_BG_MASK_DEFAULT;
-  if (/var\(/i.test(v)) return PROFILE_BG_MASK_DEFAULT;
-  if (!/^[a-zA-Z0-9\s.,%()#_-]+$/.test(v)) return PROFILE_BG_MASK_DEFAULT;
-  return v;
-}
-
-/**
- * 装饰（昵称特效色 + 主页背景遮罩）。
- *
- * **只放开关与样式值，不放清单与门槛**：清单是源码级资产（昵称色值必须落成 Tailwind 字面量类名），
+ * **只放开关，不放清单与门槛**：清单是源码级资产（昵称色值必须落成 Tailwind 字面量类名），
  * 门槛写在每一项旁边 —— 唯一事实来源是 `lib/decorations.ts`。
  * 把清单搬进后台只会制造「配置里有、源码里没有」的假选项。
  *
@@ -356,11 +320,6 @@ export function safeBgMask(raw: string | null | undefined): string {
 const decorationSchema = z.object({
   /** 昵称特效色总开关。关闭后存量配色立即不再渲染（与背景同纪律，不做永久保留特例） */
   nicknameEnabled: z.boolean().default(true),
-  /**
-   * 主页背景遮罩（mask-image 的完整值）。默认 = 当前线上那条渐变，见 PROFILE_BG_MASK_DEFAULT。
-   * 渲染前还要过 safeBgMask()：填坏只会退回内置遮罩，不影响其他配置。
-   */
-  bgMask: z.string().trim().max(PROFILE_BG_MASK_MAX).default(PROFILE_BG_MASK_DEFAULT),
 });
 
 export const incentiveSchema = z.object({

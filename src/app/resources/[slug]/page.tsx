@@ -8,9 +8,9 @@ import { parseMeta } from "@/lib/meta";
 import { getTheme, detailTemplateFor } from "@/lib/site";
 import { getIncentive } from "@/lib/incentive";
 import { getPointBalance } from "@/lib/points";
-import { levelOf, safeBgMask } from "@/lib/points-config";
+import { levelOf } from "@/lib/points-config";
 import { publicUrl } from "@/lib/storage/url";
-import { profileBgUnlocked } from "@/lib/upload-config";
+import { profileBgUnlocked, safeBgMask } from "@/lib/upload-config";
 import { renderSiteSidebar, WidgetArea, type DetailWidgetCtx } from "@/components/sidebar/SiteSidebar";
 import SidebarLayout from "@/components/layout/SidebarLayout";
 import DetailPost from "@/components/resource/detail/DetailPost";
@@ -149,9 +149,9 @@ export default async function ResourcePage({ params }: PageProps) {
     );
     if (unlocked) bgUrl = publicUrl(detail.author.profileBgPcKey);
   }
-  // 遮罩形状与个人主页**共用同一个后台配置**（incentive.decoration.bgMask）—— 同一张图铺在两个页面，
-  // 形状必须一致，否则作者在设置页预览到的和他资源页看到的是两回事。填坏只退回内置遮罩。
-  const bgMask = safeBgMask(incentive.decoration.bgMask);
+  // 遮罩形状取**作者自己的**设置（与个人主页同一个值）—— 同一张图铺在两个页面，形状必须一致，
+  // 否则作者在设置页预览到的和访客在这里看到的是两回事。填坏只退回内置默认遮罩。
+  const bgMask = safeBgMask(detail.author.profileBgMask);
 
   // 相关推荐只对已发布内容计算（草稿/待审不需要）
   const related =

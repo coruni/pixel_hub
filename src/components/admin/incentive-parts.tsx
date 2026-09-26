@@ -312,59 +312,6 @@ export function TextRow({
   );
 }
 
-/**
- * 多行长文本行（如主页背景遮罩的整条渐变值）：控件撑满整行。
- * 不走 Row 的 `10rem` 控件列 —— 那条渐变有 200+ 字符，挤在窄列里既看不全也改不动。
- */
-export function TextAreaRow({
-  id,
-  label,
-  range,
-  hint,
-  value,
-  onChange,
-  rows = 3,
-  maxLength,
-  footer,
-}: {
-  id: string;
-  label: string;
-  range?: string;
-  hint?: ReactNode;
-  value: string;
-  onChange: (v: string) => void;
-  rows?: number;
-  maxLength?: number;
-  /** 控件下方的补充内容（校验提示、恢复默认按钮等） */
-  footer?: ReactNode;
-}) {
-  return (
-    <div className="px-4 py-4 sm:px-5">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <label className="text-xs font-medium text-neutral-700" htmlFor={id}>
-          {label}
-        </label>
-        {range && (
-          <span className="rounded-none bg-neutral-100 px-1.5 py-0.5 text-[10px] text-neutral-500">
-            {range}
-          </span>
-        )}
-      </div>
-      {hint && <HintDetails>{hint}</HintDetails>}
-      <textarea
-        id={id}
-        rows={rows}
-        maxLength={maxLength}
-        spellCheck={false}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={`${INPUT_SM} mt-2 w-full text-[11px] leading-5`}
-      />
-      {footer}
-    </div>
-  );
-}
-
 /** 多选切换行（如启用哪几个榜单周期）：每个选项独立开关，至少保留一个由调用方负责 */
 export function ToggleRow<T extends string>({
   label,

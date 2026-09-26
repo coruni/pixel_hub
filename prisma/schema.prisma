@@ -34,6 +34,7 @@ model User {
   // ---- 个人主页背景（铺满视口的最底层底图，达等级才开放；未设置则不渲染）。仅桌面端展示 ----
   profileBgPcKey String? // 左右两侧经横向遮罩渐显，贴屏幕边缘最清晰（窄屏不渲染）
   profileBgOnResource Boolean @default(true) // 是否把这张背景一并铺到本人发布的资源详情页（默认铺；仅影响资源页，个人主页始终展示）
+  profileBgMask String? // 该用户自定义的遮罩形状（CSS mask-image 值）。null = 用内置默认遮罩（upload-config.ts 的 PROFILE_BG_MASK_DEFAULT）
   // ---- 装饰（清单与等级门槛的唯一事实来源是 src/lib/decorations.ts；这里只存用户的选择）----
   nameColor       String? // 昵称特效色 key。null = 站点默认前景色
   bio          String?
