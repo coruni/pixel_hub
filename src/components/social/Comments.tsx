@@ -5,15 +5,21 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ImagePlus, X } from "lucide-react";
 import { CrepeFeature } from "@milkdown/crepe";
-import { addCommentAction, deleteCommentAction } from "@/lib/actions/social";
+import { addCommentAction, deleteCommentAction, loadRepliesAction, loadRootCommentsAction } from "@/lib/actions/social";
 import ImageViewer from "@/components/ui/ImageViewer";
 import MdEditor from "@/components/rte/MdEditor";
 import { useFileDrop } from "@/lib/hooks/use-file-drop";
 import { useFilePaste } from "@/lib/hooks/use-file-paste";
 import { confirmDialog, toast } from "@/components/ui/feedback";
 import CommentItem, { commentInputCls, type ReplyState } from "./comment-item";
+import { CommentsPager } from "./CommentPager";
 import { flashComment, useCommentPolling } from "./use-comment-polling";
-import type { CommentImage, CommentShape } from "./comment-types";
+import {
+  totalPagesOf,
+  type CommentImage,
+  type CommentShape,
+  type CommentsPaging,
+} from "./comment-types";
 import { Button } from "@/components/ui/Button";
 
 export type { CommentAuthor, CommentImage, CommentShape } from "./comment-types";
@@ -33,20 +39,24 @@ const COMMENT_FEATURES: Partial<Record<CrepeFeature, boolean>> = {
   [CrepeFeature.BlockEdit]: false,
 };
 
-/** 资源评论区：主楼发布框（带附图）+ 评论树 + 15s 增量轮询 */
+/** 资源评论区：主楼发布框（带附图）+ 评论树（根楼层与子评论各自分页）+ 增量轮询 */
 export default function Comments({
   resourceId,
   canPost,
   viewerId,
   isStaff,
   comments,
+  commentsPaging,
   imageMax,
 }: {
   resourceId: string;
   canPost: boolean;
   viewerId?: string;
   isStaff?: boolean;
+  /** 服务端下发的第 1 页根楼层 */
   comments: CommentShape[];
+  /** 与 comments 配套的分页元信息 */
+  commentsPaging: CommentsPaging;
   /** 附图张数上限：后台 /admin/uploads「评论附图张数」，0 = 禁止附图 */
   imageMax: number;
 }) {
@@ -71,7 +81,84 @@ export default function Comments({
   /** 编辑器实例键：发表成功后自增以重置编辑器内容（MdEditor 的 defaultValue 仅挂载时消费） */
   const [editorKey, setEditorKey] = useState(0);
 
-  const merged = useCommentPolling(resourceId, comments);
+  // ---- 分页：列表状态由本组件持有，实时 hook 只负责往上打补丁 ----
+  const [merged, setMerged] = useState<CommentShape[]>(comments);
+  const [page, setPage] = useState(commentsPaging.page);
+  const [paging, setPaging] = useState<CommentsPaging>(commentsPaging);
+  const [pagePending, setPagePending] = useState(false);
+  /** 正在切换回复页的根楼层 id：同屏只允许一个，避免并发覆盖 */
+  const [repliesPendingId, setRepliesPendingId] = useState<string | null>(null);
+
+  // 服务端重新下发（发帖后的 router.refresh）→ 本地回到服务端给的那一页
+  const [baseComments, setBaseComments] = useState(comments);
+  const [basePaging, setBasePaging] = useState(commentsPaging);
+  if (baseComments !== comments) {
+    setBaseComments(comments);
+    setMerged(comments);
+  }
+  if (basePaging !== commentsPaging) {
+    setBasePaging(commentsPaging);
+    setPage(commentsPaging.page);
+    setPaging(commentsPaging);
+  }
+
+  const pageRef = useRef(page);
+  useEffect(() => {
+    pageRef.current = page;
+  }, [page]);
+
+  /** 重拉当前页：实时侧的删除 / 审核兜底走这里，避免把用户从第 N 页弹回第 1 页 */
+  const reload = useCallback(async () => {
+    const res = await loadRootCommentsAction({ resourceId, page: pageRef.current });
+    if (!res.ok) return;
+    setMerged(res.roots);
+    setPage(res.paging.page);
+    setPaging({ ...res.paging, commentTotal: res.commentTotal });
+  }, [resourceId]);
+
+  useCommentPolling({
+    resourceId,
+    comments: merged,
+    setComments: setMerged,
+    // 基准只跟服务端下发的那一页走，不随本地合并变化
+    sinceResetKey: comments,
+    page,
+    onReload: reload,
+    onAdded: (n) => setPaging((p) => ({ ...p, commentTotal: p.commentTotal + n })),
+  });
+
+  /** 根楼层翻页：整页替换，并把评论区滚回顶部 */
+  async function goPage(next: number) {
+    if (pagePending || next < 1 || next === page) return;
+    setPagePending(true);
+    const res = await loadRootCommentsAction({ resourceId, page: next });
+    setPagePending(false);
+    if (!res.ok) {
+      toast(res.error, "error");
+      return;
+    }
+    setMerged(res.roots);
+    setPage(res.paging.page);
+    setPaging({ ...res.paging, commentTotal: res.commentTotal });
+    document.getElementById("comments")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  /** 子评论翻页：只替换该根楼层的回复，其它楼层不动 */
+  async function goRepliesPage(rootId: string, next: number) {
+    if (repliesPendingId) return;
+    setRepliesPendingId(rootId);
+    const res = await loadRepliesAction({ rootId, page: next });
+    setRepliesPendingId(null);
+    if (!res.ok) {
+      toast(res.error, "error");
+      return;
+    }
+    setMerged((prev) =>
+      prev.map((c) =>
+        c.id === rootId ? { ...c, replies: res.replies, repliesPaging: res.paging } : c,
+      ),
+    );
+  }
 
   // 外部链接带 #comment-<id>：挂载后定位并高亮（居中+闪烁）；目标已删则静默跳过。
   const didLocate = useRef(false);
@@ -174,8 +261,9 @@ export default function Comments({
   }
 
   async function remove(commentId: string) {
-    // 删的是根楼层时提醒回复的去向：回复不会一起消失，会上移成独立评论（见 queries 的 rootIdOf 上溯）
-    const replies = merged.find((c) => c.id === commentId)?.replies.length ?? 0;
+    // 删的是根楼层时提醒回复的去向：回复不会一起消失，会上移成独立评论
+    // （口径见 comments-paging 的 rootFloorWhere）。这里取该根的总回复数，不是当前页的条数。
+    const replies = merged.find((c) => c.id === commentId)?.repliesPaging.total ?? 0;
     const ok = await confirmDialog({
       title: "删除评论",
       message: replies
@@ -197,13 +285,14 @@ export default function Comments({
       toast("网络异常，未能确认删除结果，请刷新页面查看", "error");
     } finally {
       setDeletingId(null);
-      // 成功或结果未知都刷新：服务端可能已经删掉了，让列表回到真实状态
-      router.refresh();
+      // 成功或结果未知都重拉：服务端可能已经删掉了，让列表回到真实状态。
+      // 走 reload 而不是 router.refresh，避免把用户从第 N 页弹回第 1 页。
+      void reload();
     }
   }
 
-  // 总数含楼中楼回复
-  const total = merged.length + merged.reduce((n, c) => n + c.replies.length, 0);
+  // 总数含楼中楼回复，由服务端给：本地只加载了一部分，自己数会少
+  const total = paging.commentTotal;
 
   return (
     <section id="comments" className="mt-10 scroll-mt-24 border-t border-neutral-200 pt-8">
@@ -320,9 +409,7 @@ export default function Comments({
           </div>
           )}
           <div className="mt-2 flex items-center justify-end gap-3">
-            <span className="text-xs text-neutral-400">
-              支持 Markdown 基础语法
-            </span>
+            
             <Button
               type="button"
               disabled={sending || !text.trim() || text.length > COMMENT_MAX}
@@ -354,17 +441,26 @@ export default function Comments({
             sending={sending}
             deletingId={deletingId}
             inputCls={commentInputCls}
+            repliesPending={repliesPendingId === c.id}
             onReplyChange={setReply}
             onPost={post}
             onDelete={remove}
             onNavigate={navigateToComment}
+            onRepliesPage={goRepliesPage}
             onViewImages={(images, index) => setViewer({ images, index })}
           />
         ))}
         {merged.length === 0 && (
-          <li className="text-sm text-neutral-400">还没有评论，来说两句？</li>
+          <li className="text-sm text-neutral-400">
+            {totalPagesOf(paging) > 1 ? "这一页没有评论。" : "还没有评论，来说两句？"}
+          </li>
         )}
       </ul>
+
+      {/* 只有多页时才给分页器：单页摆个「1/1」只是噪音 */}
+      {totalPagesOf(paging) > 1 && (
+        <CommentsPager paging={paging} commentTotal={total} pending={pagePending} onChange={goPage} />
+      )}
 
       {viewer && (
         <ImageViewer

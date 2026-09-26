@@ -362,6 +362,7 @@ export async function CommentBlock({ ctx }: { ctx: DetailCtx }) {
       viewerId={meId}
       isStaff={isStaff}
       comments={detail.comments}
+      commentsPaging={detail.commentsPaging}
       imageMax={L.commentImageMaxCount}
     />
   );

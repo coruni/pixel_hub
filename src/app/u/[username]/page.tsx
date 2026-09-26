@@ -530,7 +530,7 @@ export default async function UserPage({
       )}
       {tab === "favorites" &&
         (works.length > 0 ? (
-          <ResourceGrid className="mt-4" items={works} display="card" ratio="3:4" />
+          <ResourceGrid className="mt-4 lg:grid-cols-6!" items={works} display="card" ratio="3:4" />
         ) : (
           emptyBox("还没有收藏内容")
         ))}

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { isOnline } from "@/lib/online";
 import { auth } from "@/lib/auth";
 import { searchRuntime } from "@/lib/search";
+import { fetchRootCommentsPage } from "@/lib/comments-paging";
 import { cache } from "react";
 import { unstable_noStore as noStore } from "next/cache";
 import type { Prisma, ResourceType } from "@prisma/client";
@@ -416,117 +417,9 @@ export const getResourceDetail = cache(async (slug: string, viewerId?: string) =
     };
   }
 
-  // 一次取评论（软上限：取最新 200 条再正序），在内存里展平：二级以下的回复全部挂到根楼层下（按时间序），
-  // 避免嵌套多层；深层回复带上 replyTo（被回复人）供 UI 显示 "回复 @xx"
-  const allComments = (
-    await prisma.comment.findMany({
-      where: { resourceId: resource.id, status: "PUBLIC" },
-      orderBy: { createdAt: "desc" },
-      take: 200,
-      include: {
-        author: {
-          select: {
-            username: true,
-            name: true,
-            avatarKey: true,
-            bio: true,
-            role: true,
-            trusted: true,
-            createdAt: true,
-          },
-        },
-        media: {
-          orderBy: { sort: "asc" },
-          select: { storageKey: true, width: true, height: true },
-        },
-      },
-    })
-  ).reverse();
-  // 用户 hover 卡片统计（作品数/关注者数）+ 在线状态，authorId 批量查一次
-  const authorIds = [...new Set(allComments.map((c) => c.authorId))];
-  const authorStats = await prisma.user.findMany({
-    where: { id: { in: authorIds } },
-    select: {
-      id: true,
-      lastSeenAt: true,
-      _count: { select: { resources: true, followers: true } },
-    },
-  });
-  const statsMap = new Map(
-    authorStats.map((u) => [u.id, { ...u._count, lastSeenAt: u.lastSeenAt }]),
-  );
-  const commentMap = new Map(allComments.map((c) => [c.id, c]));
-  const rootIdOf = (c: (typeof allComments)[number]): string => {
-    let cur = c;
-    while (cur.parentId) {
-      const p = commentMap.get(cur.parentId);
-      // 祖先楼层已被删除（不在 PUBLIC 集合）→ 上溯链断裂，当前可达的最早祖先视为根
-      if (!p) break;
-      cur = p;
-    }
-    return cur.id;
-  };
-  const replyName = (a: { username: string; name: string | null }) => a.name ?? a.username;
-  // 根楼层 = 无父，或父已被删除（上溯链断裂）。**必须与 rootIdOf 同一口径**：
-  // 只按 `!parentId` 判根，会让「父被删掉的那条回复」既不是根、也不会出现在任何根的 replies 里
-  // ——整条回复连同它的子回复被静默吞掉（评论区看不到，但它在库里仍是 PUBLIC）。
-  const rootIds = new Set(allComments.filter((c) => rootIdOf(c) === c.id).map((c) => c.id));
-  const repliesByRoot = new Map<
-    string,
-    {
-      c: (typeof allComments)[number];
-      replyTo: { id: string; name: string; content: string } | null;
-    }[]
-  >();
-  for (const c of allComments) {
-    if (rootIds.has(c.id)) continue;
-    // 类型收窄用；逻辑上非根楼层的 parentId 必然存在（无父的已在 rootIds 里）
-    const parentId = c.parentId;
-    if (!parentId) continue;
-    const rootId = rootIdOf(c);
-    const list = repliesByRoot.get(rootId) ?? [];
-    const parent = commentMap.get(parentId);
-    // 二级回复 replyTo 为 null；深层回复指向被回复评论（供 UI hover 卡片定位、引用卡显示原文）
-    list.push({
-      c,
-      replyTo: parent?.parentId
-        ? { id: parent.id, name: replyName(parent.author), content: parent.content }
-        : null,
-    });
-    repliesByRoot.set(rootId, list);
-  }
-
-  // client 组件（Comments）拿到的 avatarKey 必须是已解析 URL：浏览器端 env 不可用
-  const toCommentAuthor = (
-    a: {
-      username: string;
-      name: string | null;
-      avatarKey: string | null;
-      bio: string | null;
-      role: string;
-      trusted: boolean;
-      createdAt: Date;
-    },
-    id: string,
-  ) => {
-    const s = statsMap.get(id);
-    return {
-      id,
-      username: a.username,
-      name: a.name,
-      avatarKey: a.avatarKey ? publicUrl(a.avatarKey) : null,
-      bio: a.bio,
-      role: a.role,
-      trusted: a.trusted,
-      createdAt: a.createdAt,
-      resourceCount: s?.resources,
-      followerCount: s?.followers,
-      online: isOnline(s?.lastSeenAt),
-    };
-  };
-  const toCommentImages = (
-    ms: { storageKey: string; width: number | null; height: number | null }[],
-  ) => ms.map((m) => ({ url: publicUrl(m.storageKey), width: m.width, height: m.height }));
+  // 评论区第一页：根楼层按 createdAt 倒序（最新在前），每个根只展开第 1 页回复。
+  // 后续页与子评论翻页走 loadRootCommentsAction / loadRepliesAction，不再一次性全量取数。
+  const commentsPage = await fetchRootCommentsPage(resource.id, 1);
 
   // media 已映射为 gallery，不再随返回值重复序列化（原对象含多个 storage key 字段）
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -551,24 +444,8 @@ export const getResourceDetail = cache(async (slug: string, viewerId?: string) =
       followerCount: resource.author._count.followers,
       online: isOnline(resource.author.lastSeenAt),
     },
-    comments: allComments
-      .filter((c) => rootIds.has(c.id))
-      .map((c) => ({
-        id: c.id,
-        authorId: c.authorId,
-        content: c.content,
-        createdAt: c.createdAt,
-        author: toCommentAuthor(c.author, c.authorId),
-        images: toCommentImages(c.media),
-        replies: (repliesByRoot.get(c.id) ?? []).map(({ c: rp, replyTo }) => ({
-          id: rp.id,
-          authorId: rp.authorId,
-          content: rp.content,
-          createdAt: rp.createdAt,
-          author: toCommentAuthor(rp.author, rp.authorId),
-          replyTo,
-        })),
-      })),
+    comments: commentsPage.roots,
+    commentsPaging: { ...commentsPage.paging, commentTotal: commentsPage.commentTotal },
     viewer: viewerStates,
   };
 });

@@ -5,7 +5,9 @@ import { timeAgo } from "@/lib/format";
 import PresenceAvatar from "@/components/ui/PresenceAvatar";
 import UserHoverCard from "@/components/ui/UserHoverCard";
 import CommentHoverCard from "./CommentHoverCard";
-import type { CommentImage, CommentShape } from "./comment-types";
+import type { CommentImage, CommentReply, CommentShape } from "./comment-types";
+import { totalPagesOf } from "./comment-types";
+import { RepliesPager } from "./CommentPager";
 import { Button } from "@/components/ui/Button";
 import Markdown from "@/components/rte/Markdown";
 
@@ -75,10 +77,12 @@ export default function CommentItem({
   sending,
   deletingId,
   inputCls,
+  repliesPending,
   onReplyChange,
   onPost,
   onDelete,
   onNavigate,
+  onRepliesPage,
   onViewImages,
 }: {
   c: CommentShape;
@@ -90,10 +94,13 @@ export default function CommentItem({
   /** 全树共用一个「正在删除」id：该条（含其回复）的删除按钮禁用并改文案，避免确认后重复点击 */
   deletingId?: string | null;
   inputCls: string;
+  /** 该根楼层正在切换回复页 */
+  repliesPending: boolean;
   onReplyChange: (next: ReplyState) => void;
   onPost: (parentId: string | null, text: string) => void;
   onDelete: (commentId: string) => Promise<void>;
   onNavigate: (commentId: string, fallbackRootId: string) => void;
+  onRepliesPage: (rootId: string, page: number) => void;
   onViewImages: (images: CommentImage[], index: number) => void;
 }) {
   const replyOpen = reply.openFor === c.id;
@@ -207,6 +214,15 @@ export default function CommentItem({
           ))}
         </ul>
       )}
+
+      {/* 回复超过一页才给分页器：单页已经全展开了，摆个「1/1」只是噪音 */}
+      {totalPagesOf(c.repliesPaging) > 1 && (
+        <RepliesPager
+          paging={c.repliesPaging}
+          pending={repliesPending}
+          onChange={(page) => onRepliesPage(c.id, page)}
+        />
+      )}
     </li>
   );
 }
@@ -221,7 +237,7 @@ function ReplyItem({
   onDelete,
   onNavigate,
 }: {
-  rp: CommentShape["replies"][number];
+  rp: CommentReply;
   rootId: string;
   canPost: boolean;
   canDel: boolean;

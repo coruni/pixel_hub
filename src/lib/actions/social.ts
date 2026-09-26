@@ -20,6 +20,8 @@ import { publishCommentChanged, publishCommentNew } from "@/lib/realtime/publish
 import { audit } from "@/lib/actions/_guards";
 import { MIB } from "@/lib/upload-config";
 import { getUploadLimits } from "@/lib/upload-limits";
+import { fetchRepliesPage, fetchRootCommentsPage } from "@/lib/comments-paging";
+import type { CommentReply, CommentShape, PagingMeta } from "@/components/social/comment-types";
 import {
   compressWith,
   compressConfigOf,
@@ -526,6 +528,65 @@ export async function addCommentAction(
   // 实时推送放在事务提交之后：正文不随推送下发，观看端收到信号后自行拉增量（见 use-comment-polling）
   publishCommentNew(resource.id);
   return { ok: true };
+}
+
+// ---------- 评论分页 ----------
+// 首屏由 getResourceDetail 直接给出第 1 页；这里只负责翻页，取数口径与首屏完全一致
+// （根楼层 createdAt 倒序、每根附带其回复的第 1 页），否则翻页会出现重复或漏行。
+
+const rootCommentsPageSchema = z.object({
+  resourceId: z.string().min(1).max(64),
+  page: z.number().int().min(1).max(500),
+});
+
+export type RootCommentsPageResult =
+  | { ok: true; roots: CommentShape[]; paging: PagingMeta; commentTotal: number }
+  | { ok: false; error: string };
+
+/** 评论区根楼层翻页：返回该页的根楼层（每个根只带第 1 页回复） */
+export async function loadRootCommentsAction(input: {
+  resourceId: string;
+  page: number;
+}): Promise<RootCommentsPageResult> {
+  const parsed = rootCommentsPageSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "参数不合法" };
+
+  // 与 getResourceDetail 同口径：登录用户可预览未发布资源的评论区，匿名只看已发布
+  const session = await auth();
+  const viewerId = typeof session?.user?.id === "string" && session.user.id ? session.user.id : null;
+  const resource = await prisma.resource.findFirst({
+    where: {
+      id: parsed.data.resourceId,
+      ...(viewerId ? {} : { status: "PUBLISHED" as const }),
+    },
+    select: { id: true },
+  });
+  if (!resource) return { ok: false, error: "资源不存在或已下线" };
+
+  const p = await fetchRootCommentsPage(resource.id, parsed.data.page);
+  return { ok: true, roots: p.roots, paging: p.paging, commentTotal: p.commentTotal };
+}
+
+const repliesPageSchema = z.object({
+  rootId: z.string().min(1).max(64),
+  page: z.number().int().min(1).max(500),
+});
+
+export type RepliesPageResult =
+  | { ok: true; replies: CommentReply[]; paging: PagingMeta }
+  | { ok: false; error: string };
+
+/** 单个根楼层的子评论翻页 */
+export async function loadRepliesAction(input: {
+  rootId: string;
+  page: number;
+}): Promise<RepliesPageResult> {
+  const parsed = repliesPageSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "参数不合法" };
+
+  const p = await fetchRepliesPage(parsed.data.rootId, parsed.data.page);
+  if (!p) return { ok: false, error: "这条评论已不存在" };
+  return { ok: true, replies: p.replies, paging: p.paging };
 }
 
 /** 删除评论。失败时给可读原因 —— 前台要把它直接 toast 出来，不能只回一个 ok:false。 */
