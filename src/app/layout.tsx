@@ -29,7 +29,7 @@ export async function generateMetadata(): Promise<Metadata> {
     },
   };
   return {
-    title: { default: name, template: `%s · ${name}` },
+    title: { default: name, template: `%s - ${name}` },
     description,
     // meta keywords：Google 忽略，百度/Yandex 仍参考；未配置不输出
     keywords: seo.keywords || undefined,
@@ -38,7 +38,7 @@ export async function generateMetadata(): Promise<Metadata> {
       type: "website",
       siteName: name,
       locale: seo.ogLocale,
-      title: { default: name, template: `%s · ${name}` },
+      title: { default: name, template: `%s - ${name}` },
       description,
     },
     twitter: { card: "summary_large_image" },

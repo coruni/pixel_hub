@@ -24,7 +24,7 @@ export default function Footer({
   contactEmail: string;
 }) {
   return (
-    <footer className="mt-10 border-t border-brand-200 py-8 text-center text-xs text-neutral-400">
+    <footer className="mt-10 py-8 text-center text-xs text-neutral-400">
       <p>
         {FOOTER_LINKS.map((l, i) => (
           <span key={l.href}>

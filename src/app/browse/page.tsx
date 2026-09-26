@@ -46,7 +46,7 @@ export async function generateMetadata({
   // 若共用一套标题/描述就会被判重复内容
   const cat = await resolveCat(sp);
   return {
-    title: cat ? `${cat.name} · 浏览` : "浏览",
+    title: cat ? `${cat.name} - 浏览` : "浏览",
     description: cat
       ? `浏览「${cat.name}」分类下的全部资源，可按类型、时间与热度筛选。`
       : "浏览站内全部资源，可按分类、类型、时间与热度筛选。",
@@ -60,8 +60,8 @@ export default async function BrowsePage({ searchParams }: { searchParams: Promi
   const u = session?.user;
   const q = str(sp, "q")?.trim() ?? "";
   const cat = await resolveCat(sp);
-  const pageTitle = q ? "搜索" : cat ? `${cat.name} · 浏览` : "浏览";
-  const fullTitle = `${pageTitle} · ${resolveSiteName(seo)}`;
+  const pageTitle = q ? "搜索" : cat ? `${cat.name} - 浏览` : "浏览";
+  const fullTitle = `${pageTitle} - ${resolveSiteName(seo)}`;
   return (
     <>
       <BrowseTitleSync title={fullTitle} />

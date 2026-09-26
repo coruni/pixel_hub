@@ -7,12 +7,22 @@ import SidebarLayout from "@/components/layout/SidebarLayout";
 import { getTheme } from "@/lib/site";
 import type { SP } from "@/lib/search-params";
 
-import { getSeoConfig, resolveSiteName } from "@/lib/seo-config";
+import { getSeoConfig, resolveHomeTitle, resolveSiteName } from "@/lib/seo-config";
 
-// root layout 的 title.template 不作用于与其同段的首页，需自行拼接站点名
+// root layout 的 title.template 不作用于与其同段的首页，需自行拼接站点名。
+// 标题主体来自后台「首页标题 / 首页副标题」（拼成「标题 - 副标题」），未配置时回退「发现」。
 export async function generateMetadata(): Promise<Metadata> {
-  const name = resolveSiteName(await getSeoConfig());
-  return { title: `发现 · ${name}` };
+  const seo = await getSeoConfig();
+  const name = resolveSiteName(seo);
+  const title = resolveHomeTitle(seo);
+  return {
+    title: `${title} - ${name}`,
+    // 首页描述：后台默认描述优先，其次副标题，最后内置文案
+    description:
+      seo.defaultDescription ||
+      seo.homeSubtitle ||
+      `分享与发现图片、游戏等数字资源的${name}平台`,
+  };
 }
 
 export default async function HomePage({ searchParams }: { searchParams: Promise<SP> }) {

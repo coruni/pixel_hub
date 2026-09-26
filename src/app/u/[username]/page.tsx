@@ -48,7 +48,7 @@ export async function generateMetadata({
   const meId =
     typeof session?.user?.id === "string" && session.user.id ? session.user.id : undefined;
   const p = await getProfile(username, meId);
-  return { title: p ? `${p.name ?? p.username} · 个人主页` : "用户不存在" };
+  return { title: p ? `${p.name ?? p.username} - 个人主页` : "用户不存在" };
 }
 
 const roleBadge: Record<string, { label: string; cls: string }> = {

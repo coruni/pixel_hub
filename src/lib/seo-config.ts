@@ -29,6 +29,10 @@ export const seoConfigSchema = z.object({
   ogLocale: z.string().default(""),
   // 默认 meta description；空 = 回退代码内文案（含站点名）
   defaultDescription: z.string().default(""),
+  // 首页专属标题（仅首页生效）；空 = 回退内置文案「发现」。与 homeSubtitle 拼成「标题 - 副标题」
+  homeTitle: z.string().default(""),
+  // 首页专属副标题（仅首页生效）；为空时首页标题只输出 homeTitle，不拼分隔符
+  homeSubtitle: z.string().default(""),
   // 页脚自定义文案（站名之后的一句话）；空 = 不显示
   footerText: z.string().default(""),
   // ICP 备案号（页脚展示）；空 = 不显示
@@ -69,6 +73,8 @@ export function sanitizeSeo(config: SeoConfig): SeoConfig {
     },
     ogLocale: locale && LOCALE_RE.test(locale) ? locale : "zh_CN",
     defaultDescription: config.defaultDescription.trim().slice(0, 300),
+    homeTitle: config.homeTitle.trim().slice(0, 60),
+    homeSubtitle: config.homeSubtitle.trim().slice(0, 60),
     footerText: config.footerText.trim().slice(0, 120),
     icp: config.icp.trim().slice(0, 60),
     contactEmail: config.contactEmail.trim().slice(0, 200),
@@ -134,4 +140,14 @@ export function jsonLd(data: unknown): string {
 /** 站点名解析：后台配置优先，未配置回退 env NEXT_PUBLIC_SITE_NAME（站点展示统一入口） */
 export function resolveSiteName(seo: SeoConfig): string {
   return seo.siteName || fallbackSiteName();
+}
+
+/**
+ * 首页 `<title>` 的主体（不含站点名后缀，后缀由 root layout 的 template 拼接）。
+ * 口径：配了 homeTitle 就用它；配了 homeSubtitle 则拼成「标题 - 副标题」。
+ * 两者都没配时回退内置文案「发现」——保证首页标题永不空白。
+ */
+export function resolveHomeTitle(seo: SeoConfig): string {
+  const title = seo.homeTitle || "发现";
+  return seo.homeSubtitle ? `${title} - ${seo.homeSubtitle}` : title;
 }

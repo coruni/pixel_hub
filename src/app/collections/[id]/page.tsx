@@ -18,7 +18,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const col = await getCollectionDetail(id, meId);
   if (!col || !col.isPublic) return { title: "收藏夹不存在", robots: { index: false } };
   return {
-    title: `${col.name} · ${col.owner.name ?? col.owner.username} 的收藏夹`,
+    title: `${col.name} - ${col.owner.name ?? col.owner.username} 的收藏夹`,
     description: col.description ?? undefined,
   };
 }

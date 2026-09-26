@@ -47,6 +47,8 @@ export default function SeoManager({
     baidu: config.verifications.baidu,
     ogLocale: config.ogLocale,
     defaultDescription: config.defaultDescription,
+    homeTitle: config.homeTitle,
+    homeSubtitle: config.homeSubtitle,
     structuredData: config.structuredData,
     indexnowEnabled: config.indexnow.enabled,
     indexnowKey: config.indexnow.key,
@@ -70,6 +72,8 @@ export default function SeoManager({
     },
     ogLocale: form.ogLocale,
     defaultDescription: form.defaultDescription,
+    homeTitle: form.homeTitle,
+    homeSubtitle: form.homeSubtitle,
     structuredData: form.structuredData,
     indexnow: { enabled: form.indexnowEnabled, key: form.indexnowKey },
   });
@@ -266,6 +270,42 @@ export default function SeoManager({
             />
             <p className="mt-1 text-[10px] leading-4 text-neutral-400">
               形如 zh_CN / en_US；留空或非法时回退 zh_CN。
+            </p>
+          </div>
+          <div>
+            <label htmlFor="seo-home-title" className={LABEL_STRONG}>
+              首页标题
+            </label>
+            <input
+              id="seo-home-title"
+              value={form.homeTitle}
+              onChange={(e) => set({ homeTitle: e.target.value })}
+              className={INPUT}
+              maxLength={60}
+              placeholder="留空使用「发现」"
+              autoComplete="off"
+              spellCheck={false}
+            />
+            <p className="mt-1 text-[10px] leading-4 text-neutral-400">
+              仅首页生效。最终标题为「首页标题 - 首页副标题 - 站点名」。
+            </p>
+          </div>
+          <div>
+            <label htmlFor="seo-home-subtitle" className={LABEL_STRONG}>
+              首页副标题
+            </label>
+            <input
+              id="seo-home-subtitle"
+              value={form.homeSubtitle}
+              onChange={(e) => set({ homeSubtitle: e.target.value })}
+              className={INPUT}
+              maxLength={60}
+              placeholder="留空只显示首页标题"
+              autoComplete="off"
+              spellCheck={false}
+            />
+            <p className="mt-1 text-[10px] leading-4 text-neutral-400">
+              仅首页生效，与首页标题用「 - 」连接；留空时不输出分隔符。
             </p>
           </div>
           <div>
