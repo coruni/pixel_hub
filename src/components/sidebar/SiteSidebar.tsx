@@ -97,9 +97,11 @@ async function renderWidgets(
 ): Promise<ReactNode | null> {
   const primaries: ReactNode[] = [];
   const mores: ReactNode[] = [];
+  // 各侧栏组件只读各自的数据源，彼此没有依赖；并行渲染避免热门/标签/创作者等模块串行阻塞首屏。
+  const rendered = await Promise.all(widgets.map((w) => renderWidget(w, detail)));
   for (let i = 0; i < widgets.length; i++) {
     const w = widgets[i];
-    const node = await renderWidget(w, detail);
+    const node = rendered[i];
     if (!node) continue;
     const cls = visibleOnClass(w.visibleOn);
     const wrapped = cls ? (

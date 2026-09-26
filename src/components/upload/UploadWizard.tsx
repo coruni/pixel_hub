@@ -28,7 +28,7 @@ import {
   draftTimeText,
   type DraftPayload,
 } from "@/lib/draft";
-import MdEditor from "@/components/rte/MdEditor";
+import MdEditor from "@/components/rte/MdEditorLazy";
 import MediaPicker from "./media-picker";
 import { ArticleSection, GameSection, ImageSection, type AttachRow } from "./wizard-sections";
 import { AvSection } from "./av-section";

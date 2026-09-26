@@ -5,7 +5,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { resetDocAction, saveDocAction } from "@/lib/actions/docs";
-import MdEditor from "@/components/rte/MdEditor";
+import MdEditor from "@/components/rte/MdEditorLazy";
 import { confirmDialog } from "@/components/ui/feedback";
 
 import { Button } from "@/components/ui/Button";

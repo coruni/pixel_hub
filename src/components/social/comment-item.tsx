@@ -17,15 +17,13 @@ import {
 import { RepliesPager } from "./CommentPager";
 import { Button } from "@/components/ui/Button";
 import Markdown from "@/components/rte/Markdown";
-import MdEditor from "@/components/rte/MdEditor";
-import { CrepeFeature } from "@milkdown/crepe";
-
+import MdEditor from "@/components/rte/MdEditorLazy";
 /** 单个根楼层 + 楼中楼回复列表。回复框状态由 Comments 统一持有（同屏只开一个）。 */
-const COMMENT_FEATURES: Partial<Record<CrepeFeature, boolean>> = {
-  [CrepeFeature.ImageBlock]: false,
-  [CrepeFeature.Table]: false,
-  [CrepeFeature.BlockEdit]: false,
-};
+const COMMENT_FEATURES = {
+  "image-block": false,
+  table: false,
+  "block-edit": false,
+} as const;
 
 /** 评论正文排版：编辑器的 15px 是文章级字号，评论用 14px 更贴合列表节奏 */
 const COMMENT_MD_CLS = "md-body text-sm leading-6 text-neutral-700";

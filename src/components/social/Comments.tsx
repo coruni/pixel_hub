@@ -4,10 +4,9 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ImagePlus, X } from "lucide-react";
-import { CrepeFeature } from "@milkdown/crepe";
 import { addCommentAction, deleteCommentAction, loadRepliesAction, loadRootCommentsAction } from "@/lib/actions/social";
 import ImageViewer from "@/components/ui/ImageViewer";
-import MdEditor from "@/components/rte/MdEditor";
+import MdEditor from "@/components/rte/MdEditorLazy";
 import { useFileDrop } from "@/lib/hooks/use-file-drop";
 import { useFilePaste } from "@/lib/hooks/use-file-paste";
 import { confirmDialog, toast } from "@/components/ui/feedback";
@@ -30,11 +29,11 @@ export type { CommentAuthor, CommentImage, CommentShape } from "./comment-types"
  *  ImageBlock 关闭后斜杠菜单的 Image 项自动消失；BlockEdit 关闭会连同 / 斜杠菜单一起去掉
  *  （评论框只有 6rem 高，块操作柄会溢到框外，且靠手打语法足够）。
  *  手打 ![alt](url) 仍可生成行内图，该风险在渲染层用图片域名白名单兜底。 */
-const COMMENT_FEATURES: Partial<Record<CrepeFeature, boolean>> = {
-  [CrepeFeature.ImageBlock]: false,
-  [CrepeFeature.Table]: false,
-  [CrepeFeature.BlockEdit]: false,
-};
+const COMMENT_FEATURES = {
+  "image-block": false,
+  table: false,
+  "block-edit": false,
+} as const;
 
 /** 资源评论区：主楼发布框（带附图）+ 评论树（根楼层与子评论各自分页）+ 增量轮询 */
 export default function Comments({

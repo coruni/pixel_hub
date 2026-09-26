@@ -63,7 +63,7 @@ export default function Gallery({ media }: { media: GalleryMedia[] }) {
           onSwiper={setSwiper}
           onSlideChange={(s) => setIndex(s.activeIndex)}
         >
-          {media.map((m) => (
+          {media.map((m, i) => (
             <SwiperSlide
               key={m.id}
               className="flex! h-[50vh]! items-center justify-center"
@@ -79,6 +79,8 @@ export default function Gallery({ media }: { media: GalleryMedia[] }) {
                 width={m.width ?? undefined}
                 height={m.height ?? undefined}
                 draggable={false}
+                loading={i === index ? "eager" : "lazy"}
+                decoding={i === index ? "sync" : "async"}
                 className="max-h-full max-w-full h-full cursor-zoom-in select-none object-cover"
               />
             </SwiperSlide>
@@ -128,7 +130,13 @@ export default function Gallery({ media }: { media: GalleryMedia[] }) {
                 aria-label={`第 ${i + 1} 张`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={m.thumbUrl} alt="" className="h-full w-full object-cover" />
+                <img
+                  src={m.thumbUrl}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  className="h-full w-full object-cover"
+                />
               </Button>
             ))}
           </div>

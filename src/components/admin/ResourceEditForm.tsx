@@ -8,7 +8,7 @@
 // 保证「改稿」与「发布」在字段、样式、交互上完全一致。slug / 作者 / 计数 / 历史版本由服务端保持不变。
 import { useActionState, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import MdEditor from "@/components/rte/MdEditor";
+import MdEditor from "@/components/rte/MdEditorLazy";
 
 import { updateResourceAdminAction } from "@/lib/actions/admin-content";
 import type { ResourceEditState, EditableResourceType } from "@/lib/actions/_resource-edit";

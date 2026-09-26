@@ -207,13 +207,13 @@ function toFeedItem(r: FeedRow): FeedItem {
  * （首页板块、浏览/搜索/标签/作者主页、相关推荐、侧栏组件、无限追加 action 都汇到这里）。
  * 非请求上下文一律按游客处理（最安全）；显式 includeNsfw 参数可覆盖。
  */
-async function viewerAuthed(): Promise<boolean> {
+const viewerAuthed = cache(async (): Promise<boolean> => {
   try {
     return !!(await auth())?.user;
   } catch {
     return false;
   }
-}
+});
 
 export async function getFeed(
   params: FeedParams,
@@ -481,27 +481,29 @@ export async function getRelated(resource: RelatedSeed): Promise<FeedCard[]> {
     }
   };
 
+  const poolRequests: Promise<{ items: FeedItem[] }>[] = [];
   if (resource.category) {
-    const { items } = await getFeed({
-      categorySlug: resource.category.slug,
-      sort: "popular",
-      pageSize: LIMIT * 2,
-    });
-    push(items);
+    poolRequests.push(
+      getFeed({
+        categorySlug: resource.category.slug,
+        sort: "popular",
+        pageSize: LIMIT * 2,
+      }),
+    );
   }
   if (resource.tags.length > 0) {
-    const { items } = await getFeed({
-      tagSlugs: resource.tags.map((t) => t.slug),
-      sort: "popular",
-      pageSize: LIMIT * 2,
-    });
-    push(items);
+    poolRequests.push(
+      getFeed({
+        tagSlugs: resource.tags.map((t) => t.slug),
+        sort: "popular",
+        pageSize: LIMIT * 2,
+      }),
+    );
   }
-  {
-    // 同类型热门池兜底（分类/标签池不足时补足多样性）
-    const { items } = await getFeed({ type: resource.type, sort: "popular", pageSize: LIMIT * 2 });
-    push(items);
-  }
+  // 同类型热门池兜底（分类/标签池不足时补足多样性）；三个候选池并行取数，仍按原顺序合并。
+  poolRequests.push(getFeed({ type: resource.type, sort: "popular", pageSize: LIMIT * 2 }));
+  const pools = await Promise.all(poolRequests);
+  for (const { items } of pools) push(items);
 
   const baseTags = new Set(resource.tags.map((t) => t.slug));
   return pool

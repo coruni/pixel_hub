@@ -16,16 +16,7 @@ const BASE_FEATURES: Partial<Record<CrepeFeature, boolean>> = {
   [CrepeFeature.CodeMirror]: false,
 };
 
-export default function MdEditor({
-  defaultValue = "",
-  onChange,
-  placeholder = "直接输入，至少 10 个字…",
-  minHeight = "16rem",
-  ariaLabel = "Markdown 编辑器",
-  features,
-  toolbar = true,
-  compact = false,
-}: {
+export type MdEditorProps = {
   defaultValue?: string;
   onChange?: (markdown: string) => void;
   placeholder?: string;
@@ -37,7 +28,18 @@ export default function MdEditor({
   toolbar?: boolean;
   /** 紧凑模式：隐藏全屏按钮、内容区降为正文级字号、内距收紧（评论框这类嵌入式场景） */
   compact?: boolean;
-}) {
+};
+
+export default function MdEditor({
+  defaultValue = "",
+  onChange,
+  placeholder = "直接输入，至少 10 个字…",
+  minHeight = "16rem",
+  ariaLabel = "Markdown 编辑器",
+  features,
+  toolbar = true,
+  compact = false,
+}: MdEditorProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
   const onChangeRef = useRef(onChange);

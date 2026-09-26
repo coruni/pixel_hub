@@ -108,23 +108,29 @@ export async function renderSameCategory(w: SidebarWidget, detail?: DetailWidget
       }
     }
   };
+  const poolRequests: Promise<{ items: FeedItem[] }>[] = [];
   if (detail.categorySlug) {
-    const { items } = await getFeed({
-      categorySlug: detail.categorySlug,
-      sort: "popular",
-      pageSize: cfg.count,
-      period,
-    });
-    add(items);
+    poolRequests.push(
+      getFeed({
+        categorySlug: detail.categorySlug,
+        sort: "popular",
+        pageSize: cfg.count,
+        period,
+      }),
+    );
   }
-  if (out.length < cfg.count) {
-    // 同类型热门池取大一点，过滤掉已占位后仍有余量
-    const { items } = await getFeed({
+  // 同分类和同类型热门池相互独立，并行取数后仍按原优先级合并。
+  poolRequests.push(
+    getFeed({
       type: detail.type,
       sort: "popular",
       pageSize: cfg.count * 2,
       period,
-    });
+    }),
+  );
+  const pools = await Promise.all(poolRequests);
+  for (const { items } of pools) {
+    if (out.length >= cfg.count) break;
     add(items);
   }
   if (out.length === 0) return null;
