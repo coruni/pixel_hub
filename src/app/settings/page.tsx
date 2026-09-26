@@ -117,10 +117,12 @@ export default async function SettingsPage({
         <>
           <section className={sectionCls}>
             <h2 className={sectionTitle}>主页横幅</h2>
-            <HeroForm
-              heroImageKey={profile?.heroImageKey ?? null}
-              heroMaxMb={limits.heroImageMaxMb}
-            />
+            <div className="mt-4">
+              <HeroForm
+                heroImageKey={profile?.heroImageKey ?? null}
+                heroMaxMb={limits.heroImageMaxMb}
+              />
+            </div>
           </section>
 
           <section className={sectionCls}>
@@ -140,7 +142,9 @@ export default async function SettingsPage({
 
           <section className={sectionCls}>
             <h2 className={sectionTitle}>个人资料</h2>
-            <SettingsForm name={profile?.name ?? null} bio={profile?.bio ?? null} />
+            <div className="mt-4">
+              <SettingsForm name={profile?.name ?? null} bio={profile?.bio ?? null} />
+            </div>
           </section>
 
           {profile && (
@@ -165,14 +169,16 @@ export default async function SettingsPage({
       panel: (
         <section className={sectionCls}>
           <h2 className={sectionTitle}>通知设置</h2>
-          <NotificationsForm
-            emailNotifyComment={profile?.emailNotifyComment ?? true}
-            emailNotifyModeration={profile?.emailNotifyModeration ?? true}
-            inAppNotifyLike={profile?.inAppNotifyLike ?? true}
-            inAppNotifyComment={profile?.inAppNotifyComment ?? true}
-            inAppNotifyFollow={profile?.inAppNotifyFollow ?? true}
-            inAppNotifySystem={profile?.inAppNotifySystem ?? true}
-          />
+          <div className="mt-4">
+            <NotificationsForm
+              emailNotifyComment={profile?.emailNotifyComment ?? true}
+              emailNotifyModeration={profile?.emailNotifyModeration ?? true}
+              inAppNotifyLike={profile?.inAppNotifyLike ?? true}
+              inAppNotifyComment={profile?.inAppNotifyComment ?? true}
+              inAppNotifyFollow={profile?.inAppNotifyFollow ?? true}
+              inAppNotifySystem={profile?.inAppNotifySystem ?? true}
+            />
+          </div>
         </section>
       ),
     },
@@ -183,23 +189,29 @@ export default async function SettingsPage({
         <>
           <section className={sectionCls}>
             <h2 className={sectionTitle}>发布偏好</h2>
-            <PublishForm autoSaveDraft={prefs?.autoSaveDraft ?? true} draftCount={draftCount} />
+            <div className="mt-4">
+              <PublishForm autoSaveDraft={prefs?.autoSaveDraft ?? true} draftCount={draftCount} />
+            </div>
           </section>
 
           <section className={sectionCls}>
             <h2 className={sectionTitle}>图片水印</h2>
-            <WatermarkForm
-              enabled={prefs?.watermarkImages ?? false}
-              text={prefs?.watermarkText ?? null}
-              position={prefs?.watermarkPosition ?? "BOTTOM_RIGHT"}
-              username={me.username}
-            />
+            <div className="mt-4">
+              <WatermarkForm
+                enabled={prefs?.watermarkImages ?? false}
+                text={prefs?.watermarkText ?? null}
+                position={prefs?.watermarkPosition ?? "BOTTOM_RIGHT"}
+                username={me.username}
+              />
+            </div>
           </section>
 
           {/* 草稿箱：与开关同屏，省掉独立页面与菜单里的第二个入口 */}
           <section id="drafts" className={sectionCls}>
             <h2 className={sectionTitle}>草稿箱</h2>
-            <DraftsPanel userId={me.id} />
+            <div className="mt-4">
+              <DraftsPanel userId={me.id} />
+            </div>
           </section>
         </>
       ),
