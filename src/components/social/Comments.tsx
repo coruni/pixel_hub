@@ -248,47 +248,75 @@ export default function Comments({
               {text.length}/{COMMENT_MAX}
             </p>
           )}
-          {/* 附图选择 + 预览（imageMax = 0 时隐藏入口） */}
+          {/* 附图：两种形态互斥渲染。
+              - 无图：只显示「附图 0/N」入口按钮
+              - 有图：按钮让位给缩略图行，末尾的虚线方框接管入口并显示剩余额度
+              imageMax = 0（后台关闭附图）时整块不渲染。 */}
           {imageMax > 0 && (
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <label
-              className={`inline-flex cursor-pointer items-center gap-1.5 rounded-none border bg-surface px-3 py-1.5 text-xs transition ${
-                dragging
-                  ? "border-brand-500 text-brand-700"
-                  : "border-brand-200 text-neutral-600 hover:border-brand-500 hover:text-neutral-900"
-              }`}
-            >
-              <ImagePlus size={14} aria-hidden />
-              附图 {files.length}/{imageMax}
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/png,image/jpeg,image/webp,image/gif"
-                multiple
-                disabled={sending || imagesFull}
-                hidden
-                onChange={(e) => pickImages(e.target.files)}
-              />
-            </label>
-            <span className="text-xs text-neutral-400">拖入或粘贴也可添加</span>
-            {previews.map((src, i) => (
-              <span key={src} className="relative">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={src}
-                  alt={`待上传的附图 ${i + 1}`}
-                  className="h-14 w-14 rounded-none border border-brand-200 object-cover"
-                />
-                <Button
-                  type="button"
-                  onClick={() => removeImage(i)}
-                  aria-label={`移除附图 ${i + 1}`}
-                  className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-none border border-brand-200 bg-surface text-neutral-500 hover:border-red-300 hover:text-red-500"
-                >
-                  <X size={11} aria-hidden />
-                </Button>
-              </span>
-            ))}
+          <div className="mt-2">
+            <input
+              ref={fileRef}
+              id="comment-image-input"
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              multiple
+              disabled={sending || imagesFull}
+              hidden
+              onChange={(e) => pickImages(e.target.files)}
+            />
+            {files.length === 0 ? (
+              <label
+                htmlFor="comment-image-input"
+                className={`inline-flex cursor-pointer items-center gap-1.5 rounded-none border bg-surface px-3 py-1.5 text-xs transition ${
+                  dragging
+                    ? "border-brand-500 text-brand-700"
+                    : "border-brand-200 text-neutral-600 hover:border-brand-500 hover:text-neutral-900"
+                }`}
+              >
+                <ImagePlus size={14} aria-hidden />
+                附图 0/{imageMax}
+              </label>
+            ) : (
+              <div className="flex flex-wrap items-start gap-2">
+                {previews.map((src, i) => (
+                  <span key={src} className="relative">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={src}
+                      alt={`待上传的附图 ${i + 1}`}
+                      className="h-20 w-20 rounded-none border border-brand-200 object-cover"
+                    />
+                    <Button
+                      type="button"
+                      onClick={() => removeImage(i)}
+                      aria-label={`移除附图 ${i + 1}`}
+                      className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-none border border-brand-200 bg-surface text-neutral-500 hover:border-red-300 hover:text-red-500"
+                    >
+                      <X size={11} aria-hidden />
+                    </Button>
+                  </span>
+                ))}
+                {/* 添加方框：唯一的入口（点击 / 拖入 / 粘贴）；额度用完就不渲染，
+                    与 useFileDrop/useFilePaste 的 disabled 条件同步，避免「框还在但拖进去没反应」 */}
+                {!imagesFull && (
+                  <label
+                    htmlFor="comment-image-input"
+                    className={`grid h-20 w-20 cursor-pointer place-items-center rounded-none border-2 border-dashed text-center transition ${
+                      dragging
+                        ? "border-brand-600 bg-brand-100 text-brand-700"
+                        : "border-brand-300 bg-brand-50/40 text-brand-700 hover:border-brand-500 hover:bg-brand-50"
+                    }`}
+                  >
+                    <span className="px-1 text-[11px] leading-tight">
+                      {dragging ? "松开即可" : "＋ 添加"}
+                      <span className="mt-0.5 block font-normal text-[10px] opacity-70">
+                        拖入或粘贴 {files.length}/{imageMax}
+                      </span>
+                    </span>
+                  </label>
+                )}
+              </div>
+            )}
           </div>
           )}
           <div className="mt-2 flex items-center justify-end gap-3">
