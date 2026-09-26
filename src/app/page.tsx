@@ -17,7 +17,9 @@ export async function generateMetadata(): Promise<Metadata> {
   const name = resolveSiteName(seo);
   const title = resolveHomeTitle(seo);
   return {
-    title: `${title} - ${name}`,
+    title: {
+      absolute: `${title} - ${name}`,
+    },
     // 首页描述：后台默认描述优先，其次副标题，最后内置文案
     description:
       seo.defaultDescription ||
