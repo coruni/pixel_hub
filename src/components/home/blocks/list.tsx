@@ -1,6 +1,7 @@
 import ResourceGrid from "@/components/resource/ResourceGrid";
 import BlockShell from "@/components/home/BlockShell";
 import { getFeed } from "@/lib/queries";
+import { getIncentive } from "@/lib/incentive";
 import type { CardRatio, ContentDisplay, ContentType } from "@/lib/display";
 import ListMore from "./list-more";
 
@@ -31,21 +32,32 @@ export default async function ListBlock({
   cfg: ListBlockCfg;
 }) {
   const period = cfg.period && cfg.period !== "all" ? cfg.period : undefined;
-  const { items } = await getFeed({
-    type: cfg.type,
-    sort: cfg.sort,
-    pageSize: cfg.count,
-    categorySlugs: cfg.categorySlugs,
-    tagSlugs: cfg.tagSlugs,
-    period,
-  });
+  const [{ items }, incentive] = await Promise.all([
+    getFeed({
+      type: cfg.type,
+      sort: cfg.sort,
+      pageSize: cfg.count,
+      categorySlugs: cfg.categorySlugs,
+      tagSlugs: cfg.tagSlugs,
+      period,
+    }),
+    // 昵称色开关：ListMore 是客户端组件，读不到服务端配置，必须在这里取好传下去。
+    // getIncentive 走请求级 cache，与页面其它读取共享同一次查询。
+    getIncentive(),
+  ]);
   if (items.length === 0) return null;
 
   const ratio = cfg.display === "list" ? undefined : cfg.ratio;
+  const nicknameEnabled = incentive.decoration.nicknameEnabled;
 
   return (
     <BlockShell title={title}>
-      <ResourceGrid items={items} display={cfg.display} ratio={ratio} />
+      <ResourceGrid
+        items={items}
+        display={cfg.display}
+        ratio={ratio}
+        nicknameEnabled={nicknameEnabled}
+      />
       {cfg.paged && (
         <ListMore
           type={cfg.type}
@@ -57,6 +69,7 @@ export default async function ListBlock({
           ratio={ratio}
           period={period}
           mode={cfg.loadMode ?? "button"}
+          nicknameEnabled={nicknameEnabled}
         />
       )}
     </BlockShell>

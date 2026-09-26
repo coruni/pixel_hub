@@ -26,6 +26,7 @@ export default function ListMore({
   ratio,
   period,
   mode = "button",
+  nicknameEnabled = true,
 }: {
   type: "ALL" | ContentType;
   sort: Sort;
@@ -37,6 +38,8 @@ export default function ListMore({
   /** 时间窗口：与首屏一致，保证后续页用同一筛选条件 */
   period?: "week" | "month";
   mode?: LoadMoreMode;
+  /** 昵称特效色总开关：客户端组件读不到服务端配置，必须由服务端板块传下来 */
+  nicknameEnabled?: boolean;
 }) {
   const { more, hasMore, done, err, pending, loadNext } = useLoadMore<Item>((page) =>
     loadListPageAction({ page, pageSize, type, sort, categorySlugs, tagSlugs, period }),
@@ -75,7 +78,12 @@ export default function ListMore({
     <div>
       {more.length > 0 && (
         <div className="mt-4">
-          <ResourceGrid items={more} display={display} ratio={ratio} />
+          <ResourceGrid
+            items={more}
+            display={display}
+            ratio={ratio}
+            nicknameEnabled={nicknameEnabled}
+          />
         </div>
       )}
       {err && <p className="mt-2 text-center text-xs text-red-500">{err}</p>}

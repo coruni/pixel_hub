@@ -4,16 +4,21 @@ import ResourceRow from "./ResourceRow";
 import ResourceCard from "./ResourceCard";
 
 // 按显示形态渲染资源集合：card=统一比例卡片网格(默认 3:4，可显式传 ratio) / list=横向行列表。
+//
+// nicknameEnabled 一路透传到卡片：服务端调用点不传即可（默认 true），
+// **客户端调用点必须由服务端页面传真实值** —— 客户端读不到激励配置。
 export default function ResourceGrid({
   items,
   display,
   className = "",
   ratio,
+  nicknameEnabled = true,
 }: {
   items: FeedCard[];
   display: ContentDisplay;
   className?: string;
   ratio?: CardRatio | null;
+  nicknameEnabled?: boolean;
 }) {
   if (items.length === 0) return null;
 
@@ -21,7 +26,7 @@ export default function ResourceGrid({
     return (
       <div className={`grid gap-3 ${className}`}>
         {items.map((item) => (
-          <ResourceRow key={item.id} item={item} />
+          <ResourceRow key={item.id} item={item} nicknameEnabled={nicknameEnabled} />
         ))}
       </div>
     );
@@ -31,7 +36,7 @@ export default function ResourceGrid({
   return (
     <div className={`grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 ${className}`}>
       {items.map((item) => (
-        <ResourceCard key={item.id} item={item} ratio={ratio} />
+        <ResourceCard key={item.id} item={item} ratio={ratio} nicknameEnabled={nicknameEnabled} />
       ))}
     </div>
   );

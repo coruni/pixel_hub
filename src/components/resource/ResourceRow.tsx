@@ -2,11 +2,21 @@ import Link from "next/link";
 import { Download, Heart } from "lucide-react";
 import type { FeedCard } from "@/lib/queries";
 import { formatCount } from "@/lib/format";
-import Nickname from "@/components/ui/Nickname";
+import NicknameText from "@/components/ui/NicknameText";
 import CoverPlaceholder from "./CoverPlaceholder";
 
 // 横向「缩略图 + 标题/作者/分类」行卡：用于列表显示形态（首页 list 板块、归档列表、侧栏排行）。
-export default function ResourceRow({ item }: { item: FeedCard }) {
+//
+// 【昵称色开关走 prop，不用服务端 <Nickname>】本组件也会被客户端组件渲染
+// （首页 list-more、/browse 的 FeedInfinite）—— 引服务端 async 组件会把
+// getIncentive → prisma 拖进浏览器包。理由详见 ResourceCard 的同名 prop 注释。
+export default function ResourceRow({
+  item,
+  nicknameEnabled = true,
+}: {
+  item: FeedCard;
+  nicknameEnabled?: boolean;
+}) {
   const w = item.cover?.width ?? 3;
   const h = item.cover?.height ?? 2;
   return (
@@ -36,10 +46,11 @@ export default function ResourceRow({ item }: { item: FeedCard }) {
         </span>
         <span className="mt-0.5 block truncate text-[11px] text-neutral-400">
           {/* 行卡是浅底（bg-surface）→ 默认 tone="light"，跟随明暗主题 */}
-          <Nickname
+          <NicknameText
             name={item.author.name}
             username={item.author.username}
             color={item.author.nameColor}
+            enabled={nicknameEnabled}
           />
           {item.category ? ` · ${item.category.name}` : ""}
         </span>

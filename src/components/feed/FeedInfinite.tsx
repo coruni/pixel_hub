@@ -21,6 +21,7 @@ export default function FeedInfinite({
   initialCursor,
   params,
   emptyText,
+  nicknameEnabled = true,
 }: {
   initial: FeedCard[];
   initialHasMore: boolean;
@@ -28,6 +29,12 @@ export default function FeedInfinite({
   initialCursor: FeedCursor | null;
   params: FeedFilters;
   emptyText: string;
+  /**
+   * 昵称特效色总开关。本组件是客户端组件，读不到服务端激励配置，
+   * 必须由服务端页面（FeedBrowser）传下来，再透传给卡片 —— 否则会退化成
+   * 「管理员关了功能但列表里还在上色」。
+   */
+  nicknameEnabled?: boolean;
 }) {
   const [items, setItems] = useState(initial);
   const [hasMore, setHasMore] = useState(initialHasMore);
@@ -97,7 +104,13 @@ export default function FeedInfinite({
   return (
     <div>
       {/* 统一 3:4 竖版卡：PC 4 列 / 平板 3 列 / 移动 2 列（与 ResourceGrid card 断点一致） */}
-      <ResourceGrid className="mt-4" items={items} display="card" ratio="3:4" />
+      <ResourceGrid
+        className="mt-4"
+        items={items}
+        display="card"
+        ratio="3:4"
+        nicknameEnabled={nicknameEnabled}
+      />
 
       {err && (
         <div className="mt-5 flex flex-col items-center gap-2 text-center">

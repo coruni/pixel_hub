@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { getCategories, getFeed, getTopTags, toFeedCard } from "@/lib/queries";
+import { getIncentive } from "@/lib/incentive";
 import { enumParam, intParam, str, type SP } from "@/lib/search-params";
 import { FEED_PAGE_SIZE } from "@/lib/feed-paging";
 import ResourceGrid from "@/components/resource/ResourceGrid";
@@ -52,7 +53,7 @@ export default async function FeedBrowser({
           .replace(/[^a-zA-Z0-9]+/g, "-")
           .replace(/^-+|-+$/g, "")) + "-feed";
 
-  const [categories, feed, topTags] = await Promise.all([
+  const [categories, feed, topTags, incentive] = await Promise.all([
     getCategories(),
     getFeed({
       type,
@@ -67,7 +68,11 @@ export default async function FeedBrowser({
     }),
     // 热门标签仅浏览页需要，其余页直接空数组
     showTags ? getTopTags() : Promise.resolve([] as Awaited<ReturnType<typeof getTopTags>>),
+    // 昵称色开关：无限滚动流是客户端组件，读不到服务端配置，必须在这里取好传下去。
+    // getIncentive 走请求级 cache，与页面其它读取共享同一次查询。
+    getIncentive(),
   ]);
+  const nicknameEnabled = incentive.decoration.nicknameEnabled;
   const { items, hasMore, nextCursor } = feed;
   const emptyText = follow
     ? "关注的作者还没有新内容"
@@ -141,6 +146,7 @@ export default async function FeedBrowser({
         follow,
       }}
       emptyText={emptyText}
+      nicknameEnabled={nicknameEnabled}
     />
   ) : (
     <>
@@ -149,6 +155,7 @@ export default async function FeedBrowser({
         items={items.map(toFeedCard)}
         display="card"
         ratio="3:4"
+        nicknameEnabled={nicknameEnabled}
       />
       {items.length === 0 && (
         <div className="mt-20 text-center text-sm text-neutral-400">{emptyText}</div>

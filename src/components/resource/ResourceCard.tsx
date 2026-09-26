@@ -13,7 +13,7 @@ import {
 import type { FeedCard } from "@/lib/queries";
 import { formatCount } from "@/lib/format";
 import { CARD_DEFAULT_ASPECT, CARD_RATIOS, TYPE_LABEL, type CardRatio } from "@/lib/display";
-import Nickname from "@/components/ui/Nickname";
+import NicknameText from "@/components/ui/NicknameText";
 import CoverPlaceholder from "./CoverPlaceholder";
 
 /** 类型 → 角标图标/配色；新增类型只改这一张表 */
@@ -33,9 +33,22 @@ const TYPE_BADGE = {
 export default function ResourceCard({
   item,
   ratio,
+  nicknameEnabled = true,
 }: {
   item: FeedCard;
   ratio?: CardRatio | null;
+  /**
+   * 昵称特效色总开关。
+   *
+   * 【为什么这里收 prop 而不是用 <Nickname>】
+   *   本组件既被服务端页面用，也被**客户端组件**用（/browse 的 FeedInfinite、
+   *   首页 list-more）。用 async 的 <Nickname> 会把 getIncentive → prisma 拖进浏览器包，
+   *   运行时报「PrismaClient is unable to run in this browser environment」。
+   *   所以统一走客户端安全的 NicknameText，开关由上层传：
+   *   - 服务端调用点可以不传（默认 true，与 NicknameText 默认一致）；
+   *   - 客户端调用点**必须**由服务端页面一路传下来（客户端读不到配置）。
+   */
+  nicknameEnabled?: boolean;
 }) {
   const w = item.cover?.width && item.cover.width > 0 ? item.cover.width : 3;
   const h = item.cover?.height && item.cover.height > 0 ? item.cover.height : 2;
@@ -87,10 +100,11 @@ export default function ResourceCard({
         </p>
         <p className="mt-0.5 flex items-center gap-1 text-[11px] text-white/85">
           {/* 卡片底部是固定黑条（不随主题变化）→ tone="dark" 走亮阶 */}
-          <Nickname
+          <NicknameText
             name={item.author.name}
             username={item.author.username}
             color={item.author.nameColor}
+            enabled={nicknameEnabled}
             tone="dark"
             className="truncate"
           />
