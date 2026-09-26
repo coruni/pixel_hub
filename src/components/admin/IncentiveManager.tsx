@@ -17,6 +17,7 @@ import {
   Coins,
   Gift,
   Info,
+  Palette,
   Repeat2,
   Save,
   Scale,
@@ -58,6 +59,7 @@ const GROUPS = [
   "scores",
   "settleEligible",
   "profile",
+  "decoration",
   "download",
   "coin",
   "withdraw",
@@ -315,6 +317,29 @@ export default function IncentiveManager({
                 .sort((a, b) => a.min - b.min)
                 .map((lv, i) => ({ value: String(i), label: `${lv.name}（${lv.min} 分）` })),
             ]}
+          />
+        </Section>
+
+        {/* ---------- 装饰 ---------- */}
+        <Section
+          icon={Palette}
+          title="装饰"
+          desc="昵称特效色与官方背景库的总开关。清单（有哪些色、哪些预设）与每款的解锁等级写在 src/lib/decorations.ts，不在这里配置——昵称色值必须是 Tailwind 字面量类名、官方背景是随仓库发布的静态资源，两者后台都无法新增，做成配置只会得到「配置里有、源码里没有」的假选项。装饰只按等级门槛开放，不消耗贡献分。"
+          className="lg:col-span-2"
+        >
+          <SwitchRow
+            id="inc-deco-nick"
+            label="开放昵称特效色"
+            hint="关闭后：用户不能再设置昵称颜色，存量配色也立即停止渲染。"
+            checked={Boolean(g("decoration").nicknameEnabled)}
+            onChange={(v) => setGroup("decoration", { nicknameEnabled: v })}
+          />
+          <SwitchRow
+            id="inc-deco-bg"
+            label="开放官方背景库"
+            hint="关闭后：用户不能再选官方预设背景，已选的回落为自传图或无背景。"
+            checked={Boolean(g("decoration").bgPresetEnabled)}
+            onChange={(v) => setGroup("decoration", { bgPresetEnabled: v })}
           />
         </Section>
 

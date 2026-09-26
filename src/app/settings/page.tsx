@@ -12,6 +12,8 @@ import PrivacyForm from "@/components/auth/privacy-form";
 import AvatarForm from "@/components/auth/avatar-form";
 import HeroForm from "@/components/auth/HeroForm";
 import ProfileBgForm from "@/components/auth/ProfileBgForm";
+import BgPresetPicker from "@/components/auth/BgPresetPicker";
+import NameColorForm from "@/components/auth/NameColorForm";
 import NotificationsForm from "@/components/auth/NotificationsForm";
 import PublishForm from "@/components/auth/PublishForm";
 import WatermarkForm from "@/components/auth/WatermarkForm";
@@ -25,6 +27,7 @@ import { getRuntimeConfig, githubClientId, githubClientSecret } from "@/lib/runt
 import { getIncentive } from "@/lib/incentive";
 import { getContributionSummary } from "@/lib/points";
 import { profileBgUnlocked } from "@/lib/upload-config";
+import { NAME_COLORS, PROFILE_BG_PRESETS, decorationUnlocked } from "@/lib/decorations";
 import { Button } from "@/components/ui/Button";
 
 export const metadata: Metadata = { title: "账户设置", robots: { index: false } };
@@ -83,6 +86,8 @@ export default async function SettingsPage({
         colorMode: true,
         profileBgPcKey: true,
         profileBgOnResource: true,
+        profileBgPreset: true,
+        nameColor: true,
       },
     }),
     countDrafts(me.id),
@@ -94,6 +99,25 @@ export default async function SettingsPage({
   // 门槛可能指向一个被裁掉的档位 —— 那时只显示「达到更高等级」，不去编一个等级名。
   const bgGateLevels = [...incentive.levels].sort((a, b) => a.min - b.min);
   const bgUnlocked = profileBgUnlocked(summary.level, incentive.profile.bgMinLevel, incentive.enabled);
+
+  // 装饰解锁：门槛写在 decorations.ts 每一项旁边，判定与前台渲染共用 decorationUnlocked()。
+  // 这里把「等级名」一并算好传给客户端 —— 客户端不碰 levels 配置，只负责显示。
+  const levelNameAt = (lv: number) => bgGateLevels[lv]?.name ?? null;
+  const nameColorOptions = NAME_COLORS.map((c) => ({
+    key: c.key,
+    name: c.name,
+    className: c.className,
+    swatchClass: c.swatchClass,
+    unlocked: decorationUnlocked(summary.level, c.minLevel, incentive.enabled),
+    needName: levelNameAt(c.minLevel),
+  }));
+  const bgPresetOptions = PROFILE_BG_PRESETS.map((p) => ({
+    id: p.id,
+    name: p.name,
+    url: p.url,
+    unlocked: decorationUnlocked(summary.level, p.minLevel, incentive.enabled),
+    needName: levelNameAt(p.minLevel),
+  }));
   const githubEnabled = Boolean(githubClientId(runtimeCfg) && githubClientSecret(runtimeCfg));
   const joined = profile
     ? new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "long", day: "numeric" }).format(
@@ -108,37 +132,13 @@ export default async function SettingsPage({
     ...(joined ? [{ k: "加入时间", v: joined }] : []),
   ];
 
-  // 7 个 panel：资料 / 通知 / 发布 / 安全 / 第三方 / 外观 / 账号（头像独立在 tab 外常驻）
+  // 8 个 panel：资料 / 装饰 / 通知 / 发布 / 安全 / 第三方 / 外观 / 账号（头像独立在 tab 外常驻）
   const tabs = [
     {
       key: "profile",
       label: "资料",
       panel: (
         <>
-          <section className={sectionCls}>
-            <h2 className={sectionTitle}>主页横幅</h2>
-            <p className={sectionHint}>主页横幅不建议和主页被背景一起使用</p>
-            <HeroForm
-              heroImageKey={profile?.heroImageKey ?? null}
-              heroMaxMb={limits.heroImageMaxMb}
-            />
-          </section>
-
-          <section className={sectionCls}>
-            <h2 className={sectionTitle}>主页背景</h2>
-            <p className={sectionHint}>铺满整个屏幕的最底层底图，不会盖住主页横幅。仅桌面端展示</p>
-            <ProfileBgForm
-              unlocked={bgUnlocked}
-              gateName={bgGateLevels[incentive.profile.bgMinLevel]?.name ?? null}
-              points={summary.points}
-              nextName={summary.next?.name ?? null}
-              toNext={summary.toNext}
-              pcKey={prefs?.profileBgPcKey ?? null}
-              onResource={prefs?.profileBgOnResource ?? true}
-              maxMb={limits.profileBgMaxMb}
-            />
-          </section>
-
           <section className={sectionCls}>
             <h2 className={sectionTitle}>个人资料</h2>
             <div className="mt-4">
@@ -156,6 +156,69 @@ export default async function SettingsPage({
                 showFavorites={profile.showFavorites}
                 showFollowers={profile.showFollowers}
                 showFollowing={profile.showFollowing}
+              />
+            </section>
+          )}
+        </>
+      ),
+    },
+    {
+      key: "decoration",
+      label: "装饰",
+      panel: (
+        <>
+          <section className={sectionCls}>
+            <h2 className={sectionTitle}>主页横幅</h2>
+            <p className={sectionHint}>主页横幅不建议和主页背景一起使用</p>
+            <HeroForm
+              heroImageKey={profile?.heroImageKey ?? null}
+              heroMaxMb={limits.heroImageMaxMb}
+            />
+          </section>
+
+          <section className={sectionCls}>
+            <h2 className={sectionTitle}>主页背景</h2>
+            <p className={sectionHint}>铺满整个屏幕的最底层底图，不会盖住主页横幅。仅桌面端展示</p>
+
+            {incentive.decoration.bgPresetEnabled && (
+              <div className="mb-5 border-b border-brand-200 pb-5">
+                <h3 className="text-xs font-medium text-neutral-700">官方背景库</h3>
+                <div className="mt-2">
+                  <BgPresetPicker
+                    options={bgPresetOptions}
+                    current={prefs?.profileBgPreset ?? null}
+                    hasUploaded={Boolean(prefs?.profileBgPcKey)}
+                  />
+                </div>
+              </div>
+            )}
+
+            <h3 className="text-xs font-medium text-neutral-700">自定义上传</h3>
+            <div className="mt-2">
+              <ProfileBgForm
+                unlocked={bgUnlocked}
+                gateName={bgGateLevels[incentive.profile.bgMinLevel]?.name ?? null}
+                points={summary.points}
+                nextName={summary.next?.name ?? null}
+                toNext={summary.toNext}
+                pcKey={prefs?.profileBgPcKey ?? null}
+                onResource={prefs?.profileBgOnResource ?? true}
+                maxMb={limits.profileBgMaxMb}
+              />
+            </div>
+          </section>
+
+          {incentive.decoration.nicknameEnabled && (
+            <section className={sectionCls}>
+              <h2 className={sectionTitle}>昵称特效色</h2>
+              <p className={sectionHint}>
+                昵称在评论、资源卡、个人主页等处显示的颜色。按贡献分等级逐款开放，不消耗贡献分
+              </p>
+              <NameColorForm
+                options={nameColorOptions}
+                current={prefs?.nameColor ?? null}
+                sample={profile?.name ?? me.username}
+                points={summary.points}
               />
             </section>
           )}

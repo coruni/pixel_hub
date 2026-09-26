@@ -45,6 +45,7 @@ export default function Comments({
   comments,
   commentsPaging,
   imageMax,
+  nicknameEnabled,
 }: {
   resourceId: string;
   canPost: boolean;
@@ -56,6 +57,8 @@ export default function Comments({
   commentsPaging: CommentsPaging;
   /** 附图张数上限：后台 /admin/uploads「评论附图张数」，0 = 禁止附图 */
   imageMax: number;
+  /** 昵称特效色功能开关（服务端读激励配置后下发）。客户端拿不到配置，只能这样传进来 */
+  nicknameEnabled: boolean;
 }) {
   const router = useRouter();
   const [text, setText] = useState("");
@@ -445,6 +448,7 @@ export default function Comments({
             canPost={canPost}
             viewerId={viewerId}
             isStaff={isStaff}
+            nicknameEnabled={nicknameEnabled}
             reply={reply}
             sending={sending}
             deletingId={deletingId}

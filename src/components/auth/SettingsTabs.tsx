@@ -3,7 +3,7 @@
 // 账户设置页 tab 切换：客户端管 active，server page 把每个 panel 作为 React 节点传入。
 // 复刻后台 SiteLayoutManager 的 tablist 风格（border-b 下划线激活态）。
 //
-// 窄屏（320 / 375px）6 个 tab 总宽 346px，会超过 max-w-xl 容器的可用宽度：
+// 窄屏（320 / 375px）下 tab 总宽超过 max-w-xl 容器的可用宽度（8 个 tab 时约 480px）：
 // 这里不换行，改成横向滚动（shrink-0 + overflow-x-auto），并隐藏滚动条——
 // 否则滚动条会占掉 tab 行下方约 10px，把下划线与 track 线错开。
 // 下划线压线沿用 -mb-px，但必须挂在这层滚动容器而不是按钮上：滚动容器会裁掉自己的

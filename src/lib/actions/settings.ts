@@ -374,9 +374,10 @@ export async function uploadProfileBgAction(
       select: { profileBgPcKey: true },
     });
     const old = row?.profileBgPcKey;
+    // 与官方背景预设互斥：上传自传图即清掉 preset（见 lib/actions/decorations.ts 的说明）
     await prisma.user.update({
       where: { id: user.id },
-      data: { profileBgPcKey: url },
+      data: { profileBgPcKey: url, profileBgPreset: null },
     });
     if (old && old !== url) await delFile(old).catch(() => {});
 

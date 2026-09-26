@@ -26,6 +26,8 @@ const MAX_REPLY_DEPTH = 20;
 const AUTHOR_SELECT = {
   username: true,
   name: true,
+  // 昵称特效色：评论是昵称最密集的展示场景，装饰价值最高的一处
+  nameColor: true,
   avatarKey: true,
   bio: true,
   role: true,

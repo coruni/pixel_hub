@@ -25,7 +25,7 @@ export type FeedItem = {
   nsfw: boolean;
   category: { slug: string; name: string } | null;
   tags: { slug: string; name: string }[];
-  author: { username: string; name: string | null };
+  author: { username: string; name: string | null; nameColor: string | null };
   cover: {
     url: string;
     width: number | null;
@@ -49,7 +49,7 @@ export type FeedCard = {
   loginRequired: boolean;
   nsfw: boolean;
   category: { slug: string; name: string } | null;
-  author: { username: string; name: string | null };
+  author: { username: string; name: string | null; nameColor: string | null };
   cover: {
     url: string;
     width: number | null;
@@ -134,7 +134,7 @@ type FeedRow = {
   nsfw: boolean;
   category: { slug: string; name: string } | null;
   tags: { tag: { slug: string; name: string } }[];
-  author: { username: string; name: string | null };
+  author: { username: string; name: string | null; nameColor: string | null };
   coverMedia: {
     thumbKey: string | null;
     bigKey: string | null;
@@ -162,7 +162,7 @@ const feedSelect = {
   loginRequired: true,
   nsfw: true,
   coverMedia: { select: coverSelect },
-  author: { select: { username: true, name: true } },
+  author: { select: { username: true, name: true, nameColor: true } },
   category: { select: { slug: true, name: true } },
   tags: { select: { tag: { select: { slug: true, name: true } } } },
 } satisfies Prisma.ResourceSelect;
@@ -185,7 +185,11 @@ function toFeedItem(r: FeedRow): FeedItem {
     nsfw: r.nsfw,
     category: r.category ? { slug: r.category.slug, name: r.category.name } : null,
     tags: r.tags?.map((t) => ({ slug: t.tag.slug, name: t.tag.name })) ?? [],
-    author: { username: r.author.username, name: r.author.name },
+    author: {
+      username: r.author.username,
+      name: r.author.name,
+      nameColor: r.author.nameColor,
+    },
     cover: r.coverMedia
       ? {
           url: coverUrl(r.coverMedia),
@@ -351,6 +355,7 @@ export const getResourceDetail = cache(async (slug: string, viewerId?: string) =
           // 资源详情页也要铺作者的主页背景（开关 + 等级门槛在页面里判定），随 author 一次取出
           profileBgPcKey: true,
           profileBgOnResource: true,
+          profileBgPreset: true,
           role: true,
           trusted: true,
           createdAt: true,
@@ -437,6 +442,7 @@ export const getResourceDetail = cache(async (slug: string, viewerId?: string) =
       // 与上面 avatarKey（已解析成 URL）不同 —— 别照着 avatarKey 的用法直接塞进 <img src>。
       profileBgPcKey: resource.author.profileBgPcKey,
       profileBgOnResource: resource.author.profileBgOnResource,
+      profileBgPreset: resource.author.profileBgPreset,
       role: resource.author.role,
       trusted: resource.author.trusted,
       createdAt: resource.author.createdAt,
@@ -686,7 +692,7 @@ const recSelect = {
   loginRequired: true,
   nsfw: true,
   coverMedia: { select: coverSelect },
-  author: { select: { id: true, username: true, name: true } },
+  author: { select: { id: true, username: true, name: true, nameColor: true } },
   category: { select: { slug: true, name: true } },
   tags: { select: { tag: { select: { slug: true, name: true } } } },
 } satisfies Prisma.ResourceSelect;
@@ -961,6 +967,10 @@ export type UserProfile = {
   heroImageKey: string | null;
   /** 个人主页背景（铺满视口的最底层底图，仅桌面端渲染）；是否真的有资格渲染由 profileBgUnlocked 判定 */
   profileBgPcKey: string | null;
+  /** 官方背景库预设 id；与 profileBgPcKey 互斥。能否渲染由 decorations.ts 的 bgPresetUrlOf 判定 */
+  profileBgPreset: string | null;
+  /** 昵称特效色 key；能否渲染由 decorations.ts 的 nameColorClassOf 判定 */
+  nameColor: string | null;
   role: "USER" | "MODERATOR" | "ADMIN";
   trusted: boolean;
   createdAt: Date;
@@ -997,6 +1007,8 @@ export const getProfile = cache(
         avatarKey: true,
         heroImageKey: true,
         profileBgPcKey: true,
+        profileBgPreset: true,
+        nameColor: true,
         role: true,
         trusted: true,
         createdAt: true,
@@ -1030,6 +1042,8 @@ export const getProfile = cache(
       avatarKey: user.avatarKey,
       heroImageKey: user.heroImageKey,
       profileBgPcKey: user.profileBgPcKey,
+      profileBgPreset: user.profileBgPreset,
+      nameColor: user.nameColor,
       role: user.role,
       trusted: user.trusted,
       createdAt: user.createdAt,

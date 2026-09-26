@@ -6,6 +6,8 @@ export type CommentAuthor = HoverCardUser & {
   username: string;
   name: string | null;
   avatarKey?: string | null;
+  /** 昵称特效色 key（见 lib/decorations.ts）；null/缺省 = 站点默认色 */
+  nameColor?: string | null;
 };
 
 export type CommentImage = { url: string; width: number | null; height: number | null };

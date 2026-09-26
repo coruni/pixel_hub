@@ -11,6 +11,8 @@ import {
   Star,
 } from "lucide-react";
 import type { FeedCard } from "@/lib/queries";
+import { getIncentive } from "@/lib/incentive";
+import { nameColorBrightClass } from "@/lib/decorations";
 import { formatCount } from "@/lib/format";
 import { CARD_DEFAULT_ASPECT, CARD_RATIOS, TYPE_LABEL, type CardRatio } from "@/lib/display";
 import CoverPlaceholder from "./CoverPlaceholder";
@@ -29,13 +31,17 @@ const TYPE_BADGE = {
  * 标题 / 作者·分类 / 赞藏评(·下载) 全部压在封面底部的黑色渐变上，视觉即纯图卡。
  * 封面按 ratio 裁切（默认 3:4 竖版；显式给了 ratio 才换别的比例），同一网格内高度一致。
  */
-export default function ResourceCard({
+export default async function ResourceCard({
   item,
   ratio,
 }: {
   item: FeedCard;
   ratio?: CardRatio | null;
 }) {
+  // 昵称特效色：卡片底部是固定黑条，必须用深底专用亮阶（见 decorations.ts 的说明）。
+  // getIncentive 走 cache()，同请求内无论多少张卡都只查一次库。
+  const incentive = await getIncentive();
+  const nickCls = nameColorBrightClass(item.author.nameColor, incentive.decoration.nicknameEnabled);
   const w = item.cover?.width && item.cover.width > 0 ? item.cover.width : 3;
   const h = item.cover?.height && item.cover.height > 0 ? item.cover.height : 2;
   const cover = item.cover;
@@ -86,7 +92,7 @@ export default function ResourceCard({
           {item.title}
         </p>
         <p className="mt-0.5 flex items-center gap-1 text-[11px] text-white/85">
-          <span className="truncate">{author}</span>
+          <span className={`truncate ${nickCls ?? ""}`}>{author}</span>
           <span className="text-white/45">·</span>
           <span className="shrink-0">{meta}</span>
         </p>

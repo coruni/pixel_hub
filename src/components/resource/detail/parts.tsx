@@ -16,6 +16,7 @@ import { FavoriteButton, LikeButton, FollowButton } from "@/components/social/in
 import ReportButton from "@/components/social/ReportButton";
 import { VersionDownloadButton, VersionForm } from "@/components/resource/version";
 import { getUploadLimits } from "@/lib/upload-limits";
+import { getIncentive } from "@/lib/incentive";
 
 export type DetailCtx = {
   detail: Exclude<ResourceDetail, null>;
@@ -351,10 +352,10 @@ export function DescriptionBlock({ ctx }: { ctx: DetailCtx }) {
   );
 }
 
-/** 评论区（附图上限读后台上传限制配置） */
+/** 评论区（附图上限读后台上传限制配置；昵称色开关读激励配置） */
 export async function CommentBlock({ ctx }: { ctx: DetailCtx }) {
   const { detail, authed, meId, isStaff } = ctx;
-  const L = await getUploadLimits();
+  const [L, incentive] = await Promise.all([getUploadLimits(), getIncentive()]);
   return (
     <Comments
       resourceId={detail.id}
@@ -364,6 +365,7 @@ export async function CommentBlock({ ctx }: { ctx: DetailCtx }) {
       comments={detail.comments}
       commentsPaging={detail.commentsPaging}
       imageMax={L.commentImageMaxCount}
+      nicknameEnabled={incentive.decoration.nicknameEnabled}
     />
   );
 }

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { timeAgo } from "@/lib/format";
+import { nameColorClass } from "@/lib/decorations";
 import PresenceAvatar from "@/components/ui/PresenceAvatar";
 import UserHoverCard from "@/components/ui/UserHoverCard";
 import CommentHoverCard from "./CommentHoverCard";
@@ -82,6 +83,7 @@ export default function CommentItem({
   canPost,
   viewerId,
   isStaff,
+  nicknameEnabled,
   reply,
   sending,
   deletingId,
@@ -98,6 +100,8 @@ export default function CommentItem({
   canPost: boolean;
   viewerId?: string;
   isStaff?: boolean;
+  /** 昵称特效色功能开关（服务端读配置后下发）；关闭时评论昵称保持默认色 */
+  nicknameEnabled: boolean;
   reply: ReplyState;
   sending: boolean;
   /** 全树共用一个「正在删除」id：该条（含其回复）的删除按钮禁用并改文案，避免确认后重复点击 */
@@ -135,7 +139,9 @@ export default function CommentItem({
         </UserHoverCard>
         <Link
           href={`/u/${c.author.username}`}
-          className="text-sm font-medium text-neutral-800 hover:text-brand-600"
+          className={`text-sm font-medium hover:text-brand-600 ${
+            nameColorClass(c.author.nameColor, nicknameEnabled) ?? "text-neutral-800"
+          }`}
         >
           {c.author.name ?? c.author.username}
         </Link>
@@ -231,6 +237,7 @@ export default function CommentItem({
               canPost={canPost}
               canDel={viewerId === rp.authorId || !!isStaff}
               deleting={deletingId === rp.id}
+              nicknameEnabled={nicknameEnabled}
               onReplyTo={(parent, to) =>
                 onReplyChange({ openFor: c.id, text: "", target: { parent, to } })
               }
@@ -259,6 +266,7 @@ function ReplyItem({
   canPost,
   canDel,
   deleting,
+  nicknameEnabled,
   onReplyTo,
   onDelete,
   onNavigate,
@@ -268,6 +276,8 @@ function ReplyItem({
   canPost: boolean;
   canDel: boolean;
   deleting: boolean;
+  /** 昵称特效色功能开关，由 CommentItem 透传 */
+  nicknameEnabled: boolean;
   onReplyTo: (parent: string, to: string) => void;
   onDelete: (commentId: string) => Promise<void>;
   onNavigate: (commentId: string, fallbackRootId: string) => void;
@@ -292,7 +302,9 @@ function ReplyItem({
         </UserHoverCard>
         <Link
           href={`/u/${rp.author.username}`}
-          className="text-xs font-medium text-neutral-800 hover:text-brand-600"
+          className={`text-xs font-medium hover:text-brand-600 ${
+            nameColorClass(rp.author.nameColor, nicknameEnabled) ?? "text-neutral-800"
+          }`}
         >
           {rp.author.name ?? rp.author.username}
         </Link>

@@ -54,6 +54,29 @@
   --neutral-100: #f5f5f5;
   --neutral-900: #171717;
   --amber-50: #fffbeb;
+  /* 昵称特效色（游戏属性色）。亮色主题一律取深阶：这些色要当正文级文字用，
+     必须对 --background (#faf9f5) 满足 ≥4.5:1，鲜艳的亮阶在这个暖白底上不达标。
+     暗色主题在 html.dark 覆盖为亮阶（同一 key，两套值），调用方只认语义名。
+     清单与解锁等级见 src/lib/decorations.ts —— 那里才是唯一事实来源。 */
+  --nick-flame: #b3341a;
+  --nick-frost: #1667b8;
+  --nick-thunder: #6d28d9;
+  --nick-venom: #157a3d;
+  --nick-radiance: #9a5b0f;
+  --nick-shadow: #5b3fa8;
+  --nick-abyss: #0e7490;
+  --nick-blood: #9f1239;
+  /* 深底专用亮阶：资源卡底部黑色遮罩、hero 大图上的署名这类底**不随主题变化**，
+     必须固定用亮色。上面那组在亮色主题下是深色，压黑条上不可读（对比度不足 2:1）。
+     两组的取值区间互斥（浅底要 L≤0.17，黑底要 L≥0.21），不存在一个值两边都达标。 */
+  --nick-flame-bright: #ff8f5e;
+  --nick-frost-bright: #74c6ff;
+  --nick-thunder-bright: #c3a2ff;
+  --nick-venom-bright: #62e39a;
+  --nick-radiance-bright: #ffc760;
+  --nick-shadow-bright: #b9a6ff;
+  --nick-abyss-bright: #6fdcf0;
+  --nick-blood-bright: #ff8ea8;
 }
 
 /* ---------- 暗色主题 ----------
@@ -116,6 +139,17 @@ html.dark {
   --color-amber-600: #f5a83c;
   --color-amber-700: #f7bd6a;
   --color-amber-900: #fad58f;
+
+  /* 昵称特效色：暗色主题换亮阶（对 --background #17130e 满足 ≥4.5:1）。
+     与亮色主题是同一组 key 的两套值，调用方只写 text-nick-* 即可自动跟随明暗。 */
+  --nick-flame: #ff8f5e;
+  --nick-frost: #74c6ff;
+  --nick-thunder: #c3a2ff;
+  --nick-venom: #62e39a;
+  --nick-radiance: #ffc760;
+  --nick-shadow: #b9a6ff;
+  --nick-abyss: #6fdcf0;
+  --nick-blood: #ff8ea8;
 }
 
 /* 背景/前景色映射。字体不加 --font-sans/--font-mono 覆盖：
@@ -146,6 +180,25 @@ html.dark {
   --color-neutral-100: var(--neutral-100);
   --color-neutral-900: var(--neutral-900);
   --color-amber-50: var(--amber-50);
+  /* 昵称特效色 → text-nick-* / bg-nick-* 等 utility。
+     清单硬编码在这里（Tailwind 只扫源码字面量），与 decorations.ts 一一对应。 */
+  --color-nick-flame: var(--nick-flame);
+  --color-nick-frost: var(--nick-frost);
+  --color-nick-thunder: var(--nick-thunder);
+  --color-nick-venom: var(--nick-venom);
+  --color-nick-radiance: var(--nick-radiance);
+  --color-nick-shadow: var(--nick-shadow);
+  --color-nick-abyss: var(--nick-abyss);
+  --color-nick-blood: var(--nick-blood);
+  /* 深底专用亮阶 → text-nick-*-bright（资源卡黑条、hero 图上的署名用） */
+  --color-nick-flame-bright: var(--nick-flame-bright);
+  --color-nick-frost-bright: var(--nick-frost-bright);
+  --color-nick-thunder-bright: var(--nick-thunder-bright);
+  --color-nick-venom-bright: var(--nick-venom-bright);
+  --color-nick-radiance-bright: var(--nick-radiance-bright);
+  --color-nick-shadow-bright: var(--nick-shadow-bright);
+  --color-nick-abyss-bright: var(--nick-abyss-bright);
+  --color-nick-blood-bright: var(--nick-blood-bright);
 }
 
 body {

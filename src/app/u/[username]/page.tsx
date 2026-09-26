@@ -25,6 +25,7 @@ import {
 import { formatCount } from "@/lib/format";
 import { publicUrl } from "@/lib/storage/url";
 import { profileBgUnlocked } from "@/lib/upload-config";
+import { bgPresetUrlOf, nameColorClass } from "@/lib/decorations";
 import ResourceGrid from "@/components/resource/ResourceGrid";
 import PresenceAvatar from "@/components/ui/PresenceAvatar";
 import { FollowButton } from "@/components/social/interactions";
@@ -143,6 +144,14 @@ export default async function UserPage({
   // ——「达到等级才开放」是一致口径，不做「传过就永久保留」的特例。
   const bgUnlocked = profileBgUnlocked(levelIndex, incentive.profile.bgMinLevel, incentive.enabled);
   const bgPcKey = bgUnlocked ? profile.profileBgPcKey : null;
+
+  // 装饰：门槛同样在服务端重算（与设置页共用 decorations.ts 的判定）。
+  // 官方预设**优先于**自传图 —— 两者在写侧已互斥，这里再优先一次只是让「万一同时有值」也有确定结果。
+  const bgPresetUrl = incentive.decoration.bgPresetEnabled
+    ? bgPresetUrlOf(profile.profileBgPreset, levelIndex, incentive.enabled)
+    : null;
+  const bgUrl = bgPresetUrl ?? (bgPcKey ? publicUrl(bgPcKey) : null);
+  const nickCls = nameColorClass(profile.nameColor, incentive.decoration.nicknameEnabled);
 
   // 头部操作区。编辑 / 打赏紧跟昵称末尾，作为纯图标随昵称行自然换行；
   // 关注按钮独立放在资料区最右侧，不参与昵称长度计算。
@@ -342,11 +351,11 @@ export default async function UserPage({
           而这一层的外层是 max-w-7xl 容器，只有 fixed 能脱离它的宽度约束铺到屏幕两端。
           只在 sm 及以上渲染：窄屏没有侧边留白，遮罩带会直接压到卡片下面。
           -z-10 让它落在所有内容（含 hero）之下，且仍在 body 底色之上。 */}
-      {bgPcKey && (
+      {bgUrl && (
         <div
           aria-hidden
           className="profile-bg-pc pointer-events-none fixed inset-0 -z-10 hidden bg-cover bg-center bg-no-repeat sm:block"
-          style={{ backgroundImage: `url(${publicUrl(bgPcKey)})` }}
+          style={{ backgroundImage: `url(${bgUrl})` }}
         />
       )}
       {/* 头部：可选 hero 横幅图。移动端背景向下延伸覆盖到统计行底部，整张图用 mask 渐变：
@@ -369,7 +378,9 @@ export default async function UserPage({
             />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="min-w-0 break-words text-2xl font-semibold tracking-tight text-neutral-900">
+                <h1
+                  className={`min-w-0 break-words text-2xl font-semibold tracking-tight ${nickCls ?? "text-neutral-900"}`}
+                >
                   {profile.name ?? profile.username}
                 </h1>
                 {nameActions}
@@ -406,7 +417,9 @@ export default async function UserPage({
           />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="min-w-0 break-words text-2xl font-semibold tracking-tight text-neutral-900">
+              <h1
+                className={`min-w-0 break-words text-2xl font-semibold tracking-tight ${nickCls ?? "text-neutral-900"}`}
+              >
                 {profile.name ?? profile.username}
               </h1>
               {nameActions}
