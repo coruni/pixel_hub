@@ -6,6 +6,7 @@ import PageTracker from "@/components/layout/PageTracker";
 import PresencePing from "@/components/layout/PresencePing";
 import RealtimeBridge from "@/components/layout/RealtimeBridge";
 import ColorModeSync from "@/components/layout/ColorModeSync";
+import GlobalProfileBgLoader from "@/components/layout/GlobalProfileBgLoader";
 import { auth } from "@/lib/auth";
 import { fromDbColorMode } from "@/lib/color-mode";
 import { siteUrl } from "@/lib/site-url";
@@ -85,6 +86,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           />
         )}
         <ColorModeSync />
+        <GlobalProfileBgLoader />
         <PageTracker />
         <PresencePing signedIn={Boolean(session?.user)} />
         <RealtimeBridge signedIn={Boolean(session?.user)} />

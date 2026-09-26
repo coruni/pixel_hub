@@ -135,12 +135,22 @@ export default async function ResourcePage({ params }: PageProps) {
   // D9：NSFW 详情登录门 —— 已发布成人内容仅登录后可见，未登录一律 404（不进索引/不泄露图）
   if (detail.status === "PUBLISHED" && detail.nsfw && !meId) notFound();
 
-  // 作者的主页背景：三个条件同时成立才铺 —— ① 作者设了图 ② 开关打开（默认开）③ 作者**现在**仍达等级。
+  // 作者的主页背景：三个条件同时成立才铺 —— ① 作者设了图 ② 开关打开 ③ 作者**现在**仍达等级。
   // 等级必须重算、不能信任「当初传得上来」：门槛与档位都在后台可改，作者也可能掉档；
   // 判定复用前台与设置页同一个 profileBgUnlocked()，口径只有一份。
   // 没设背景的作者（眼下是绝大多数）连这一次点数查询都不会发生 —— 短路在 getPointBalance 之前。
+  //
+  // 【可见性二分】profileBgOnResource 管的是「**其他访客**能不能在资源详情页看到这张背景」；
+  // 作者本人（meId === detail.authorId）不受该开关限制 —— 自己关掉开关只是不给别人看，
+  // 不该把自己的背景也藏起来。
+  //
+  // 【与「全局显示」的优先级】作者背景 > 访客自己的全局背景。这里**不做** JS 去重，
+  // 交给 globals.css 的 `body:has([data-profile-bg-owner]) [data-profile-bg-global]`：
+  // 本层铺了就标 data-profile-bg-owner，全局层随之自隐。纯 CSS 判渲染结果，
+  // 不用复制服务端的开关/等级口径，软导航也不会错帧。
+  const isOwnResourcePage = meId === detail.authorId;
   let bgUrl: string | null = null;
-  if (detail.author.profileBgPcKey && detail.author.profileBgOnResource) {
+  if (detail.author.profileBgPcKey && (detail.author.profileBgOnResource || isOwnResourcePage)) {
     const authorLevel = levelOf(await getPointBalance(detail.authorId), incentive.levels);
     const unlocked = profileBgUnlocked(
       authorLevel,
@@ -233,10 +243,13 @@ export default async function ResourcePage({ params }: PageProps) {
       rail={rail ?? undefined}
     >
       {/* 作者主页背景：铺满视口的最底层，fixed 脱离 grid 流、不参与布局。
-          与个人主页共用同一个遮罩类 .profile-bg-pc（左右两侧渐显、中间留白），仅桌面端渲染。 */}
+          与个人主页共用同一个遮罩类 .profile-bg-pc（左右两侧渐显、中间留白），仅桌面端渲染。
+          data-profile-bg-owner 是给全局显示层（根 layout）看的优先级标记：本层存在时，
+          访客自己的全局背景会由 globals.css 的 :has() 规则隐掉 —— 作者优先。 */}
       {bgUrl && (
         <div
           aria-hidden
+          data-profile-bg-owner
           className="profile-bg-pc pointer-events-none fixed inset-0 -z-10 hidden bg-cover bg-center bg-no-repeat sm:block"
           style={{ backgroundImage: `url(${bgUrl})`, "--profile-bg-mask": bgMask } as CSSProperties}
         />

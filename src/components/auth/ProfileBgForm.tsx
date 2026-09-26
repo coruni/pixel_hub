@@ -6,6 +6,7 @@ import { useActionState, useRef, useState } from "react";
 import { Lock, Trash2, Upload } from "lucide-react";
 import {
   removeProfileBgAction,
+  updateProfileBgGlobalAction,
   updateProfileBgMaskAction,
   updateProfileBgOnResourceAction,
   uploadProfileBgAction,
@@ -43,6 +44,7 @@ export default function ProfileBgForm({
   toNext,
   pcKey,
   onResource,
+  global: globalDisplay,
   maxMb,
   bgMask,
 }: {
@@ -54,8 +56,10 @@ export default function ProfileBgForm({
   nextName: string | null;
   toNext: number;
   pcKey: string | null;
-  /** 是否把这张背景一并铺到本人发布的资源详情页（默认铺） */
+  /** 是否允许**其他访客**在本人发布的资源详情页看到这张背景（默认允许；本人自己始终可见） */
   onResource: boolean;
+  /** 全局显示：铺到除后台外的所有页面（默认关） */
+  global: boolean;
   maxMb: number;
   /** 该用户已保存的遮罩值（**原始值**，未经校验：库里可能躺着旧脏值，要让用户看见并改掉）；null = 未自定义 */
   bgMask: string | null;
@@ -71,6 +75,12 @@ export default function ProfileBgForm({
     {},
   );
   const plFormRef = useRef<HTMLFormElement>(null);
+  // 全局显示开关同样自带 form（勾选即提交）。
+  const [glState, glAction, glPending] = useActionState<SettingsActionState, FormData>(
+    updateProfileBgGlobalAction,
+    {},
+  );
+  const glFormRef = useRef<HTMLFormElement>(null);
   // 遮罩同样自带一个 form：调形状不该逼用户重选图（保存按钮在没选图时是禁用的）。
   const [mkState, mkAction, mkPending] = useActionState<SettingsActionState, FormData>(
     updateProfileBgMaskAction,
@@ -198,7 +208,37 @@ export default function ProfileBgForm({
         <p className="mt-1.5 text-[11px] text-neutral-400">单张最大 {maxMb}MB，不支持 GIF。</p>
       </form>
 
-      {/* 展示范围：只在你本人发布的资源详情页生效，个人主页始终展示。 */}
+      {/* 展示范围：两个开关各自一个 form（勾选即提交）。
+          - 全局显示：铺到除后台外的所有页面（含其他访客可见）。
+          - 资源页可见：只控制「**其他访客**在你发布的资源详情页能不能看到」，你自己始终可见。 */}
+      <form
+        ref={glFormRef}
+        action={glAction}
+        className="mt-4 border-t border-brand-200 pt-3.5"
+      >
+        <label className="flex items-start gap-3">
+          <SquareCheckbox
+            name="global"
+            defaultChecked={globalDisplay}
+            disabled={glPending}
+            onChange={() => glFormRef.current?.requestSubmit()}
+            ariaLabel="在所有页面都展示这张背景"
+            className="mt-0.5"
+          />
+          <span className="min-w-0">
+            <span className="block text-sm text-neutral-800">全局显示</span>
+            <span className="mt-0.5 block text-[11px] leading-4 text-neutral-400">
+              开启后这张背景会铺在除后台外的所有页面；关闭时只在个人主页和资源详情页展示
+            </span>
+          </span>
+        </label>
+        {glPending && <p className="mt-1.5 text-xs text-neutral-400">保存中…</p>}
+        {!glPending && glState.ok && <p className="mt-1.5 text-xs text-emerald-600">✓ 已更新</p>}
+        {!glPending && glState.error && (
+          <p className="mt-1.5 text-xs text-red-500">{glState.error}</p>
+        )}
+      </form>
+
       <form ref={plFormRef} action={plAction} className="mt-4 border-t border-brand-200 pt-3.5">
         <label className="flex items-start gap-3">
           <SquareCheckbox
@@ -206,11 +246,14 @@ export default function ProfileBgForm({
             defaultChecked={onResource}
             disabled={plPending}
             onChange={() => plFormRef.current?.requestSubmit()}
-            ariaLabel="在资源详情页也展示这张背景"
+            ariaLabel="允许他人在你的资源详情页看到这张背景"
             className="mt-0.5"
           />
           <span className="min-w-0">
-            <span className="block text-sm text-neutral-800">在资源详情页也展示</span>
+            <span className="block text-sm text-neutral-800">资源页对他人可见</span>
+            <span className="mt-0.5 block text-[11px] leading-4 text-neutral-400">
+              未勾选时其他访客看不到，但你自己仍然看得到
+            </span>
           </span>
         </label>
         {plPending && <p className="mt-1.5 text-xs text-neutral-400">保存中…</p>}

@@ -85,6 +85,7 @@ export default async function SettingsPage({
         colorMode: true,
         profileBgPcKey: true,
         profileBgOnResource: true,
+        profileBgGlobal: true,
         profileBgMask: true,
         nameColor: true,
       },
@@ -179,6 +180,7 @@ export default async function SettingsPage({
                 toNext={summary.toNext}
                 pcKey={prefs?.profileBgPcKey ?? null}
                 onResource={prefs?.profileBgOnResource ?? true}
+                global={prefs?.profileBgGlobal ?? false}
                 maxMb={limits.profileBgMaxMb}
                 bgMask={prefs?.profileBgMask ?? null}
               />

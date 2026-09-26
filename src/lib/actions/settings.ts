@@ -442,6 +442,35 @@ export async function updateProfileBgOnResourceAction(
   }
 }
 
+// ---- 主页背景「全局显示」----
+//
+// 同样**独立于上传动作**（自带不含 file 的表单）。只写这一个布尔，绝不触碰 profileBgPcKey。
+// 开启后背景铺到全站每一页（后台除外），所以失效范围是**整站** —— 必须用
+// revalidatePath("/", "layout") 清掉所有路由的缓存的 layout，只清 /settings 不够。
+// 与该开关正交的是 profileBgOnResource（只管「其他访客在资源详情页能不能看到」）。
+export async function updateProfileBgGlobalAction(
+  _prev: SettingsActionState,
+  fd: FormData,
+): Promise<SettingsActionState> {
+  const user = (await auth())?.user;
+  if (!user) return { error: "请先登录" };
+
+  const global = String(fd.get("global") ?? "") === "on";
+  try {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { profileBgGlobal: global },
+    });
+    revalidatePath("/settings");
+    revalidatePath(`/u/${user.username}`);
+    revalidatePath("/", "layout"); // 全站背景：所有页面的 layout 都要重算
+    return { ok: true };
+  } catch (e) {
+    console.error("[profile-bg-global]", e);
+    return { error: "保存失败，请重试" };
+  }
+}
+
 // ---- 背景遮罩形状（用户自定义）----
 //
 // 同样**独立于上传动作**：调形状不该逼用户重选一遍图。

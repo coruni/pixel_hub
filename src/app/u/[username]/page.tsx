@@ -149,6 +149,11 @@ export default async function UserPage({
   // 主页背景：**最底层底图**（铺满视口、不覆盖 hero），达等级且有图才渲染。
   // 门槛判定与设置页表单共用 profileBgUnlocked()；等级掉下来或管理员抬高门槛后，旧图会立即不再渲染
   // ——「达到等级才开放」是一致口径，不做「传过就永久保留」的特例。
+  //
+  // 【与「全局显示」的优先级】主人背景 > 访客自己的全局背景。这里**不做** JS 去重，
+  // 交给 globals.css 的 `body:has([data-profile-bg-owner]) [data-profile-bg-global]`：
+  // 本层铺了就标 data-profile-bg-owner，全局层随之自隐。纯 CSS 判渲染结果，
+  // 不用复制服务端的开关/等级口径，软导航也不会错帧。
   const bgUnlocked = profileBgUnlocked(levelIndex, incentive.profile.bgMinLevel, incentive.enabled);
   const bgPcKey = bgUnlocked ? profile.profileBgPcKey : null;
 
@@ -358,6 +363,7 @@ export default async function UserPage({
       {bgUrl && (
         <div
           aria-hidden
+          data-profile-bg-owner
           className="profile-bg-pc pointer-events-none fixed inset-0 -z-10 hidden bg-cover bg-center bg-no-repeat sm:block"
           style={{ backgroundImage: `url(${bgUrl})`, "--profile-bg-mask": bgMask } as CSSProperties}
         />
