@@ -1,5 +1,7 @@
 // 首页板块 —— 服务端查询层（渲染 / 后台初始化共用）。
 // 板块目录与 config 校验见 home-config.ts。
+import { cache } from "react";
+import { cachedInRequest } from "@/lib/cached-in-request";
 import { prisma } from "@/lib/db/prisma";
 import { isOnline } from "@/lib/online";
 import {
@@ -25,37 +27,46 @@ export type HomeSectionView = {
   config: HomeSectionConfig;
 };
 
+/** 首页布局缓存标签；后台增删改/排序后主动失效。 */
+export const HOME_SECTIONS_CACHE_TAG = "config:home-sections";
+
+const readCachedHomeSections = cachedInRequest(
+  async (): Promise<HomeSectionView[]> => {
+    const rows = await prisma.homeSection.findMany({ orderBy: { order: "asc" } });
+    if (rows.length === 0) {
+      return DEFAULT_SECTIONS.map((d, i) => ({
+        id: `__default__${i}`,
+        kind: d.kind,
+        title: d.title,
+        order: d.order,
+        enabled: d.enabled,
+        visibleOn: "all",
+        requireAuth: false,
+        config: d.config,
+      }));
+    }
+    return rows.map((r) => {
+      const kind = (HOME_SECTION_KINDS as string[]).includes(r.kind)
+        ? (r.kind as HomeSectionKind)
+        : "feed";
+      return {
+        id: r.id,
+        kind,
+        title: r.title,
+        order: r.order,
+        enabled: r.enabled,
+        visibleOn: r.visibleOn === "pc" || r.visibleOn === "mobile" ? r.visibleOn : "all",
+        requireAuth: r.requireAuth === true,
+        config: parseSectionConfig(r.kind as HomeSectionKind, r.config),
+      };
+    });
+  },
+  ["home-sections"],
+  { tags: [HOME_SECTIONS_CACHE_TAG], revalidate: 300 },
+);
+
 /** 读取启用的板块列表（按 order 升序）。空表时用代码内默认布局兜底渲染，绝不空白。 */
-export async function getHomeSections(): Promise<HomeSectionView[]> {
-  const rows = await prisma.homeSection.findMany({ orderBy: { order: "asc" } });
-  if (rows.length === 0) {
-    return DEFAULT_SECTIONS.map((d, i) => ({
-      id: `__default__${i}`,
-      kind: d.kind,
-      title: d.title,
-      order: d.order,
-      enabled: d.enabled,
-      visibleOn: "all",
-      requireAuth: false,
-      config: d.config,
-    }));
-  }
-  return rows.map((r) => {
-    const kind = (HOME_SECTION_KINDS as string[]).includes(r.kind)
-      ? (r.kind as HomeSectionKind)
-      : "feed";
-    return {
-      id: r.id,
-      kind,
-      title: r.title,
-      order: r.order,
-      enabled: r.enabled,
-      visibleOn: r.visibleOn === "pc" || r.visibleOn === "mobile" ? r.visibleOn : "all",
-      requireAuth: r.requireAuth === true,
-      config: parseSectionConfig(r.kind as HomeSectionKind, r.config),
-    };
-  });
-}
+export const getHomeSections = cache(async (): Promise<HomeSectionView[]> => readCachedHomeSections());
 
 /** 空表时落库默认布局（后台首页布局页首次打开前调用），幂等 */
 export async function ensureHomeSections(): Promise<void> {

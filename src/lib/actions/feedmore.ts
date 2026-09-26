@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { getFeed, toFeedCard, type FeedCard } from "@/lib/queries";
+import { parseFeedCursor, type FeedCursor } from "@/lib/feed-paging";
 
 export type ListPageParams = {
   page: number;
@@ -58,7 +59,8 @@ export type BrowseFeedParams = {
   q?: string;
   /** 仅关注 Tab：由服务端从登录会话推导关注对象，客户端不传 userId */
   follow?: boolean;
-  page: number;
+  /** keyset 游标：null 表示取首屏之后的第一窗（客户端只回传服务端给过的值，不自己构造） */
+  cursor: FeedCursor | null;
   pageSize: number;
 };
 
@@ -70,16 +72,30 @@ const browseFeedSchema = z.object({
   tagSlug: z.string().max(80).optional(),
   q: z.string().max(60).optional(),
   follow: z.boolean().optional(),
-  page: z.number().int().min(2).max(2000),
+  cursor: z.unknown().optional(),
   pageSize: z.number().int().min(1).max(48),
 });
 
-/** 浏览页「加载后续页」：按与首屏一致的筛选取第 page 页（page ≥ 2），追加进同一条流 */
-export async function loadBrowseFeedAction(
-  p: BrowseFeedParams,
-): Promise<{ ok: boolean; items: FeedCard[]; hasMore: boolean; error?: string }> {
+export type BrowseFeedResult = {
+  ok: boolean;
+  items: FeedCard[];
+  hasMore: boolean;
+  /** 下一页游标；hasMore 为 false 时为 null */
+  nextCursor: FeedCursor | null;
+  error?: string;
+};
+
+/** 浏览页「加载后续页」：按与首屏一致的筛选取游标之后的一窗，追加进同一条流 */
+export async function loadBrowseFeedAction(p: BrowseFeedParams): Promise<BrowseFeedResult> {
   const parsed = browseFeedSchema.safeParse(p);
-  if (!parsed.success) return { ok: false, items: [], hasMore: false, error: "参数不合法" };
+  if (!parsed.success)
+    return { ok: false, items: [], hasMore: false, nextCursor: null, error: "参数不合法" };
+
+  // 游标来自客户端，必须重新校验结构（zod 只保证它是 unknown）
+  // null / undefined → 不带游标，等价于 offset 分页的第 1 页
+  const cursor = parsed.data.cursor == null ? null : parseFeedCursor(parsed.data.cursor);
+  if (parsed.data.cursor != null && !cursor)
+    return { ok: false, items: [], hasMore: false, nextCursor: null, error: "参数不合法" };
 
   // 「关注」列表以服务端会话为准：未登录时视为普通浏览
   let followOnlyOf: string | undefined;
@@ -96,8 +112,13 @@ export async function loadBrowseFeedAction(
     tagSlug: parsed.data.tagSlug,
     q: parsed.data.q,
     followOnlyOf,
-    page: parsed.data.page,
+    cursor: cursor ?? undefined,
     pageSize: parsed.data.pageSize,
   });
-  return { ok: true, items: r.items.map(toFeedCard), hasMore: r.hasMore };
+  return {
+    ok: true,
+    items: r.items.map(toFeedCard),
+    hasMore: r.hasMore,
+    nextCursor: r.nextCursor,
+  };
 }

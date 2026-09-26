@@ -1,5 +1,6 @@
 // 上传限制 —— 服务端读取层（渲染 / action / 上传路由共用）。配置结构校验见 upload-config.ts。
 import { cache } from "react";
+import { cachedInRequest } from "@/lib/cached-in-request";
 import { prisma } from "@/lib/db/prisma";
 import {
   DEFAULT_UPLOAD_LIMITS,
@@ -9,18 +10,27 @@ import {
   type UploadLimits,
 } from "@/lib/upload-config";
 
-/** 读上传限制；未落库时返回代码内默认（不写库，绝不空白）。请求内去重（同请求多处共用） */
-export const getUploadLimits = cache(async (): Promise<UploadLimits> => {
-  const row = await prisma.siteSetting.findUnique({ where: { key: UPLOAD_LIMITS_KEY } });
-  if (!row) return parseUploadLimits(null);
-  let value: unknown = null;
-  try {
-    value = JSON.parse(row.value);
-  } catch {
-    value = null;
-  }
-  return parseUploadLimits(value);
-});
+/** 上传限制跨请求缓存标签；后台保存后主动失效。 */
+export const UPLOAD_LIMITS_CACHE_TAG = "config:upload-limits";
+
+const readCachedUploadLimits = cachedInRequest(
+  async (): Promise<UploadLimits> => {
+    const row = await prisma.siteSetting.findUnique({ where: { key: UPLOAD_LIMITS_KEY } });
+    if (!row) return parseUploadLimits(null);
+    let value: unknown = null;
+    try {
+      value = JSON.parse(row.value);
+    } catch {
+      value = null;
+    }
+    return parseUploadLimits(value);
+  },
+  ["upload-limits"],
+  { tags: [UPLOAD_LIMITS_CACHE_TAG], revalidate: 300 },
+);
+
+/** 读上传限制；未落库时返回代码内默认（不写库，绝不空白）。请求内继续去重。 */
+export const getUploadLimits = cache(async (): Promise<UploadLimits> => readCachedUploadLimits());
 
 /** 空表落库默认上传限制（后台 /admin/uploads 打开前调用），幂等 */
 export async function ensureUploadLimits(): Promise<void> {

@@ -68,7 +68,7 @@ export default async function FeedBrowser({
     // 热门标签仅浏览页需要，其余页直接空数组
     showTags ? getTopTags() : Promise.resolve([] as Awaited<ReturnType<typeof getTopTags>>),
   ]);
-  const { items, hasMore } = feed;
+  const { items, hasMore, nextCursor } = feed;
   const emptyText = follow
     ? "关注的作者还没有新内容"
     : q
@@ -130,6 +130,7 @@ export default async function FeedBrowser({
       key={feedKey}
       initial={items.map(toFeedCard)}
       initialHasMore={hasMore}
+      initialCursor={nextCursor}
       params={{
         type,
         sort,

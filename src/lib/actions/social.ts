@@ -390,12 +390,18 @@ export async function addCommentAction(
   if (!resource) return { error: "资源不存在或已关闭评论" };
 
   let parentAuthorId: string | null = null;
+  // 回复必须继承父的 rootId，评论树才能靠 rootId 一条等值查询取全后代（见 comments-paging.ts）。
+  // 父的 rootId 为空说明迁移 0016 还没回填，此时留空让取数端回退 BFS —— 不能在这里"顺手补"，
+  // 因为补父的 rootId 需要递归上溯，属于迁移的职责，写路径只做常数工作。
+  let rootId: string | null = null;
   if (parsed.data.parentId) {
     const parent = await prisma.comment.findFirst({
       where: { id: parsed.data.parentId, resourceId: resource.id, status: "PUBLIC" },
+      select: { id: true, authorId: true, rootId: true },
     });
     if (!parent) return { error: "回复的楼层不存在" };
     parentAuthorId = parent.authorId;
+    rootId = parent.rootId ?? parent.id;
   }
 
   // 附图（仅主楼，回复不带图）：先落盘，成功与否不阻断文字评论
@@ -456,7 +462,8 @@ export async function addCommentAction(
     }
   }
 
-  // 评论 + 附图记录 + 计数同事务
+  // 评论 + 附图记录 + 计数同事务。
+  // rootId 在同一个事务里补写自己：根楼层的 rootId 等于自身 id，必须等 create 拿到 id 才知道。
   const comment = await prisma.$transaction(async (tx) => {
     const c = await tx.comment.create({
       data: {
@@ -464,8 +471,12 @@ export async function addCommentAction(
         authorId: user.id,
         parentId: parsed.data.parentId,
         content: parsed.data.content,
+        rootId,
       },
     });
+    if (!rootId) {
+      await tx.comment.update({ where: { id: c.id }, data: { rootId: c.id } });
+    }
     if (saved.length > 0) {
       await tx.media.createMany({
         data: saved.map((m, i) => ({
@@ -655,14 +666,10 @@ export async function incrementDownloadAction(resourceId: string): Promise<{ ok:
   const session = await auth();
   const userId =
     typeof session?.user?.id === "string" && session.user.id ? session.user.id : null;
+  // downloadCount 的 +1 在 recordDownload 内与记录插入同一事务完成（见 download-record.ts），
+  // 这里不再补发 update —— 那会把「插入记录 + 加计数」拆成两次独立往返。
   const rec = await recordDownload({ resourceId, userId, ipHash: hashIp(ip) });
 
-  if (rec.firstTime) {
-    await prisma.resource.update({
-      where: { id: resourceId },
-      data: { downloadCount: { increment: 1 } },
-    });
-  }
   // 只对已上架资源计分，且不给自己加分；after() 保证计分不拖慢下载响应
   const refId = rec.counted ? rec.refId : null;
   if (refId && resource.status === "PUBLISHED" && resource.authorId !== userId) {

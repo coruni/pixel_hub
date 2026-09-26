@@ -5,16 +5,21 @@
 //
 // 【重要】本页保存是**整份替换**（WYSIWYG）：表单永远提交完整配置文档，
 // 缺失字段组回落代码内默认（见 points-config.safeIncentive）。不要改成分字段增量写。
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { adminOnly, audit } from "@/lib/actions/_guards";
 import { DEFAULT_INCENTIVE_CONFIG, safeIncentive } from "@/lib/points-config";
-import { readIncentiveDoc, writeIncentiveDoc } from "@/lib/incentive";
+import {
+  INCENTIVE_CACHE_TAG,
+  readIncentiveDoc,
+  writeIncentiveDoc,
+} from "@/lib/incentive";
 import type { ActionResult } from "@/lib/hooks";
 
 const CONFLICT: ActionResult = { ok: false, error: "配置已被其他人修改，请刷新页面后重试" };
 
 /** 配置影响面：后台自身 + 前台所有展示等级/贡献分/榜单的入口 */
 function incentiveRevalidate() {
+  revalidateTag(INCENTIVE_CACHE_TAG, "max");
   revalidatePath("/admin/incentive");
   revalidatePath("/admin");
   revalidatePath("/creators");

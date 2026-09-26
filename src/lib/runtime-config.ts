@@ -3,6 +3,7 @@
 // 读取优先级：后台配置 > 旧 .env 回退（迁移期平滑：env 删掉后纯靠后台，未删也不冲突）。
 // 模式与 seo-config 一致：schema 只做形状与默认值，输出规范化统一走 sanitizeRuntimeConfig。
 import { cache } from "react";
+import { cachedInRequest } from "@/lib/cached-in-request";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { setS3Runtime } from "@/lib/storage/url";
@@ -261,13 +262,25 @@ export function searchCandidateLimit(c: RuntimeConfig): number {
   return Math.min(50_000, Math.max(1000, Math.trunc(n)));
 }
 
+/** 运行配置跨请求缓存标签；后台保存后主动失效。 */
+export const RUNTIME_CONFIG_CACHE_TAG = "config:runtime";
+
+const readCachedRuntimeConfig = cachedInRequest(
+  async (): Promise<RuntimeConfig> => {
+    const row = await prisma.siteSetting.findUnique({ where: { key: RUNTIME_CONFIG_KEY } });
+    return row ? parseRuntimeConfig(safeJson(row.value)) : DEFAULT_RUNTIME_CONFIG;
+  },
+  ["runtime-config"],
+  { tags: [RUNTIME_CONFIG_CACHE_TAG], revalidate: 300 },
+);
+
 /**
  * 请求级去重读取（登录页/设置页/上传链路同请求共用一次查询）。
  * 附带把 s3 运行时镜像同步给 storage/url 的同步 publicUrl（client 端无 DB，见其注释）。
+ * 镜像同步放在缓存函数外，避免跨请求命中 Data Cache 时跳过进程内状态初始化。
  */
 export const getRuntimeConfig = cache(async (): Promise<RuntimeConfig> => {
-  const row = await prisma.siteSetting.findUnique({ where: { key: RUNTIME_CONFIG_KEY } });
-  const cfg = row ? parseRuntimeConfig(safeJson(row.value)) : DEFAULT_RUNTIME_CONFIG;
+  const cfg = await readCachedRuntimeConfig();
   // 同步 s3 运行时镜像：driver=s3 且算出公开基址才镜像，否则清掉（切驱动后残留会拼错 URL）
   if (cfg.storageDriver === "s3") {
     const base = s3PublicBase(cfg);

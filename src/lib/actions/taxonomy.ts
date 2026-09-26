@@ -3,14 +3,16 @@
 // 分类/标签管理（后台 taxonomy）：全部 ADMIN 守卫 + AuditLog（共享 _guards）。
 // 删除类动作单独立名（DELETE_CATEGORY / DELETE_TAG），不再混在 EDIT_* 里——
 // 否则日志页「编辑分类」同时混着新建/更新/删除，事后无法按动作筛出删除记录。
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { prisma } from "@/lib/db/prisma";
+import { TAXONOMY_CACHE_TAG } from "@/lib/queries";
 import { asciiSlug, autoSlugBase, randomTail } from "@/lib/slug";
 import { adminOnly, audit } from "@/lib/actions/_guards";
 
 type Result = { ok: true } | { ok: false; error: string };
 
 function revalidateAll() {
+  revalidateTag(TAXONOMY_CACHE_TAG, "max");
   for (const p of ["/", "/browse", "/admin/categories", "/admin/tags"])
     revalidatePath(p);
 }

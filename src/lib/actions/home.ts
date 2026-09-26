@@ -1,7 +1,8 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { prisma } from "@/lib/db/prisma";
+import { HOME_SECTIONS_CACHE_TAG } from "@/lib/home";
 import { adminOnly, audit } from "@/lib/actions/_guards";
 import { publicUrl } from "@/lib/storage";
 import {
@@ -12,6 +13,7 @@ import {
 } from "@/lib/home-config";
 
 function homeRevalidate() {
+  revalidateTag(HOME_SECTIONS_CACHE_TAG, "max");
   revalidatePath("/admin/site"); // 首页布局已并入站点布局页
   revalidatePath("/");
   revalidatePath("/admin");

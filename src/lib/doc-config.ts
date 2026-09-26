@@ -2,6 +2,7 @@
 // 存储沿用 SiteSetting，value 直接存 Markdown 文本（key: doc:<page>）；未落库或为空 = 使用内置默认。
 // 前台用全站 Markdown 管线（rte/Markdown + .md-body）渲染，管理员可完全自定义结构与篇幅。
 import { cache } from "react";
+import { cachedInRequestWithArgs } from "@/lib/cached-in-request";
 import { prisma } from "@/lib/db/prisma";
 
 export const DOC_KEYS = ["rules", "terms", "privacy"] as const;
@@ -168,12 +169,21 @@ const DEFAULTS: Record<DocKey, string> = {
   privacy: DEFAULT_PRIVACY_MD,
 };
 
-/** 前台读取：自定义内容为空时回退内置默认 */
-export const getDocMarkdown = cache(async (page: DocKey): Promise<string> => {
-  const row = await prisma.siteSetting.findUnique({ where: { key: DOC_PAGES[page].key } });
-  const md = row?.value?.trim() ?? "";
-  return md || DEFAULTS[page];
-});
+/** 内容页跨请求缓存标签；任一协议保存/恢复后统一失效三页。 */
+export const DOCS_CACHE_TAG = "config:docs";
+
+const readCachedDocMarkdown = cachedInRequestWithArgs(
+  async (page: DocKey): Promise<string> => {
+    const row = await prisma.siteSetting.findUnique({ where: { key: DOC_PAGES[page].key } });
+    const md = row?.value?.trim() ?? "";
+    return md || DEFAULTS[page];
+  },
+  ["doc-markdown"],
+  { tags: [DOCS_CACHE_TAG], revalidate: 300 },
+);
+
+/** 前台读取：自定义内容为空时回退内置默认；同一请求内继续去重。 */
+export const getDocMarkdown = cache(async (page: DocKey): Promise<string> => readCachedDocMarkdown(page));
 
 /** 后台读取：原始自定义值（区分「未自定义」与「已自定义」）+ 修改时间 */
 export async function getDocWithMeta(page: DocKey): Promise<{

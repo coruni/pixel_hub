@@ -1,7 +1,8 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { prisma } from "@/lib/db/prisma";
+import { THEME_CACHE_TAG } from "@/lib/site";
 import { adminOnly, audit } from "@/lib/actions/_guards";
 import {
   DETAIL_TEMPLATE_IDS,
@@ -26,7 +27,8 @@ import {
 import { isContentType, type ContentType } from "@/lib/display";
 
 function themeRevalidate() {
-  // 前台动态页每次请求现读 DB；这里刷新路由缓存与后台自身
+  // 主题配置使用跨请求 Data Cache；保存后先失效数据，再刷新受影响路由。
+  revalidateTag(THEME_CACHE_TAG, "max");
   revalidatePath("/admin/site");
   revalidatePath("/admin");
   revalidatePath("/");

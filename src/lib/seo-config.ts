@@ -2,6 +2,7 @@
 // 存储沿用 SiteSetting（key="seo"，JSON + 乐观锁 version）；解析非法一律回退默认，绝不让前台空白。
 // 注意：schema 只做形状与默认值（zod v4 的 transform 管道不继承 default），输出规范化统一走 sanitizeSeo。
 import { cache } from "react";
+import { cachedInRequest } from "@/lib/cached-in-request";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { siteName as fallbackSiteName } from "@/lib/site-url";
@@ -90,18 +91,27 @@ export function serializeSeoConfig(config: SeoConfig): string {
   return JSON.stringify(sanitizeSeo(seoConfigSchema.parse(config)));
 }
 
-/** 请求级去重读取（layout 与页面同请求共用一次查询） */
-export const getSeoConfig = cache(async (): Promise<SeoConfig> => {
-  const row = await prisma.siteSetting.findUnique({ where: { key: SEO_KEY } });
-  if (!row) return DEFAULT_SEO;
-  let value: unknown = null;
-  try {
-    value = JSON.parse(row.value);
-  } catch {
-    value = null;
-  }
-  return parseSeoConfig(value);
-});
+/** SEO 配置跨请求缓存标签；后台保存后主动失效。 */
+export const SEO_CACHE_TAG = "config:seo";
+
+const readCachedSeoConfig = cachedInRequest(
+  async (): Promise<SeoConfig> => {
+    const row = await prisma.siteSetting.findUnique({ where: { key: SEO_KEY } });
+    if (!row) return DEFAULT_SEO;
+    let value: unknown = null;
+    try {
+      value = JSON.parse(row.value);
+    } catch {
+      value = null;
+    }
+    return parseSeoConfig(value);
+  },
+  ["seo-config"],
+  { tags: [SEO_CACHE_TAG], revalidate: 300 },
+);
+
+/** 请求级去重读取（layout 与页面同请求共用一次查询），跨请求由 Data Cache 复用。 */
+export const getSeoConfig = cache(async (): Promise<SeoConfig> => readCachedSeoConfig());
 
 /** 后台编辑用：配置 + 乐观锁版本（行不存在时 version=0，首建后自增） */
 export async function getSeoWithVersion(): Promise<{ config: SeoConfig; version: number }> {

@@ -4,8 +4,10 @@ import { isOnline } from "@/lib/online";
 import { auth } from "@/lib/auth";
 import { searchRuntime } from "@/lib/search";
 import { fetchRootCommentsPage } from "@/lib/comments-paging";
+import type { FeedCursor } from "@/lib/feed-paging";
 import { cache } from "react";
 import { unstable_noStore as noStore } from "next/cache";
+import { cachedInRequest, cachedInRequestWithArgs } from "@/lib/cached-in-request";
 import type { Prisma, ResourceType } from "@prisma/client";
 
 export type FeedItem = {
@@ -94,6 +96,12 @@ export type FeedParams = {
   ids?: string[]; // 指定 id 集合（首页主推等），顺序需调用方自行按 id 重排
   page?: number;
   pageSize?: number;
+  /**
+   * keyset 游标：给了它就**忽略 page/skip**，只取「排序上排在游标之后」的一窗。
+   * 由 getFeed 返回的 nextCursor 原样回传即可（FeedInfinite 走这条路径）。
+   * 调用方若来自客户端，必须先过 parseFeedCursor 校验。
+   */
+  cursor?: FeedCursor;
   /** D9：显式覆盖 NSFW 可见性；缺省按当前登录态（登录可见全站，游客只见 SFW） */
   includeNsfw?: boolean;
 };
@@ -217,7 +225,7 @@ const viewerAuthed = cache(async (): Promise<boolean> => {
 
 export async function getFeed(
   params: FeedParams,
-): Promise<{ items: FeedItem[]; page: number; hasMore: boolean }> {
+): Promise<{ items: FeedItem[]; page: number; hasMore: boolean; nextCursor: FeedCursor | null }> {
   const page = Math.max(1, params.page ?? 1);
   // D9：游客（含搜索引擎）只见 SFW；登录后全站可见
   const allowNsfw = params.includeNsfw ?? (await viewerAuthed());
@@ -259,7 +267,7 @@ export async function getFeed(
       const cand = await rt.engine.search(q, { limit: rt.candidateLimit });
       let ids = cand.ids;
       if (pinned) ids = ids.filter((id) => pinned.has(id));
-      if (ids.length === 0) return { items: [], page, hasMore: false };
+      if (ids.length === 0) return { items: [], page, hasMore: false, nextCursor: null };
       relevanceOrder = ids;
       where.id = { in: ids };
     } catch (e) {
@@ -289,9 +297,9 @@ export async function getFeed(
     const have = new Set(inter.map((r) => r.id));
     const ordered = relevanceOrder.filter((id) => have.has(id));
     const total = ordered.length;
-    if (total === 0) return { items: [], page, hasMore: false };
+    if (total === 0) return { items: [], page, hasMore: false, nextCursor: null };
     const pageIds = ordered.slice((page - 1) * pageSize, page * pageSize);
-    if (pageIds.length === 0) return { items: [], page, hasMore: false };
+    if (pageIds.length === 0) return { items: [], page, hasMore: false, nextCursor: null };
     const fetched = await prisma.resource.findMany({
       where: { id: { in: pageIds } },
       select: feedSelect,
@@ -300,7 +308,13 @@ export async function getFeed(
     const rows = pageIds
       .map((id) => byId.get(id))
       .filter((r): r is FeedRow => !!r);
-    return { items: rows.map(toFeedItem), page, hasMore: page * pageSize < total };
+    return {
+      items: rows.map(toFeedItem),
+      page,
+      hasMore: page * pageSize < total,
+      // 全文检索走的是「候选 id 全集 + 切片」，不接 keyset 游标（相关度顺序不是列值）
+      nextCursor: null,
+    };
   }
 
   // 排序带 id 决胜：同值时结果稳定（分页翻页不跳动）
@@ -311,29 +325,126 @@ export async function getFeed(
         ? [{ downloadCount: "desc" }, { publishedAt: "desc" }, { id: "desc" }]
         : [{ publishedAt: "desc" }, { createdAt: "desc" }, { id: "desc" }];
 
+  // —— keyset（游标）分页 ——
+  // 有 cursor 时不再用 skip：把「上一页最后一条」的位置展开成 keyset 条件，窗口永远从
+  // 数据本身锚定，翻页期间有新内容插入也不会重复/漏（offset 分页做不到）。
+  // 前提：资源流的排序键全在 Resource 主表上（author / tags 只是过滤，不参与排序）。
+  if (params.cursor) {
+    const after = cursorAfter(params.cursor, params.sort);
+    where.AND = Array.isArray(where.AND) ? [...where.AND, after] : [after];
+  }
+
   const rows = await prisma.resource.findMany({
     where,
     orderBy,
     take: pageSize + 1,
-    skip: (page - 1) * pageSize,
+    // 游标模式不带 skip：窗口由 where 里的 keyset 条件决定
+    ...(params.cursor ? {} : { skip: (page - 1) * pageSize }),
     select: feedSelect,
   });
   const hasMore = rows.length > pageSize;
-  return { items: rows.slice(0, pageSize).map(toFeedItem), page, hasMore };
+  const pageRows = hasMore ? rows.slice(0, pageSize) : rows;
+  const last = pageRows[pageRows.length - 1];
+  return {
+    items: pageRows.map(toFeedItem),
+    page,
+    hasMore,
+    // 下一页的游标；没有下一页（或本页为空）时为 null
+    nextCursor: hasMore && last ? toFeedCursor(last, params.sort) : null,
+  };
 }
 
-// 请求内去重：Navbar 分类菜单、sidebar widget、首页 categories 板块常在同页重复取
-export const getCategories = cache(async () => {
-  return prisma.category.findMany({ orderBy: [{ sort: "asc" }, { name: "asc" }] });
-});
+/** 由一行的排序键值构造下一页游标 */
+function toFeedCursor(row: FeedRow, sort: SortKey | undefined): FeedCursor {
+  return {
+    k:
+      sort === "popular"
+        ? row.likeCount
+        : sort === "downloads"
+          ? row.downloadCount
+          : (row.publishedAt?.getTime() ?? 0),
+    t: row.publishedAt ? row.publishedAt.getTime() : null,
+    id: row.id,
+  };
+}
 
-export const getTopTags = cache(async (limit = 24) => {
-  return prisma.tag.findMany({
-    orderBy: { count: "desc" },
-    take: limit,
-    select: { slug: true, name: true, count: true },
-  });
-});
+/**
+ * keyset 条件：`ORDER BY 主排序键 DESC, publishedAt DESC, id DESC` 之后「严格排在游标之后」的行。
+ *
+ * 展开成字典序比较：(m1 < c1) OR (m1 = c1 AND m2 < c2) OR (m1 = c1 AND m2 = c2 AND m3 < c3)。
+ * 三个键的降序组合已唯一确定一行（id 是主键），所以用 `lt` 而非 `lte` —— lte 会把游标那行
+ * 自己再取回来，翻页就多一条。
+ *
+ * `createdAt` **不出现在 keyset 里**：它是 latest 排序在 publishedAt 之后的第三键，而 id 是主键，
+ * (publishedAt, id) 已经唯一。像 id 一样把 createdAt 也带进去只会让 OR 分支翻倍、SQL 更贵，
+ * 换不到任何正确性 —— 唯一代价是 publishedAt 与 id 都相同的情况本就不可能发生。
+ *
+ * publishedAt 可空，而 `lt` 对 NULL 恒为 UNKNOWN（Postgres 的 DESC 默认 NULLS FIRST），
+ * 所以必须显式区分「游标还在时间区」「已进入 null 区」两种情形，否则 null 段的行会被整段跳过。
+ */
+function cursorAfter(c: FeedCursor, sort: SortKey | undefined): Prisma.ResourceWhereInput {
+  const major: "likeCount" | "downloadCount" | "publishedAt" =
+    sort === "popular" ? "likeCount" : sort === "downloads" ? "downloadCount" : "publishedAt";
+
+  // latest 排序：主排序键就是 publishedAt，比较链只剩 (publishedAt, id)
+  if (major === "publishedAt") {
+    return {
+      OR: [
+        // 游标还在时间区 → 取更早的行
+        ...(c.t !== null ? [{ publishedAt: { lt: new Date(c.t) } }] : []),
+        // 游标本身 publishedAt 为空（已进 null 区）→ 只排空值本身
+        ...(c.t === null ? [{ publishedAt: null }] : []),
+        // 同值行按 id 决胜
+        { publishedAt: c.t === null ? null : new Date(c.t), id: { lt: c.id } },
+      ],
+    };
+  }
+
+  // popular / downloads：主排序键是数值列，publishedAt 是第二键
+  const atMajor = { [major]: c.k } as Prisma.ResourceWhereInput;
+  return {
+    OR: [
+      // 主键更小 —— 后面所有行都算在内
+      { [major]: { lt: c.k } } as Prisma.ResourceWhereInput,
+      ...(c.t !== null
+        ? [
+            { ...atMajor, publishedAt: { lt: new Date(c.t) } },
+            { ...atMajor, publishedAt: new Date(c.t), id: { lt: c.id } },
+          ]
+        : [
+            // 主键同值且游标的 publishedAt 为空：null 区里只能再按 id 决胜。
+            // 注意不能写成 publishedAt: { lt: ... } —— 唯一可能与 c.k 并列的 null 行就在这里。
+            { ...atMajor, publishedAt: null, id: { lt: c.id } },
+          ]),
+    ].map((x) => x as Prisma.ResourceWhereInput),
+  };
+}
+
+// 分类/标签是低频变更的公共数据：跨请求缓存，后台 taxonomy 写入后按标签失效。
+export const TAXONOMY_CACHE_TAG = "content:taxonomy";
+
+const readCachedCategories = cachedInRequest(
+  async () => prisma.category.findMany({ orderBy: [{ sort: "asc" }, { name: "asc" }] }),
+  ["categories"],
+  { tags: [TAXONOMY_CACHE_TAG], revalidate: 300 },
+);
+
+// limit 是数值参数，映射成字符串进缓存键（cachedInRequestWithArgs 的 A 约束为 string）
+const readCachedTopTags = cachedInRequestWithArgs(
+  async (limit: string) =>
+    prisma.tag.findMany({
+      orderBy: { count: "desc" },
+      take: Number(limit),
+      select: { slug: true, name: true, count: true },
+    }),
+  ["top-tags"],
+  { tags: [TAXONOMY_CACHE_TAG], revalidate: 300 },
+);
+
+// 请求内去重：Navbar 分类菜单、sidebar widget、首页 categories 板块常在同页重复取。
+export const getCategories = cache(async () => readCachedCategories());
+
+export const getTopTags = cache(async (limit = 24) => readCachedTopTags(String(limit)));
 
 export type ResourceDetail = Awaited<ReturnType<typeof getResourceDetail>>;
 

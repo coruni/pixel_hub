@@ -1,5 +1,6 @@
 // 站点外观 —— 服务端读取层（渲染 / 后台初始化共用）。配置结构校验见 site-config.ts。
 import { cache } from "react";
+import { cachedInRequest } from "@/lib/cached-in-request";
 import { prisma } from "@/lib/db/prisma";
 import {
   DEFAULT_THEME,
@@ -9,18 +10,27 @@ import {
   type Theme,
 } from "@/lib/site-config";
 
-/** 读取主题设置；未落库时返回代码内默认（不写库，绝不空白）。请求内去重（page 与 sidebar 共用） */
-export const getTheme = cache(async (): Promise<Theme> => {
-  const row = await prisma.siteSetting.findUnique({ where: { key: THEME_KEY } });
-  if (!row) return parseTheme(null);
-  let value: unknown = null;
-  try {
-    value = JSON.parse(row.value);
-  } catch {
-    value = null;
-  }
-  return parseTheme(value);
-});
+/** 主题配置跨请求缓存标签；后台保存后主动失效，避免每个动态页面都重复查 SiteSetting。 */
+export const THEME_CACHE_TAG = "config:theme";
+
+const readCachedTheme = cachedInRequest(
+  async (): Promise<Theme> => {
+    const row = await prisma.siteSetting.findUnique({ where: { key: THEME_KEY } });
+    if (!row) return parseTheme(null);
+    let value: unknown = null;
+    try {
+      value = JSON.parse(row.value);
+    } catch {
+      value = null;
+    }
+    return parseTheme(value);
+  },
+  ["site-theme"],
+  { tags: [THEME_CACHE_TAG], revalidate: 300 },
+);
+
+/** 读取主题设置；未落库时返回代码内默认（不写库，绝不空白）。请求内继续去重。 */
+export const getTheme = cache(async (): Promise<Theme> => readCachedTheme());
 
 /** 读取原始值是否存在（后台判空用） */
 export async function siteSettingExists(key: string): Promise<boolean> {

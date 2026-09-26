@@ -28,7 +28,7 @@ export type RecordDownloadInput = {
 };
 
 export type RecordDownloadResult = {
-  /** 是否首次：true 表示本次应给 `Resource.downloadCount` +1 */
+  /** 是否首次：true 表示本次已为 `Resource.downloadCount` +1（已计入，调用方不要再加） */
   firstTime: boolean;
   /** 是否通过计分闸门：false 时**下载照常**，只是不给作者贡献分 */
   counted: boolean;
@@ -36,7 +36,13 @@ export type RecordDownloadResult = {
   refId: string | null;
 };
 
-/** 月度配额与单作品上限判定 —— 只决定「给不给分」，与能否下载无关 */
+/**
+ * 月度配额与单作品上限判定 —— 只决定「给不给分」，与能否下载无关。
+ *
+ * 原先两条闸门各发一次 `count`，加上快路径的 findUnique 和最终的 create，
+ * 一次下载最多 4 次往返。现在两个 count 合并成一条 `SELECT (子查询, 子查询)`：
+ * 子查询永远执行，只是被不启用的闸门忽略 —— 读的是同一组索引，成本可忽略。
+ */
 async function passesScoreGate(
   cfg: IncentiveConfig,
   subjectKey: string,
@@ -44,18 +50,18 @@ async function passesScoreGate(
   periodKey: string,
 ): Promise<boolean> {
   const monthlyCap = cfg.download.monthlyScoreCap;
-  if (monthlyCap > 0) {
-    const used = await prisma.downloadRecord.count({
-      where: { subjectKey, periodKey, counted: true },
-    });
-    if (used >= monthlyCap) return false;
-  }
-  if (cfg.download.perResourceCapEnabled) {
-    const usedOnResource = await prisma.downloadRecord.count({
-      where: { resourceId, periodKey, counted: true },
-    });
-    if (usedOnResource >= cfg.download.perResourceCap) return false;
-  }
+  const perResourceCap = cfg.download.perResourceCapEnabled ? cfg.download.perResourceCap : 0;
+  if (monthlyCap <= 0 && perResourceCap <= 0) return true;
+
+  const [row] = await prisma.$queryRaw<{ monthly: number; per_resource: number }[]>`
+    SELECT
+      (SELECT count(*)::int FROM "DownloadRecord"
+        WHERE "subjectKey" = ${subjectKey} AND "periodKey" = ${periodKey} AND "counted" = true) AS monthly,
+      (SELECT count(*)::int FROM "DownloadRecord"
+        WHERE "resourceId" = ${resourceId} AND "periodKey" = ${periodKey} AND "counted" = true) AS per_resource
+  `;
+  if (monthlyCap > 0 && (row?.monthly ?? 0) >= monthlyCap) return false;
+  if (perResourceCap > 0 && (row?.per_resource ?? 0) >= perResourceCap) return false;
   return true;
 }
 
@@ -71,7 +77,10 @@ function sweepOldRecords(cfg: IncentiveConfig): void {
 
 /**
  * 记一次下载。并发安全：靠唯一键兜住「同一主体同时点两次」。
- * 调用方拿到 `firstTime` 后再自增 `Resource.downloadCount`，拿到 `counted` 后再走计分。
+ *
+ * `firstTime` 为 true 时，`Resource.downloadCount` 的 +1 **已在本函数内完成** ——
+ * 原先由调用方在拿到 firstTime 后再发一次 update，那是「插入记录」和「加计数」两次
+ * 独立往返，中间还可能因为调用方抛错而只成一半。现在两者同一事务，要么都成立要么都不。
  */
 export async function recordDownload(input: RecordDownloadInput): Promise<RecordDownloadResult> {
   const cfg = await getIncentive();
@@ -92,15 +101,23 @@ export async function recordDownload(input: RecordDownloadInput): Promise<Record
       : false;
 
   try {
-    await prisma.downloadRecord.create({
-      data: {
-        resourceId: input.resourceId,
-        subjectKey,
-        userId: input.userId,
-        ipHash: input.ipHash,
-        periodKey,
-        counted,
-      },
+    await prisma.$transaction(async (tx) => {
+      await tx.downloadRecord.create({
+        data: {
+          resourceId: input.resourceId,
+          subjectKey,
+          userId: input.userId,
+          ipHash: input.ipHash,
+          periodKey,
+          counted,
+        },
+      });
+      // 条件自增：只对「已上架」资源计数，与旧调用方的 status 判断口径一致。
+      // 未发布资源的下载仍会留记录（用于去重与计分闸门），只是不动 downloadCount。
+      await tx.resource.updateMany({
+        where: { id: input.resourceId, status: "PUBLISHED" },
+        data: { downloadCount: { increment: 1 } },
+      });
     });
   } catch (e) {
     // 并发：另一请求刚插入同一 (resourceId, subjectKey) → 视为重复，不重复计数

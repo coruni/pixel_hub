@@ -211,6 +211,11 @@ model Resource {
 
   @@index([status, type])
   @@index([status, publishedAt(sort: Desc)])
+  // 公开流默认按发布时间稳定排序；nsfw 放在状态后覆盖游客的 SFW 过滤。
+  @@index([status, nsfw, publishedAt(sort: Desc), createdAt(sort: Desc), id(sort: Desc)], map: "Resource_status_nsfw_publishedAt_createdAt_id_idx")
+  // 最热 / 最多下载列表的排序索引；登录态不带 nsfw 条件时仍回退上面的 status 排序索引。
+  @@index([status, nsfw, likeCount(sort: Desc), publishedAt(sort: Desc), id(sort: Desc)], map: "Resource_status_nsfw_likeCount_publishedAt_id_idx")
+  @@index([status, nsfw, downloadCount(sort: Desc), publishedAt(sort: Desc), id(sort: Desc)], map: "Resource_status_nsfw_downloadCount_publishedAt_id_idx")
   @@index([authorId])
   @@index([categoryId])
 }
@@ -339,6 +344,10 @@ model Comment {
   parentId   String?
   parent     Comment?      @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
   replies    Comment[]     @relation("CommentReplies")
+  // 根楼层 id：根自己指向自己。让「某根的全部后代」成为一条可索引的等值查询，
+  // 不必再靠 parentId 逐层 BFS（旧实现每层一次往返，深树还要靠 MAX_REPLY_DEPTH 兜底成环）。
+  // 存量数据由 0016 迁移回填；写入端在 addCommentAction 里维护（回复继承父的 rootId）。
+  rootId     String?
   media      Media[]
   content    String
   status     CommentStatus @default(PUBLIC)
@@ -347,7 +356,15 @@ model Comment {
   reports    Report[] @relation("ReportComment") // 举报目标（见 Report）
 
   @@index([resourceId, createdAt])
+  // 根楼层分页同时过滤公开状态并按时间倒序。
+  @@index([resourceId, status, createdAt(sort: Desc), id(sort: Desc)], map: "Comment_resourceId_status_createdAt_id_idx")
+  // 回复 BFS 按 parentId + 公开状态取下一层，并按时间正序展开。
+  @@index([parentId, status, createdAt(sort: Asc), id(sort: Asc)], map: "Comment_parentId_status_createdAt_id_idx")
   @@index([parentId]) // 楼中楼按 parent 取回复
+  // 取某根的全部后代：`WHERE rootId = ? AND status = 'PUBLIC' ORDER BY createdAt`。
+  // rootId 可空（迁移尚未回填时），但生产写入路径一定填值，索引选择性接近主键。
+  @@index([rootId, status, createdAt(sort: Asc), id(sort: Asc)], map: "Comment_rootId_status_createdAt_id_idx")
+  @@index([rootId])
 }
 
 model Follow {
@@ -378,6 +395,8 @@ model Notification {
   createdAt  DateTime         @default(now())
 
   @@index([userId, readAt])
+  // 通知列表按用户/筛选类型取最新记录。
+  @@index([userId, type, createdAt(sort: Desc)], map: "Notification_userId_type_createdAt_idx")
   @@index([actorId])
 }
 
@@ -708,7 +727,11 @@ model DownloadRecord {
 
   @@unique([resourceId, subjectKey]) // 主体级去重：同一主体对同一作品只计一次
   @@index([subjectKey, periodKey])
+  // 月度主体配额还会过滤 counted=true。
+  @@index([subjectKey, periodKey, counted], map: "DownloadRecord_subjectKey_periodKey_counted_idx")
   @@index([resourceId, periodKey])
+  // 单作品月度配额还会过滤 counted=true。
+  @@index([resourceId, periodKey, counted], map: "DownloadRecord_resourceId_periodKey_counted_idx")
   @@index([periodKey])
 }
 

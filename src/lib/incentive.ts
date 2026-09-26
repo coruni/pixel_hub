@@ -3,6 +3,7 @@
 // 与 theme（site.ts + site-config.ts）、uploadLimits（upload-limits.ts + upload-config.ts）同范式：
 // 读不到 / 读到坏数据 → 回代码内默认，**绝不抛错**（配置坏掉不能让全站页面 500）。
 import { cache } from "react";
+import { cachedInRequest } from "@/lib/cached-in-request";
 import { prisma } from "@/lib/db/prisma";
 import {
   INCENTIVE_KEY,
@@ -11,18 +12,29 @@ import {
   type IncentiveConfig,
 } from "@/lib/points-config";
 
-/** 读激励配置；未落库时返回代码内默认（不写库）。请求内去重（page 与 sidebar 共用） */
-export const getIncentive = cache(async (): Promise<IncentiveConfig> => {
-  const row = await prisma.siteSetting.findUnique({ where: { key: INCENTIVE_KEY } });
-  if (!row) return parseIncentive(null);
-  let value: unknown = null;
-  try {
-    value = JSON.parse(row.value);
-  } catch {
-    value = null;
-  }
-  return parseIncentive(value);
-});
+/** 激励配置跨请求缓存标签；后台保存后主动失效。 */
+export const INCENTIVE_CACHE_TAG = "config:incentive";
+
+const readCachedIncentive = cachedInRequest(
+  async (): Promise<IncentiveConfig> => {
+    const row = await prisma.siteSetting.findUnique({ where: { key: INCENTIVE_KEY } });
+    if (!row) return parseIncentive(null);
+    let value: unknown = null;
+    try {
+      value = JSON.parse(row.value);
+    } catch {
+      value = null;
+    }
+    return parseIncentive(value);
+  },
+  ["incentive-config"],
+  { tags: [INCENTIVE_CACHE_TAG], revalidate: 300 },
+);
+
+/** 读激励配置；未落库时返回代码内默认（不写库）。请求内去重（page 与 sidebar 共用）。 */
+export const getIncentive = cache(
+  async (): Promise<IncentiveConfig> => await readCachedIncentive(),
+);
 
 /** 激励总开关：关掉后不计分、不展示等级与榜单（存量数据保留）。计分热路径只读这一个布尔 */
 export async function incentiveEnabled(): Promise<boolean> {

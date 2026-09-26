@@ -20,29 +20,30 @@ export async function POST(req: NextRequest) {
     if (!path.startsWith("/")) return new Response(null, { status: 204 });
 
     const ipHash = hashIp(ip);
-
     const day = dayKey(new Date());
-
-    await prisma.visit.create({ data: { day, ipHash, path } });
-
-    // 访问明细保留 180 天：约 1% 的请求顺带清理过期行（机会式保留，免去定时任务；
-    // 按 day 前缀比较可命中索引，YYYY-MM-DD 字典序即时间序）
-    if (Math.random() < 0.01) {
-      const cutoffDay = dayKey(new Date(Date.now() - 180 * 24 * 3600 * 1000));
-      void prisma.visit.deleteMany({ where: { day: { lt: cutoffDay } } }).catch(() => {});
-    }
 
     // 资源详情页浏览量与 PV 同链路采集（bumpView 无调用方，viewCount 从不增长的旧 bug）
     // updateMany：slug 不存在/未发布时静默不计数；同 IP 限流天然防刷
     const slug = path.match(/^\/resources\/([^/?#]+)/)?.[1];
-    if (slug) {
-      void prisma.resource
-        .updateMany({
+
+    // 三条写入合并成一次事务 + 一次往返（原先是 create / bumpView / sweep 各自独立 await，
+    // 远程库上等于把 PV 采集拖成 3 个 RTT，而这是每个页面浏览都走的路径）。
+    // 事务内 ensure 语义不变：visit 失败整体失败、viewCount 也不加，与旧行为一致。
+    const sweep = Math.random() < 0.01;
+    const cutoffDay = sweep ? dayKey(new Date(Date.now() - 180 * 24 * 3600 * 1000)) : null;
+
+    await prisma.$transaction(async (tx) => {
+      await tx.visit.create({ data: { day, ipHash, path } });
+      if (slug) {
+        await tx.resource.updateMany({
           where: { slug: decodeURIComponent(slug), status: "PUBLISHED" },
           data: { viewCount: { increment: 1 } },
-        })
-        .catch(() => {});
-    }
+        });
+      }
+      // 访问明细保留 180 天：约 1% 的请求顺带清理过期行（机会式保留，免去定时任务；
+      // 按 day 前缀比较可命中索引，YYYY-MM-DD 字典序即时间序）
+      if (cutoffDay) await tx.visit.deleteMany({ where: { day: { lt: cutoffDay } } });
+    });
   } catch {
     // 统计失败不影响访问
   }

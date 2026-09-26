@@ -3,12 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { loadBrowseFeedAction, type BrowseFeedParams } from "@/lib/actions/feedmore";
 import type { FeedCard } from "@/lib/queries";
-import { FEED_PAGE_SIZE } from "@/lib/feed-paging";
+import { FEED_PAGE_SIZE, type FeedCursor } from "@/lib/feed-paging";
 import Loader from "@/components/Loader";
 import ResourceGrid from "@/components/resource/ResourceGrid";
 import { Button } from "@/components/ui/Button";
 
-type FeedFilters = Omit<BrowseFeedParams, "page" | "pageSize">;
+type FeedFilters = Omit<BrowseFeedParams, "cursor" | "pageSize">;
 
 /**
  * /browse 的无限滚动流：首屏 initial 由 SSR 注入，滚近底部（提前约一屏高）时自动取下一页并
@@ -18,11 +18,14 @@ type FeedFilters = Omit<BrowseFeedParams, "page" | "pageSize">;
 export default function FeedInfinite({
   initial,
   initialHasMore,
+  initialCursor,
   params,
   emptyText,
 }: {
   initial: FeedCard[];
   initialHasMore: boolean;
+  /** 首屏返回的游标；从此往后逐窗追加，不再依赖 page/skip */
+  initialCursor: FeedCursor | null;
   params: FeedFilters;
   emptyText: string;
 }) {
@@ -31,11 +34,12 @@ export default function FeedInfinite({
   const [done, setDone] = useState(!initialHasMore);
   const [err, setErr] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const pageRef = useRef(1);
+  const cursorRef = useRef<FeedCursor | null>(initialCursor);
   const busyRef = useRef(false);
   const doneRef = useRef(!initialHasMore);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
-  // 已渲染的 id 集合：追加前按 id 去重，防止 offset 分页在追页期间发生位移时重复出卡（重复 id 同时是重复 React key）
+  // 已渲染的 id 集合：游标分页下重复理论上不会发生（同一位置只可能被取到一次），
+  // 但并发追加同一窗、或服务端排序键被并发改写时仍可能撞上，保留按 id 去重兜底（重复 id 同时是重复 React key）
   const seenRef = useRef(new Set(initial.map((i) => i.id)));
 
   async function loadNext() {
@@ -46,20 +50,22 @@ export default function FeedInfinite({
     try {
       const r = await loadBrowseFeedAction({
         ...params,
-        page: pageRef.current + 1,
+        cursor: cursorRef.current,
         pageSize: FEED_PAGE_SIZE,
       });
       if (!r.ok) {
         setErr(r.error ?? "加载失败");
         return;
       }
-      // 去重后只追加新卡片；整页都是已渲染项说明 offset 已漂移（追页期间有增删），就此收尾而不是原地反复请求
+      // 去重后只追加新卡片
       const fresh = r.items.filter((i) => !seenRef.current.has(i.id));
       for (const i of fresh) seenRef.current.add(i.id);
       if (fresh.length > 0) setItems((prev) => [...prev, ...fresh]);
-      pageRef.current += 1;
+      cursorRef.current = r.nextCursor;
       setHasMore(r.hasMore);
-      if (!r.hasMore || r.items.length === 0 || fresh.length === 0) {
+      // 没有下一页 / 空窗 → 收尾。注意**不再**用「整页都重复」当终局信号：
+      // 那是 offset 漂移的补丁，游标分页下正常不会发生，真发生也只该跳过、不该终止流。
+      if (!r.hasMore || r.items.length === 0) {
         doneRef.current = true;
         setDone(true);
       }

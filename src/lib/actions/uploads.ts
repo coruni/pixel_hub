@@ -2,7 +2,7 @@
 
 // 上传限制后台配置：保存 / 恢复默认。读写 SiteSetting["uploadLimits"]（乐观锁 doc），
 // 仿 actions/site.ts 骨架。强制点（上传路由/action）直接消费 getUploadLimits()，无需经此。
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { adminOnly, audit } from "@/lib/actions/_guards";
 import {
   COMMENT_COUNT_RANGE,
@@ -16,12 +16,17 @@ import {
   normalizeExts,
   type ImageOutputFormat,
 } from "@/lib/upload-config";
-import { readUploadLimitsDoc, writeUploadLimitsDoc } from "@/lib/upload-limits";
+import {
+  UPLOAD_LIMITS_CACHE_TAG,
+  readUploadLimitsDoc,
+  writeUploadLimitsDoc,
+} from "@/lib/upload-limits";
 import type { ActionResult } from "@/lib/hooks";
 
 const CONFLICT: ActionResult = { ok: false, error: "配置已被其他人修改，请刷新页面后重试" };
 
 function uploadsRevalidate() {
+  revalidateTag(UPLOAD_LIMITS_CACHE_TAG, "max");
   revalidatePath("/admin/uploads");
   revalidatePath("/admin");
 }

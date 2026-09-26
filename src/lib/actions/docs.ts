@@ -1,16 +1,17 @@
 "use server";
 
 // 内容页（社区规则/用户协议/隐私协议）后台保存：仅管理员；SiteSetting(key="doc:<page>") 直存 Markdown。
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { prisma } from "@/lib/db/prisma";
 import { adminOnly, audit } from "@/lib/actions/_guards";
-import { DOC_PAGES, isDocKey } from "@/lib/doc-config";
+import { DOCS_CACHE_TAG, DOC_PAGES, isDocKey } from "@/lib/doc-config";
 
 export type DocSaveResult = { ok: boolean; error?: string };
 
 const MAX_DOC_MD = 100_000;
 
 function revalidateDocPages(): void {
+  revalidateTag(DOCS_CACHE_TAG, "max");
   revalidatePath("/rules");
   revalidatePath("/terms");
   revalidatePath("/privacy");
