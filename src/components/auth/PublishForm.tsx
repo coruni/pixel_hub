@@ -41,9 +41,7 @@ export default function PublishForm({
         />
         <span className="min-w-0">
           <span className="block text-sm text-neutral-800">自动保存草稿</span>
-          <span className="mt-0.5 block text-xs leading-5 text-neutral-400">
-            开启后编辑内容时每 30 秒自动留存一次草稿；关闭则只在点「保存草稿」或按 Ctrl+S 时留档。
-          </span>
+         
         </span>
       </label>
 

@@ -171,9 +171,6 @@ export default function ProfileBgForm({
           />
           <span className="min-w-0">
             <span className="block text-sm text-neutral-800">在资源详情页也展示</span>
-            <span className="mt-0.5 block text-xs leading-5 text-neutral-400">
-              关掉后你发布的资源详情页不再铺这张背景，个人主页照常展示，图也不会被删除。
-            </span>
           </span>
         </label>
         {plPending && <p className="mt-1.5 text-xs text-neutral-400">保存中…</p>}

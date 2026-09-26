@@ -74,6 +74,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
           username?: string;
           role?: "USER" | "MODERATOR" | "ADMIN";
           trusted?: boolean;
+          colorMode?: "SYSTEM" | "LIGHT" | "DARK";
           pw?: string;
         };
         if (user) {
@@ -91,7 +92,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
         if (t.id) {
           const row = await prisma.user.findUnique({
             where: { id: t.id },
-            select: { role: true, trusted: true, bannedAt: true, passwordHash: true },
+            // colorMode 一并回查：配色偏好是账号设置，改完要在下一次请求的首帧就生效，
+            // 不能等重新登录换 token。多带一列，换来「设置页一保存、刷新即所见」。
+            select: {
+              role: true,
+              trusted: true,
+              bannedAt: true,
+              passwordHash: true,
+              colorMode: true,
+            },
           });
           const sig = row?.passwordHash?.slice(-16) ?? "";
           if (!row || row.bannedAt || (t.pw !== undefined && t.pw !== sig)) {
@@ -100,10 +109,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
             delete t.username;
             delete t.role;
             delete t.trusted;
+            delete t.colorMode;
             delete t.pw;
           } else {
             t.role = row.role;
             t.trusted = row.trusted;
+            t.colorMode = row.colorMode;
             t.pw = sig;
           }
         }

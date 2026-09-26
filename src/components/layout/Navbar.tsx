@@ -13,7 +13,6 @@ import type { NavItem } from "@/lib/site-config";
 import { NAV_CONTROL_H } from "@/lib/ui/cls";
 import UserMenu from "./UserMenu";
 import NavCategoriesMenu from "./NavCategoriesMenu";
-import ThemeToggle from "./ThemeToggle";
 import MobileNav from "./MobileNav";
 import SearchBox from "./SearchBox";
 
@@ -97,7 +96,7 @@ export default async function Navbar() {
         <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
           {/* 站内搜索（全文检索）：≥sm 行内显示；窄屏在汉堡抽屉顶部提供 */}
           <SearchBox className="hidden w-40 sm:block lg:w-52" placeholder="搜索资源…" />
-          <ThemeToggle />
+          {/* 明暗切换已移入「账户设置 → 外观」：配色是低频偏好，且要跟账号走（游客跟随浏览器） */}
           {/* 小屏汉堡菜单：导航项 + 分类直达（桌面端隐藏） */}
           <MobileNav
             items={items.map((it) => ({

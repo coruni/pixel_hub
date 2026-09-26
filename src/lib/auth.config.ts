@@ -52,6 +52,7 @@ export const authConfig = {
         username?: string;
         role?: "USER" | "MODERATOR" | "ADMIN";
         trusted?: boolean;
+        colorMode?: "SYSTEM" | "LIGHT" | "DARK";
       };
       // token 身份被清空（封禁/改密后的失效会话，见 lib/auth.ts 的 jwt 回查）→ 视为未登录
       if (!t.id) {
@@ -63,6 +64,8 @@ export const authConfig = {
         session.user.username = t.username ?? "";
         session.user.role = t.role ?? "USER";
         session.user.trusted = t.trusted ?? false;
+        // 旧 token（本次改动之前签发的）没有 colorMode，兜到 SYSTEM = 跟随系统
+        session.user.colorMode = t.colorMode ?? "SYSTEM";
       }
       return session;
     },

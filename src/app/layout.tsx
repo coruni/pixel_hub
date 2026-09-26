@@ -5,7 +5,9 @@ import Footer from "@/components/layout/Footer";
 import PageTracker from "@/components/layout/PageTracker";
 import PresencePing from "@/components/layout/PresencePing";
 import RealtimeBridge from "@/components/layout/RealtimeBridge";
+import ColorModeSync from "@/components/layout/ColorModeSync";
 import { auth } from "@/lib/auth";
+import { fromDbColorMode } from "@/lib/color-mode";
 import { siteUrl } from "@/lib/site-url";
 import { getSeoConfig, jsonLd, resolveSiteName } from "@/lib/seo-config";
 
@@ -43,8 +45,11 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-// 首帧同步主题（放 body 前、阻塞渲染执行，防止暗色闪白）：localStorage 未设置时跟随系统
-const themeInitScript = `try{var t=localStorage.getItem("theme");var d=t?t==="dark":window.matchMedia("(prefers-color-scheme: dark)").matches;if(d)document.documentElement.classList.add("dark")}catch(e){}`;
+// 首帧同步配色（放 body 最前、阻塞渲染执行，防止暗色闪白）。
+// 偏好只从 <html data-color-mode> 读 —— 服务端已按「已登录取账号值 / 游客取 system」写好，
+// 这里只把「偏好」翻译成「最终 class」：system 时现问 matchMedia，light/dark 时直接用。
+// 游客没有账号也没有本地存储，因此天然跟随浏览器配色；系统切换由 ColorModeSync 接管。
+const themeInitScript = `try{var e=document.documentElement,m=e.getAttribute("data-color-mode")||"system",d=m==="dark"||(m!=="light"&&window.matchMedia("(prefers-color-scheme: dark)").matches);e.classList.toggle("dark",d);e.style.colorScheme=d?"dark":"light"}catch(err){}`;
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const [session, seo] = await Promise.all([auth(), getSeoConfig()]);
@@ -64,7 +69,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       })
     : null;
   return (
-    <html lang="zh-CN" className="h-full antialiased" suppressHydrationWarning>
+    <html
+      lang="zh-CN"
+      className="h-full antialiased"
+      // 游客取 system（跟随浏览器）；已登录取账号上的偏好。首帧脚本据此上 class
+      data-color-mode={fromDbColorMode(session?.user?.colorMode)}
+      suppressHydrationWarning
+    >
       <body className="flex min-h-full flex-col bg-background text-neutral-900">
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
         {websiteLd && (
@@ -73,6 +84,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             dangerouslySetInnerHTML={{ __html: websiteLd }}
           />
         )}
+        <ColorModeSync />
         <PageTracker />
         <PresencePing signedIn={Boolean(session?.user)} />
         <RealtimeBridge signedIn={Boolean(session?.user)} />

@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
-/* 暗色模式：class 策略（<html class="dark">），由 layout 内联脚本 + ThemeToggle 切换 */
+/* 暗色模式：class 策略（<html class="dark">）。偏好记在 <html data-color-mode>
+   （已登录取账号设置、游客固定 system），由 layout 内联脚本上 class，设置页「外观」改它 */
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* Fusion Pixel 中文像素字体（SIL OFL 1.1，许可见 public/fonts/OFL-LICENSE.txt） */

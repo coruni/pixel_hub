@@ -95,6 +95,20 @@ export function profileBgUnlocked(level: number, minLevel: number, incentiveEnab
  */
 export const WATERMARK_TEXT_MAX = 40;
 
+/**
+ * 水印落点。取值与 Prisma 的 WatermarkPosition 枚举逐字一致（大写），
+ * 表单直接把它当 radio 的 value 提交，省掉一层大小写转换。
+ * 顺序 = 设置页里的展示顺序（四角按左上→右上→左下→右下，最后是全屏）。
+ */
+export const WATERMARK_POSITIONS = [
+  "TOP_LEFT",
+  "TOP_RIGHT",
+  "BOTTOM_LEFT",
+  "BOTTOM_RIGHT",
+  "TILE",
+] as const;
+export type WatermarkPositionValue = (typeof WATERMARK_POSITIONS)[number];
+
 /** 压缩输出格式：webp（默认，体积最优）/ jpg（兼容性最好，无透明）/ png（无损或调色板量化） */
 export const IMAGE_FORMATS = ["webp", "jpg", "png"] as const;
 export type ImageOutputFormat = (typeof IMAGE_FORMATS)[number];

@@ -412,13 +412,19 @@ export async function addCommentAction(
     images.length > 0
       ? await prisma.user.findUnique({
           where: { id: user.id },
-          select: { username: true, watermarkImages: true, watermarkText: true },
+          select: {
+            username: true,
+            watermarkImages: true,
+            watermarkText: true,
+            watermarkPosition: true,
+          },
         })
       : null;
   const watermark = await resolveWatermark(
     !!wmPref?.watermarkImages,
     wmPref?.username ?? "",
     wmPref?.watermarkText,
+    wmPref?.watermarkPosition ?? "BOTTOM_RIGHT",
   );
   let saved: { key: string; width: number; height: number; size: number; mime: string }[] = [];
   if (images.length > 0) {

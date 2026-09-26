@@ -55,6 +55,9 @@ model User {
   // ---- 图片水印（默认关闭）。开启后上传的图集/评论附图会被打上文字水印，原图同样改写 ----
   watermarkImages Boolean @default(false) // 是否给上传的图片加水印
   watermarkText   String? // 水印文字；空 = 用默认「@用户名」
+  watermarkPosition WatermarkPosition @default(BOTTOM_RIGHT) // 水印落点；TILE = 全屏平铺斜水印（默认右下角，与历史行为一致）
+  // ---- 外观偏好（账号级，跨设备同步）----
+  colorMode ColorMode @default(SYSTEM) // 配色偏好。SYSTEM = 跟随系统/浏览器；游客无账号，一律按浏览器偏好
 
   accounts       Account[]
   sessions       Session[]
@@ -470,6 +473,22 @@ enum Role {
   USER
   MODERATOR
   ADMIN
+}
+
+/// 配色偏好。SYSTEM = 跟随系统/浏览器（prefers-color-scheme），也是默认值
+enum ColorMode {
+  SYSTEM
+  LIGHT
+  DARK
+}
+
+/// 水印落点。四个角按 gravity 贴边；TILE = 全屏平铺斜水印
+enum WatermarkPosition {
+  TOP_LEFT
+  TOP_RIGHT
+  BOTTOM_LEFT
+  BOTTOM_RIGHT
+  TILE
 }
 
 enum ResourceType {

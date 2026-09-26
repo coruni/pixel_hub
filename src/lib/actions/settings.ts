@@ -5,10 +5,11 @@ import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import sharp from "sharp";
 import { auth } from "@/lib/auth";
+import { toDbColorMode } from "@/lib/color-mode";
 import { prisma } from "@/lib/db/prisma";
 import { rateLimit } from "@/lib/rate-limit";
 import { makeKey, saveFile, delFile } from "@/lib/storage";
-import { MIB, WATERMARK_TEXT_MAX, profileBgUnlocked } from "@/lib/upload-config";
+import { MIB, WATERMARK_POSITIONS, WATERMARK_TEXT_MAX, profileBgUnlocked } from "@/lib/upload-config";
 import { getUploadLimits } from "@/lib/upload-limits";
 import { getIncentive } from "@/lib/incentive";
 import { getContributionSummary } from "@/lib/points";
@@ -79,6 +80,8 @@ export async function updatePrivacyAction(
 const watermarkSchema = z.object({
   watermarkImages: z.boolean(),
   watermarkText: z.string().trim().max(WATERMARK_TEXT_MAX, `水印文字最长 ${WATERMARK_TEXT_MAX} 字`),
+  // 取值与 Prisma 枚举逐字一致，表单原样提交，不做大小写转换
+  watermarkPosition: z.enum(WATERMARK_POSITIONS),
 });
 
 export async function updateWatermarkAction(
@@ -92,6 +95,7 @@ export async function updateWatermarkAction(
     // checkbox 提交语义：勾选 = "on"，未勾选 = 缺失
     watermarkImages: fd.get("watermarkImages") === "on",
     watermarkText: fd.get("watermarkText") ?? "",
+    watermarkPosition: fd.get("watermarkPosition") ?? "",
   });
   if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
 
@@ -101,7 +105,35 @@ export async function updateWatermarkAction(
       watermarkImages: parsed.data.watermarkImages,
       // 空串落 null：水印文字留空 = 用默认「@用户名」，不要在库里存一个空串表示「无文字」
       watermarkText: parsed.data.watermarkText || null,
+      watermarkPosition: parsed.data.watermarkPosition,
     },
+  });
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+// ---- 外观：配色偏好（账号级）----
+// 存账号而不是 localStorage：换设备、换浏览器都跟着走。
+// 游客没有账号，一律跟随浏览器 prefers-color-scheme（见 app/layout.tsx 的首帧脚本）。
+// 前端选中即刷 <html>（即时预览），点保存才落库 —— 与其它设置区块同一节奏。
+
+const colorModeSchema = z.object({
+  colorMode: z.enum(["system", "light", "dark"]),
+});
+
+export async function updateColorModeAction(
+  _prev: SettingsActionState,
+  fd: FormData,
+): Promise<SettingsActionState> {
+  const user = (await auth())?.user;
+  if (!user) return { error: "请先登录" };
+
+  const parsed = colorModeSchema.safeParse({ colorMode: fd.get("colorMode") ?? "" });
+  if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { colorMode: toDbColorMode(parsed.data.colorMode) },
   });
   revalidatePath("/settings");
   return { ok: true };

@@ -10,10 +10,12 @@
 // 只有用户输入里出现站点字体覆盖不到的字符（emoji、未收录的罕用字…）时才回退到
 // <text> + fontconfig，那时才需要镜像里装字体，见 watermarkAvailable()。
 //
-// 落点用 `gravity: "southeast"`（sharp 自己算），因此不依赖调用方给的图片高宽是否精确；
-// 宽高只用于两件事：字号缩放，以及「覆盖层不得高于底图」的前置判断。
+// 落点由用户偏好决定：四个角交给 sharp 的 gravity（坐标它自己算，因此不依赖调用方给的图片
+// 高宽是否精确）；全屏斜水印则是自己拼一块旋转过的瓦片，交给 sharp 的 composite tile 平铺。
+// 宽高只用于三件事：字号缩放、平铺密度，以及「覆盖层不得大于底图」的前置判断。
 import fs from "node:fs";
 import path from "node:path";
+import type { WatermarkPosition } from "@prisma/client";
 import * as fontkitModule from "fontkit";
 import sharp from "sharp";
 import { WATERMARK_TEXT_MAX } from "@/lib/upload-config";
@@ -32,14 +34,14 @@ type FontkitApi = { create(source: Uint8Array | ArrayBuffer): unknown };
 const fontkit = ((fontkitModule as unknown as { default?: FontkitApi }).default ??
   fontkitModule) as unknown as FontkitApi;
 
-/** 水印内容。位置与样式固定（右下角、深色填充 + 浅色描边），只让用户决定「写什么」 */
-export type WatermarkSpec = { text: string };
+/** 水印内容与落点。样式固定（深色填充 + 浅色描边），让用户决定「写什么」和「打在哪」 */
+export type WatermarkSpec = { text: string; position: WatermarkPosition };
 
 /** 覆盖层的两种绘制方式：path = 站点字体轮廓；text = SVG `<text>` 交给 fontconfig 回退 */
 export type OverlayMode = "path" | "text";
 
-/** 覆盖层产物 */
-type Overlay = { input: Buffer; height: number; fontSize: number; mode: OverlayMode };
+/** 覆盖层产物。宽高是覆盖层自身尺寸，用于「放不放得下」与平铺瓦片的守卫 */
+type Overlay = { input: Buffer; width: number; height: number; fontSize: number; mode: OverlayMode };
 
 /**
  * 回退字族栈，交给 fontconfig 逐级回退。刻意不加引号：带空格的字族名在 pango 里可以直接裸写，
@@ -117,6 +119,36 @@ export function overlayHeight(imageWidth: number): number {
 
 const padXOf = (fontSize: number) => Math.round(fontSize * 0.85);
 
+/**
+ * 排一行字：返回**字体设计单位**下的字形路径、整行宽度（多少个 em）与 em 基准。
+ * 翻 y 轴与缩放刻意留给调用方在自己的 `<g>` 上做 —— 角落水印和斜水印的变换不同，
+ * 但「字怎么排出来」只有这一份，改字体相关逻辑不用改两处。
+ */
+function glyphRun(text: string, font: FontkitFont): {
+  glyphData: string;
+  emWidth: number;
+  units: number;
+} {
+  const units = font.unitsPerEm;
+  const run = font.layout(text);
+  // 与字号无关的「字宽 = 多少个 em」。Fusion Pixel 的 CJK 是 1em、拉丁是 0.5em，
+  // 中英混排用固定系数估必然偏，这里直接取字体自己的 advance。
+  const emWidth = run.advanceWidth / units;
+  // 字形轮廓的坐标是「字体设计单位、y 轴向上」，各字形的平移量也按原始单位写，
+  // 由调用方在 <g> 上做一次 scale(s, -s) 统一翻到 SVG 的 y 轴向下。
+  const glyphs: string[] = [];
+  let pen = 0;
+  for (let i = 0; i < run.glyphs.length; i++) {
+    const d = run.glyphs[i].path.toSVG();
+    const pos = run.positions[i];
+    if (d) {
+      glyphs.push(`<path transform="translate(${pen + pos.xOffset} ${-pos.yOffset})" d="${d}"/>`);
+    }
+    pen += pos.xAdvance;
+  }
+  return { glyphData: glyphs.join(""), emWidth, units };
+}
+
 // ────────────────────────────── 轮廓模式（主路径） ──────────────────────────────
 
 /**
@@ -128,11 +160,7 @@ const padXOf = (fontSize: number) => Math.round(fontSize * 0.85);
  */
 function buildPathOverlay(text: string, imageWidth: number, font: FontkitFont): Overlay {
   const width0 = Math.max(1, imageWidth);
-  const units = font.unitsPerEm;
-  const run = font.layout(text);
-  // 与字号无关的「字宽 = 多少个 em」。Fusion Pixel 的 CJK 是 1em、拉丁是 0.5em，
-  // 中英混排用固定系数估必然偏，这里直接取字体自己的 advance。
-  const emWidth = run.advanceWidth / units;
+  const { glyphData, emWidth, units } = glyphRun(text, font);
 
   // 放不下就整体缩字。迭代两次即可收敛到亚像素：字号与内边距同比例缩，第二次只是补掉
   // padX 取整带来的零点几像素偏差。**不设字号下限** —— 下限只会让「缩不下」变成「裁字」，
@@ -159,17 +187,6 @@ function buildPathOverlay(text: string, imageWidth: number, font: FontkitFont): 
   // 字形轮廓的坐标是「字体设计单位、y 轴向上」，这里只在 <g> 上做一次 scale(s, -s) 翻到
   // SVG 的 y 轴向下，各字形的平移量就仍然按原始字体单位写，不必逐点换算。
   const scale = fontSize / units;
-  const glyphs: string[] = [];
-  let pen = 0;
-  for (let i = 0; i < run.glyphs.length; i++) {
-    const d = run.glyphs[i].path.toSVG();
-    const pos = run.positions[i];
-    if (d) {
-      glyphs.push(`<path transform="translate(${pen + pos.xOffset} ${-pos.yOffset})" d="${d}"/>`);
-    }
-    pen += pos.xAdvance;
-  }
-  const glyphData = glyphs.join("");
 
   // 两趟绘制：**先浅色描边、再压深色填充**（字幕的经典做法，不是反过来）。
   // 反过来的「白字 + 深描边」在暖白底上只剩一圈细描边、字心与底色同色 —— 整块字看起来是空心的、
@@ -186,7 +203,7 @@ function buildPathOverlay(text: string, imageWidth: number, font: FontkitFont): 
     `<g ${group} fill="#000000" fill-opacity="0.72">${glyphData}</g>` +
     `</svg>`;
 
-  return { input: Buffer.from(svg), height, fontSize, mode: "path" };
+  return { input: Buffer.from(svg), width, height, fontSize, mode: "path" };
 }
 
 // ────────────────────────── 回退模式（系统字体） ──────────────────────────
@@ -212,7 +229,7 @@ function buildTextOverlay(text: string, imageWidth: number): Overlay {
     `<text ${common} fill="none" stroke="#ffffff" stroke-opacity="0.9" stroke-width="${(fontSize * 0.16).toFixed(2)}" stroke-linejoin="round">${esc(text)}</text>` +
     `<text ${common} fill="#000000" fill-opacity="0.72">${esc(text)}</text>` +
     `</svg>`;
-  return { input: Buffer.from(svg), height, fontSize, mode: "text" };
+  return { input: Buffer.from(svg), width, height, fontSize, mode: "text" };
 }
 
 /** 生成覆盖层：站点字体覆盖得住就用轮廓，否则回退系统字体 */
@@ -222,13 +239,112 @@ export function buildOverlay(text: string, imageWidth: number): Overlay {
   return buildTextOverlay(text, imageWidth);
 }
 
+// ─────────────────────── 全屏平铺斜水印（TILE 落点） ───────────────────────
+//
+// 做法：把一行字旋转 -25° 做成一小块「瓦片」，再交给 sharp 的 composite({ tile: true })
+// 平铺满整张图。与角落水印的关键差别是**密度要自己控**：
+//   · 字号由「一行字大约占图宽多少」反推，而不是直接沿用角落字号 —— 否则 40 字的用户名
+//     会排成一条横贯全图的长线，平铺一次都铺不满，「全屏」就无从谈起；
+//   · 同时也压住角落字号的上限（不超它的 0.6），免得大图上铺出几块巨大的字；
+//   · 两层绘制的透明度都比角落水印低一截 —— 平铺后视觉密度上来了，同样的黑度会糊住画面。
+
+/** 斜水印抬起的角度（度）。0 太呆板、45 又太抢眼，25 是「一眼看出是水印但不挡内容」的档 */
+const TILE_ANGLE = 25;
+/** 平铺字号上下限：下限保证缩略图上还能认出是字，上限避免小图被一块字盖满 */
+const TILE_FONT_MIN = 9;
+const TILE_FONT_MAX = 28;
+
+/** 平铺瓦片的字号：让整行字约占半图宽，且不超角落水印字号的六成 */
+function tileFontSize(imageWidth: number, emWidth: number): number {
+  const ideal = (imageWidth * 0.5) / Math.max(0.5, emWidth);
+  const capped = Math.min(ideal, watermarkFontSize(imageWidth) * 0.6);
+  return Math.max(TILE_FONT_MIN, Math.min(TILE_FONT_MAX, Math.round(capped)));
+}
+
+/**
+ * 瓦片几何：由「旋转后的外接矩形 + 内边距」算出宽高，以及把内容摆到瓦片中心的外层 transform。
+ * 字宽由调用方按各自方式给（轮廓=字体精确 advance、回退=按字数估），
+ * 但两种模式的瓦片尺寸口径一致，不会出现「有站点字体时密、缺字时疏」。
+ *
+ * 旋转后字头字尾会甩到行高之外，所以必须按 sin/cos 重新算外接矩形并留边，
+ * 否则相邻瓦片会互相切掉字尾。
+ */
+function tileFrame(textWidth: number, fontSize: number) {
+  const rad = (TILE_ANGLE * Math.PI) / 180;
+  const pad = Math.round(fontSize * 0.9);
+  const width = Math.ceil(textWidth * Math.cos(rad) + fontSize * Math.sin(rad)) + pad * 2;
+  const height = Math.ceil(textWidth * Math.sin(rad) + fontSize * Math.cos(rad)) + pad * 2;
+  const outer = `translate(${(width / 2).toFixed(2)} ${(height / 2).toFixed(2)}) rotate(${-TILE_ANGLE})`;
+  return { width, height, outer };
+}
+
+/** 在瓦片中心摆放整行字：横向居中 + 下移半个字高（字形是沿基线向上长的） */
+function tileInner(textWidth: number, fontSize: number, scale = 1): string {
+  const shiftY = (fontSize * 0.4).toFixed(2);
+  if (scale === 1) return `translate(${(-textWidth / 2).toFixed(2)} ${shiftY})`;
+  return (
+    `translate(${(-textWidth / 2).toFixed(2)} ${shiftY}) ` +
+    `scale(${scale.toFixed(6)} ${(-scale).toFixed(6)})`
+  );
+}
+
+const tileSvg = (width: number, height: number, groups: string) =>
+  Buffer.from(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">${groups}</svg>`,
+  );
+
+function buildTilePathOverlay(text: string, imageWidth: number, font: FontkitFont): Overlay {
+  const { glyphData, emWidth, units } = glyphRun(text, font);
+  const fontSize = tileFontSize(imageWidth, emWidth);
+  const textWidth = emWidth * fontSize;
+  const { width, height, outer } = tileFrame(textWidth, fontSize);
+  const inner = tileInner(textWidth, fontSize, fontSize / units);
+  const groups =
+    `<g transform="${outer}">` +
+    `<g transform="${inner}" fill="none" stroke="#ffffff" stroke-opacity="0.28" stroke-width="${(units * 0.16).toFixed(2)}" stroke-linejoin="round">${glyphData}</g>` +
+    `<g transform="${inner}" fill="#000000" fill-opacity="0.16">${glyphData}</g>` +
+    `</g>`;
+  return { input: tileSvg(width, height, groups), width, height, fontSize, mode: "path" };
+}
+
+/** 回退模式的斜瓦片：估算口径与角落回退一致（每字符 1.05em），且不需要 text-anchor —— 中心已对齐 */
+function buildTileTextOverlay(text: string, imageWidth: number): Overlay {
+  const emWidth = text.length * 1.05;
+  const fontSize = tileFontSize(imageWidth, emWidth);
+  const textWidth = emWidth * fontSize;
+  const { width, height, outer } = tileFrame(textWidth, fontSize);
+  const inner = tileInner(textWidth, fontSize);
+  const common = `x="0" y="0" font-family="${FALLBACK_FONT}" font-size="${fontSize}"`;
+  const groups =
+    `<g transform="${outer}"><g transform="${inner}">` +
+    `<text ${common} fill="none" stroke="#ffffff" stroke-opacity="0.28" stroke-width="${(fontSize * 0.16).toFixed(2)}" stroke-linejoin="round">${esc(text)}</text>` +
+    `<text ${common} fill="#000000" fill-opacity="0.16">${esc(text)}</text>` +
+    `</g></g>`;
+  return { input: tileSvg(width, height, groups), width, height, fontSize, mode: "text" };
+}
+
+/** 生成斜瓦片：站点字体覆盖得住就用轮廓，否则回退系统字体（与角落水印同一套判断） */
+export function buildTileOverlay(text: string, imageWidth: number): Overlay {
+  const font = siteFont();
+  if (font && coversAll(font, text)) return buildTilePathOverlay(text, imageWidth, font);
+  return buildTileTextOverlay(text, imageWidth);
+}
+
 // ────────────────────────────── 复合 ──────────────────────────────
+
+/** 四个角落点 → sharp 的 gravity 名。TILE 不在这张表里（平铺是另一条路径） */
+const GRAVITY_OF = {
+  TOP_LEFT: "northwest",
+  TOP_RIGHT: "northeast",
+  BOTTOM_LEFT: "southwest",
+  BOTTOM_RIGHT: "southeast",
+} as const;
 
 /**
  * 给 sharp 管道加水印。**必须在 compressWith / 格式编码之前调用**（复合要发生在编码之前）。
  *
- * `baseHeight` 只用于「覆盖层放不放得下」：宽高比极端的图（长条、全景）覆盖层会高于底图，
- * 直接 composite 会被 sharp 拒绝并让整次上传失败 —— 这里改为静默跳过该尺寸的水印。
+ * `imageWidth` / `baseHeight` 只用于「覆盖层放不放得下」：宽高比极端的图（长条、全景）覆盖层会
+ * 超出底图，直接 composite 会被 sharp 拒绝并让整次上传失败 —— 这里改为静默跳过该尺寸的水印。
  * 宁可这张图没水印，也不能让用户的图传不上去。
  */
 export function applyWatermark(
@@ -238,9 +354,19 @@ export function applyWatermark(
   baseHeight: number,
 ): SharpPipe {
   if (!spec?.text) return pipe;
-  const { input, height } = buildOverlay(spec.text, imageWidth);
-  if (baseHeight <= height + 4) return pipe;
-  return pipe.composite([{ input, gravity: "southeast" }]);
+  const baseWidth = Math.max(1, imageWidth);
+
+  if (spec.position === "TILE") {
+    const tile = buildTileOverlay(spec.text, baseWidth);
+    // 瓦片比底图还大时 sharp 会直接报错，与角落水印同一口径：跳过这张，不让整次上传失败
+    if (tile.width > baseWidth || tile.height > baseHeight) return pipe;
+    // 从左上角起铺。gravity 是平铺的起始锚点，用 center 会让四条边都出现半块瓦片
+    return pipe.composite([{ input: tile.input, tile: true, gravity: "northwest" }]);
+  }
+
+  const overlay = buildOverlay(spec.text, baseWidth);
+  if (baseHeight <= overlay.height + 4) return pipe;
+  return pipe.composite([{ input: overlay.input, gravity: GRAVITY_OF[spec.position] }]);
 }
 
 // ────────────────────────── 环境自检（仅回退模式需要） ──────────────────────────
@@ -303,12 +429,13 @@ export function resolveWatermarkText(username: string, custom?: string | null): 
 export async function resolveWatermark(
   enabled: boolean,
   username: string,
-  custom?: string | null,
+  custom: string | null | undefined,
+  position: WatermarkPosition,
 ): Promise<WatermarkSpec | null> {
   if (!enabled) return null;
   const text = resolveWatermarkText(username, custom);
   const font = siteFont();
-  if (font && coversAll(font, text)) return { text };
+  if (font && coversAll(font, text)) return { text, position };
   if (!(await watermarkAvailable())) return null;
-  return { text };
+  return { text, position };
 }

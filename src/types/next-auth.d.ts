@@ -8,6 +8,8 @@ declare module "next-auth" {
       username: string;
       role: "USER" | "MODERATOR" | "ADMIN";
       trusted: boolean;
+      /** 配色偏好（库里的枚举形态）。SYSTEM = 跟随系统/浏览器 */
+      colorMode: "SYSTEM" | "LIGHT" | "DARK";
     } & DefaultSession["user"];
   }
 
@@ -25,5 +27,6 @@ declare module "next-auth/jwt" {
     username?: string;
     role?: "USER" | "MODERATOR" | "ADMIN";
     trusted?: boolean;
+    colorMode?: "SYSTEM" | "LIGHT" | "DARK";
   }
 }

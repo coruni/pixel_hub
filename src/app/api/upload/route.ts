@@ -45,12 +45,18 @@ export async function POST(req: NextRequest) {
   // 「@用户名」，而 session 里的 username 是登录时写进 token 的，不依赖它更稳。
   const me = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { username: true, watermarkImages: true, watermarkText: true },
+    select: {
+      username: true,
+      watermarkImages: true,
+      watermarkText: true,
+      watermarkPosition: true,
+    },
   });
   const watermark = await resolveWatermark(
     !!me?.watermarkImages,
     me?.username ?? "",
     me?.watermarkText,
+    me?.watermarkPosition ?? "BOTTOM_RIGHT",
   );
 
   // 单次上传张数上限：客户端（向导按类型传入，如 ARTICLE 固定 1 张）只允许**收窄**，

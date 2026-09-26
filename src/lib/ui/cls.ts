@@ -23,6 +23,25 @@ export const INPUT_FILTER =
   "rounded-none border border-brand-200 bg-surface px-3 py-1.5 text-xs outline-none transition focus:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-400";
 
 /**
+ * 分类/筛选用 chip（直角细边框，未选中落在 surface 上）。
+ * 这份样式此前在 FeedBrowser、creators、u/[username]、admin/* 里各抄了一份，
+ * 新增调用点一律取这里，别再复制。
+ *
+ * - `min-h-11 sm:min-h-0`：窄屏下把触控高度补到 44px，sm 起回落成 26px 的紧凑单行；
+ *   存量调用点迁过来后同样会被修正。
+ * - 焦点环只写在 focus-visible 上，不用 outline-none 抹掉键盘焦点。
+ */
+export const CHIP_BASE =
+  "inline-flex min-h-11 items-center whitespace-nowrap rounded-none border px-3 py-1 text-xs transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 sm:min-h-0";
+
+export const chipClass = (active: boolean) =>
+  `${CHIP_BASE} ${
+    active
+      ? "border-brand-600 bg-brand-500 text-white"
+      : "border-brand-200 bg-surface text-neutral-600 hover:border-brand-500"
+  }`;
+
+/**
  * 顶部导航行内控件的统一高度：搜索框输入、主题切换、汉堡按钮、头像菜单、注册。
  * 这些控件在 64px 高的导航条里并排，各自 py-* 算出来的高度并不相等（32/34/38/40），
  * 统一改成显式高度后基线才对齐——新增导航控件请一并取这个常量。

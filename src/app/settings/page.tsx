@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { ArrowUpRight } from "lucide-react";
 import { auth } from "@/lib/auth";
+import { fromDbColorMode } from "@/lib/color-mode";
 import { prisma } from "@/lib/db/prisma";
 import { getProfile } from "@/lib/queries";
 import { getUploadLimits } from "@/lib/upload-limits";
@@ -14,6 +15,7 @@ import ProfileBgForm from "@/components/auth/ProfileBgForm";
 import NotificationsForm from "@/components/auth/NotificationsForm";
 import PublishForm from "@/components/auth/PublishForm";
 import WatermarkForm from "@/components/auth/WatermarkForm";
+import ColorModeForm from "@/components/auth/ColorModeForm";
 import DraftsPanel from "@/components/auth/DraftsPanel";
 import { EmailForm, PasswordForm } from "@/components/auth/security-forms";
 import SettingsTabs from "@/components/auth/SettingsTabs";
@@ -77,6 +79,8 @@ export default async function SettingsPage({
         autoSaveDraft: true,
         watermarkImages: true,
         watermarkText: true,
+        watermarkPosition: true,
+        colorMode: true,
         profileBgPcKey: true,
         profileBgOnResource: true,
       },
@@ -104,7 +108,7 @@ export default async function SettingsPage({
     ...(joined ? [{ k: "加入时间", v: joined }] : []),
   ];
 
-  // 5 个 panel：资料 / 通知 / 发布 / 安全 / 第三方 / 账号（头像独立在 tab 外常驻）
+  // 7 个 panel：资料 / 通知 / 发布 / 安全 / 第三方 / 外观 / 账号（头像独立在 tab 外常驻）
   const tabs = [
     {
       key: "profile",
@@ -192,6 +196,7 @@ export default async function SettingsPage({
             <WatermarkForm
               enabled={prefs?.watermarkImages ?? false}
               text={prefs?.watermarkText ?? null}
+              position={prefs?.watermarkPosition ?? "BOTTOM_RIGHT"}
               username={me.username}
             />
           </section>
@@ -199,7 +204,6 @@ export default async function SettingsPage({
           {/* 草稿箱：与开关同屏，省掉独立页面与菜单里的第二个入口 */}
           <section id="drafts" className={sectionCls}>
             <h2 className={sectionTitle}>草稿箱</h2>
-            <p className={sectionHint}>写东西时自动留存的半成品，可继续编辑或删除</p>
             <DraftsPanel userId={me.id} />
           </section>
         </>
@@ -263,6 +267,19 @@ export default async function SettingsPage({
                 </form>
               ))}
           </div>
+        </section>
+      ),
+    },
+    {
+      key: "appearance",
+      label: "外观",
+      panel: (
+        <section className={sectionCls}>
+          <h2 className={sectionTitle}>配色模式</h2>
+          <p className={sectionHint}>
+            选择站点的明暗配色；换设备登录同样生效。未登录的访客一律跟随浏览器的配色设置
+          </p>
+          <ColorModeForm mode={fromDbColorMode(prefs?.colorMode)} />
         </section>
       ),
     },
