@@ -299,6 +299,52 @@ summary {
   color: var(--md-heading);
 }
 
+/* ---------- 评论正文里的 Markdown 排版收敛 ----------
+   .md-body 是文章级规格（h2 20px、pre 大内距、表格整宽），直接套进评论会撑爆行高。
+   评论只允许基础语法，这里把块级元素压到与 14px 正文协调的量级。 */
+.md-body-wrap .md-body h1,
+.md-body-wrap .md-body h2,
+.md-body-wrap .md-body h3,
+.md-body-wrap .md-body h4 {
+  font-size: 0.95rem;
+  line-height: 1.4;
+  margin: 0.5rem 0 0.25rem;
+}
+
+.md-body-wrap .md-body > :first-child {
+  margin-top: 0;
+}
+
+.md-body-wrap .md-body > :last-child {
+  margin-bottom: 0;
+}
+
+.md-body-wrap .md-body p {
+  margin: 0.35rem 0;
+}
+
+.md-body-wrap .md-body ul,
+.md-body-wrap .md-body ol {
+  margin: 0.35rem 0;
+  padding-left: 1.25rem;
+}
+
+.md-body-wrap .md-body blockquote {
+  margin: 0.35rem 0;
+}
+
+.md-body-wrap .md-body pre {
+  margin: 0.35rem 0;
+  padding: 0.5rem 0.6rem;
+  font-size: 0.8rem;
+}
+
+/* 评论里的图片只可能是手打的 ![alt](url)，限制高度避免一条评论占满整屏 */
+.md-body-wrap .md-body img {
+  max-height: 16rem;
+  width: auto;
+}
+
 /* 资源详情「描述」长文：正文字号/行距比侧栏小卡稍大（写在 .md-body 之后以覆盖同类属性） */
 .md-body--lg {
   font-size: 15px;
@@ -606,6 +652,27 @@ summary {
   border-style: solid;
   border-width: 0;
   border-top-width: 1px;
+}
+
+/* ---------- 紧凑模式（评论框等嵌入式场景）----------
+   关闭工具栏后仅剩内容区，字号从文章级 15px 降到正文级 14px、
+   内距 14px → 10px，让 6rem 高的框看起来是「输入框」而不是「文档页」。 */
+.md-editor[data-compact] .milkdown {
+  --crepe-base-font-size: 14px;
+}
+
+.md-editor[data-compact] .milkdown .ProseMirror {
+  padding: 10px 12px;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+/* 紧凑模式下标题再收一档：评论里 h1 不该比正文大出半行 */
+.md-editor[data-compact] .milkdown .ProseMirror h1,
+.md-editor[data-compact] .milkdown .ProseMirror h2,
+.md-editor[data-compact] .milkdown .ProseMirror h3,
+.md-editor[data-compact] .milkdown .ProseMirror h4 {
+  margin: 0.5rem 0 0.2rem;
 }
 
 /* ---------- 全屏编写 ----------

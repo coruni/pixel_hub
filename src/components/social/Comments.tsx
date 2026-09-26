@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ImagePlus, X } from "lucide-react";
+import { CrepeFeature } from "@milkdown/crepe";
 import { addCommentAction, deleteCommentAction } from "@/lib/actions/social";
 import ImageViewer from "@/components/ui/ImageViewer";
+import MdEditor from "@/components/rte/MdEditor";
 import { confirmDialog, toast } from "@/components/ui/feedback";
 import CommentItem, { commentInputCls, type ReplyState } from "./comment-item";
 import { flashComment, useCommentPolling } from "./use-comment-polling";
@@ -13,6 +15,19 @@ import type { CommentImage, CommentShape } from "./comment-types";
 import { Button } from "@/components/ui/Button";
 
 export type { CommentAuthor, CommentImage, CommentShape } from "./comment-types";
+
+/** 评论正文长度上限，与 social.ts 的 commentSchema.max(2000) 同口径（按 Markdown 源码字符数） */
+const COMMENT_MAX = 2000;
+/** 剩余多少字开始提示 */
+const COMMENT_WARN_AT = 200;
+
+/** 评论编辑器：关掉图片块（不提供上传入口）、表格与工具栏，只保留基础 Markdown 语法。
+ *  ImageBlock 关闭后斜杠菜单的 Image 项自动消失；手打 ![alt](url) 仍可生成行内图，
+ *  该风险在渲染层用图片域名白名单兜底（见 comment-item / Markdown）。 */
+const COMMENT_FEATURES: Partial<Record<CrepeFeature, boolean>> = {
+  [CrepeFeature.ImageBlock]: false,
+  [CrepeFeature.Table]: false,
+};
 
 /** 资源评论区：主楼发布框（带附图）+ 评论树 + 15s 增量轮询 */
 export default function Comments({
@@ -42,8 +57,15 @@ export default function Comments({
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
+  /** previews 的镜像：卸载清理需要读到最新值，但清理 effect 不能依赖它（否则每次变更都跑一遍卸载） */
+  const previewsRef = useRef<string[]>([]);
+  useEffect(() => {
+    previewsRef.current = previews;
+  }, [previews]);
   // 评论图片查看器：所在楼层图片列表 + 点击的索引
   const [viewer, setViewer] = useState<{ images: CommentImage[]; index: number } | null>(null);
+  /** 编辑器实例键：发表成功后自增以重置编辑器内容（MdEditor 的 defaultValue 仅挂载时消费） */
+  const [editorKey, setEditorKey] = useState(0);
 
   const merged = useCommentPolling(resourceId, comments);
 
@@ -70,14 +92,37 @@ export default function Comments({
     if (!list) return;
     const next = [...files, ...Array.from(list)].slice(0, imageMax);
     setFiles(next);
-    setPreviews(next.map((f) => URL.createObjectURL(f)));
+    syncPreviews(next);
+  }
+
+  /** 预览 URL 与 files 一一对应地重建：先释放旧的再建新的，避免反复增删持续泄漏 blob */
+  function syncPreviews(next: File[]) {
+    setPreviews((prev) => {
+      for (const url of prev) URL.revokeObjectURL(url);
+      return next.map((f) => URL.createObjectURL(f));
+    });
   }
 
   function removeImage(i: number) {
     const next = files.filter((_, idx) => idx !== i);
     setFiles(next);
-    setPreviews(next.map((f) => URL.createObjectURL(f)));
+    syncPreviews(next);
   }
+
+  /** 发表成功后清空附图，并释放预览 blob */
+  const clearImages = useCallback(() => {
+    setFiles([]);
+    setPreviews((prev) => {
+      for (const url of prev) URL.revokeObjectURL(url);
+      return [];
+    });
+    if (fileRef.current) fileRef.current.value = "";
+  }, []);
+
+  // 卸载时释放剩余预览 blob（组件被路由切换销毁的情况）
+  useEffect(() => () => {
+    for (const url of previewsRef.current) URL.revokeObjectURL(url);
+  }, []);
 
   async function post(parentId: string | null, value: string) {
     setSending(true);
@@ -92,12 +137,22 @@ export default function Comments({
     if (res.ok) {
       setText("");
       setReply({ openFor: null, text: "", target: null });
-      setFiles([]);
-      setPreviews([]);
-      if (fileRef.current) fileRef.current.value = "";
+      // 楼中楼回复框是受控 input，由 text 驱动；主楼编辑器非受控，靠换 key 重建来清空
+      if (!parentId) {
+        clearImages();
+        setEditorKey((k) => k + 1);
+      }
       router.refresh();
     } else {
       setError(res.error ?? "发送失败");
+    }
+  }
+
+  // Ctrl/Cmd + Enter 发表主楼评论（编辑器内亦可直接触发）
+  function onComposerKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+      e.preventDefault();
+      if (!sending && text.trim() && text.length <= COMMENT_MAX) void post(null, text);
     }
   }
 
@@ -142,15 +197,27 @@ export default function Comments({
       )}
 
       {canPost ? (
-        <div className="mt-4">
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            rows={2}
-            placeholder="友善发言，说说你的看法…"
-            className={commentInputCls}
-            aria-label="发表评论"
+        <div className="mt-4" onKeyDown={onComposerKeyDown}>
+          <MdEditor
+            key={editorKey}
+            defaultValue=""
+            onChange={setText}
+            minHeight="6rem"
+            ariaLabel="发表评论"
+            placeholder="友善发言，说说你的看法… 支持 Markdown 基础语法，输入 / 唤出块类型"
+            features={COMMENT_FEATURES}
+            toolbar={false}
+            compact
           />
+          {text.length > COMMENT_MAX - COMMENT_WARN_AT && (
+            <p
+              className={`mt-1 text-right text-xs ${
+                text.length > COMMENT_MAX ? "text-red-500" : "text-amber-600"
+              }`}
+            >
+              {text.length}/{COMMENT_MAX}
+            </p>
+          )}
           {/* 附图选择 + 预览（imageMax = 0 时隐藏入口） */}
           {imageMax > 0 && (
           <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -171,13 +238,13 @@ export default function Comments({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={src}
-                  alt=""
+                  alt={`待上传的附图 ${i + 1}`}
                   className="h-14 w-14 rounded-none border border-brand-200 object-cover"
                 />
                 <Button
                   type="button"
                   onClick={() => removeImage(i)}
-                  aria-label="移除图片"
+                  aria-label={`移除附图 ${i + 1}`}
                   className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-none border border-brand-200 bg-surface text-neutral-500 hover:border-red-300 hover:text-red-500"
                 >
                   <X size={11} aria-hidden />
@@ -186,14 +253,17 @@ export default function Comments({
             ))}
           </div>
           )}
-          <div className="mt-2 flex justify-end">
+          <div className="mt-2 flex items-center justify-end gap-3">
+            <span className="text-xs text-neutral-400">
+              支持 Markdown 基础语法
+            </span>
             <Button
               type="button"
-              disabled={sending || !text.trim()}
+              disabled={sending || !text.trim() || text.length > COMMENT_MAX}
               onClick={() => post(null, text)}
               variant="primary" size="md"
             >
-              发表评论
+              {sending ? "发送中…" : "发表评论"}
             </Button>
           </div>
         </div>

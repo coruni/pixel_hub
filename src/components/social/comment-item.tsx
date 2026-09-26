@@ -7,11 +7,16 @@ import UserHoverCard from "@/components/ui/UserHoverCard";
 import CommentHoverCard from "./CommentHoverCard";
 import type { CommentImage, CommentShape } from "./comment-types";
 import { Button } from "@/components/ui/Button";
+import Markdown from "@/components/rte/Markdown";
 
 /** 单个根楼层 + 楼中楼回复列表。回复框状态由 Comments 统一持有（同屏只开一个）。 */
 
+/** 楼中楼回复框仍是单行 input（不支持 Markdown），沿用原样式 */
 export const commentInputCls =
   "w-full rounded-none border border-brand-200 bg-surface px-3.5 py-2.5 text-sm outline-none transition focus:border-brand-500";
+
+/** 评论正文排版：编辑器的 15px 是文章级字号，评论用 14px 更贴合列表节奏 */
+const COMMENT_MD_CLS = "md-body text-sm leading-6 text-neutral-700";
 
 export type ReplyState = {
   /** 展开回复框的根楼层 id */
@@ -20,6 +25,46 @@ export type ReplyState = {
   /** 楼中楼定向目标：{ 被回复楼层 id, 被回复人昵称 }；null 表示回复根楼层 */
   target: { parent: string; to: string } | null;
 };
+
+/** 评论附图缩略图网格：等高切片 + 序号角标，点击开查看器。
+ *  与正文左对齐（pl-10 对应头像缩进），保持与文本同一条视觉基线。 */
+function CommentImages({
+  images,
+  onView,
+}: {
+  images: CommentImage[];
+  onView: (index: number) => void;
+}) {
+  return (
+    <div className="mt-2 flex flex-wrap gap-2 pl-10">
+      {images.map((img, i) => (
+        <Button
+          key={i}
+          type="button"
+          onClick={() => onView(i)}
+          aria-label={`查看第 ${i + 1} 张附图（共 ${images.length} 张）`}
+          className="group relative block"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={img.url}
+            alt=""
+            loading="lazy"
+            className="h-24 w-24 rounded-none border border-brand-200 object-cover transition group-hover:border-brand-500 group-focus-visible:border-brand-500"
+          />
+          {images.length > 1 && (
+            <span
+              aria-hidden
+              className="pointer-events-none absolute bottom-0 right-0 bg-black/55 px-1 text-[11px] leading-4 text-white"
+            >
+              {i + 1}/{images.length}
+            </span>
+          )}
+        </Button>
+      ))}
+    </div>
+  );
+}
 
 export default function CommentItem({
   c,
@@ -90,28 +135,13 @@ export default function CommentItem({
           </Button>
         )}
       </div>
-      <p className="mt-2 whitespace-pre-wrap pl-10 text-sm leading-6 text-neutral-700">
-        {c.content}
-      </p>
-      {c.images && c.images.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-2 pl-10">
-          {c.images.map((img, i) => (
-            <Button
-              key={i}
-              type="button"
-              onClick={() => onViewImages(c.images!, i)}
-              aria-label={`查看第 ${i + 1} 张图片`}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={img.url}
-                alt=""
-                loading="lazy"
-                className="max-h-40 rounded-none border border-brand-200 object-cover transition hover:border-brand-500"
-              />
-            </Button>
-          ))}
+      <div className="md-body-wrap mt-2 pl-10 text-neutral-700">
+        <div className={COMMENT_MD_CLS}>
+          <Markdown zoomable>{c.content}</Markdown>
         </div>
+      </div>
+      {c.images && c.images.length > 0 && (
+        <CommentImages images={c.images} onView={(i) => onViewImages(c.images!, i)} />
       )}
       {canPost && (
         <Button
@@ -246,7 +276,11 @@ function ReplyItem({
           </Button>
         )}
       </div>
-      <p className="mt-1.5 whitespace-pre-wrap text-sm leading-6 text-neutral-700">{rp.content}</p>
+      <div className="mt-1.5 pl-10 text-neutral-700">
+        <div className={COMMENT_MD_CLS}>
+          <Markdown zoomable>{rp.content}</Markdown>
+        </div>
+      </div>
       {canPost && (
         <Button
           type="button"
