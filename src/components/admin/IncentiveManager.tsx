@@ -168,11 +168,14 @@ export default function IncentiveManager({
   return (
     <div className="space-y-5">
       {/* ---------- 开篇：三层次 + 两个池 ---------- */}
-      <div className="border border-brand-200 bg-brand-50/50 px-4 py-4 sm:px-5">
-        <div className="flex items-start gap-3">
-          <Info size={16} className="mt-0.5 shrink-0 text-brand-600" aria-hidden />
+      <details className="border border-brand-200 bg-brand-50/50 px-4 py-3 sm:px-5">
+        <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-medium text-neutral-800">
+          <Info size={16} className="shrink-0 text-brand-600" aria-hidden />
+          配置前先看：三个层次和两个池
+        </summary>
+        <div className="mt-3 flex items-start gap-3">
           <div className="min-w-0 text-xs leading-5 text-neutral-600">
-            <p className="font-medium text-neutral-800">改之前先分清三个层次和两个池</p>
+            <p className="font-medium text-neutral-800">贡献分、PIX、元，以及激励池和现金池</p>
             <ul className="mt-1.5 space-y-1">
               <li>
                 <b className="font-medium text-neutral-700">贡献分</b>
@@ -196,7 +199,7 @@ export default function IncentiveManager({
             </ul>
           </div>
         </div>
-      </div>
+      </details>
 
       <div className="grid items-start gap-5 lg:grid-cols-2">
         {/* ---------- 总开关 ---------- */}

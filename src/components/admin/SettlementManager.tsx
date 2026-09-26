@@ -27,6 +27,17 @@ import {
   resetDraftAction,
 } from "@/lib/actions/settlement";
 
+function HintDetails({ text }: { text: string }) {
+  return (
+    <details className="mt-1 text-[10px] leading-4 text-neutral-400">
+      <summary className="w-fit cursor-pointer list-none underline decoration-dotted underline-offset-2">
+        说明
+      </summary>
+      <p className="mt-1 max-w-prose">{text}</p>
+    </details>
+  );
+}
+
 type PeriodMeta = {
   periodKey: string;
   status: "DRAFT" | "CONFIRMED" | "PAID";
@@ -61,7 +72,7 @@ function Metric({
       >
         {value}
       </p>
-      {hint && <p className="mt-0.5 text-[10px] leading-4 text-neutral-400">{hint}</p>}
+      {hint && <HintDetails text={hint} />}
     </div>
   );
 }

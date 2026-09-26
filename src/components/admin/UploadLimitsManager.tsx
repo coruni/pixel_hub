@@ -5,6 +5,7 @@
 // 纯客户端表单，保存走 saveUploadLimitsAction；数值服务端 clamp、后缀 normalizeExts 权威校验，
 // 前端只是组织入参并在服务端 refresh 后把最新配置同步回本地草稿（渲染期派生，见下方 prev 对比）。
 import { useState } from "react";
+import type { ReactNode } from "react";
 import {
   Check,
   FileUp,
@@ -39,6 +40,17 @@ import { confirmDialog } from "@/components/ui/feedback";
 import { resetUploadLimitsAction, saveUploadLimitsAction } from "@/lib/actions/uploads";
 import { INPUT_SM, SELECT_SM } from "@/lib/ui/cls";
 import { Button } from "@/components/ui/Button";
+
+function HintDetails({ children }: { children: ReactNode }) {
+  return (
+    <details className="mt-1 text-[11px] leading-4 text-neutral-400">
+      <summary className="w-fit cursor-pointer list-none underline decoration-dotted underline-offset-2">
+        说明
+      </summary>
+      <div className="mt-1 max-w-prose">{children}</div>
+    </details>
+  );
+}
 
 /** 图片类体积字段：档位只有 1–100MB，用 MB 输入即自然，不配单位选择 */
 type ImageMbKey =
@@ -300,7 +312,7 @@ export default function UploadLimitsManager({ limits }: { limits: UploadLimits }
                       {MB_RANGE.image.min}–{MB_RANGE.image.max} MB
                     </span>
                   </div>
-                  <p className="mt-1 text-[11px] leading-4 text-neutral-400">{f.hint}</p>
+                  <HintDetails>{f.hint}</HintDetails>
                 </div>
                 <input
                   id={`ul-${f.key}`}
@@ -347,7 +359,7 @@ export default function UploadLimitsManager({ limits }: { limits: UploadLimits }
                       {f.max === undefined ? `≥ ${f.min} 张` : `${f.min}–${f.max} 张`}
                     </span>
                   </div>
-                  <p className="mt-1 text-[11px] leading-4 text-neutral-400">{f.hint}</p>
+                  <HintDetails>{f.hint}</HintDetails>
                 </div>
                 <input
                   id={`ul-${f.key}`}
@@ -419,15 +431,14 @@ export default function UploadLimitsManager({ limits }: { limits: UploadLimits }
                   {attachBad}
                 </p>
               ) : (
-                <p
-                  id="ul-attachmentSize-hint"
-                  className="mt-1 text-[11px] leading-4 text-neutral-400"
-                >
-                  {ATTACH_HINT}
-                  {draft.attachmentUnit === "GB" && (
-                    <span className="ml-1 tabular-nums text-neutral-500">当前 = {attachMb}MB</span>
-                  )}
-                </p>
+                <div id="ul-attachmentSize-hint">
+                  <HintDetails>
+                    {ATTACH_HINT}
+                    {draft.attachmentUnit === "GB" && (
+                      <span className="ml-1 tabular-nums text-neutral-500">当前 = {attachMb}MB</span>
+                    )}
+                  </HintDetails>
+                </div>
               )}
             </div>
 
@@ -525,9 +536,7 @@ export default function UploadLimitsManager({ limits }: { limits: UploadLimits }
                   {QUALITY_RANGE.min}–{QUALITY_RANGE.max}
                 </span>
               </div>
-              <p className="mt-1 text-[11px] leading-4 text-neutral-400">
-                {FORMAT_QUALITY_HINT[draft.imageFormat]}
-              </p>
+              <HintDetails>{FORMAT_QUALITY_HINT[draft.imageFormat]}</HintDetails>
               <input
                 id="ul-imageQuality"
                 type="number"

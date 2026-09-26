@@ -40,6 +40,7 @@ export default function DetailTemplateCard({ theme, run }: { theme: Theme; run: 
               <span className={LABEL_STRONG}>{r.label}</span>
               <select
                 value={v}
+                title={DETAIL_TEMPLATE_META[v || theme.detailTemplate.default].desc}
                 onChange={(e) =>
                   run(() =>
                     setDetailTemplateAction({
@@ -57,9 +58,6 @@ export default function DetailTemplateCard({ theme, run }: { theme: Theme; run: 
                   </option>
                 ))}
               </select>
-              <span className="mt-1 block text-[11px] text-neutral-400">
-                {DETAIL_TEMPLATE_META[v || theme.detailTemplate.default].desc}
-              </span>
             </label>
           );
         })}

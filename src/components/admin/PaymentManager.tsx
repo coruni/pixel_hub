@@ -19,6 +19,17 @@ import { fenToYuanText, parseYuanToFen } from "@/lib/money";
 import { KEEP_SECRET } from "@/lib/payment-config";
 import { checkEpayChannelAction, resetPaymentConfigAction, savePaymentConfigAction } from "@/lib/actions/payment";
 
+function HintDetails({ text }: { text: string }) {
+  return (
+    <details className="mt-1 text-[11px] leading-4 text-neutral-400">
+      <summary className="w-fit cursor-pointer list-none underline decoration-dotted underline-offset-2">
+        说明
+      </summary>
+      <p className="mt-1 max-w-prose">{text}</p>
+    </details>
+  );
+}
+
 export type PaymentView = {
   epay: {
     enabled: boolean;
@@ -63,7 +74,7 @@ function Field({
         <label className="text-xs font-medium text-neutral-700" htmlFor={id}>
           {label}
         </label>
-        {hint && <p className="mt-1 text-[11px] leading-4 text-neutral-400">{hint}</p>}
+        {hint && <HintDetails text={hint} />}
       </div>
       <div className="min-w-0">{children}</div>
     </div>

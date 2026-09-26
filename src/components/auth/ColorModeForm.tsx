@@ -17,7 +17,7 @@ const OPTIONS: { value: ColorMode; label: string; note: string; Icon: typeof Sun
   {
     value: "system",
     label: "跟随系统",
-    note: "随操作系统/浏览器的深浅色走，系统切换时自动同步",
+    note: "自动切换主题",
     Icon: Monitor,
   },
   { value: "light", label: "浅色", note: "始终使用暖白浅色主题", Icon: Sun },

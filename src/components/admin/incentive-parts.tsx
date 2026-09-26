@@ -8,6 +8,17 @@ import { ArrowUp, Plus, Trash2, type LucideIcon } from "lucide-react";
 import { INPUT_SM } from "@/lib/ui/cls";
 import { Button } from "@/components/ui/Button";
 
+function HintDetails({ children }: { children: ReactNode }) {
+  return (
+    <details className="mt-1 text-[11px] leading-4 text-neutral-400">
+      <summary className="w-fit cursor-pointer list-none underline decoration-dotted underline-offset-2">
+        说明
+      </summary>
+      <div className="mt-1 max-w-prose">{children}</div>
+    </details>
+  );
+}
+
 /** 区块外壳：图标 + 标题 + 一句话说明 + 内容 */
 export function Section({
   icon: Icon,
@@ -74,7 +85,7 @@ export function Row({
             </span>
           )}
         </div>
-        {hint && <p className="mt-1 text-[11px] leading-4 text-neutral-400">{hint}</p>}
+        {hint && <HintDetails>{hint}</HintDetails>}
       </div>
       <div className="min-w-0">{children}</div>
     </div>
@@ -215,7 +226,7 @@ export function SwitchRow({
               </span>
             )}
           </span>
-          {hint && <span className="mt-1 block text-[11px] leading-4 text-neutral-400">{hint}</span>}
+          {hint && <HintDetails>{hint}</HintDetails>}
         </span>
       </label>
     </div>
@@ -240,7 +251,7 @@ export function SegmentedRow<T extends string>({
   return (
     <div className="px-4 py-4 sm:px-5">
       <p className="text-xs font-medium text-neutral-700">{label}</p>
-      {hint && <p className="mt-1 text-[11px] leading-4 text-neutral-400">{hint}</p>}
+      {hint && <HintDetails>{hint}</HintDetails>}
       <div
         className="mt-2 grid gap-2"
         style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}
@@ -318,7 +329,7 @@ export function ToggleRow<T extends string>({
   return (
     <div className="px-4 py-4 sm:px-5">
       <p className="text-xs font-medium text-neutral-700">{label}</p>
-      {hint && <p className="mt-1 text-[11px] leading-4 text-neutral-400">{hint}</p>}
+      {hint && <HintDetails>{hint}</HintDetails>}
       <div className="mt-2 flex flex-wrap gap-2">
         {options.map((o) => {
           const active = values.includes(o.value);

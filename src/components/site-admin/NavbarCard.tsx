@@ -223,12 +223,11 @@ export default function NavbarCard({
         >
           <Plus size={12} /> 添加导航项
         </Button>
-        <span className="self-center text-[11px] text-neutral-400">外链需以 http(s):// 开头</span>
       </div>
 
       <div className="mt-4 rounded-none border border-brand-200 bg-brand-50/40 p-3">
         <div className="flex flex-wrap items-center gap-2.5">
-          <label className="flex cursor-pointer items-center gap-2 text-sm text-neutral-800">
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-neutral-800" title="导航链接后显示分类直达下拉">
             <SquareCheckbox checked={menu.enabled} onChange={(next) => setMenu({ ...menu, enabled: next })} ariaLabel="启用分类菜单" />
             启用「分类」下拉菜单
           </label>
@@ -239,7 +238,6 @@ export default function NavbarCard({
             className={`${INPUT_SM} w-28`}
             aria-label="菜单文字"
           />
-          <span className="text-[11px] text-neutral-400">导航链接后显示分类直达下拉</span>
         </div>
       </div>
     </section>

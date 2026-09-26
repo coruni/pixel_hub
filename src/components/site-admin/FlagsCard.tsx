@@ -35,6 +35,7 @@ export default function FlagsCard({
               type="button"
               disabled={pending}
               onClick={() => run(() => updateSidebarFlagsAction({ showOn: { [p.key]: !on } }))}
+              title={p.hint}
               className={`flex items-start gap-2 rounded-none border px-3.5 py-3 text-left transition disabled:opacity-50 ${
                 on
                   ? "border-brand-500 bg-brand-500 text-white"
@@ -46,12 +47,7 @@ export default function FlagsCard({
               >
                 ✓
               </span>
-              <span>
-                <span className="block text-sm font-medium">{p.label}</span>
-                <span className={`block text-xs ${on ? "text-white/70" : "text-neutral-400"}`}>
-                  {p.hint}
-                </span>
-              </span>
+              <span className="block text-sm font-medium">{p.label}</span>
             </Button>
           );
         })}

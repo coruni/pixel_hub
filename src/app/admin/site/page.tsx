@@ -156,6 +156,7 @@ export default async function AdminSitePage() {
       </div>
 
       <SubTabs
+        variant="segmented"
         tabs={[
           { key: "home", label: "首页布局" },
           { key: "layout", label: "全站布局" },

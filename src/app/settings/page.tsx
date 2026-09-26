@@ -117,7 +117,6 @@ export default async function SettingsPage({
         <>
           <section className={sectionCls}>
             <h2 className={sectionTitle}>主页横幅</h2>
-            <p className={sectionHint}>展示在公开主页头部，未设置则按原版头部显示</p>
             <HeroForm
               heroImageKey={profile?.heroImageKey ?? null}
               heroMaxMb={limits.heroImageMaxMb}
@@ -141,7 +140,6 @@ export default async function SettingsPage({
 
           <section className={sectionCls}>
             <h2 className={sectionTitle}>个人资料</h2>
-            <p className={sectionHint}>昵称与简介会展示在你的公开主页</p>
             <SettingsForm name={profile?.name ?? null} bio={profile?.bio ?? null} />
           </section>
 
@@ -167,7 +165,6 @@ export default async function SettingsPage({
       panel: (
         <section className={sectionCls}>
           <h2 className={sectionTitle}>通知设置</h2>
-          <p className={sectionHint}>选择要接收的动态与提醒方式（审核结果、评论回复、点赞关注等）</p>
           <NotificationsForm
             emailNotifyComment={profile?.emailNotifyComment ?? true}
             emailNotifyModeration={profile?.emailNotifyModeration ?? true}
@@ -186,13 +183,11 @@ export default async function SettingsPage({
         <>
           <section className={sectionCls}>
             <h2 className={sectionTitle}>发布偏好</h2>
-            <p className={sectionHint}>控制发布内容时草稿的留存方式</p>
             <PublishForm autoSaveDraft={prefs?.autoSaveDraft ?? true} draftCount={draftCount} />
           </section>
 
           <section className={sectionCls}>
             <h2 className={sectionTitle}>图片水印</h2>
-            <p className={sectionHint}>给上传的图片押上署名，防止被搬运时丢掉出处</p>
             <WatermarkForm
               enabled={prefs?.watermarkImages ?? false}
               text={prefs?.watermarkText ?? null}
@@ -234,7 +229,6 @@ export default async function SettingsPage({
       panel: (
         <section className={sectionCls}>
           <h2 className={sectionTitle}>第三方账号</h2>
-          <p className={sectionHint}>通过外部服务登录或绑定到本站账号</p>
           <div className="mt-4 flex items-center justify-between gap-4">
             <div className="min-w-0">
               <p className="text-sm text-neutral-800">GitHub</p>
@@ -289,7 +283,6 @@ export default async function SettingsPage({
       panel: (
         <section className={sectionCls}>
           <h2 className={sectionTitle}>账号信息</h2>
-          <p className={sectionHint}>只读展示，无法直接修改；如需变更请联系管理员</p>
           <dl className="mt-4 space-y-2.5">
             {info.map((row) => (
               <div key={row.k} className="flex items-baseline justify-between gap-4 text-sm">
@@ -335,7 +328,6 @@ export default async function SettingsPage({
       {/* 头像：独立在 tab 之外常驻，tab 只切换资料/通知/安全等板块 */}
       <section className={`${sectionCls} mt-6`}>
         <h2 className={sectionTitle}>头像</h2>
-        <p className={sectionHint}>展示在个人主页、评论区与作者信息</p>
         <AvatarForm
           name={profile?.name ?? null}
           username={me.username}

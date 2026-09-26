@@ -109,6 +109,7 @@ export default function SiteLayoutManager({
               type="button"
               role="tab"
               aria-selected={on}
+              title={tab.hint}
               onClick={() => {
                 setActiveSection(tab.key);
                 setEditingId(null);
@@ -120,7 +121,6 @@ export default function SiteLayoutManager({
               }`}
             >
               {tab.label}
-              <span className="ml-2 text-[11px] font-normal text-neutral-400">{tab.hint}</span>
             </Button>
           );
         })}
