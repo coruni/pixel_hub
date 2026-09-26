@@ -9,8 +9,9 @@ import type { SP } from "@/lib/search-params";
 
 import { getSeoConfig, resolveHomeTitle, resolveSiteName } from "@/lib/seo-config";
 
-// root layout 的 title.template 不作用于与其同段的首页，需自行拼接站点名。
-// 标题主体来自后台「首页标题 / 首页副标题」（拼成「标题 - 副标题」），未配置时回退「发现」。
+// 首页与 root layout 同段，title.template **不作用于它**（已实抓 HTML 验证：
+// 只给主体时 <title> 就是主体本身，没有站点名后缀）→ 站点名必须在这里手拼。
+// 而 /browse 等子页面 template 生效，那边**不能**再手拼（会拼成「A - B - 站点名 - 站点名」）。
 export async function generateMetadata(): Promise<Metadata> {
   const seo = await getSeoConfig();
   const name = resolveSiteName(seo);
