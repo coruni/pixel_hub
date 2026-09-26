@@ -35,7 +35,6 @@ export default function SeoManager({
   const [pushResult, setPushResult] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const [form, setForm] = useState({
-    siteName: config.siteName,
     siteLogo: config.siteLogo,
     keywords: config.keywords,
     footerText: config.footerText,
@@ -58,7 +57,6 @@ export default function SeoManager({
 
   // 表单 → 落库载荷：整体提交，任何一项改动都随全量保存写回
   const payload = () => ({
-    siteName: form.siteName,
     siteLogo: form.siteLogo,
     keywords: form.keywords,
     footerText: form.footerText,
@@ -125,24 +123,10 @@ export default function SeoManager({
       <section className="border border-brand-200 bg-surface p-5">
         <h3 className="text-sm font-semibold text-neutral-900">站点信息</h3>
         <p className="mt-1 text-xs text-neutral-400">
-          站点名称用于 &lt;title&gt;、OG、结构化数据与导航徽标；留空回退环境变量 NEXT_PUBLIC_SITE_NAME。
+          网站名称即首页标题（下方「展示与结构化数据」里配置），用于 &lt;title&gt;、OG、结构化数据、
+          导航徽标、页脚与邮件；留空回退内置文案「资源社区」。
         </p>
         <div className="mt-4 space-y-4">
-          <div>
-            <label htmlFor="seo-site-name" className={LABEL_STRONG}>
-              网站名称
-            </label>
-            <input
-              id="seo-site-name"
-              value={form.siteName}
-              onChange={(e) => set({ siteName: e.target.value })}
-              className={INPUT}
-              maxLength={40}
-              placeholder="留空使用环境变量配置"
-              autoComplete="off"
-              spellCheck={false}
-            />
-          </div>
           <div>
             <label htmlFor="seo-site-logo" className={LABEL_STRONG}>
               站点 Logo
@@ -153,7 +137,7 @@ export default function SeoManager({
               onChange={(e) => set({ siteLogo: e.target.value })}
               className={INPUT}
               maxLength={300}
-              placeholder="留空使用环境变量配置或内置站点图标"
+              placeholder="留空使用内置站点图标"
               autoComplete="off"
               spellCheck={false}
             />
@@ -274,20 +258,21 @@ export default function SeoManager({
           </div>
           <div>
             <label htmlFor="seo-home-title" className={LABEL_STRONG}>
-              首页标题
+              首页标题（网站名称）
             </label>
             <input
               id="seo-home-title"
               value={form.homeTitle}
               onChange={(e) => set({ homeTitle: e.target.value })}
               className={INPUT}
-              maxLength={60}
-              placeholder="留空使用「发现」"
+              maxLength={40}
+              placeholder="留空使用「资源社区」"
               autoComplete="off"
               spellCheck={false}
             />
             <p className="mt-1 text-[10px] leading-4 text-neutral-400">
-              仅首页生效。最终标题为「首页标题 - 首页副标题 - 站点名」。
+              同时作为站点名称，用于导航徽标、&lt;title&gt;、OG、结构化数据、页脚与邮件。
+              首页最终标题为「首页标题 - 首页副标题 - 站点名」。
             </p>
           </div>
           <div>

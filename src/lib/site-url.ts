@@ -7,12 +7,7 @@ export function siteUrl(): string {
   );
 }
 
-// 站点名称（导航 logo / <title> / OG siteName / 页脚）。NEXT_PUBLIC_ 前缀使 client 组件同名可用。
-export function siteName(): string {
-  return process.env.NEXT_PUBLIC_SITE_NAME?.trim() || "资源社区";
-}
-
 // 站点 logo（导航徽标）：未配置时回退站点图标 src/app/icon.svg（与 favicon 同源，换一处即两处生效）
 export function siteLogo(): string {
-  return process.env.NEXT_PUBLIC_SITE_LOGO?.trim() || "/icon.svg";
+  return "/icon.svg";
 }

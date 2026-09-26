@@ -2,8 +2,8 @@ import { prisma } from "@/lib/db/prisma";
 import { sendMail } from "@/lib/mailer";
 import { renderMailHtml } from "@/lib/mail-template";
 import { rateLimit } from "@/lib/rate-limit";
-import { siteName } from "@/lib/site-url";
 import { requestSiteUrl } from "@/lib/request-origin";
+import { getSeoConfig, resolveSiteName } from "@/lib/seo-config";
 import { getRuntimeConfig } from "@/lib/runtime-config";
 
 // 邮件通知通道：后台「站点配置」开启邮件通知（或旧 env MAIL_NOTIFY=1）且 SMTP 配置齐备时启用；
@@ -46,19 +46,20 @@ export async function notifyByEmail(
           ? u.emailNotifyModeration !== false
           : u.emailNotifyComment !== false;
     if (!optedIn) return; // 用户可在设置中按类型关闭邮件提醒
+    const name = resolveSiteName(await getSeoConfig());
     // 通知链接用"当前请求"的公网域名（CDN/反代兼容），勿用 .env 静态域名
     const link = linkPath ? `${await requestSiteUrl()}${linkPath}` : undefined;
-    const text = `${body}${link ? `\n\n${link}` : ""}\n\n—— 来自 ${siteName()}（可在设置中关闭邮件提醒）`;
+    const text = `${body}${link ? `\n\n${link}` : ""}\n\n—— 来自 ${name}（可在设置中关闭邮件提醒）`;
     await sendMail(
       u.email,
-      `【${siteName()}】${subject}`,
+      `【${name}】${subject}`,
       text,
-      renderMailHtml({
+      await renderMailHtml({
         title: subject,
         lines: [body],
         linkUrl: link,
         linkText: "查看详情",
-        note: `可在站内设置中关闭邮件提醒。—— 来自 ${siteName()}`,
+        note: `可在站内设置中关闭邮件提醒。—— 来自 ${name}`,
       }),
     );
   } catch {
@@ -79,14 +80,15 @@ export async function notifySecurityEmail(
   try {
     if (!to) return;
     if (!(await emailNotifyEnabled())) return;
+    const name = resolveSiteName(await getSeoConfig());
     await sendMail(
       to,
-      `【${siteName()}】${subject}`,
+      `【${name}】${subject}`,
       body,
-      renderMailHtml({
+      await renderMailHtml({
         title: subject,
         lines: [body],
-        note: `这是一封账号安全提醒，与你是否开启邮件通知无关。—— 来自 ${siteName()}`,
+        note: `这是一封账号安全提醒，与你是否开启邮件通知无关。—— 来自 ${name}`,
       }),
     );
   } catch {

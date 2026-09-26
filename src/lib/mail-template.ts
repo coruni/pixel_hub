@@ -4,7 +4,8 @@
 // 邮件客户端 CSS 支持极差：<style> 常被剥离、flex/grid 不支持——全部内联样式、块级布局、
 // 无外部资源/图片；box-shadow 属渐进增强（Outlook 等不支持时仍是直角品牌卡片，不破坏布局）。
 // sendMail 的 text 参数仍保留为纯文本兜底。
-import { siteName, siteUrl } from "@/lib/site-url";
+import { siteUrl } from "@/lib/site-url";
+import { getSeoConfig, resolveSiteName } from "@/lib/seo-config";
 
 export type MailContent = {
   /** 正文主标题 */
@@ -20,8 +21,8 @@ export type MailContent = {
   note?: string;
 };
 
-export function renderMailHtml(c: MailContent): string {
-  const name = siteName();
+export async function renderMailHtml(c: MailContent): Promise<string> {
+  const name = resolveSiteName(await getSeoConfig());
   // 页眉 host 优先取主按钮链接的域名（调用方已按"当前请求"动态拼接，与 CDN 后用户访问域一致）；
   // 验证码等无链接邮件回退 env 基址（纯装饰，不影响功能）。
   const host = c.linkUrl

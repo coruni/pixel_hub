@@ -9,7 +9,7 @@ import { prisma } from "@/lib/db/prisma";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
 import { sendMail } from "@/lib/mailer";
 import { renderMailHtml } from "@/lib/mail-template";
-import { siteName } from "@/lib/site-url";
+import { getSeoConfig, resolveSiteName } from "@/lib/seo-config";
 import { requestSiteUrl } from "@/lib/request-origin";
 
 // ---------- 请求重置（忘记密码页） ----------
@@ -49,13 +49,14 @@ export async function requestPasswordResetAction(
 
   // 链接用"当前请求"的公网域名（CDN/反代兼容），勿回退到 .env 静态域名
   const link = `${await requestSiteUrl()}/reset-password?token=${token}`;
+  const name = resolveSiteName(await getSeoConfig());
   const mail = await sendMail(
     parsed.data.email,
-    `【${siteName()}】找回密码`,
-    `你（或他人）正在用这个邮箱重置 ${siteName()} 账号的密码。\n\n打开下面的链接设置新密码（30 分钟内有效，仅可使用一次）：\n${link}\n\n如果这不是你的操作，请忽略本邮件。`,
-    renderMailHtml({
+    `【${name}】找回密码`,
+    `你（或他人）正在用这个邮箱重置 ${name} 账号的密码。\n\n打开下面的链接设置新密码（30 分钟内有效，仅可使用一次）：\n${link}\n\n如果这不是你的操作，请忽略本邮件。`,
+    await renderMailHtml({
       title: "找回密码",
-      lines: [`你（或他人）正在用这个邮箱重置 ${siteName()} 账号的密码。`],
+      lines: [`你（或他人）正在用这个邮箱重置 ${name} 账号的密码。`],
       linkUrl: link,
       linkText: "重置密码",
       note: "链接 30 分钟内有效，仅可使用一次；如按钮无法点击，可将链接复制到浏览器打开。如果这不是你的操作，请忽略本邮件。",

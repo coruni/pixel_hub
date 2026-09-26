@@ -5,14 +5,14 @@ import { cache } from "react";
 import { cachedInRequest } from "@/lib/cached-in-request";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
-import { siteName as fallbackSiteName } from "@/lib/site-url";
 
 export const SEO_KEY = "seo";
 
+/** 站点名兜底：「首页标题」未配置时的默认站点名（全站唯一来源） */
+export const FALLBACK_SITE_NAME = "资源社区";
+
 export const seoConfigSchema = z.object({
-  // 站点名称（<title> / OG siteName / JSON-LD / 导航徽标）；空 = 回退 env NEXT_PUBLIC_SITE_NAME
-  siteName: z.string().default(""),
-  // 站点 logo（导航徽标）：站内 /uploads 路径或 http(s) URL；空 = 回退 env NEXT_PUBLIC_SITE_LOGO / 内置图标
+  // 站点 logo（导航徽标）：站内 /uploads 路径或 http(s) URL；空 = 内置站点图标
   siteLogo: z.string().default(""),
   // meta keywords（Google 忽略，百度/Yandex 仍参考）；逗号分隔；空 = 不输出
   keywords: z.string().default(""),
@@ -29,7 +29,8 @@ export const seoConfigSchema = z.object({
   ogLocale: z.string().default(""),
   // 默认 meta description；空 = 回退代码内文案（含站点名）
   defaultDescription: z.string().default(""),
-  // 首页专属标题（仅首页生效）；空 = 回退内置文案「发现」。与 homeSubtitle 拼成「标题 - 副标题」
+  // 站点名 / 首页标题（同一字段）：<title>、OG siteName、JSON-LD、导航徽标、页脚、邮件与首页标题共用；
+  // 空 = 回退内置文案「资源社区」
   homeTitle: z.string().default(""),
   // 首页专属副标题（仅首页生效）；为空时首页标题只输出 homeTitle，不拼分隔符
   homeSubtitle: z.string().default(""),
@@ -62,7 +63,6 @@ const LOCALE_RE = /^[a-z]{2}(_[A-Za-z]{2,4})?$/;
 export function sanitizeSeo(config: SeoConfig): SeoConfig {
   const locale = config.ogLocale.trim().slice(0, 12).replace("-", "_");
   return {
-    siteName: config.siteName.trim().slice(0, 40),
     siteLogo: config.siteLogo.trim().slice(0, 300),
     keywords: config.keywords.trim().slice(0, 200),
     verifications: {
@@ -73,7 +73,7 @@ export function sanitizeSeo(config: SeoConfig): SeoConfig {
     },
     ogLocale: locale && LOCALE_RE.test(locale) ? locale : "zh_CN",
     defaultDescription: config.defaultDescription.trim().slice(0, 300),
-    homeTitle: config.homeTitle.trim().slice(0, 60),
+    homeTitle: config.homeTitle.trim().slice(0, 40),
     homeSubtitle: config.homeSubtitle.trim().slice(0, 60),
     footerText: config.footerText.trim().slice(0, 120),
     icp: config.icp.trim().slice(0, 60),
@@ -137,17 +137,17 @@ export function jsonLd(data: unknown): string {
   return JSON.stringify(data).replace(/</g, "\\u003c");
 }
 
-/** 站点名解析：后台配置优先，未配置回退 env NEXT_PUBLIC_SITE_NAME（站点展示统一入口） */
+/** 站点名解析：后台「首页标题」即站点名（唯一来源），未配置时回退内置文案 —— 站点展示统一入口 */
 export function resolveSiteName(seo: SeoConfig): string {
-  return seo.siteName || fallbackSiteName();
+  return seo.homeTitle || FALLBACK_SITE_NAME;
 }
 
 /**
  * 首页 `<title>` 的主体（不含站点名后缀，后缀由 root layout 的 template 拼接）。
- * 口径：配了 homeTitle 就用它；配了 homeSubtitle 则拼成「标题 - 副标题」。
- * 两者都没配时回退内置文案「发现」——保证首页标题永不空白。
+ * 口径：站点名即「首页标题」；配了 homeSubtitle 则拼成「站点名 - 副标题」。
+ * 两者都没配时回退内置文案——保证首页标题永不空白。
  */
 export function resolveHomeTitle(seo: SeoConfig): string {
-  const title = seo.homeTitle || "发现";
+  const title = resolveSiteName(seo);
   return seo.homeSubtitle ? `${title} - ${seo.homeSubtitle}` : title;
 }

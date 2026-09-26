@@ -8,7 +8,7 @@ import { rateLimit, clientIp } from "@/lib/rate-limit";
 import { sendMail, smtpConfigured } from "@/lib/mailer";
 import { renderMailHtml } from "@/lib/mail-template";
 import { issueRegisterCode } from "@/lib/register-code";
-import { siteName } from "@/lib/site-url";
+import { getSeoConfig, resolveSiteName } from "@/lib/seo-config";
 
 export type SendCodeState = { ok?: boolean; error?: string };
 
@@ -33,13 +33,14 @@ export async function sendRegisterCodeAction(
   if (!(await smtpConfigured())) return { error: "站点未配置邮件服务，请联系管理员" };
 
   const code = await issueRegisterCode(email);
+  const name = resolveSiteName(await getSeoConfig());
   const mail = await sendMail(
     email,
-    `【${siteName()}】注册验证码`,
+    `【${name}】注册验证码`,
     `你的注册验证码是：${code}\n\n10 分钟内有效，请勿泄露给他人。若非本人操作请忽略本邮件。`,
-    renderMailHtml({
+    await renderMailHtml({
       title: "注册验证码",
-      lines: ["你正在注册 " + siteName() + " 账号，验证码如下："],
+      lines: [`你正在注册 ${name} 账号，验证码如下：`],
       highlight: code,
       note: "验证码 10 分钟内有效，请勿泄露给他人；若非本人操作请忽略本邮件。",
     }),
