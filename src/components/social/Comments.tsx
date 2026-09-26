@@ -8,6 +8,8 @@ import { CrepeFeature } from "@milkdown/crepe";
 import { addCommentAction, deleteCommentAction } from "@/lib/actions/social";
 import ImageViewer from "@/components/ui/ImageViewer";
 import MdEditor from "@/components/rte/MdEditor";
+import { useFileDrop } from "@/lib/hooks/use-file-drop";
+import { useFilePaste } from "@/lib/hooks/use-file-paste";
 import { confirmDialog, toast } from "@/components/ui/feedback";
 import CommentItem, { commentInputCls, type ReplyState } from "./comment-item";
 import { flashComment, useCommentPolling } from "./use-comment-polling";
@@ -91,13 +93,13 @@ export default function Comments({
   }
 
   function pickImages(list: FileList | null) {
-    if (!list) return;
+    if (!list || list.length === 0) return;
     const next = [...files, ...Array.from(list)].slice(0, imageMax);
     setFiles(next);
     syncPreviews(next);
   }
 
-  /** 预览 URL 与 files 一一对应地重建：先释放旧的再建新的，避免反复增删持续泄漏 blob */
+  /** 预览 URL 与 files 一一对应地重建：先释放旧的再建新，避免反复增删持续泄漏 blob */
   function syncPreviews(next: File[]) {
     setPreviews((prev) => {
       for (const url of prev) URL.revokeObjectURL(url);
@@ -125,6 +127,19 @@ export default function Comments({
   useEffect(() => () => {
     for (const url of previewsRef.current) URL.revokeObjectURL(url);
   }, []);
+
+  // 拖入 / Ctrl+V 附图：与点击选择同一条链路，直送 pickImages。
+  // imageMax 为 0（后台关闭附图）或已达上限时关掉，避免拖进来的图片被静默丢弃。
+  const imagesFull = imageMax <= 0 || files.length >= imageMax;
+  const { dragging, dropProps } = useFileDrop({
+    onFiles: pickImages,
+    disabled: sending || imagesFull,
+  });
+  const { pasteProps } = useFilePaste({
+    onFiles: pickImages,
+    disabled: sending,
+    enabled: imageMax > 0 && !imagesFull,
+  });
 
   async function post(parentId: string | null, value: string) {
     setSending(true);
@@ -199,7 +214,20 @@ export default function Comments({
       )}
 
       {canPost ? (
-        <div className="mt-4" onKeyDown={onComposerKeyDown}>
+        // 整个输入区即投放目标：拖到编辑器上、预览缩略图上、按钮上都算数，
+        // 不必对准某个小格子。pasteProps 同理——在框内 Ctrl+V 截图即成为附图。
+        <div
+          className="relative mt-4"
+          onKeyDown={onComposerKeyDown}
+          {...dropProps}
+          {...pasteProps}
+        >
+          {dragging && (
+            // 拖拽期间整块盖一层提示：像素站点不用毛玻璃，走实心 brand-50 + 虚线描边
+            <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center border-2 border-dashed border-brand-500 bg-brand-50/95">
+              <span className="text-sm font-medium text-brand-700">松开即可添加附图</span>
+            </div>
+          )}
           <MdEditor
             key={editorKey}
             defaultValue=""
@@ -223,7 +251,13 @@ export default function Comments({
           {/* 附图选择 + 预览（imageMax = 0 时隐藏入口） */}
           {imageMax > 0 && (
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-none border border-brand-200 bg-surface px-3 py-1.5 text-xs text-neutral-600 hover:border-brand-500 hover:text-neutral-900">
+            <label
+              className={`inline-flex cursor-pointer items-center gap-1.5 rounded-none border bg-surface px-3 py-1.5 text-xs transition ${
+                dragging
+                  ? "border-brand-500 text-brand-700"
+                  : "border-brand-200 text-neutral-600 hover:border-brand-500 hover:text-neutral-900"
+              }`}
+            >
               <ImagePlus size={14} aria-hidden />
               附图 {files.length}/{imageMax}
               <input
@@ -231,10 +265,12 @@ export default function Comments({
                 type="file"
                 accept="image/png,image/jpeg,image/webp,image/gif"
                 multiple
+                disabled={sending || imagesFull}
                 hidden
                 onChange={(e) => pickImages(e.target.files)}
               />
             </label>
+            <span className="text-xs text-neutral-400">拖入或粘贴也可添加</span>
             {previews.map((src, i) => (
               <span key={src} className="relative">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
