@@ -203,13 +203,21 @@ export default function HomeManager({
     persistOrder(next);
   }
 
+  const enabledCount = rows.filter((row) => row.enabled).length;
+
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-neutral-500">
-          拖拽或上下按钮调整板块顺序，改动实时生效。
-        </p>
-        <Link href="/" className="text-sm text-neutral-600 hover:text-neutral-900 hover:underline">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3 border-b border-neutral-200 pb-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-semibold text-neutral-900">首页板块</p>
+            <span className="text-xs tabular-nums text-neutral-400">
+              {enabledCount} / {rows.length} 已启用
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-neutral-500">拖拽或使用上下按钮调整顺序，改动实时生效。</p>
+        </div>
+        <Link href="/" className="text-sm text-neutral-600 underline-offset-4 hover:text-neutral-900 hover:underline">
           预览首页 →
         </Link>
       </div>
@@ -221,7 +229,7 @@ export default function HomeManager({
       ) : (
         <ul className="space-y-2">
           {rows.map((row, index) => (
-            <li key={row.id} className="rounded-none border border-brand-200 bg-surface">
+            <li key={row.id} className="rounded-none border border-neutral-200 bg-surface">
               <div
                 draggable
                 onDragStart={(e) => {

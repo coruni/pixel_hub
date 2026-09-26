@@ -19,12 +19,17 @@ export default async function AdminRuntimePage() {
 
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-medium text-neutral-900">站点配置</h2>
-      </div>
-      <p className="mb-4 rounded-none border border-brand-200 bg-surface px-4 py-3 text-xs leading-5 text-neutral-500">
-        运行配置与 SEO 元信息集中管理，保存后立即生效、无需改 .env 重启。运行配置留空的项会回退
-        读取旧 .env（迁移期兼容），配置齐全后可从 .env 删除对应变量。仅管理员可见。
+      <header className="mb-6 border-b border-neutral-200 pb-5">
+        <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-600">
+          站点设置 / 系统配置
+        </p>
+        <h2 className="text-xl font-semibold tracking-tight text-neutral-900">站点配置</h2>
+        <p className="mt-1 text-sm text-neutral-500">
+          集中管理运行参数与 SEO 信息，保存后立即生效，无需修改 .env 或重启服务。
+        </p>
+      </header>
+      <p className="mb-4 border-l-2 border-brand-400 bg-surface px-4 py-3 text-xs leading-5 text-neutral-500">
+        运行配置留空的项目会在迁移期回退读取旧 .env；配置齐全后可从 .env 删除对应变量。仅管理员可见。
       </p>
 
       <SubTabs

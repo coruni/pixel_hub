@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 
 export type AdminTab = { href: string; label: string; adminOnly?: boolean };
+export type AdminTabGroup = { label: string; items: AdminTab[] };
 
 const TAB_ICONS: Record<string, LucideIcon> = {
   "/admin": LayoutDashboard,
@@ -49,38 +50,57 @@ const TAB_ICONS: Record<string, LucideIcon> = {
   "/admin/payment": CreditCard,
 };
 
-/** 后台侧栏导航：桌面左侧竖排（sticky），移动端横向滚动；当前路由橙色高亮 */
-export default function AdminTabs({ tabs, isAdmin }: { tabs: AdminTab[]; isAdmin: boolean }) {
+/** 后台侧栏导航：桌面按业务分组竖排（sticky），移动端按分组横向滚动。 */
+export default function AdminTabs({
+  groups,
+  tabs,
+  isAdmin,
+}: {
+  groups?: AdminTabGroup[];
+  tabs?: AdminTab[];
+  isAdmin: boolean;
+}) {
   const pathname = usePathname();
-  const list = tabs.filter((t) => !t.adminOnly || isAdmin);
+  const sections = groups ?? [{ label: "", items: tabs ?? [] }];
   return (
-    <nav className="flex w-full min-w-0 gap-1.5 overflow-x-auto pb-2 lg:sticky lg:top-20 lg:flex-col lg:gap-0.5 lg:overflow-visible lg:pb-0">
-      {list.map((t) => {
-        const active = t.href === "/admin" ? pathname === "/admin" : pathname.startsWith(t.href);
-        const Icon = TAB_ICONS[t.href];
+    <nav className="min-w-0 lg:sticky lg:top-20">
+      {sections.map((group, groupIndex) => {
+        const list = group.items.filter((t) => !t.adminOnly || isAdmin);
+        if (list.length === 0) return null;
         return (
-          <Link
-            key={t.href}
-            href={t.href}
-            className={`flex items-center gap-2 rounded-none px-3 py-2 text-sm ${
-              // 移动端横向滚动：不能被压缩，否则文字被挤成竖排
-              "shrink-0 lg:shrink"
-            } ${
-              active
-                ? "border border-brand-600 bg-brand-500 font-medium text-white"
-                : "text-neutral-600 transition hover:bg-brand-50 hover:text-neutral-900"
-            }`}
-          >
-            {Icon && (
-              <Icon
-                size={15}
-                className={`shrink-0 ${active ? "text-white/90" : "text-neutral-400"}`}
-                aria-hidden
-              />
+          <div key={group.label || groupIndex} className={groupIndex > 0 ? "mt-4" : ""}>
+            {group.label && (
+              <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-400">
+                {group.label}
+              </p>
             )}
-            {/* 桌面窄栏（lg:w-48）容纳不下时省略而不是撑破容器 */}
-            <span className="min-w-0 truncate">{t.label}</span>
-          </Link>
+            <div className="flex w-full min-w-0 gap-1.5 overflow-x-auto pb-2 lg:flex-col lg:gap-0.5 lg:overflow-visible lg:pb-0">
+              {list.map((t) => {
+                const active = t.href === "/admin" ? pathname === "/admin" : pathname.startsWith(t.href);
+                const Icon = TAB_ICONS[t.href];
+                return (
+                  <Link
+                    key={t.href}
+                    href={t.href}
+                    className={`flex items-center gap-2 rounded-none px-3 py-2 text-sm shrink-0 lg:shrink ${
+                      active
+                        ? "border border-brand-600 bg-brand-500 font-medium text-white"
+                        : "text-neutral-600 transition hover:bg-brand-50 hover:text-neutral-900"
+                    }`}
+                  >
+                    {Icon && (
+                      <Icon
+                        size={15}
+                        className={`shrink-0 ${active ? "text-white/90" : "text-neutral-400"}`}
+                        aria-hidden
+                      />
+                    )}
+                    <span className="min-w-0 truncate">{t.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
         );
       })}
     </nav>

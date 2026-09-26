@@ -69,7 +69,7 @@ export default function NavbarCard({
     ]);
 
   const iconBtn =
-    "grid h-7 w-7 shrink-0 place-items-center rounded-none text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-800 disabled:opacity-30";
+    "grid h-9 w-9 shrink-0 place-items-center rounded-none text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-800 focus-visible:ring-2 focus-visible:ring-brand-400 disabled:opacity-30";
 
   return (
     <section className="rounded-none border border-brand-200 bg-surface p-5">
@@ -99,96 +99,116 @@ export default function NavbarCard({
         </Button>
       </div>
 
-      <div className="mt-4 space-y-1.5">
+      <div className="mt-4 space-y-2">
         {items.map((it, i) => {
           const Icon = it.icon ? (NAV_ICON_MAP[it.icon] ?? null) : null;
           return (
-            <div
-              key={it.id}
-              className="flex flex-wrap items-center gap-1.5 rounded-none border border-brand-200 px-2 py-1.5"
-            >
-              <Button
-                type="button"
-                disabled={pending || i === 0}
-                onClick={() => move(i, -1)}
-                aria-label="上移"
-                className={iconBtn}
-              >
-                <ChevronUp size={14} />
-              </Button>
-              <Button
-                type="button"
-                disabled={pending || i === items.length - 1}
-                onClick={() => move(i, 1)}
-                aria-label="下移"
-                className={iconBtn}
-              >
-                <ChevronDown size={14} />
-              </Button>
-              <Button
-                type="button"
-                disabled={pending}
-                onClick={() => setAt(i, { enabled: !it.enabled })}
-                aria-label={it.enabled ? "停用" : "启用"}
-                className={iconBtn}
-              >
-                {it.enabled ? <Eye size={14} /> : <EyeOff size={14} />}
-              </Button>
-              <Button
-                type="button"
-                disabled={pending}
-                onClick={() => setItems((arr) => arr.filter((_, idx) => idx !== i))}
-                aria-label="删除"
-                className={`${iconBtn} hover:bg-red-50 hover:text-red-500`}
-              >
-                <Trash2 size={14} />
-              </Button>
+            <div key={it.id} className="rounded-none border border-neutral-200 bg-surface p-3">
+              <div className="flex items-center gap-3">
+                <span
+                  className={`grid h-9 w-9 shrink-0 place-items-center rounded-none ${it.enabled ? "bg-brand-500 text-white" : "bg-neutral-100 text-neutral-400"}`}
+                >
+                  {Icon ? <Icon size={15} /> : <span className="text-xs">·</span>}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium text-neutral-500">导航项 {String(i + 1).padStart(2, "0")}</p>
+                  <p className="truncate text-sm font-medium text-neutral-800">
+                    {it.label || <span className="text-neutral-400">未命名导航</span>}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-0.5">
+                  <Button
+                    type="button"
+                    disabled={pending || i === 0}
+                    onClick={() => move(i, -1)}
+                    aria-label="上移"
+                    className={iconBtn}
+                  >
+                    <ChevronUp size={15} />
+                  </Button>
+                  <Button
+                    type="button"
+                    disabled={pending || i === items.length - 1}
+                    onClick={() => move(i, 1)}
+                    aria-label="下移"
+                    className={iconBtn}
+                  >
+                    <ChevronDown size={15} />
+                  </Button>
+                  <Button
+                    type="button"
+                    disabled={pending}
+                    onClick={() => setAt(i, { enabled: !it.enabled })}
+                    aria-label={it.enabled ? "停用" : "启用"}
+                    className={iconBtn}
+                  >
+                    {it.enabled ? <Eye size={15} /> : <EyeOff size={15} />}
+                  </Button>
+                  <Button
+                    type="button"
+                    disabled={pending}
+                    onClick={() => setItems((arr) => arr.filter((_, idx) => idx !== i))}
+                    aria-label="删除"
+                    className={`${iconBtn} hover:bg-red-50 hover:text-red-500`}
+                  >
+                    <Trash2 size={15} />
+                  </Button>
+                </div>
+              </div>
 
-              <span
-                className={`grid h-7 w-7 shrink-0 place-items-center rounded-none ${it.enabled ? "bg-brand-500 text-white" : "bg-neutral-100 text-neutral-400"}`}
-              >
-                {Icon ? <Icon size={14} /> : <span className="text-[10px]">·</span>}
-              </span>
-
-              <input
-                value={it.label}
-                onChange={(e) => setAt(i, { label: e.target.value.slice(0, 24) })}
-                placeholder="名称"
-                className={`w-24 ${INPUT_SM}`}
-                aria-label="名称"
-              />
-              <input
-                value={it.href}
-                onChange={(e) => setAt(i, { href: e.target.value.slice(0, 300) })}
-                placeholder="/路径 或 https://外链"
-                className={`min-w-40 flex-1 ${INPUT_SM}`}
-                aria-label="地址"
-              />
-              <select
-                value={it.icon ?? ""}
-                onChange={(e) => setAt(i, { icon: e.target.value || null })}
-                className={`w-28 ${INPUT_SM}`}
-                aria-label="图标"
-              >
-                <option value="">无图标</option>
-                {NAV_ICONS.map((ic) => (
-                  <option key={ic} value={ic}>
-                    {ic}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={it.showTo}
-                onChange={(e) => setAt(i, { showTo: e.target.value as NavItem["showTo"] })}
-                className={`w-28 ${INPUT_SM}`}
-                aria-label="可见性"
-              >
-                {NAV_VISIBILITY_KEYS.map((v) => (
-                  <option key={v} value={v}>
-                    {NAV_VISIBILITY_LABELS[v]}
-                  </option>
-                ))}
-              </select>
+              <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(7rem,0.7fr)_minmax(12rem,1.8fr)_7rem_7rem]">
+                <label className="min-w-0">
+                  <span className="mb-1 block text-[10px] text-neutral-400">名称</span>
+                  <input
+                    value={it.label}
+                    onChange={(e) => setAt(i, { label: e.target.value.slice(0, 24) })}
+                    placeholder="导航名称"
+                    className={`w-full ${INPUT_SM}`}
+                    aria-label="名称"
+                  />
+                </label>
+                <label className="min-w-0">
+                  <span className="mb-1 block text-[10px] text-neutral-400">地址</span>
+                  <input
+                    value={it.href}
+                    onChange={(e) => setAt(i, { href: e.target.value.slice(0, 300) })}
+                    placeholder="/路径 或 https://外链"
+                    className={`w-full ${INPUT_SM}`}
+                    aria-label="地址"
+                  />
+                </label>
+                <label className="min-w-0">
+                  <span className="mb-1 block text-[10px] text-neutral-400">图标</span>
+                  <select
+                    value={it.icon ?? ""}
+                    onChange={(e) => setAt(i, { icon: e.target.value || null })}
+                    className={`w-full ${INPUT_SM}`}
+                    aria-label="图标"
+                  >
+                    <option value="">无图标</option>
+                    {NAV_ICONS.map((ic) => (
+                      <option key={ic} value={ic}>
+                        {ic}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="min-w-0">
+                  <span className="mb-1 block text-[10px] text-neutral-400">可见性</span>
+                  <select
+                    value={it.showTo}
+                    onChange={(e) => setAt(i, { showTo: e.target.value as NavItem["showTo"] })}
+                    className={`w-full ${INPUT_SM}`}
+                    aria-label="可见性"
+                  >
+                    {NAV_VISIBILITY_KEYS.map((v) => (
+                      <option key={v} value={v}>
+                        {NAV_VISIBILITY_LABELS[v]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
             </div>
           );
         })}

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getTheme, ensureSiteTheme } from "@/lib/site";
 import { ensureHomeSections } from "@/lib/home";
 import { HOME_SECTION_KINDS, parseSectionConfig, type HomeSectionKind } from "@/lib/home-config";
+import { getAreaWidgets, type WidgetAreaKey } from "@/lib/site-config";
 import SiteLayoutManager from "@/components/site-admin/SiteLayoutManager";
 import HomeManager from "@/components/home-admin/HomeManager";
 import SubTabs from "@/components/admin/SubTabs";
@@ -78,13 +79,80 @@ export default async function AdminSitePage() {
     config: parseSectionConfig(r.kind as HomeSectionKind, r.config),
   }));
 
+  const widgetAreas: WidgetAreaKey[] = [
+    "home",
+    "archive",
+    "archiveTop",
+    "archiveBottom",
+    "detail",
+    "detailTop",
+    "detailMiddle",
+    "detailBottom",
+  ];
+  const widgetCount = widgetAreas.reduce((sum, area) => sum + getAreaWidgets(theme, area).length, 0);
+  const enabledWidgetCount = widgetAreas.reduce(
+    (sum, area) => sum + getAreaWidgets(theme, area).filter((widget) => widget.enabled).length,
+    0,
+  );
+  const pageStats = [
+    {
+      label: "首页板块",
+      value: `${homeRows.filter((row) => row.enabled).length} / ${homeRows.length}`,
+      note: "已启用",
+      tone: "brand",
+    },
+    {
+      label: "顶部导航",
+      value: `${theme.navbar.items.filter((item) => item.enabled).length} / ${theme.navbar.items.length}`,
+      note: "已启用",
+      tone: "neutral",
+    },
+    {
+      label: "页面组件",
+      value: `${enabledWidgetCount} / ${widgetCount}`,
+      note: "已启用",
+      tone: "neutral",
+    },
+  ] as const;
+
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-medium text-neutral-900">站点布局</h2>
-        <Link href="/" className="text-sm text-neutral-500 hover:text-neutral-900 hover:underline">
+      <header className="mb-6 flex flex-wrap items-end justify-between gap-4 border-b border-neutral-200 pb-5">
+        <div>
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-600">
+            站点设置 / 外观与布局
+          </p>
+          <h2 className="text-xl font-semibold tracking-tight text-neutral-900">站点布局</h2>
+          <p className="mt-1 text-sm text-neutral-500">
+            管理首页内容顺序，以及全站导航、详情页和侧栏组件。
+          </p>
+        </div>
+        <Link
+          href="/"
+          className="shrink-0 text-sm text-neutral-500 underline-offset-4 hover:text-neutral-900 hover:underline"
+        >
           查看前台 →
         </Link>
+      </header>
+
+      <div className="mb-6 grid gap-3 sm:grid-cols-3">
+        {pageStats.map((stat) => (
+          <div key={stat.label} className="border border-neutral-200 bg-surface px-4 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs text-neutral-500">{stat.label}</span>
+              <span
+                className={
+                  stat.tone === "brand" ? "h-2 w-2 bg-brand-500" : "h-2 w-2 bg-neutral-300"
+                }
+                aria-hidden
+              />
+            </div>
+            <div className="mt-1 flex items-baseline gap-2">
+              <strong className="text-xl font-semibold tabular-nums text-neutral-900">{stat.value}</strong>
+              <span className="text-xs text-neutral-400">{stat.note}</span>
+            </div>
+          </div>
+        ))}
       </div>
 
       <SubTabs

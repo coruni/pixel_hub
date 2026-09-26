@@ -44,6 +44,7 @@ export default function SiteLayoutManager({
   const [theme, setTheme] = useState(initial);
   const [prev, setPrev] = useState(initial);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState<"basics" | "widgets">("basics");
   const [activeArea, setActiveArea] = useState<WidgetAreaKey>("home");
   const [pending, start] = useTransition();
   const [dragId, setDragId] = useState<string | null>(null);
@@ -95,19 +96,57 @@ export default function SiteLayoutManager({
   }
 
   return (
-    <div className="space-y-6">
-      <NavbarCard
-        items={theme.navbar.items}
-        menu={theme.navbar.categoriesMenu}
-        run={run}
-        pending={pending}
-      />
+    <div>
+      <div className="mb-5 flex max-w-full gap-1 overflow-x-auto border-b border-neutral-200" role="tablist">
+        {[
+          { key: "basics" as const, label: "基础布局", hint: "导航、详情页与侧栏" },
+          { key: "widgets" as const, label: "页面组件", hint: "各页面的组件与顺序" },
+        ].map((tab) => {
+          const on = activeSection === tab.key;
+          return (
+            <Button
+              key={tab.key}
+              type="button"
+              role="tab"
+              aria-selected={on}
+              onClick={() => {
+                setActiveSection(tab.key);
+                setEditingId(null);
+              }}
+              className={`-mb-px shrink-0 border-b-2 px-4 pb-3 pt-1 text-sm transition ${
+                on
+                  ? "border-brand-500 font-medium text-brand-700"
+                  : "border-transparent text-neutral-500 hover:text-neutral-800"
+              }`}
+            >
+              {tab.label}
+              <span className="ml-2 text-[11px] font-normal text-neutral-400">{tab.hint}</span>
+            </Button>
+          );
+        })}
+      </div>
 
-      <DetailTemplateCard theme={theme} run={run} />
-
-      <FlagsCard theme={theme} pending={pending} run={run} />
-
-      <section className="rounded-none border border-brand-200 bg-surface p-5">
+      {activeSection === "basics" ? (
+        <div className="space-y-5">
+          <div className="border-l-2 border-brand-400 pl-3">
+            <h3 className="text-sm font-semibold text-neutral-900">全站基础布局</h3>
+            <p className="mt-1 text-xs leading-5 text-neutral-500">
+              先确定站点骨架，再到「页面组件」调整每个页面的内容模块。
+            </p>
+          </div>
+          <NavbarCard
+            items={theme.navbar.items}
+            menu={theme.navbar.categoriesMenu}
+            run={run}
+            pending={pending}
+          />
+          <div className="grid gap-5 xl:grid-cols-2">
+            <DetailTemplateCard theme={theme} run={run} />
+            <FlagsCard theme={theme} pending={pending} run={run} />
+          </div>
+        </div>
+      ) : (
+        <section className="rounded-none border border-neutral-200 bg-surface p-5">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-base font-semibold text-neutral-900">页面组件</h2>
@@ -187,7 +226,7 @@ export default function SiteLayoutManager({
           ) : (
             <ul className="mt-4 space-y-2">
               {widgets.map((w, index) => (
-                <li key={w.id} className="rounded-none border border-brand-200">
+                <li key={w.id} className="rounded-none border border-neutral-200 bg-surface">
                   <div
                     draggable
                     onDragStart={(e) => {
@@ -349,7 +388,8 @@ export default function SiteLayoutManager({
             </div>
           </div>
         </div>
-      </section>
+        </section>
+      )}
     </div>
   );
 }

@@ -9,26 +9,51 @@ export const metadata: Metadata = {
   robots: { index: false },
 };
 
-const tabs: { href: string; label: string; adminOnly?: boolean }[] = [
-  { href: "/admin", label: "概览" },
-  { href: "/admin/queue", label: "审核队列" },
-  { href: "/admin/content", label: "内容库" },
-  { href: "/admin/reports", label: "举报" },
-  { href: "/admin/users", label: "用户管理" },
-  { href: "/admin/media", label: "媒体库" },
-  { href: "/admin/logs", label: "操作日志" },
-  { href: "/admin/categories", label: "分类管理", adminOnly: true },
-  { href: "/admin/tags", label: "标签管理", adminOnly: true },
-  { href: "/admin/drives", label: "云盘", adminOnly: true },
-  { href: "/admin/uploads", label: "上传限制", adminOnly: true },
-  { href: "/admin/incentive", label: "创作者激励", adminOnly: true },
-  { href: "/admin/settlement", label: "结算台", adminOnly: true },
-  { href: "/admin/withdrawals", label: "提现审核", adminOnly: true },
-  { href: "/admin/finance", label: "收支台账", adminOnly: true },
-  { href: "/admin/payment", label: "支付设置", adminOnly: true },
-  { href: "/admin/site", label: "站点布局", adminOnly: true },
-  { href: "/admin/docs", label: "内容页面", adminOnly: true },
-  { href: "/admin/runtime", label: "站点配置", adminOnly: true },
+const navGroups: { label: string; items: { href: string; label: string; adminOnly?: boolean }[] }[] = [
+  {
+    label: "工作台",
+    items: [
+      { href: "/admin", label: "概览" },
+      { href: "/admin/queue", label: "审核队列" },
+      { href: "/admin/reports", label: "举报" },
+    ],
+  },
+  {
+    label: "内容与用户",
+    items: [
+      { href: "/admin/content", label: "内容库" },
+      { href: "/admin/users", label: "用户管理" },
+      { href: "/admin/categories", label: "分类管理", adminOnly: true },
+      { href: "/admin/tags", label: "标签管理", adminOnly: true },
+      { href: "/admin/docs", label: "内容页面", adminOnly: true },
+    ],
+  },
+  {
+    label: "资源与运营",
+    items: [
+      { href: "/admin/media", label: "媒体库" },
+      { href: "/admin/drives", label: "云盘", adminOnly: true },
+      { href: "/admin/uploads", label: "上传限制", adminOnly: true },
+      { href: "/admin/logs", label: "操作日志" },
+    ],
+  },
+  {
+    label: "收益与支付",
+    items: [
+      { href: "/admin/incentive", label: "创作者激励", adminOnly: true },
+      { href: "/admin/settlement", label: "结算台", adminOnly: true },
+      { href: "/admin/withdrawals", label: "提现审核", adminOnly: true },
+      { href: "/admin/finance", label: "收支台账", adminOnly: true },
+      { href: "/admin/payment", label: "支付设置", adminOnly: true },
+    ],
+  },
+  {
+    label: "站点设置",
+    items: [
+      { href: "/admin/site", label: "站点布局", adminOnly: true },
+      { href: "/admin/runtime", label: "站点配置", adminOnly: true },
+    ],
+  },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -54,7 +79,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               {role === "ADMIN" ? "管理员" : "版主"}
             </span>
           </div>
-          <AdminTabs tabs={tabs} isAdmin={role === "ADMIN"} />
+          <AdminTabs groups={navGroups} isAdmin={role === "ADMIN"} />
         </aside>
         <div className="min-w-0 flex-1">{children}</div>
       </div>
