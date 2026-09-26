@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import PresenceAvatar from "@/components/ui/PresenceAvatar";
+import NicknameText from "@/components/ui/NicknameText";
 import { useLiveOnline } from "@/lib/realtime/use-realtime";
 import { formatCount } from "@/lib/format";
 import { useHoverDelay } from "@/lib/hooks";
@@ -12,6 +13,8 @@ export type HoverCardUser = {
   username: string;
   name: string | null;
   avatarKey?: string | null;
+  /** 昵称特效色 key（User.nameColor）；缺省 = 站点默认前景色 */
+  nameColor?: string | null;
   // 统计与身份信息可缺省：缺省时对应区块不渲染
   bio?: string | null;
   role?: string;
@@ -33,9 +36,12 @@ const ROLE_LABEL: Record<string, string> = {
  */
 export default function UserHoverCard({
   user,
+  nicknameEnabled = true,
   children,
 }: {
   user: HoverCardUser;
+  /** 昵称特效色开关（后台 incentive.decoration.nicknameEnabled）；客户端组件读不到配置，由服务端调用方转交 */
+  nicknameEnabled?: boolean;
   children: ReactNode;
 }) {
   const { open, openDelayed, close, setOpen } = useHoverDelay(300);
@@ -71,9 +77,15 @@ export default function UserHoverCard({
             />
             <span className="min-w-0 flex-1">
               <span className="flex items-center gap-1.5">
-                <span className="truncate text-sm font-semibold text-neutral-900">
-                  {user.name ?? user.username}
-                </span>
+                {/* 弹层是浅底（bg-surface）→ 默认 tone="light" */}
+                <NicknameText
+                  name={user.name}
+                  username={user.username}
+                  color={user.nameColor}
+                  enabled={nicknameEnabled}
+                  className="truncate text-sm font-semibold"
+                  fallbackClassName="text-neutral-900"
+                />
                 {liveOnline && (
                   <span className="shrink-0 inline-flex items-center gap-1 rounded-none border border-emerald-600 bg-emerald-50 px-1.5 py-px text-[10px] font-medium text-emerald-700">
                     <span className="h-1.5 w-1.5 bg-emerald-500" aria-hidden /> 在线

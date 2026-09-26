@@ -238,6 +238,8 @@ export type RankedCreator = {
   userId: string;
   username: string;
   name: string | null;
+  /** 昵称特效色 key（User.nameColor）；渲染走 components/ui/Nickname */
+  nameColor: string | null;
   avatarKey: string | null;
   /** 该周期内的贡献分（all 时为累计余额） */
   points: number;
@@ -263,13 +265,14 @@ export async function getTopByPoints(period: RankPeriod, limit: number): Promise
         userId: true,
         balance: true,
         level: true,
-        user: { select: { username: true, name: true, avatarKey: true } },
+        user: { select: { username: true, name: true, nameColor: true, avatarKey: true } },
       },
     });
     return rows.map((r) => ({
       userId: r.userId,
       username: r.user.username,
       name: r.user.name,
+      nameColor: r.user.nameColor,
       avatarKey: r.user.avatarKey,
       points: r.balance,
       level: r.level,
@@ -291,6 +294,7 @@ export async function getTopByPoints(period: RankPeriod, limit: number): Promise
       id: true,
       username: true,
       name: true,
+      nameColor: true,
       avatarKey: true,
       points: { select: { level: true } },
     },
@@ -306,6 +310,7 @@ export async function getTopByPoints(period: RankPeriod, limit: number): Promise
       userId: g.userId,
       username: u.username,
       name: u.name,
+      nameColor: u.nameColor,
       avatarKey: u.avatarKey,
       points: g._sum.delta ?? 0,
       level,

@@ -10,10 +10,9 @@ import {
   Newspaper,
 } from "lucide-react";
 import { getFeed, type FeedItem } from "@/lib/queries";
-import { getIncentive } from "@/lib/incentive";
-import { nameColorBrightClass, nameColorClass } from "@/lib/decorations";
 import { formatCount } from "@/lib/format";
 import { TYPE_LABEL } from "@/lib/display";
+import Nickname from "@/components/ui/Nickname";
 import SectionTitle from "@/components/home/SectionTitle";
 
 const frame = "mx-auto max-w-7xl px-4 sm:px-6";
@@ -50,8 +49,6 @@ export default async function HeroBlock({
   };
 }) {
   const ids = cfg.featuredIds.slice(0, 5);
-  // 昵称特效色：大图与卡片形态压在固定黑渐变上（深底）→ 亮阶；list 形态是浅底 → 跟随主题
-  const nickEnabled = (await getIncentive()).decoration.nicknameEnabled;
   let items: FeedItem[];
   if (ids.length > 0) {
     const r = await getFeed({ ids, pageSize: 5 });
@@ -114,9 +111,13 @@ export default async function HeroBlock({
                   </p>
                 )}
                 <p className="mt-2 flex items-center gap-2 text-xs text-white/75">
-                  <span className={nameColorBrightClass(big.author.nameColor, nickEnabled) ?? ""}>
-                    {big.author.name ?? big.author.username}
-                  </span>
+                  {/* 压在固定黑渐变上（深底，不随主题变化）→ tone="dark" */}
+                  <Nickname
+                    name={big.author.name}
+                    username={big.author.username}
+                    color={big.author.nameColor}
+                    tone="dark"
+                  />
                   {big.category && <span>· {big.category.name}</span>}
                   <span className="inline-flex items-center gap-1">
                     <Heart size={12} />
@@ -168,9 +169,12 @@ export default async function HeroBlock({
                         {item.title}
                       </span>
                       <span className="mt-1 block truncate text-xs text-neutral-400">
-                        <span className={nameColorClass(item.author.nameColor, nickEnabled) ?? ""}>
-                          {item.author.name ?? item.author.username}
-                        </span>
+                        {/* list 形态是浅底 → 默认 tone="light"，跟随明暗主题 */}
+                        <Nickname
+                          name={item.author.name}
+                          username={item.author.username}
+                          color={item.author.nameColor}
+                        />
                         {item.category ? ` · ${item.category.name}` : ""}
                       </span>
                     </span>
@@ -204,9 +208,13 @@ export default async function HeroBlock({
                     <div className="absolute inset-x-0 bottom-0 p-3">
                       <p className="truncate text-sm font-medium text-white">{item.title}</p>
                       <p className="mt-0.5 truncate text-[11px] text-white/70">
-                        <span className={nameColorBrightClass(item.author.nameColor, nickEnabled) ?? ""}>
-                          {item.author.name ?? item.author.username}
-                        </span>
+                        {/* 卡片形态同样压黑渐变（深底）→ tone="dark" */}
+                        <Nickname
+                          name={item.author.name}
+                          username={item.author.username}
+                          color={item.author.nameColor}
+                          tone="dark"
+                        />
                         {item.category ? ` · ${item.category.name}` : ""}
                       </p>
                     </div>

@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { Download, Eye, Heart } from "lucide-react";
 import type { FeedItem } from "@/lib/queries";
-import { getIncentive } from "@/lib/incentive";
-import { nameColorClass } from "@/lib/decorations";
 import { formatCount } from "@/lib/format";
+import Nickname from "@/components/ui/Nickname";
 
 /** 侧边栏迷你内容项（排行/随机/作者作品等列表通用）：名次徽标 + 缩略图 + 指标 */
 
@@ -75,7 +74,7 @@ function MiniThumb({ item, className = "" }: { item: FeedItem; className?: strin
 }
 
 /** 列表行：缩略图横排 */
-export async function MiniRow({
+export function MiniRow({
   item,
   rank,
   metric,
@@ -84,8 +83,6 @@ export async function MiniRow({
   rank?: number;
   metric?: MetricKind;
 }) {
-  // 侧栏是浅底 → 跟随主题的 nameColorClass；getIncentive 走 cache()，同请求只查一次库
-  const nickCls = nameColorClass(item.author.nameColor, (await getIncentive()).decoration.nicknameEnabled);
   return (
     <Link
       href={`/resources/${item.slug}`}
@@ -98,7 +95,13 @@ export async function MiniRow({
           {item.title}
         </span>
         <span className="mt-0.5 flex items-center gap-1.5 text-[11px] text-neutral-400">
-          <span className={`truncate ${nickCls ?? ""}`}>{item.author.name ?? item.author.username}</span>
+          {/* 侧栏是浅底 → 默认 tone="light"，跟随明暗主题 */}
+          <Nickname
+            name={item.author.name}
+            username={item.author.username}
+            color={item.author.nameColor}
+            className="truncate"
+          />
           {item.type === "GAME" && (
             <span className="rounded-none bg-emerald-50 px-1 text-[9px] font-medium text-emerald-600">
               游戏
@@ -121,7 +124,7 @@ export async function MiniRow({
 }
 
 /** 小卡片：竖排缩略图（compact 网格用） */
-export async function MiniCard({
+export function MiniCard({
   item,
   rank,
   metric,
@@ -130,7 +133,6 @@ export async function MiniCard({
   rank?: number;
   metric?: MetricKind;
 }) {
-  const nickCls = nameColorClass(item.author.nameColor, (await getIncentive()).decoration.nicknameEnabled);
   return (
     <Link
       href={`/resources/${item.slug}`}
@@ -149,9 +151,13 @@ export async function MiniCard({
           {item.title}
         </span>
         <span className="mt-0.5 flex items-center justify-between gap-1">
-          <span className={`truncate text-[10px] ${nickCls ?? "text-neutral-400"}`}>
-            {item.author.name ?? item.author.username}
-          </span>
+          <Nickname
+            name={item.author.name}
+            username={item.author.username}
+            color={item.author.nameColor}
+            className="truncate text-[10px]"
+            fallbackClassName="text-neutral-400"
+          />
           {metric && <MetricText item={item} metric={metric} />}
         </span>
       </span>

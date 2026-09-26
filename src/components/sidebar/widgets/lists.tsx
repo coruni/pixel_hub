@@ -6,6 +6,7 @@ import { widgetTitle, type SidebarWidget } from "@/lib/site-config";
 import { creatorMetaText, timeAgo } from "@/lib/format";
 import { isOnline } from "@/lib/online";
 import PresenceAvatar from "@/components/ui/PresenceAvatar";
+import Nickname from "@/components/ui/Nickname";
 import { WidgetShell } from "../shell";
 
 /** 名单类侧边栏组件：分类入口 / 标签云 / 人气创作者 / 最新评论 */
@@ -97,9 +98,14 @@ export async function renderCreators(w: SidebarWidget) {
                 online={c.online}
               />
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium text-neutral-800 group-hover:text-neutral-950">
-                  {c.name ?? c.username}
-                </span>
+                {/* 侧栏是浅底 → 默认 tone="light"。hover 色写在昵称自身：昵称色是子元素自己的 color，父级 group-hover 盖不住它 */}
+                <Nickname
+                  name={c.name}
+                  username={c.username}
+                  color={c.nameColor}
+                  className="block truncate text-sm font-medium group-hover:text-neutral-950"
+                  fallbackClassName="text-neutral-800"
+                />
                 <span className="block truncate text-[11px] text-neutral-400">
                   {creatorMetaText(c.resources, c.metric, cfg.sort, cfg.period)}
                 </span>
@@ -132,9 +138,13 @@ export async function renderComments(w: SidebarWidget) {
             />
             <span className="min-w-0 flex-1">
               <span className="flex items-baseline gap-1.5">
-                <span className="truncate text-xs font-medium text-neutral-800">
-                  {c.author.name ?? c.author.username}
-                </span>
+                <Nickname
+                  name={c.author.name}
+                  username={c.author.username}
+                  color={c.author.nameColor}
+                  className="truncate text-xs font-medium"
+                  fallbackClassName="text-neutral-800"
+                />
                 <span className="shrink-0 text-[10px] text-neutral-300">
                   {timeAgo(c.createdAt)}
                 </span>

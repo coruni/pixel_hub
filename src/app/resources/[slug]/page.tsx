@@ -10,7 +10,6 @@ import { getPointBalance } from "@/lib/points";
 import { levelOf } from "@/lib/points-config";
 import { publicUrl } from "@/lib/storage/url";
 import { profileBgUnlocked } from "@/lib/upload-config";
-import { bgPresetUrlOf } from "@/lib/decorations";
 import { renderSiteSidebar, WidgetArea, type DetailWidgetCtx } from "@/components/sidebar/SiteSidebar";
 import SidebarLayout from "@/components/layout/SidebarLayout";
 import DetailPost from "@/components/resource/detail/DetailPost";
@@ -135,31 +134,19 @@ export default async function ResourcePage({ params }: PageProps) {
   // D9：NSFW 详情登录门 —— 已发布成人内容仅登录后可见，未登录一律 404（不进索引/不泄露图）
   if (detail.status === "PUBLISHED" && detail.nsfw && !meId) notFound();
 
-  // 作者的主页背景：四个条件同时成立才铺 —— ① 作者设了图或选了官方预设 ② 开关打开（默认开）
-  // ③ 作者**现在**仍达等级 ④ 选的是官方预设时该预设当前也开放。
+  // 作者的主页背景：三个条件同时成立才铺 —— ① 作者设了图 ② 开关打开（默认开）③ 作者**现在**仍达等级。
   // 等级必须重算、不能信任「当初传得上来」：门槛与档位都在后台可改，作者也可能掉档；
-  // 判定复用前台与设置页同一套函数（profileBgUnlocked / bgPresetUrlOf），口径只有一份。
-  // 两条支路都短路在 getPointBalance 之前 —— 没设背景的作者（眼下是绝大多数）不产生这次点数查询。
-  // 官方预设**优先于**自传图：写侧已互斥，这里再优先一次只是让「万一同时有值」也有确定结果。
+  // 判定复用前台与设置页同一个 profileBgUnlocked()，口径只有一份。
+  // 没设背景的作者（眼下是绝大多数）连这一次点数查询都不会发生 —— 短路在 getPointBalance 之前。
   let bgUrl: string | null = null;
-  const wantsOwnBg = Boolean(detail.author.profileBgPcKey) && detail.author.profileBgOnResource;
-  const wantsPreset =
-    Boolean(detail.author.profileBgPreset) &&
-    detail.author.profileBgOnResource &&
-    incentive.decoration.bgPresetEnabled;
-  if (wantsPreset || wantsOwnBg) {
+  if (detail.author.profileBgPcKey && detail.author.profileBgOnResource) {
     const authorLevel = levelOf(await getPointBalance(detail.authorId), incentive.levels);
-    bgUrl = wantsPreset
-      ? bgPresetUrlOf(detail.author.profileBgPreset, authorLevel, incentive.enabled)
-      : null;
-    if (!bgUrl && wantsOwnBg && detail.author.profileBgPcKey) {
-      const unlocked = profileBgUnlocked(
-        authorLevel,
-        incentive.profile.bgMinLevel,
-        incentive.enabled,
-      );
-      if (unlocked) bgUrl = publicUrl(detail.author.profileBgPcKey);
-    }
+    const unlocked = profileBgUnlocked(
+      authorLevel,
+      incentive.profile.bgMinLevel,
+      incentive.enabled,
+    );
+    if (unlocked) bgUrl = publicUrl(detail.author.profileBgPcKey);
   }
 
   // 相关推荐只对已发布内容计算（草稿/待审不需要）

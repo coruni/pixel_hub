@@ -15,6 +15,7 @@ import {
 import { logoutAction } from "@/lib/actions";
 import Avatar from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
+import NicknameText from "@/components/ui/NicknameText";
 import { NAV_CONTROL_H } from "@/lib/ui/cls";
 import { refreshUnread } from "@/lib/realtime/client";
 import { useRealtimeConnected, useUnreadCount } from "@/lib/realtime/use-realtime";
@@ -25,6 +26,8 @@ export type MenuUser = {
   role: string;
   trusted: boolean;
   avatarKey?: string | null;
+  /** 昵称特效色 key（User.nameColor）；缺省 = 站点默认前景色 */
+  nameColor?: string | null;
 };
 
 /** 顶部导航右侧的用户菜单：头像 + 下拉（个人主页/通知/代币/设置/发布/管理/退出）。草稿箱已并入账户设置。 */
@@ -32,11 +35,14 @@ export default function UserMenu({
   user,
   unread = 0,
   showCoins = false,
+  nicknameEnabled = true,
 }: {
   user: MenuUser;
   unread?: number;
   /** 激励体系开启时才出现「我的代币」（关闭后留一个 0 余额的死链更糟） */
   showCoins?: boolean;
+  /** 昵称特效色开关；客户端组件读不到配置，由 Navbar 转交 */
+  nicknameEnabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
@@ -102,7 +108,14 @@ export default function UserMenu({
             </span>
           )}
         </span>
-        <span className="hidden max-w-[8rem] truncate sm:block">{user.name ?? user.username}</span>
+        {/* 无特效色时沿用按钮的 text-neutral-700（不传 fallbackClassName，走继承） */}
+        <NicknameText
+          name={user.name}
+          username={user.username}
+          color={user.nameColor}
+          enabled={nicknameEnabled}
+          className="hidden max-w-[8rem] truncate sm:block"
+        />
         <ChevronDown
           size={14}
           className={`text-neutral-400 transition ${open ? "rotate-180" : ""}`}
@@ -118,7 +131,13 @@ export default function UserMenu({
           {/* 用户信息头 */}
           <div className="border-b border-neutral-100 px-3 py-2.5">
             <p className="truncate text-sm font-semibold text-neutral-900">
-              {user.name ?? user.username}
+              {/* 无特效色时沿用 p 的 text-neutral-900（走继承） */}
+              <NicknameText
+                name={user.name}
+                username={user.username}
+                color={user.nameColor}
+                enabled={nicknameEnabled}
+              />
             </p>
             <p className="mt-0.5 flex items-center gap-1.5 text-xs text-neutral-400">
               <span className="truncate">@{user.username}</span>

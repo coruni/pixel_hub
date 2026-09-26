@@ -25,7 +25,7 @@ import {
 import { formatCount } from "@/lib/format";
 import { publicUrl } from "@/lib/storage/url";
 import { profileBgUnlocked } from "@/lib/upload-config";
-import { bgPresetUrlOf, nameColorClass } from "@/lib/decorations";
+import Nickname from "@/components/ui/Nickname";
 import ResourceGrid from "@/components/resource/ResourceGrid";
 import PresenceAvatar from "@/components/ui/PresenceAvatar";
 import { FollowButton } from "@/components/social/interactions";
@@ -70,6 +70,7 @@ const userSelect = {
   id: true,
   username: true,
   name: true,
+  nameColor: true,
   bio: true,
   avatarKey: true,
   lastSeenAt: true,
@@ -80,6 +81,7 @@ type UserRowArgs = {
     id: string;
     username: string;
     name: string | null;
+    nameColor: string | null;
     bio: string | null;
     avatarKey: string | null;
     lastSeenAt: Date | null;
@@ -88,7 +90,7 @@ type UserRowArgs = {
   meId: string | undefined;
 };
 
-function UserRow({ u, following, meId }: UserRowArgs) {
+async function UserRow({ u, following, meId }: UserRowArgs) {
   return (
     <li className="flex items-center gap-3 rounded-none p-2 transition hover:bg-brand-50">
       <Link href={`/u/${u.username}`} className="flex min-w-0 flex-1 items-center gap-3">
@@ -101,9 +103,13 @@ function UserRow({ u, following, meId }: UserRowArgs) {
           online={isOnline(u.lastSeenAt)}
         />
         <span className="min-w-0">
-          <span className="block truncate text-sm font-medium text-neutral-800">
-            {u.name ?? u.username}
-          </span>
+          <Nickname
+            name={u.name}
+            username={u.username}
+            color={u.nameColor}
+            className="block truncate text-sm font-medium"
+            fallbackClassName="text-neutral-800"
+          />
           <span className="block truncate text-xs text-neutral-400">
             {u.bio || `@${u.username}`}
           </span>
@@ -145,13 +151,7 @@ export default async function UserPage({
   const bgUnlocked = profileBgUnlocked(levelIndex, incentive.profile.bgMinLevel, incentive.enabled);
   const bgPcKey = bgUnlocked ? profile.profileBgPcKey : null;
 
-  // 装饰：门槛同样在服务端重算（与设置页共用 decorations.ts 的判定）。
-  // 官方预设**优先于**自传图 —— 两者在写侧已互斥，这里再优先一次只是让「万一同时有值」也有确定结果。
-  const bgPresetUrl = incentive.decoration.bgPresetEnabled
-    ? bgPresetUrlOf(profile.profileBgPreset, levelIndex, incentive.enabled)
-    : null;
-  const bgUrl = bgPresetUrl ?? (bgPcKey ? publicUrl(bgPcKey) : null);
-  const nickCls = nameColorClass(profile.nameColor, incentive.decoration.nicknameEnabled);
+  const bgUrl = bgPcKey ? publicUrl(bgPcKey) : null;
 
   // 头部操作区。编辑 / 打赏紧跟昵称末尾，作为纯图标随昵称行自然换行；
   // 关注按钮独立放在资料区最右侧，不参与昵称长度计算。
@@ -213,7 +213,7 @@ export default async function UserPage({
   );
 
   // ---- 各 tab 数据（统一每页 24 条，多取 1 条判断 hasMore） ----
-  const PAGE_SIZE = 24;
+  const PAGE_SIZE = 30;
   let works: FeedCard[] = [];
   let followRows: UserRowArgs["u"][] = [];
   let viewerFollows = new Set<string>();
@@ -378,10 +378,13 @@ export default async function UserPage({
             />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <h1
-                  className={`min-w-0 break-words text-2xl font-semibold tracking-tight ${nickCls ?? "text-neutral-900"}`}
-                >
-                  {profile.name ?? profile.username}
+                <h1 className="min-w-0 break-words text-2xl font-semibold tracking-tight">
+                  <Nickname
+                    name={profile.name}
+                    username={profile.username}
+                    color={profile.nameColor}
+                    fallbackClassName="text-neutral-900"
+                  />
                 </h1>
                 {nameActions}
                 <span className="text-sm text-neutral-400">@{profile.username}</span>
@@ -417,10 +420,13 @@ export default async function UserPage({
           />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h1
-                className={`min-w-0 break-words text-2xl font-semibold tracking-tight ${nickCls ?? "text-neutral-900"}`}
-              >
-                {profile.name ?? profile.username}
+              <h1 className="min-w-0 break-words text-2xl font-semibold tracking-tight">
+                <Nickname
+                  name={profile.name}
+                  username={profile.username}
+                  color={profile.nameColor}
+                  fallbackClassName="text-neutral-900"
+                />
               </h1>
               {nameActions}
               <span className="text-sm text-neutral-400">@{profile.username}</span>
@@ -543,7 +549,7 @@ export default async function UserPage({
       )}
       {tab === "favorites" &&
         (works.length > 0 ? (
-          <ResourceGrid className="mt-4 lg:grid-cols-6!" items={works} display="card" ratio="3:4" />
+          <ResourceGrid className="mt-4 lg:grid-cols-5!" items={works} display="card" ratio="3:4" />
         ) : (
           emptyBox("还没有收藏内容")
         ))}

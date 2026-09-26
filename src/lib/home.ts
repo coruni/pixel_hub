@@ -135,6 +135,8 @@ export type CreatorRow = {
   id: string;
   username: string;
   name: string | null;
+  /** 昵称特效色 key（User.nameColor）；渲染走 components/ui/Nickname */
+  nameColor: string | null;
   avatarKey: string | null;
   resources: number;
   /**
@@ -227,6 +229,7 @@ export async function getTopCreators(
       id: true,
       username: true,
       name: true,
+      nameColor: true,
       avatarKey: true,
       lastSeenAt: true,
       _count: { select: { resources: true } },
@@ -241,6 +244,7 @@ export async function getTopCreators(
       id,
       username: u.username,
       name: u.name,
+      nameColor: u.nameColor,
       avatarKey: u.avatarKey,
       resources: u._count.resources,
       metric: metricById.get(id) ?? 0,

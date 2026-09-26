@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { timeAgo } from "@/lib/format";
-import { nameColorClass } from "@/lib/decorations";
 import PresenceAvatar from "@/components/ui/PresenceAvatar";
+import NicknameText from "@/components/ui/NicknameText";
 import UserHoverCard from "@/components/ui/UserHoverCard";
 import CommentHoverCard from "./CommentHoverCard";
 import {
@@ -122,7 +122,7 @@ export default function CommentItem({
   return (
     <li id={`comment-${c.id}`} data-comment-id={c.id} className="scroll-mt-24">
       <div className="flex items-center gap-2">
-        <UserHoverCard user={c.author}>
+        <UserHoverCard user={c.author} nicknameEnabled={nicknameEnabled}>
           <Link
             href={`/u/${c.author.username}`}
             aria-label={`${c.author.name ?? c.author.username} 的主页`}
@@ -137,13 +137,16 @@ export default function CommentItem({
             />
           </Link>
         </UserHoverCard>
-        <Link
-          href={`/u/${c.author.username}`}
-          className={`text-sm font-medium hover:text-brand-600 ${
-            nameColorClass(c.author.nameColor, nicknameEnabled) ?? "text-neutral-800"
-          }`}
-        >
-          {c.author.name ?? c.author.username}
+        <Link href={`/u/${c.author.username}`}>
+          {/* hover 色写在昵称自身：昵称色是子元素自己的 color，父链路的 hover:text-* 盖不住它 */}
+          <NicknameText
+            name={c.author.name}
+            username={c.author.username}
+            color={c.author.nameColor}
+            enabled={nicknameEnabled}
+            className="text-sm font-medium hover:text-brand-600"
+            fallbackClassName="text-neutral-800"
+          />
         </Link>
         <span className="text-xs text-neutral-400">· {timeAgo(c.createdAt)}</span>
         {canDel && (
@@ -285,7 +288,7 @@ function ReplyItem({
   return (
     <li id={`comment-${rp.id}`} data-comment-id={rp.id} className="scroll-mt-24">
       <div className="flex items-center gap-2">
-        <UserHoverCard user={rp.author}>
+        <UserHoverCard user={rp.author} nicknameEnabled={nicknameEnabled}>
           <Link
             href={`/u/${rp.author.username}`}
             aria-label={`${rp.author.name ?? rp.author.username} 的主页`}
@@ -300,13 +303,15 @@ function ReplyItem({
             />
           </Link>
         </UserHoverCard>
-        <Link
-          href={`/u/${rp.author.username}`}
-          className={`text-xs font-medium hover:text-brand-600 ${
-            nameColorClass(rp.author.nameColor, nicknameEnabled) ?? "text-neutral-800"
-          }`}
-        >
-          {rp.author.name ?? rp.author.username}
+        <Link href={`/u/${rp.author.username}`}>
+          <NicknameText
+            name={rp.author.name}
+            username={rp.author.username}
+            color={rp.author.nameColor}
+            enabled={nicknameEnabled}
+            className="text-xs font-medium hover:text-brand-600"
+            fallbackClassName="text-neutral-800"
+          />
         </Link>
         {rp.replyTo && (
           <span className="text-[11px] text-neutral-400">

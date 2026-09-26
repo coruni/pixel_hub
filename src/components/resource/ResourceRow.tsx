@@ -1,16 +1,12 @@
 import Link from "next/link";
 import { Download, Heart } from "lucide-react";
 import type { FeedCard } from "@/lib/queries";
-import { getIncentive } from "@/lib/incentive";
-import { nameColorClass } from "@/lib/decorations";
 import { formatCount } from "@/lib/format";
+import Nickname from "@/components/ui/Nickname";
 import CoverPlaceholder from "./CoverPlaceholder";
 
 // 横向「缩略图 + 标题/作者/分类」行卡：用于列表显示形态（首页 list 板块、归档列表、侧栏排行）。
-export default async function ResourceRow({ item }: { item: FeedCard }) {
-  // 行卡是浅底（bg-surface）→ 走跟随主题的 nameColorClass，不用深底亮阶
-  const incentive = await getIncentive();
-  const nickCls = nameColorClass(item.author.nameColor, incentive.decoration.nicknameEnabled);
+export default function ResourceRow({ item }: { item: FeedCard }) {
   const w = item.cover?.width ?? 3;
   const h = item.cover?.height ?? 2;
   return (
@@ -39,7 +35,12 @@ export default async function ResourceRow({ item }: { item: FeedCard }) {
           {item.title}
         </span>
         <span className="mt-0.5 block truncate text-[11px] text-neutral-400">
-          <span className={nickCls ?? ""}>{item.author.name ?? item.author.username}</span>
+          {/* 行卡是浅底（bg-surface）→ 默认 tone="light"，跟随明暗主题 */}
+          <Nickname
+            name={item.author.name}
+            username={item.author.username}
+            color={item.author.nameColor}
+          />
           {item.category ? ` · ${item.category.name}` : ""}
         </span>
         <span className="mt-1 flex items-center gap-2 text-[11px] text-neutral-400">

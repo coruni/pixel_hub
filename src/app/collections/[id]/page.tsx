@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { getCollectionDetail } from "@/lib/queries";
 import { formatCount } from "@/lib/format";
 import ResourceGrid from "@/components/resource/ResourceGrid";
+import Nickname from "@/components/ui/Nickname";
 
 type PageProps = { params: Promise<{ id: string }> };
 
@@ -43,8 +44,14 @@ export default async function CollectionPage({ params }: PageProps) {
           </span>
         )}
         <span className="text-sm text-neutral-500">
-          <a href={`/u/${col.owner.username}`} className="hover:text-neutral-900">
-            {col.owner.name ?? col.owner.username}
+          <a href={`/u/${col.owner.username}`}>
+            {/* 无特效色时沿用父级 text-neutral-500；hover 色必须写在昵称自身 —— 昵称色是子元素自己的 color，父链路 hover 盖不住它 */}
+            <Nickname
+              name={col.owner.name}
+              username={col.owner.username}
+              color={col.owner.nameColor}
+              className="hover:text-neutral-900"
+            />
           </a>{" "}
           收藏的 {formatCount(col.items.length)} 个内容
         </span>

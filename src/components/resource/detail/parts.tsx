@@ -10,6 +10,7 @@ import { TYPE_LABEL } from "@/lib/display";
 import Comments from "@/components/social/Comments";
 import PresenceAvatar from "@/components/ui/PresenceAvatar";
 import UserHoverCard from "@/components/ui/UserHoverCard";
+import NicknameText from "@/components/ui/NicknameText";
 import Markdown from "@/components/rte/Markdown";
 import MarkdownImages from "@/components/rte/MarkdownImages";
 import { FavoriteButton, LikeButton, FollowButton } from "@/components/social/interactions";
@@ -55,7 +56,7 @@ export function PendingBanner({ ctx }: { ctx: DetailCtx }) {
 }
 
 /** 作者头像 + 昵称（hover 信息卡包裹，点击进主页）；size/handle 由各版式微调 */
-export function AuthorIdentity({
+export async function AuthorIdentity({
   a,
   size = "md",
   handle = true,
@@ -64,8 +65,11 @@ export function AuthorIdentity({
   size?: "sm" | "md";
   handle?: boolean;
 }) {
+  // 昵称色开关只读这一次：本组件要自己渲染昵称，还要转交给 UserHoverCard 的弹层
+  // （弹层是客户端组件，读不到服务端配置）。getIncentive 走 cache()，不会多查库。
+  const nicknameEnabled = (await getIncentive()).decoration.nicknameEnabled;
   return (
-    <UserHoverCard user={a}>
+    <UserHoverCard user={a} nicknameEnabled={nicknameEnabled}>
       <Link href={`/u/${a.username}`} className="flex items-center gap-2.5">
         <PresenceAvatar
           userId={a.id}
@@ -76,7 +80,14 @@ export function AuthorIdentity({
           online={a.online}
         />
         <span>
-          <span className="block text-sm font-medium text-neutral-800">{a.name ?? a.username}</span>
+          <NicknameText
+            name={a.name}
+            username={a.username}
+            color={a.nameColor}
+            enabled={nicknameEnabled}
+            className="block text-sm font-medium"
+            fallbackClassName="text-neutral-800"
+          />
           {handle && <span className="block text-xs text-neutral-400">@{a.username}</span>}
         </span>
       </Link>

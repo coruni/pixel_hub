@@ -8,6 +8,7 @@ import { listPeriods, payoutCounts } from "@/lib/settle";
 import { formatYuan } from "@/lib/money";
 import PresenceAvatar from "@/components/ui/PresenceAvatar";
 import LevelBadge from "@/components/ui/LevelBadge";
+import Nickname from "@/components/ui/Nickname";
 import { formatCount, dayKey } from "@/lib/format";
 
 const PERIOD_LABELS: Record<RankPeriod, string> = { all: "总榜", month: "月榜", week: "周榜" };
@@ -135,9 +136,13 @@ export default async function CreatorsPage({
                   online={false}
                 />
                 <span className="flex min-w-0 flex-1 items-center gap-2">
-                  <span className="truncate text-sm font-medium text-neutral-800">
-                    {c.name ?? c.username}
-                  </span>
+                  <Nickname
+                    name={c.name}
+                    username={c.username}
+                    color={c.nameColor}
+                    className="truncate text-sm font-medium"
+                    fallbackClassName="text-neutral-800"
+                  />
                   <LevelBadge
                     level={levelOf(c.points, cfg.levels)}
                     name={levelNameOf(c.points, cfg.levels)}

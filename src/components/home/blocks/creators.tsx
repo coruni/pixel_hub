@@ -4,6 +4,7 @@ import { getTopCreators, type CreatorSort } from "@/lib/home";
 import { creatorMetaText } from "@/lib/format";
 import type { RankPeriod } from "@/lib/points";
 import PresenceAvatar from "@/components/ui/PresenceAvatar";
+import Nickname from "@/components/ui/Nickname";
 
 export default async function CreatorsBlock({
   title,
@@ -37,9 +38,13 @@ export default async function CreatorsBlock({
               online={c.online}
             />
             <span className="min-w-0">
-              <span className="block truncate text-sm font-medium text-neutral-800">
-                {c.name ?? c.username}
-              </span>
+              <Nickname
+                name={c.name}
+                username={c.username}
+                color={c.nameColor}
+                className="block truncate text-sm font-medium"
+                fallbackClassName="text-neutral-800"
+              />
               <span className="block truncate text-[11px] text-neutral-400">
                 {creatorMetaText(c.resources, c.metric, sort, period)}
               </span>

@@ -55,19 +55,26 @@ export default async function Navbar() {
     }
   }
 
-  // 头像取库内最新值（JWT 里不带，避免换头像后过期）；传给 client 前解析成 URL
-  // 未读数与头像并行取：导航栏每个页面都要渲染，多一次 count 换掉角标「必须刷新才更新」
+  // 头像与昵称色都取库内最新值（JWT 里不带，避免改完设置后导航栏仍显示旧值）；
+  // 头像传给 client 前解析成 URL。未读数与它并行取：导航栏每个页面都要渲染，
+  // 多一次 count 换掉角标「必须刷新才更新」。
   const [me, unread] = u
     ? await Promise.all([
-        prisma.user.findUnique({ where: { id: u.id }, select: { avatarKey: true } }),
+        prisma.user.findUnique({
+          where: { id: u.id },
+          select: { avatarKey: true, nameColor: true },
+        }),
         getUnreadNotificationCount(u.id),
       ])
     : [null, 0];
   const avatarKey = me?.avatarKey ? publicUrl(me.avatarKey) : null;
 
   // 「我的代币」入口只在激励体系开启时出现 —— 关掉激励后留一个只有 0 余额的死链更糟。
-  // getIncentive 是 cache() 过的，页面里别处读过就不会再查库。
-  const showCoins = u ? (await getIncentive()).enabled : false;
+  // 昵称特效色开关与它同源，一次取出。getIncentive 是 cache() 过的，页面里别处读过就不会再查库。
+  // 访客不读（保持原样）：不给未登录页面平白多一次查询。
+  const incentive = u ? await getIncentive() : null;
+  const showCoins = incentive?.enabled ?? false;
+  const nicknameEnabled = incentive?.decoration.nicknameEnabled ?? true;
 
   return (
     <header className="sticky top-0 z-40 border-b border-brand-200 bg-surface">
@@ -113,12 +120,14 @@ export default async function Navbar() {
             <UserMenu
               unread={unread}
               showCoins={showCoins}
+              nicknameEnabled={nicknameEnabled}
               user={{
                 name: u.name ?? null,
                 username: u.username ?? "",
                 role: u.role ?? "USER",
                 trusted: !!u.trusted,
                 avatarKey,
+                nameColor: me?.nameColor ?? null,
               }}
             />
           ) : (

@@ -12,7 +12,6 @@ import PrivacyForm from "@/components/auth/privacy-form";
 import AvatarForm from "@/components/auth/avatar-form";
 import HeroForm from "@/components/auth/HeroForm";
 import ProfileBgForm from "@/components/auth/ProfileBgForm";
-import BgPresetPicker from "@/components/auth/BgPresetPicker";
 import NameColorForm from "@/components/auth/NameColorForm";
 import NotificationsForm from "@/components/auth/NotificationsForm";
 import PublishForm from "@/components/auth/PublishForm";
@@ -27,7 +26,7 @@ import { getRuntimeConfig, githubClientId, githubClientSecret } from "@/lib/runt
 import { getIncentive } from "@/lib/incentive";
 import { getContributionSummary } from "@/lib/points";
 import { profileBgUnlocked } from "@/lib/upload-config";
-import { NAME_COLORS, PROFILE_BG_PRESETS, decorationUnlocked } from "@/lib/decorations";
+import { NAME_COLORS, decorationUnlocked } from "@/lib/decorations";
 import { Button } from "@/components/ui/Button";
 
 export const metadata: Metadata = { title: "账户设置", robots: { index: false } };
@@ -86,7 +85,6 @@ export default async function SettingsPage({
         colorMode: true,
         profileBgPcKey: true,
         profileBgOnResource: true,
-        profileBgPreset: true,
         nameColor: true,
       },
     }),
@@ -107,16 +105,8 @@ export default async function SettingsPage({
     key: c.key,
     name: c.name,
     className: c.className,
-    swatchClass: c.swatchClass,
     unlocked: decorationUnlocked(summary.level, c.minLevel, incentive.enabled),
     needName: levelNameAt(c.minLevel),
-  }));
-  const bgPresetOptions = PROFILE_BG_PRESETS.map((p) => ({
-    id: p.id,
-    name: p.name,
-    url: p.url,
-    unlocked: decorationUnlocked(summary.level, p.minLevel, incentive.enabled),
-    needName: levelNameAt(p.minLevel),
   }));
   const githubEnabled = Boolean(githubClientId(runtimeCfg) && githubClientSecret(runtimeCfg));
   const joined = profile
@@ -179,22 +169,7 @@ export default async function SettingsPage({
           <section className={sectionCls}>
             <h2 className={sectionTitle}>主页背景</h2>
             <p className={sectionHint}>铺满整个屏幕的最底层底图，不会盖住主页横幅。仅桌面端展示</p>
-
-            {incentive.decoration.bgPresetEnabled && (
-              <div className="mb-5 border-b border-brand-200 pb-5">
-                <h3 className="text-xs font-medium text-neutral-700">官方背景库</h3>
-                <div className="mt-2">
-                  <BgPresetPicker
-                    options={bgPresetOptions}
-                    current={prefs?.profileBgPreset ?? null}
-                    hasUploaded={Boolean(prefs?.profileBgPcKey)}
-                  />
-                </div>
-              </div>
-            )}
-
-            <h3 className="text-xs font-medium text-neutral-700">自定义上传</h3>
-            <div className="mt-2">
+            <div className="mt-3">
               <ProfileBgForm
                 unlocked={bgUnlocked}
                 gateName={bgGateLevels[incentive.profile.bgMinLevel]?.name ?? null}

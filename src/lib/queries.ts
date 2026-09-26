@@ -350,12 +350,13 @@ export const getResourceDetail = cache(async (slug: string, viewerId?: string) =
           id: true,
           username: true,
           name: true,
+          // 详情页作者栏要渲染昵称特效色（AuthorIdentity），随 author 一次取出
+          nameColor: true,
           avatarKey: true,
           bio: true,
           // 资源详情页也要铺作者的主页背景（开关 + 等级门槛在页面里判定），随 author 一次取出
           profileBgPcKey: true,
           profileBgOnResource: true,
-          profileBgPreset: true,
           role: true,
           trusted: true,
           createdAt: true,
@@ -436,13 +437,13 @@ export const getResourceDetail = cache(async (slug: string, viewerId?: string) =
       id: resource.author.id,
       username: resource.author.username,
       name: resource.author.name,
+      nameColor: resource.author.nameColor,
       avatarKey: resource.author.avatarKey ? publicUrl(resource.author.avatarKey) : null,
       bio: resource.author.bio,
       // 资源页背景用。注意口径：这两个是**未解析的存储 key / 布尔**，页面侧还要 publicUrl()，
       // 与上面 avatarKey（已解析成 URL）不同 —— 别照着 avatarKey 的用法直接塞进 <img src>。
       profileBgPcKey: resource.author.profileBgPcKey,
       profileBgOnResource: resource.author.profileBgOnResource,
-      profileBgPreset: resource.author.profileBgPreset,
       role: resource.author.role,
       trusted: resource.author.trusted,
       createdAt: resource.author.createdAt,
@@ -967,9 +968,7 @@ export type UserProfile = {
   heroImageKey: string | null;
   /** 个人主页背景（铺满视口的最底层底图，仅桌面端渲染）；是否真的有资格渲染由 profileBgUnlocked 判定 */
   profileBgPcKey: string | null;
-  /** 官方背景库预设 id；与 profileBgPcKey 互斥。能否渲染由 decorations.ts 的 bgPresetUrlOf 判定 */
-  profileBgPreset: string | null;
-  /** 昵称特效色 key；能否渲染由 decorations.ts 的 nameColorClassOf 判定 */
+  /** 昵称特效色 key；实际渲染走 components/ui/Nickname（读激励配置开关） */
   nameColor: string | null;
   role: "USER" | "MODERATOR" | "ADMIN";
   trusted: boolean;
@@ -1007,7 +1006,6 @@ export const getProfile = cache(
         avatarKey: true,
         heroImageKey: true,
         profileBgPcKey: true,
-        profileBgPreset: true,
         nameColor: true,
         role: true,
         trusted: true,
@@ -1042,7 +1040,6 @@ export const getProfile = cache(
       avatarKey: user.avatarKey,
       heroImageKey: user.heroImageKey,
       profileBgPcKey: user.profileBgPcKey,
-      profileBgPreset: user.profileBgPreset,
       nameColor: user.nameColor,
       role: user.role,
       trusted: user.trusted,
@@ -1084,7 +1081,7 @@ export const getCollectionDetail = cache(async (id: string, viewerId?: string) =
   const col = await prisma.collection.findUnique({
     where: { id },
     include: {
-      owner: { select: { id: true, username: true, name: true } },
+      owner: { select: { id: true, username: true, name: true, nameColor: true } },
       items: {
         orderBy: { createdAt: "desc" },
         take: 100,
@@ -1240,7 +1237,9 @@ export function getRecentComments(limit: number) {
       id: true,
       content: true,
       createdAt: true,
-      author: { select: { id: true, username: true, name: true, avatarKey: true, lastSeenAt: true } },
+      author: {
+        select: { id: true, username: true, name: true, nameColor: true, avatarKey: true, lastSeenAt: true },
+      },
       resource: { select: { slug: true, title: true } },
     },
   });

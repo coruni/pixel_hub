@@ -309,10 +309,10 @@ const profileSchema = z.object({
 });
 
 /**
- * 装饰（昵称特效色 / 官方背景库）。
+ * 装饰（昵称特效色）。
  *
- * **只放开关，不放清单与门槛**：清单是源码级资产（昵称色值必须落成 Tailwind 字面量类名、
- * 官方背景是随仓库发布的静态资源），门槛写在每一项旁边 —— 唯一事实来源是 `lib/decorations.ts`。
+ * **只放开关，不放清单与门槛**：清单是源码级资产（昵称色值必须落成 Tailwind 字面量类名），
+ * 门槛写在每一项旁边 —— 唯一事实来源是 `lib/decorations.ts`。
  * 把清单搬进后台只会制造「配置里有、源码里没有」的假选项。
  *
  * 口径：装饰一律**不扣贡献分**，只按等级门槛开放（贡献分是荣誉层，扣它等于掉级）。
@@ -320,8 +320,6 @@ const profileSchema = z.object({
 const decorationSchema = z.object({
   /** 昵称特效色总开关。关闭后存量配色立即不再渲染（与背景同纪律，不做永久保留特例） */
   nicknameEnabled: z.boolean().default(true),
-  /** 官方背景库总开关。关闭后回落到用户自传背景 */
-  bgPresetEnabled: z.boolean().default(true),
 });
 
 export const incentiveSchema = z.object({
