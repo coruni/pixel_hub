@@ -58,6 +58,15 @@
   一条不分断点的 `body:has([data-profile-bg-owner]) [data-profile-bg-global]` 会让
   「只设了桌面端」的用户在移动端把自己的全局背景也隐掉。现为 `-pc` / `-mobile` 两组属性 +
   两个互补媒体查询（`min-width: 40rem` 与 `width < 40rem`）。
+- **可见性口径（2026-09-27 用户确认，别再反复问）**：
+  - `profileBgGlobal`（全局显示）是**自见**开关 —— 只让登录者自己在更多页面看到自己的背景，
+    **不会**把谁的背景推给别人。`GlobalProfileBgLoader` 取的就是 session 那个 user。
+  - `profileBgOnResource`（资源页对他人可见）是**唯一**能让访客的背景让位的开关：
+    开着 → 任何人进这个资源页只看到作者的背景，访客自己的全局层被 `:has()` 隐掉；
+    没开 / 作者没图 / 未达等级 → 访客自己的全局背景照常铺（这就是它的兜底语义）。
+  - 作者本人看自己的页面**不受该开关约束**：资源页靠 `isOwnResourcePage`（`meId === authorId`），
+    个人主页无条件铺。开关只约束别人。
+  - 别人的个人主页是唯一的例外：`GlobalProfileBg` 显式 `return null`，不做兜底。
 
 ## 资源运营标记：置顶 / 精华（2026-09-27 起）
 

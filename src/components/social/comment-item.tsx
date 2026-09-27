@@ -76,6 +76,83 @@ function CommentImages({
   );
 }
 
+/** 回复编辑器。
+ *
+ *  **它是「挂在被回复的那条评论下面」的**，不是挂在根楼层下面：点子评论的「回复」时，
+ *  框体必须贴着那条子评论出现，否则用户点完还得往上找自己刚点的是哪一条。
+ *  调用方决定挂载点（根楼层 or 某条子评论），这里只管渲染 + 提交。
+ *
+ *  `anchorKey` 参与 MdEditor 的 key：定向目标一变就重建编辑器，避免上一段草稿串到新目标上。 */
+function ReplyComposer({
+  anchorKey,
+  parentId,
+  reply,
+  sending,
+  onReplyChange,
+  onPost,
+  onComposerKeyDown,
+  className = "mt-2 pl-10",
+}: {
+  /** 挂载点标识（根楼层 id 或子评论 id），仅用于重建编辑器 */
+  anchorKey: string;
+  /** 提交时的 parentId：根楼层 → 根 id；子评论 → 该子评论 id */
+  parentId: string;
+  reply: ReplyState;
+  sending: boolean;
+  onReplyChange: (next: ReplyState) => void;
+  onPost: (parentId: string | null, text: string) => void;
+  onComposerKeyDown: (e: React.KeyboardEvent<HTMLDivElement>) => void;
+  className?: string;
+}) {
+  return (
+    <div className={className}>
+      <div onKeyDown={onComposerKeyDown}>
+        <MdEditor
+          key={anchorKey}
+          defaultValue=""
+          onChange={(text) => onReplyChange({ ...reply, text })}
+          minHeight="5rem"
+          ariaLabel={reply.target ? `回复 @${reply.target.to}` : "写下回复"}
+          placeholder={
+            reply.target ? `回复 @${reply.target.to}… 支持 Markdown` : "写下回复… 支持 Markdown"
+          }
+          features={COMMENT_FEATURES}
+          toolbar={false}
+          compact
+        />
+        {reply.text.length > COMMENT_MAX - COMMENT_WARN_AT && (
+          <p
+            className={`mt-1 text-right text-xs ${
+              reply.text.length > COMMENT_MAX ? "text-red-500" : "text-amber-600"
+            }`}
+          >
+            {reply.text.length}/{COMMENT_MAX}
+          </p>
+        )}
+        <div className="mt-2 flex flex-wrap justify-end gap-2">
+          <Button
+            type="button"
+            disabled={sending || !reply.text.trim() || reply.text.length > COMMENT_MAX}
+            onClick={() => onPost(parentId, reply.text)}
+            variant="primary"
+          >
+            {reply.target ? `回复 @${reply.target.to}` : "回复"}
+          </Button>
+          {reply.target && (
+            <Button
+              type="button"
+              onClick={() => onReplyChange({ ...reply, text: "", target: null })}
+              variant="filter"
+            >
+              取消定向
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function CommentItem({
   c,
   canPost,
@@ -117,6 +194,11 @@ export default function CommentItem({
   const replyOpen = reply.openFor === c.id;
   const canDel = viewerId === c.authorId || !!isStaff;
   const deleting = deletingId === c.id;
+  // 定向目标若落在本页某条子评论上，回复框就归那条子评论 —— 根楼层下方不再重复渲染一个。
+  // 目标不在当前页（翻页后目标被换走）时退回根楼层位置，至少不会出现「点了没反应」。
+  const targetParent = reply.target?.parent ?? null;
+  const hasTargetReply = targetParent !== null && c.replies.some((rp) => rp.id === targetParent);
+  const composerAtRoot = replyOpen && !hasTargetReply;
   return (
     <li id={`comment-${c.id}`} data-comment-id={c.id} className="scroll-mt-24">
       <div className="flex items-center gap-2">
@@ -171,81 +253,74 @@ export default function CommentItem({
           type="button"
           onClick={() =>
             onReplyChange(
-              replyOpen
+              composerAtRoot
                 ? { openFor: null, text: "", target: null }
                 : { openFor: c.id, text: "", target: null },
             )
           }
           className="mt-1.5 pl-10 text-xs text-neutral-400 hover:text-neutral-700"
         >
-          {replyOpen ? "收起" : "回复"}
+          {composerAtRoot ? "收起" : "回复"}
         </Button>
       )}
 
-      {replyOpen && (
-        <div className="mt-2 pl-10">
-          <div onKeyDown={onReplyComposerKeyDown}>
-            <MdEditor
-              key={`${c.id}:${reply.target?.parent ?? "root"}`}
-              defaultValue=""
-              onChange={(text) => onReplyChange({ ...reply, text })}
-              minHeight="5rem"
-              ariaLabel={reply.target ? `回复 @${reply.target.to}` : "写下回复"}
-              placeholder={reply.target ? `回复 @${reply.target.to}… 支持 Markdown` : "写下回复… 支持 Markdown"}
-              features={COMMENT_FEATURES}
-              toolbar={false}
-              compact
-            />
-            {reply.text.length > COMMENT_MAX - COMMENT_WARN_AT && (
-              <p
-                className={`mt-1 text-right text-xs ${
-                  reply.text.length > COMMENT_MAX ? "text-red-500" : "text-amber-600"
-                }`}
-              >
-                {reply.text.length}/{COMMENT_MAX}
-              </p>
-            )}
-            <div className="mt-2 flex flex-wrap justify-end gap-2">
-              <Button
-                type="button"
-                disabled={sending || !reply.text.trim() || reply.text.length > COMMENT_MAX}
-                onClick={() => onPost(reply.target ? reply.target.parent : c.id, reply.text)}
-                variant="primary"
-              >
-                {reply.target ? `回复 @${reply.target.to}` : "回复"}
-              </Button>
-              {reply.target && (
-                <Button
-                  type="button"
-                  onClick={() => onReplyChange({ ...reply, text: "", target: null })}
-                  variant="filter"
-                >
-                  取消定向
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
+      {/* 回复根楼层（或定向目标不在本页）时才挂在这里 */}
+      {composerAtRoot && (
+        <ReplyComposer
+          anchorKey={`${c.id}:root`}
+          parentId={c.id}
+          reply={reply}
+          sending={sending}
+          onReplyChange={onReplyChange}
+          onPost={onPost}
+          onComposerKeyDown={onReplyComposerKeyDown}
+        />
       )}
 
       {c.replies.length > 0 && (
         <ul className="ml-10 mt-3 space-y-4 border-l-2 border-neutral-100 pl-4">
-          {c.replies.map((rp) => (
-            <ReplyItem
-              key={rp.id}
-              rootId={c.id}
-              rp={rp}
-              canPost={canPost}
-              canDel={viewerId === rp.authorId || !!isStaff}
-              deleting={deletingId === rp.id}
-              nicknameEnabled={nicknameEnabled}
-              onReplyTo={(parent, to) =>
-                onReplyChange({ openFor: c.id, text: "", target: { parent, to } })
-              }
-              onDelete={onDelete}
-              onNavigate={onNavigate}
-            />
-          ))}
+          {c.replies.map((rp) => {
+            const openHere = replyOpen && targetParent === rp.id;
+            return (
+              <ReplyItem
+                key={rp.id}
+                rootId={c.id}
+                rp={rp}
+                canPost={canPost}
+                canDel={viewerId === rp.authorId || !!isStaff}
+                deleting={deletingId === rp.id}
+                nicknameEnabled={nicknameEnabled}
+                replyOpen={openHere}
+                onToggleReply={() =>
+                  onReplyChange(
+                    openHere
+                      ? { openFor: null, text: "", target: null }
+                      : {
+                          openFor: c.id,
+                          text: "",
+                          target: { parent: rp.id, to: rp.author.name ?? rp.author.username },
+                        },
+                  )
+                }
+                onDelete={onDelete}
+                onNavigate={onNavigate}
+                composer={
+                  openHere ? (
+                    <ReplyComposer
+                      anchorKey={`${c.id}:${rp.id}`}
+                      parentId={rp.id}
+                      reply={reply}
+                      sending={sending}
+                      onReplyChange={onReplyChange}
+                      onPost={onPost}
+                      onComposerKeyDown={onReplyComposerKeyDown}
+                      className="mt-2 pl-10"
+                    />
+                  ) : null
+                }
+              />
+            );
+          })}
         </ul>
       )}
 
@@ -268,9 +343,11 @@ function ReplyItem({
   canDel,
   deleting,
   nicknameEnabled,
-  onReplyTo,
+  replyOpen,
+  onToggleReply,
   onDelete,
   onNavigate,
+  composer,
 }: {
   rp: CommentReply;
   rootId: string;
@@ -279,9 +356,13 @@ function ReplyItem({
   deleting: boolean;
   /** 昵称特效色功能开关，由 CommentItem 透传 */
   nicknameEnabled: boolean;
-  onReplyTo: (parent: string, to: string) => void;
+  /** 回复框是否挂在本条下面（定向到本条的回复正在编辑） */
+  replyOpen: boolean;
+  onToggleReply: () => void;
   onDelete: (commentId: string) => Promise<void>;
   onNavigate: (commentId: string, fallbackRootId: string) => void;
+  /** 由 CommentItem 决定并注入的回复框：只有定向到本条时才非空 */
+  composer: React.ReactNode;
 }) {
   return (
     <li id={`comment-${rp.id}`} data-comment-id={rp.id} className="scroll-mt-24">
@@ -341,12 +422,14 @@ function ReplyItem({
       {canPost && (
         <Button
           type="button"
-          onClick={() => onReplyTo(rp.id, rp.author.name ?? rp.author.username)}
+          onClick={onToggleReply}
           className="mt-1 text-[11px] text-neutral-400 hover:text-neutral-700"
         >
-          回复
+          {replyOpen ? "收起" : "回复"}
         </Button>
       )}
+
+      {composer}
     </li>
   );
 }
