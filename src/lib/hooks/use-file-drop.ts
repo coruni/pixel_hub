@@ -23,6 +23,13 @@ function carriesFiles(e: DragEvent<HTMLElement>): boolean {
  *    打开被拖的本地文件把页面顶掉。
  *
  * disabled 为 true（上传中 / 已达上限）时不响应、不高亮，语义与 input 的 disabled 对齐。
+ *
+ * 【投放区**不要嵌套**】drop / dragover / dragenter 都会冒泡，内层若不在事件里 stopPropagation，
+ * 同一个文件会落进内外两层（症状：往字幕框拖 .srt，外层把它当成视频开始上传）。
+ * 但这里**刻意不提供 stopPropagation 开关** —— 一旦内层截断传播，外层就接不到那次 drop，
+ * 而浏览器在 drop 之后**不会补发 dragleave**，于是没人替外层 clear()，外层高亮永远复位不了
+ * （拖出去松手也照旧）。正确做法是让两个投放区**互为兄弟**（各占一块互不重叠的区域），
+ * 外层不要包住内层。
  */
 export function useFileDrop({
   onFiles,

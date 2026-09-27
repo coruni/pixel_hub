@@ -43,6 +43,14 @@ const boxBase =
 
 const CAPTION_ACCEPT = ".vtt,.srt,.lrc,.ass,.ssa,.txt";
 
+/** 明确的媒体 MIME：拖到字幕框里显然是放错了，直接说清楚而不是读成乱码文本。
+ *  判据取「确定是媒体」而不是「确定是文本」—— .srt / .lrc 这类浏览器常给不出 MIME，
+ *  按后者会在正确的文件上误报。 */
+function looksMedia(file: File): boolean {
+  const t = file.type;
+  return t.startsWith("audio/") || t.startsWith("video/") || t.startsWith("image/");
+}
+
 /** 已载入内容的摘要：行数 / 时长覆盖 / 体积。**按文本 memo** —— 160KB 的字幕解析一次要几毫秒，
  *  跟着每次按键重解析会把输入框拖卡。 */
 function CaptionStats({ caption }: { caption: CaptionDraft }) {
@@ -79,10 +87,22 @@ export function CaptionField({
   const unit = avKind === "audio" ? "曲目" : "分P";
   const ext = avKind === "audio" ? ".lrc" : ".srt";
 
+  // 整块字段都是投放区（不只是空态那个虚线框）：已挂载时拖进来就直接换成新文件，
+  // 与「更换文件」按钮同义。它与抽屉里的媒体投放区**互为兄弟**（那块只包标题 + 地址），
+  // 所以拖 .srt 到这里不会被当成媒体上传，反之亦然。
   const { dragging, dropProps } = useFileDrop({
     onFiles: (files) => {
       const file = files[0];
-      if (file) void loadFile(file);
+      if (!file) return;
+      // 拖进来的明显不是文本字幕就明说，别让它静默失败（用户会以为是「拖拽坏了」）
+      if (!captionFormatOfName(file.name) && looksMedia(file)) {
+        setNote({
+          text: `${file.name} 不是文本字幕文件（支持 vtt / srt / lrc / ass / ssa / txt）`,
+          bad: true,
+        });
+        return;
+      }
+      void loadFile(file);
     },
   });
 
@@ -138,11 +158,20 @@ export function CaptionField({
   const has = !!value?.text.trim();
 
   return (
-    <div className="space-y-3">
+    <div
+      {...dropProps}
+      /* 整块是投放区：拖进来的高亮就是「松手会替换/载入」的提示，不用额外的虚线框。
+         拖拽不改变布局（只换描边与底色），光标进入时内容不会跳。 */
+      className={`space-y-3 border p-2 transition ${
+        dragging ? "border-brand-500 bg-brand-50" : "border-transparent"
+      }`}
+    >
       <div className="flex items-baseline justify-between gap-3">
         {/* 不写 `${wizLabel} mb-0`：wizLabel 自带 mb-1，那是同一组属性并存、靠产物顺序定胜负 */}
         <span className="block text-sm font-medium text-neutral-700">{word}</span>
-        <span className="text-[11px] text-neutral-400">随{unit}切换，文本随资源一起保存</span>
+        <span className="text-[11px] text-neutral-400">
+          {dragging ? `松开即载入 ${ext} / .vtt / .ass` : `可拖入文件；随${unit}切换`}
+        </span>
       </div>
 
       {has && value ? (
@@ -201,8 +230,8 @@ export function CaptionField({
           </div>
         </>
       ) : (
+        /* 空态的虚线框只负责「说明这里可以放什么」——投放由外层那块统一接，内层不再挂 dropProps */
         <div
-          {...dropProps}
           className={`border-2 border-dashed px-4 py-6 text-center transition ${
             dragging ? "border-brand-500 bg-brand-50" : "border-brand-200 bg-surface"
           }`}

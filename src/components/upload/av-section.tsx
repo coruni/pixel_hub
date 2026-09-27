@@ -25,6 +25,7 @@ import { serializeCaptionDraft, type CaptionDraft } from "@/lib/captions";
 import { AV_TRACKS_MAX } from "@/lib/meta";
 import { capturePoster } from "@/lib/av-probe";
 import { mbText, type UploadLimits } from "@/lib/upload-config";
+import { useFileDrop } from "@/lib/hooks/use-file-drop";
 import { fieldErr, wizLabel, SectionTitle, STEP } from "./wizard-shared";
 import { AvRowEditor, newRowId, type AvPlayRow } from "./av-row";
 import { Button } from "@/components/ui/Button";
@@ -126,6 +127,32 @@ export function AvSection({
   const mode = isAudio ? "direct" : suggestMode(mainUrl, "video");
 
   /**
+   * 区块级投放区。
+   *
+   * 为什么不能只让每一行当投放区：一行只有 30 来像素高，作者拖文件时十有八九落在说明文字、
+   * 行间空隙或「添加」按钮上——那里浏览器根本不认投放目标，手感就是「这块不能拖」。
+   * 所以把区块里**除列表以外**的可见区域（上方说明 + 下方添加行）也接上，落点是主来源。
+   *
+   * 这两块必须与 `<ul>` **互为兄弟**：一旦某个祖先把 `<ul>` 包进投放区就成了嵌套，
+   * 拖到行上会被内外各接一次（同一个文件既进主来源又进那一行），而给内层截断传播又会
+   * 让外层的高亮永久复位不了——细节见 lib/hooks/use-file-drop.ts 的文件头。
+   */
+  const mainUploadRef = useRef<((file: File) => void) | null>(null);
+  const { dragging: zoneDragging, dropProps: zoneDropProps } = useFileDrop({
+    onFiles: (fl) => {
+      if (fl.length > 1) {
+        setMsg(`一次接一个文件（已取第 1 个）；再加${unit}请点下面的「添加${unit}」`);
+      } else {
+        setMsg(null);
+      }
+      const f = fl[0];
+      if (f) mainUploadRef.current?.(f);
+    },
+    disabled: busyIds.length > 0,
+  });
+  const zoneHot = zoneDragging ? "bg-brand-50 ring-2 ring-brand-300" : "";
+
+  /**
    * 主来源上传完成：抽一帧当封面（宿主负责上传并落封面槽）。
    * 只有视频有画面可抽，音频直接跳过。
    */
@@ -147,15 +174,19 @@ export function AvSection({
       </SectionTitle>
 
       <div>
-        <span className={wizLabel}>{unit}列表</span>
-        <p className="mb-2 text-[11px] leading-4 text-neutral-400">
-          一行一个播放项，第一行是主来源，其余按顺序播放。行上只显示标题，改地址、传文件、挂
-          {isAudio ? "歌词" : "字幕"}都点行尾的设置按钮；也可以把文件直接拖到那一行上
-          （单文件 {mbText(limits.attachmentMaxMb)}，支持 {avExtsSample(avKind, 5)}），标题会按文件名自动填。
-          {isAudio
-            ? "音频一律用站内播放器。"
-            : "站内文件与直链用站内播放器，网页地址（B 站 / YouTube 等）自动改用嵌入页。"}
-        </p>
+        {/* 上方说明区：与下面的 <ul> 平级，是区块级投放区的一部分（落点上见 mainUploadRef 那段注释） */}
+        <div {...zoneDropProps} className={`transition ${zoneHot}`}>
+          <span className={wizLabel}>{unit}列表</span>
+          <p className="mb-2 text-[11px] leading-4 text-neutral-400">
+            一行一个播放项，第一行是主来源，其余按顺序播放。行上只显示标题，改地址、传文件、挂
+            {isAudio ? "歌词" : "字幕"}都点行尾的设置按钮。也可以直接把文件拖进来 —— 拖在本区块上
+            {isAudio ? "即上传为「曲目 1」" : "即上传为「P1」"}，拖到某一{unit}上则替换那一项，标题会按文件名自动填
+            （一次一个文件，单文件 {mbText(limits.attachmentMaxMb)}，支持 {avExtsSample(avKind, 5)}）。
+            {isAudio
+              ? "音频一律用站内播放器。"
+              : "站内文件与直链用站内播放器，网页地址（B 站 / YouTube 等）自动改用嵌入页。"}
+          </p>
+        </div>
 
         <ul className="space-y-2">
           {main && (
@@ -174,6 +205,7 @@ export function AvSection({
               onRemove={() => remove(main.id)}
               onUploaded={(f) => void onMainUploaded(f)}
               onBusy={setRowBusy}
+              uploadRef={mainUploadRef}
             />
           )}
           {rest.map((r, i) => (
@@ -193,12 +225,19 @@ export function AvSection({
           ))}
         </ul>
 
-        <div className="mt-2 flex flex-wrap items-center gap-3">
+        {/* 下方操作行：区块级投放区的另一半，同样与 <ul> 平级 */}
+        <div {...zoneDropProps} className={`mt-2 flex flex-wrap items-center gap-3 transition ${zoneHot}`}>
           <Button type="button" variant="ghost" size="xs" onClick={add}>
             <Plus size={13} aria-hidden />
             添加{unit}
           </Button>
-          <span className="text-[11px] text-neutral-400">最多 {AV_TRACKS_MAX} 行</span>
+          <span className={`text-[11px] ${zoneDragging ? "font-medium text-brand-700" : "text-neutral-400"}`}>
+            {zoneDragging
+              ? isAudio
+                ? "松开即上传为「曲目 1」"
+                : "松开即上传为「P1」"
+              : `最多 ${AV_TRACKS_MAX} 行`}
+          </span>
         </div>
 
         {msg && <p className="mt-1.5 text-xs text-amber-600">{msg}</p>}

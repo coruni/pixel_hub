@@ -19,7 +19,7 @@
  * 字幕跟行走的取舍见 lib/meta.ts 的 avTrackSchema：切曲目即切歌词，没有「多轨切换」的概念。
  */
 
-import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type RefObject } from "react";
 import { Settings2 } from "lucide-react";
 import { avAcceptAttr, avTitleFromFile, type AvKind } from "@/lib/av";
 import type { CaptionDraft } from "@/lib/captions";
@@ -69,6 +69,7 @@ export function AvRowEditor({
   onRemove,
   onUploaded,
   onBusy,
+  uploadRef,
 }: {
   row: AvPlayRow;
   /** 展示名，如「曲目 1」/「P1」 */
@@ -85,6 +86,12 @@ export function AvRowEditor({
   onRemove: () => void;
   onUploaded?: (file: File) => void;
   onBusy?: (id: string, busy: boolean) => void;
+  /**
+   * 宿主把文件送进本行的通道（av-section 的区块级投放区落在主来源身上）。
+   * 上传链路（进度 / 标题自动填 / 抽帧通知）全都长在这个组件里，所以把闭包挂出去，
+   * 而不是把这条链路复制一份到宿主 —— 两份必然漂移。
+   */
+  uploadRef?: RefObject<((file: File) => void) | null>;
 }) {
   const isAudio = avKind === "audio";
   const [uploading, setUploading] = useState(false);
@@ -155,6 +162,16 @@ export function AvRowEditor({
     e.target.value = "";
     void onFile(file ?? null);
   }
+
+  // 把「上传一个文件到本行」交给宿主（区块级投放区用）。onFile 每次渲染都是新闭包，
+  // 所以这个 effect 故意不带依赖数组：挂一次旧值会让宿主用上次渲染的标题去比对自动填。
+  useEffect(() => {
+    if (!uploadRef) return;
+    uploadRef.current = (f: File) => void onFile(f);
+    return () => {
+      uploadRef.current = null;
+    };
+  });
 
   const word = isAudio ? "歌词" : "字幕";
   const hasCaption = !!row.caption?.text.trim();
@@ -262,6 +279,7 @@ export function AvRowEditor({
         onPatch={onPatch}
         onRemove={onRemove}
         onPickFile={() => fileRef.current?.click()}
+        onDropFile={(f) => void onFile(f)}
         fieldErrors={fieldErrors}
         errorKey={captionErrorKey}
       />
