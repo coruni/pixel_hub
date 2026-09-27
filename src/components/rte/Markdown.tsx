@@ -1,5 +1,6 @@
 import Link from "next/link";
 import ReactMarkdown, { type Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
 import type { ComponentProps, HTMLAttributes, ReactNode } from "react";
 
 const EXTERNAL = /^https?:\/\//i;
@@ -94,13 +95,22 @@ function ZoomableImage({ src, alt, title }: ComponentProps<"img">) {
  *
  * zoomable：正文图片变为「点击查看大图」入口（需外层套 <MarkdownImages> 才生效，
  * 二者是一对——单独的图片按钮点了没反应，所以默认关闭，只由需要查看器的正文开启）。
+ *
+ * gfm：开启 GitHub 扩展语法（表格 / 删除线 / 任务列表 / 裸链自动识别 / 脚注）。
+ *   **默认关闭**，基线是 CommonMark。只有资源详情的「描述」这类长正文显式开启 ——
+ *   表格是整宽块级元素，塞进评论那种窄列会溢出，而评论编辑器本来就关掉了表格特性
+ *   （见 Comments.tsx 的 COMMENT_FEATURES），渲染端跟着不开才一致。
+ *   remark-gfm 是整体开关、不能只挑表格，所以顺带开的几种语法都在 globals.css 的
+ *   .md-body 里配了排版，不会露出浏览器默认外观。
  */
 export default function Markdown({
   children,
   zoomable = false,
+  gfm = false,
 }: {
   children: string;
   zoomable?: boolean;
+  gfm?: boolean;
 }) {
   let headingIndex = 0;
   const nextHeadingIndex = () => headingIndex++;
@@ -128,7 +138,10 @@ export default function Markdown({
   };
 
   return (
-    <ReactMarkdown components={components} remarkPlugins={[remarkBrAsBreak]}>
+    <ReactMarkdown
+      components={components}
+      remarkPlugins={gfm ? [remarkGfm, remarkBrAsBreak] : [remarkBrAsBreak]}
+    >
       {children}
     </ReactMarkdown>
   );

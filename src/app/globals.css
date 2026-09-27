@@ -353,6 +353,52 @@ summary {
   color: var(--md-heading);
 }
 
+/* ---------- GFM 扩展语法的排版（表格见上面的 .md-body table / th / td）----------
+   仅资源详情的「描述」开启 remark-gfm（见 rte/Markdown.tsx 的 gfm 开关），这里补齐
+   同一插件**顺带**开启的另外三种语法。不补就会露出浏览器默认外观：
+   - 任务列表：复选框旁边还会再叠一个项目符号
+   - 脚注：mdast-util-gfm-footnote 给标题加了 sr-only 类，而本仓库没有这个工具类，
+     不补样式就会在正文尾部显示出一行 "Footnotes" */
+.md-body del {
+  color: var(--md-muted);
+}
+/* 去掉项目符号，用绝对定位把复选框放进缩进里。不用 flex —— li 里可能还有嵌套列表，
+   flex 会把嵌套列表和正文排成同一行。 */
+.md-body ul.contains-task-list {
+  list-style: none;
+  padding-left: 0.15rem;
+}
+.md-body li.task-list-item {
+  position: relative;
+  padding-left: 1.35rem;
+}
+.md-body li.task-list-item > input[type="checkbox"] {
+  position: absolute;
+  left: 0;
+  top: 0.42em;
+  margin: 0;
+  accent-color: var(--brand-500);
+}
+/* 脚注区：与正文用一条上边框分开，字号与颜色降一档（脚注是附加信息） */
+.md-body [data-footnotes] {
+  margin-top: 1rem;
+  border-top: 1px solid var(--md-border);
+  padding-top: 0.5rem;
+  font-size: 0.9em;
+  color: var(--md-muted);
+}
+.md-body .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  border: 0;
+  clip-path: inset(50%);
+}
+
 /* ---------- 评论正文里的 Markdown 排版收敛 ----------
    .md-body 是文章级规格（h2 20px、pre 大内距、表格整宽），直接套进评论会撑爆行高。
    评论只允许基础语法，这里把块级元素压到与 14px 正文协调的量级。 */

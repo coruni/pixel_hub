@@ -127,3 +127,21 @@
   统一判断合并目标 —— name 变了且被占用 → 目标；否则 nextSlug 撞上既存标签 → 目标；
   命中走 `mergeTagInto()`（转挂关联 + count 净增 + 删源 + audit），未命中才 `update`。
 
+## Markdown 渲染：CommonMark 基线，GFM 只给资源正文（2026-09-27 起）
+
+- 解析器是 **`react-markdown`**，基线 CommonMark，**表格属 GFM 扩展、需 `remark-gfm`**。
+  `.md-body table / th / td` 那套排版一直在 `globals.css` 里，但插件没装 → 样式从未被任何元素
+  命中，表格语法被当普通段落显示成一行 `| a | b |`。
+- `rte/Markdown.tsx` 有 `gfm?: boolean`（**默认 false**）。**只有资源正文**
+  （`resource/detail/parts.tsx` 的 `DescriptionBlock`）开；评论**不开** —— 编辑器那头
+  `Comments.tsx` 的 `COMMENT_FEATURES` 也关了表格，两边必须成对。
+- 资源编辑器 `MdEditor`（Milkdown Crepe）的 `defaultFeatures` 里 **`table: true`**，
+  作者本来就能插表格（查法：`node_modules/@milkdown/crepe/lib/esm/index.js`）。
+- remark-gfm 是**整体开关、挑不出单独表格**，顺带开删除线 / 任务列表 / 裸链 / 脚注，
+  这些都在 `.md-body` 里补了样式。尤其脚注：解析器给标题加 `sr-only` 类，而本仓库没有这个
+  工具类（Tailwind 也不会生成，源码里根本没这个字符串），必须自己写 —— 否则正文尾部会多出
+  一行 "Footnotes"。
+- 要核对 GFM 产出的真实 class 名（`contains-task-list` / `task-list-item` / `dataFootnotes`），
+  用 node 拼 `unified + remark-parse + remark-gfm + remark-rehype` 打印 hast 树即可：
+  离线、不用起服务、不落探针文件（`rehype-stringify` 没装，用 `.run(parse(md))` 拿树）。
+

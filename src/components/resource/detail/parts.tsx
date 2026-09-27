@@ -345,11 +345,13 @@ export function TypeInfoCard({ ctx }: { ctx: DetailCtx }) {
  *  排版即文章正文本身：不套卡片（无边框/底色/内距），也不带小标题 —— 与 DetailArticle
  *  的正文逐字一致，四个模板共用这一处实现。
  *  正文里的图片统一走「点击看大图」：MarkdownImages 承载排版 <section>（DOM 与改造前一致）
- *  并在捕获阶段接管点击，交给全站 ImageViewer 打开，可在同正文多张图之间前后切换。 */
+ *  并在捕获阶段接管点击，交给全站 ImageViewer 打开，可在同正文多张图之间前后切换。
+ *  gfm：资源正文是唯一开启 GFM 扩展的渲染点 —— 编辑器（Milkdown Crepe）默认带表格特性，
+ *  作者能插表格，渲染端不认就会把整段表格语法当普通段落显示成一行 `| a | b |`。 */
 export function DescriptionBlock({ ctx }: { ctx: DetailCtx }) {
   return (
     <MarkdownImages className="md-body md-body--lg">
-      <Markdown zoomable>{ctx.detail.description}</Markdown>
+      <Markdown zoomable gfm>{ctx.detail.description}</Markdown>
     </MarkdownImages>
   );
 }
