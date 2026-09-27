@@ -305,7 +305,10 @@ export default function Comments({
   const total = paging.commentTotal;
 
   return (
-    <section id="comments" className="rule-dot-t mt-10 scroll-mt-24 pt-8">
+    <section
+      id="comments"
+      className="mt-10 scroll-mt-24 border-t-2 border-dashed border-brand-300 pt-8"
+    >
       <h2 className="text-lg font-semibold text-neutral-900">评论（{total}）</h2>
 
       {error && (

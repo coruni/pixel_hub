@@ -117,7 +117,7 @@ export default function UserHoverCard({
             </span>
           )}
           {hasStats && (
-            <span className="rule-dot-t mt-2.5 flex items-center gap-4 pt-2.5">
+            <span className="mt-2.5 flex items-center gap-4 border-t-2 border-dashed border-brand-300 pt-2.5">
               {stats.map(([label, n]) => (
                 <span key={label} className="text-xs text-neutral-500">
                   {label}{" "}

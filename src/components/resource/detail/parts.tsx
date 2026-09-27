@@ -390,7 +390,7 @@ export function RelatedSection({ ctx }: { ctx: DetailCtx }) {
   const items = ctx.related ?? [];
   if (items.length === 0) return null;
   return (
-    <section className="rule-dot-t pt-5">
+    <section className="border-t-2 border-dashed border-brand-300 pt-5">
       <h2 className="text-sm font-semibold text-neutral-400">相关推荐</h2>
       <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-6">
         {items.map((item) => (

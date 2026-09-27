@@ -8,7 +8,7 @@ const LazyMdEditor = dynamic(() => import("./MdEditor"), {
   ssr: false,
   loading: () => (
     <div
-      className="md-editor relative rounded-none border border-brand-200 bg-surface"
+      className="md-editor relative rounded-none border-2 border-dashed border-brand-300 bg-surface"
       style={{ minHeight: "6rem" }}
       aria-busy="true"
       aria-label="编辑器加载中"

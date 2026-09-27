@@ -130,12 +130,14 @@ export function AvTrackList({
     <ol
       style={{ maxHeight: "45vh", ...style }}
       className={`overflow-y-auto rounded-none border ${
-        dark ? "border-white/20 bg-black/85" : "rule-dot-rows border-brand-300 bg-surface"
+        dark
+          ? "border-white/20 bg-black/85"
+          : "divide-y-2 divide-dashed divide-brand-300 border-brand-300 bg-surface"
       } ${className ?? ""}`}
     >
       {items.map((it, i) => {
         const active = i === index;
-        // 行线：亮色分支由 <ol> 的 rule-dot-rows 统一画点划线，逐行不再加边框；
+        // 行线：亮色分支由 <ol> 的 divide-y-2 divide-dashed 统一画虚线，逐行不再加边框；
         // 暗色分支压在视频画面上，是固定深底，走白色半透明实线（不参与主题与调色）。
         return (
           <li

@@ -12,7 +12,7 @@
 
 ## UI 语言与暗色主题
 - 像素风 + Fusion Pixel + 点阵背景 + 赤陶橙 brand + 全站 `rounded-none`。
-- 暗色只覆盖 brand/neutral/red/amber 且不齐：brand 50–900 全；neutral 仅 200–950（缺 50/100）；red 仅 50/100/200/300/600/700；amber 仅 100/200/300/600/700/900。`bg-neutral-100` 在暗色下仍是亮底（存量 `admin/content` 的 DRAFT 徽章如此）。emerald/sky 完全没覆盖，只在固定深底上可用。
+- 暗色只覆盖 brand/neutral/red/amber 且不齐：brand 50–900 全；`neutral` 在 `html.dark` 里显式重定义了 50 (#1c1814) / 100 (#252019) / 900，另有 @theme 直接改写的 200–950，所以 **neutral-50/100 是暗色安全的**（曾误记为「缺 50/100」，2026-09-27 用 postcss 实编核对推翻）；red 仅 50/100/200/300/600/700；amber 仅 100/200/300/600/700/900。`bg-neutral-100` 这类写法实测会跟随暗色。emerald/sky 完全没覆盖，只在固定深底上可用。
 - 类型图标唯一来源：`src/components/resource/type-icon.tsx`（TYPE_ICON / TYPE_BADGE_TONE / TypeIcon）。
 
 ## 主页背景：双槽结构
@@ -50,8 +50,9 @@
 - 资源编辑器 `MdEditor`（Milkdown Crepe）`defaultFeatures` 里 `table: true`。remark-gfm 是整体开关，顺带开删除线/任务列表/裸链/脚注；脚注标题带 `sr-only` 类，本仓库没有该工具类，必须在 `.md-body` 里自己写。
 - 核对 GFM 真实 class（`contains-task-list` / `task-list-item` / `dataFootnotes`）：node 拼 `unified + remark-parse + remark-gfm + remark-rehype`，用 `.run(parse(md))` 打印 hast 树。离线、不落探针。
 - 颜色 token（都在 `:root`，引用品牌阶自动跟随明暗，无 dark 覆盖）：`--md-code-bg` = brand-200 **只给行内 code**（无边框，靠底色辨认，别降到 100 阶）；`--md-code-block-bg` = brand-100 与 `--md-block-border` = brand-300 **给有边框的块**（`pre` 及其编辑器对应规则、`th` 底色、`th/td` 格线）。旧的 `--md-rule` 已删除。`--md-border` 现在只剩 blockquote 描边与编辑器。
-- **「评论框」= `src/components/rte/MdEditor.tsx` 根 div 的 `border-brand-300`**（不在 `Comments.tsx` 里）。同组件的全屏按钮也是 300；`globals.css` 里 `.md-editor .milkdown` 的 `--crepe-color-outline` 也是 300（它管 Crepe 表格格线，必须与前台同档，否则所见即所得破功）。`MdEditor` 被评论框与资源编辑器共用 —— 改它等于同时改两处。**后台 `admin/*` 与登录页的 `border-brand-200` 是另一套「容器描边」口径，不要顺手一起改。**
-- 分隔线 `.md-body hr` = 点划线：`border: 0` + `height: 2px` + `repeating-linear-gradient`（token `--rule-dot`：6px 划/3px 空/1px 点/3px 空），与详情页单边线 `rule-dot-t/b/rows`、评论区横线同一 token（页面单边线仍是 1px）。
+- **「评论框」= `src/components/rte/MdEditor.tsx` 根 div**（不在 `Comments.tsx` 里）：现为 `border-2 border-dashed border-brand-300`；`MdEditorLazy.tsx` 的 loading 占位必须同款，否则懒加载前后框会跳一下。`globals.css` 里 `.md-editor .milkdown` 的 `--crepe-color-outline` 是 brand-300（它管 Crepe 表格格线，必须与前台同档，否则所见即所得破功）。`MdEditor` 被评论框与资源编辑器共用 —— 改它等于同时改两处。**后台 `admin/*` 与登录页的 `border-brand-200` 是另一套「容器描边」口径，不要顺手一起改。**
+- 分隔线统一走 **CSS 原生 dashed**，颜色 brand-300、粗细 2px，**没有自定义 @utility**：`border-t-2 border-dashed border-brand-300`（各区块横线 / 评论区分隔线 / UserHoverCard）、`border-b-2 …`（DetailTwocol 标题区）、`divide-y-2 divide-dashed divide-brand-300`（下载清单 / 分P 列表行间线）。`.md-body hr` 与编辑器 `.ProseMirror hr` 都是 `border: 0` + `border-top: 2px dashed` + `height: 0`。**历史**：曾用「背景色带 + 透明占位边框」做**点划线**（`--rule-dot` / `--rule-dot-v` / `--rule-dot-w` + `rule-dot-t/-b/-rows/-box`），因为 border-style 做不出 dot-dash；用户 2026-09-27 改要纯虚线后已**整体删除**（那套还有「覆盖 background-image、调用点不能叠渐变类」的副作用）。别加回来。
+- **Tailwind v4 的 divide-\* 产物形态**：`:where(.divide-y-2 > :not(:last-child)) { … }` —— `:where` 在**外层**、结尾**两个**右括号，按 `.divide-y-2 {` 匹配会假失败。`divide-dashed` 只写 `--tw-border-style: dashed`，宽度类（`divide-y-2`）写 `border-*-style: var(--tw-border-style)`；两条命中同一批子元素，变量按元素级联求值，**产物顺序不影响**结果。
 - **别再改回中性灰**：`--md-text-lg`(#27272a) 冷灰压暖底发闷；`--md-border`(#e5e5e5) 对页面底仅 1.06:1。挑「浅底」档位前先算对比度。
 
 ## 音视频分P / 曲目

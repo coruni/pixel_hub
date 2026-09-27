@@ -37,28 +37,11 @@
   --md-border: #e5e5e5;
   /* **有边框的块**（代码块 pre、表格表头 th）的底色与描边。
      底色走 brand-100：这些块已经有外框定形，底色只是衬底，不需要 200 阶那么重；
-     描边统一 brand-300（＝ --rule-dot 的色），全页品牌外框同处一档，
+     描边统一 brand-300（＝所有分隔线的颜色），全页品牌外框同处一档，
      不再出现「同一页两种相近的橙」。两个 token 都引用品牌阶，暗色自动跟随：
      --brand-100 → #33281e、--brand-300 → #6d4e37。 */
   --md-code-block-bg: var(--brand-100);
   --md-block-border: var(--brand-300);
-  /* 单边点划线（dot-dash）的图案 —— rule-dot-t / rule-dot-b / rule-dot-rows 三个 utility
-     与 .md-body hr 共用这一份。
-     节奏：6px 划 + 3px 空 + 1px 点 + 3px 空 = 13px 一周期。点宽 1px，
-     色带高 1px 时就是一个像素方块，`.md-body hr` 拉高到 2px 时变成 2×2 方块。
-     颜色取 brand-300：详情页的所有品牌色外框都是这一档，横线跟着同色才不会出现
-     「同一页两种相近的不等橙」。brand-300 已被 html.dark 重定义（#6d4e37），
-     var() 链自动跟随，这里不需要再写一份 dark 覆盖。
-     为什么是「背景色带」而不是 border：CSS 的 border-style 只有 solid / dashed / dotted，
-     没有点划混合；border-image 同样不行 —— 切片后只有上下两边落在渐变上，
-     左右两边取到的是渐变里同一条竖线（实色）。 */
-  --rule-dot: repeating-linear-gradient(
-    to right,
-    var(--brand-300) 0 6px,
-    transparent 6px 9px,
-    var(--brand-300) 9px 10px,
-    transparent 10px 13px
-  );
   /* 代码字体栈唯一来源：前台 .md-body 与编辑器（--crepe-font-code）都引用它，
      值是 Tailwind 默认 mono 栈，与改动前的前台渲染完全一致 */
   --md-font-code: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
@@ -246,51 +229,22 @@ body {
   background-size: 8px 8px;
 }
 
-/* ---------- 单边点划线（dot-dash rule）----------
-   资源详情页的横向分隔线用它：标题区下横线、相关推荐顶线、下载清单行线、分P 列表行线、
-   评论区分隔线。图案本体是 --rule-dot（见 :root），与 .md-body hr 同一份。
+/* ---------- 分隔线：CSS 原生 dashed ----------
+   资源详情页的横向分隔线（标题区下横线、相关推荐顶线、分P 列表行线、评论区分隔线）
+   与评论输入框的四边框，一律用 Tailwind 原生类组合，**没有自定义 @utility**：
+     border-t-2 border-dashed border-brand-300    上边线
+     border-b-2 border-dashed border-brand-300    下边线
+     border-2 border-dashed border-brand-300      四边框（评论输入框）
+     divide-y-2 divide-dashed divide-brand-300    行间线（分P 列表；替代此前的 rule-dot-rows）
+   颜色 brand-300 与详情页全部品牌外框同档（html.dark 里它是 #6d4e37，自动跟随），粗细统一 2px。
+   **例外**：下载清单（download-panel）的行线刻意不走这套 —— 它是信息密集的列表，
+   2px 品牌色虚线在条目之间会糊成一片，仍用 `divide-y divide-neutral-100`（1px 实线、低调）。
 
-   为什么不用 border-style / border-image：CSS 的 border-style 只有 solid / dashed / dotted，
-   没有点划混合；border-image 切片后只有上下两边落在渐变上，左右两边取到的是同一条竖线（实色）。
-   所以走「1px 高的背景色带」——与 .md-body hr 同款做法。
-
-   【不占布局】这三个 utility 替代的是调用点上原本就存在的 1px border（border-t / border-b /
-   divide-y），所以各自带一条 border-*: 1px solid transparent 占位，再让色带落在占位边框的位置上
-   （background-origin: border-box）。盒模型与改动前逐像素一致，页面不会因为换样式而抖动 1px。
-
-   【约束】这三个类会覆盖 background-image，调用点上不能再叠 Tailwind 渐变类
-   （如 bg-[linear-gradient(...)]），否则点划线会被整条盖掉。 */
-@utility rule-dot-t {
-  border-top: 1px solid transparent;
-  background-image: var(--rule-dot);
-  background-origin: border-box;
-  background-repeat: no-repeat;
-  background-position: 0 0;
-  background-size: 100% 1px;
-}
-
-@utility rule-dot-b {
-  border-bottom: 1px solid transparent;
-  background-image: var(--rule-dot);
-  background-origin: border-box;
-  background-repeat: no-repeat;
-  background-position: 0 100%;
-  background-size: 100% 1px;
-}
-
-/* 行间点划线：整条 <ul>/<ol> 上写一个即可，取代 Tailwind 的 divide-y。
-   divide-y 在 v4 里靠 border-*-width 实现，而点划线必须走背景色带（见上），
-   两者不是同一套机制，无法只换颜色 —— 所以这里连占位边框一起复刻。 */
-@utility rule-dot-rows {
-  & > * + * {
-    border-top: 1px solid transparent;
-    background-image: var(--rule-dot);
-    background-origin: border-box;
-    background-repeat: no-repeat;
-    background-position: 0 0;
-    background-size: 100% 1px;
-  }
-}
+   【历史】这里曾用「背景色带 + 透明占位边框」实现**点划线**（6px 划 / 3px 空 / 1px 点 / 3px 空），
+   因为 border-style 只有 solid / dashed / dotted，做不出 dot-dash。改用纯虚线后原生 dashed
+   直接够用，那套机制（--rule-dot / --rule-dot-v / --rule-dot-w 与 rule-dot-t/-b/-rows/-box）
+   已整体删除。它还有个隐藏副作用是覆盖 background-image，调用点上不能再叠渐变类 ——
+   不要把它加回来。 */
 
 /* 像素风图标：lucide 线条图标去掉圆头圆角、锐利渲染，与位图字体同一语言 */
 svg.lucide {
@@ -415,17 +369,14 @@ summary {
   padding-left: 0.6rem;
   color: var(--md-muted);
 }
-/* 分割线：点划线（dot-dash）。图案本体收在 --rule-dot（见 :root），与资源详情页的
-   单边线（rule-dot-t / rule-dot-b / rule-dot-rows）**同一份 token** ——
-   同一页里正文的 <hr> 与页面横线必须完全同色同节奏，否则看着就是「没改干净」。
-   border 归零后改用色带：走 border 的话图案只能整段一种 style。
-   带高 2px（页面单边线仍是 1px）：正文里的分割线要压得住段落间距，1px 太像纸纹；
-   图案是横向 13px 一周期，加高只是让划/点变粗，节奏不变。 */
+/* 分割线：2px 虚线，颜色 brand-300 —— 与资源详情页所有横线（各区块的 border-t-2 border-dashed）
+   同一档色、同一粗细，否则同一页里正文的 <hr> 与页面横线会明显不一致。
+   border 先整体归零再只给上边，是为了不让 hr 的默认四边框参与渲染（高一律由 border-top 决定）。 */
 .md-body hr {
   margin: 0.7rem 0;
   border: 0;
-  height: 2px;
-  background-image: var(--rule-dot);
+  border-top: 2px dashed var(--brand-300);
+  height: 0;
 }
 .md-body img {
   max-width: 100%;
@@ -830,14 +781,12 @@ summary {
 
 .md-editor .milkdown .ProseMirror hr {
   margin: 0.7rem 0;
-  height: auto;
+  height: 0;
   padding: 0;
   background: none;
-  /* 与前台一致：四边 solid，仅上边框 1px（Tailwind 重置给的就是这个组合） */
-  border-color: var(--md-border);
-  border-style: solid;
-  border-width: 0;
-  border-top-width: 1px;
+  /* 与前台 .md-body hr 逐项对齐：仅上边框、2px、dashed、brand-300 */
+  border: 0;
+  border-top: 2px dashed var(--brand-300);
 }
 
 /* ---------- 紧凑模式（评论框等嵌入式场景）----------

@@ -134,7 +134,7 @@ export default function MdEditor({
   return (
     <div
       ref={rootRef}
-      className="md-editor relative rounded-none border-2 border-brand-300 bg-surface"
+      className="md-editor relative rounded-none border-2 border-dashed border-brand-300 bg-surface"
       data-fullscreen={fullscreen || undefined}
       data-compact={compact || undefined}
       style={fullscreen ? undefined : { minHeight }}

@@ -89,7 +89,7 @@ function ImageDownloadsCard({
     <section className="mt-6 rounded-none border border-brand-300 bg-surface p-5">
       <DownloadCountScope initial={detail.downloadCount}>
         <CardHead title={`图包 / 整套下载（${list.length}）`} fallbackCount={detail.downloadCount} />
-        <ul className="mt-3 rule-dot-rows">
+        <ul className="mt-3 divide-y divide-neutral-100">
           {list.map((a, i) => (
             <li
               key={i}
@@ -127,7 +127,7 @@ function ArticleAttachmentsCard({ ctx }: { ctx: DetailCtx }) {
     <section className="mt-8 rounded-none border border-brand-300 bg-surface p-6">
       <DownloadCountScope initial={detail.downloadCount}>
         <CardHead title={`附件（${list.length}）`} fallbackCount={detail.downloadCount} />
-        <ul className="mt-3 rule-dot-rows">
+        <ul className="mt-3 divide-y divide-neutral-100">
           {list.map((a, i) => (
             <li
               key={i}
@@ -174,7 +174,7 @@ function GameExternalCard({ ctx }: { ctx: DetailCtx }) {
           title={`游戏下载${rows.length > 1 ? `（${rows.length}）` : ""}`}
           fallbackCount={detail.downloadCount}
         />
-        <ul className="mt-3 rule-dot-rows">
+        <ul className="mt-3 divide-y divide-neutral-100">
           {rows.map((r, i) => (
             <li
               key={i}
