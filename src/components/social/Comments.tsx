@@ -305,7 +305,7 @@ export default function Comments({
   const total = paging.commentTotal;
 
   return (
-    <section id="comments" className="mt-10 scroll-mt-24 border-t border-neutral-200 pt-8">
+    <section id="comments" className="rule-dot-t mt-10 scroll-mt-24 pt-8">
       <h2 className="text-lg font-semibold text-neutral-900">评论（{total}）</h2>
 
       {error && (
@@ -369,7 +369,7 @@ export default function Comments({
                 className={`inline-flex cursor-pointer items-center gap-1.5 rounded-none border bg-surface px-3 py-1.5 text-xs transition ${
                   dragging
                     ? "border-brand-500 text-brand-700"
-                    : "border-brand-200 text-neutral-600 hover:border-brand-500 hover:text-neutral-900"
+                    : "border-brand-300 text-neutral-600 hover:border-brand-500 hover:text-neutral-900"
                 }`}
               >
                 <ImagePlus size={14} aria-hidden />
@@ -383,13 +383,13 @@ export default function Comments({
                     <img
                       src={src}
                       alt={`待上传的附图 ${i + 1}`}
-                      className="h-20 w-20 rounded-none border border-brand-200 object-cover"
+                      className="h-20 w-20 rounded-none border border-brand-300 object-cover"
                     />
                     <Button
                       type="button"
                       onClick={() => removeImage(i)}
                       aria-label={`移除附图 ${i + 1}`}
-                      className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-none border border-brand-200 bg-surface text-neutral-500 hover:border-red-300 hover:text-red-500"
+                      className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-none border border-brand-300 bg-surface text-neutral-500 hover:border-red-300 hover:text-red-500"
                     >
                       <X size={11} aria-hidden />
                     </Button>

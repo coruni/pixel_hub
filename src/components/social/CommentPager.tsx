@@ -112,7 +112,7 @@ export function CommentsPager({
   return (
     <nav
       aria-label="评论分页"
-      className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 pt-4"
+      className="rule-dot-t mt-6 flex flex-wrap items-center justify-between gap-3 pt-4"
     >
       <p className={META}>
         共 {commentTotal} 条评论

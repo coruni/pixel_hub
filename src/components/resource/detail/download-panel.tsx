@@ -12,7 +12,7 @@ function DlBadge({ kind }: { kind: "file" | "link" }) {
     <span
       className={`inline-flex shrink-0 items-center gap-1 rounded-none border px-2 py-0.5 text-[11px] font-medium ${
         kind === "file"
-          ? "border-brand-200 bg-brand-50 text-brand-700"
+          ? "border-brand-300 bg-brand-50 text-brand-700"
           : "border-sky-200 bg-sky-50 text-sky-700"
       }`}
     >
@@ -42,7 +42,7 @@ function ImageDownloadCard({
 }) {
   const { detail, authed } = ctx;
   return (
-    <section className="mt-6 rounded-none border border-brand-200 bg-surface p-5">
+    <section className="mt-6 rounded-none border border-brand-300 bg-surface p-5">
       <DownloadCountScope initial={detail.downloadCount}>
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
           <div className="min-w-0">
@@ -86,10 +86,10 @@ function ImageDownloadsCard({
 }) {
   const { detail, authed } = ctx;
   return (
-    <section className="mt-6 rounded-none border border-brand-200 bg-surface p-5">
+    <section className="mt-6 rounded-none border border-brand-300 bg-surface p-5">
       <DownloadCountScope initial={detail.downloadCount}>
         <CardHead title={`图包 / 整套下载（${list.length}）`} fallbackCount={detail.downloadCount} />
-        <ul className="mt-3 divide-y divide-neutral-100">
+        <ul className="mt-3 rule-dot-rows">
           {list.map((a, i) => (
             <li
               key={i}
@@ -124,10 +124,10 @@ function ArticleAttachmentsCard({ ctx }: { ctx: DetailCtx }) {
   const list = meta.downloads;
   if (list.length === 0) return null;
   return (
-    <section className="mt-8 rounded-none border border-brand-200 bg-surface p-6">
+    <section className="mt-8 rounded-none border border-brand-300 bg-surface p-6">
       <DownloadCountScope initial={detail.downloadCount}>
         <CardHead title={`附件（${list.length}）`} fallbackCount={detail.downloadCount} />
-        <ul className="mt-3 divide-y divide-neutral-100">
+        <ul className="mt-3 rule-dot-rows">
           {list.map((a, i) => (
             <li
               key={i}
@@ -168,13 +168,13 @@ function GameExternalCard({ ctx }: { ctx: DetailCtx }) {
   const rows = ctx.meta.downloads.filter((d) => d.url);
   if (rows.length === 0) return null;
   return (
-    <section className="mt-6 rounded-none border border-brand-200 bg-surface p-5">
+    <section className="mt-6 rounded-none border border-brand-300 bg-surface p-5">
       <DownloadCountScope initial={detail.downloadCount}>
         <CardHead
           title={`游戏下载${rows.length > 1 ? `（${rows.length}）` : ""}`}
           fallbackCount={detail.downloadCount}
         />
-        <ul className="mt-3 divide-y divide-neutral-100">
+        <ul className="mt-3 rule-dot-rows">
           {rows.map((r, i) => (
             <li
               key={i}

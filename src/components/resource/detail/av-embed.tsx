@@ -37,7 +37,7 @@ export default function AvEmbed({
     <div>
       <div
         className={
-          isAudio ? "aspect-video w-full border border-brand-200 bg-neutral-100" : "aspect-video w-full bg-black"
+          isAudio ? "aspect-video w-full border border-brand-300 bg-neutral-100" : "aspect-video w-full bg-black"
         }
       >
         <iframe

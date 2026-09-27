@@ -45,7 +45,7 @@ export default function DetailArticle({
         {detail.category && (
           <Link
             href={`/browse?cat=${detail.category.slug}`}
-            className="rounded-none border border-brand-200 bg-surface px-2.5 py-0.5 text-[11px] font-medium text-neutral-500 hover:border-brand-500 hover:text-neutral-800"
+            className="rounded-none border border-brand-300 bg-surface px-2.5 py-0.5 text-[11px] font-medium text-neutral-500 hover:border-brand-500 hover:text-neutral-800"
           >
             {detail.category.name}
           </Link>
@@ -87,7 +87,7 @@ export default function DetailArticle({
         <img
           src={cover.bigUrl}
           alt={detail.title}
-          className="mt-6 max-h-[26rem] w-full border border-brand-200 object-cover"
+          className="mt-6 max-h-[26rem] w-full border border-brand-300 object-cover"
         />
       )}
 
@@ -105,7 +105,7 @@ export default function DetailArticle({
               key={m.id}
               src={m.bigUrl}
               alt=""
-              className="w-full border border-brand-200 object-cover"
+              className="w-full border border-brand-300 object-cover"
             />
           ))}
         </div>

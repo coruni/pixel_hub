@@ -60,7 +60,7 @@ function CommentImages({
             src={img.url}
             alt=""
             loading="lazy"
-            className="h-24 w-24 rounded-none border border-brand-200 object-cover transition group-hover:border-brand-500 group-focus-visible:border-brand-500"
+            className="h-24 w-24 rounded-none border border-brand-300 object-cover transition group-hover:border-brand-500 group-focus-visible:border-brand-500"
           />
           {images.length > 1 && (
             <span

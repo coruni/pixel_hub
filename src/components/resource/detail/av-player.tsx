@@ -59,7 +59,7 @@ function formatOf(url: string, mode: string): string | null {
 /** 头部元信息格：图标 + 名称 + 值 */
 function Chip({ Icon, label, value }: { Icon: LucideIcon; label: string; value: string }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-none border border-brand-200 bg-surface px-2 py-0.5 text-xs">
+    <span className="inline-flex items-center gap-1 rounded-none border border-brand-300 bg-surface px-2 py-0.5 text-xs">
       <Icon size={12} className="text-neutral-500" aria-hidden />
       <span className="text-neutral-500">{label}</span>
       <span className="text-neutral-800">{value}</span>
@@ -144,7 +144,7 @@ export function AvPlayerBlock({ ctx }: { ctx: DetailCtx }) {
 
       <div className="mt-3">
         {list.length === 0 ? (
-          <p className="rounded-none border border-dashed border-brand-200 px-4 py-6 text-center text-sm text-neutral-500">
+          <p className="rounded-none border border-dashed border-brand-300 px-4 py-6 text-center text-sm text-neutral-500">
             作者未提供播放来源
           </p>
         ) : meta.mode === "embed" && /^https?:\/\//i.test(list[0].url) ? (
@@ -156,7 +156,7 @@ export function AvPlayerBlock({ ctx }: { ctx: DetailCtx }) {
             <div
               className={
                 isAudio
-                  ? "aspect-video w-full border border-brand-200 bg-neutral-100"
+                  ? "aspect-video w-full border border-brand-300 bg-neutral-100"
                   : "aspect-video w-full bg-black"
               }
             >

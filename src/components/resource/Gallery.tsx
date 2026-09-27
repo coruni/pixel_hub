@@ -41,7 +41,7 @@ export default function Gallery({ media }: { media: GalleryMedia[] }) {
 
   if (media.length === 0) {
     return (
-      <div className="relative aspect-[3/2] overflow-hidden rounded-none border border-brand-200 bg-neutral-100">
+      <div className="relative aspect-[3/2] overflow-hidden rounded-none border border-brand-300 bg-neutral-100">
         <CoverPlaceholder />
       </div>
     );
@@ -56,7 +56,7 @@ export default function Gallery({ media }: { media: GalleryMedia[] }) {
   return (
     <div>
       {/* 主图轮播：swiper 拖动/触摸切换，hover 出箭头 */}
-      <div className="group relative overflow-hidden rounded-none border border-brand-200 bg-neutral-900 ">
+      <div className="group relative overflow-hidden rounded-none border border-brand-300 bg-neutral-900 ">
         <Swiper
           modules={[Keyboard]}
           keyboard={{ enabled: true }}

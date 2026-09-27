@@ -171,7 +171,7 @@ export function LyricsPanel({
   return (
     <div
       ref={boxRef}
-      className={`relative max-h-56 overflow-y-auto rounded-none border border-brand-200 bg-brand-50/70 p-1.5 ${className ?? ""}`}
+      className={`relative max-h-56 overflow-y-auto rounded-none border border-brand-300 bg-brand-50/70 p-1.5 ${className ?? ""}`}
     >
       {timed ? (
         <ol>

@@ -46,7 +46,7 @@ export default function CollapsibleAside({ main, aside }: { main: ReactNode; asi
         aria-expanded={open}
         aria-label={open ? "收起信息面板" : "展开信息面板"}
         title={open ? "收起信息面板" : "展开信息面板"}
-        className="absolute top-0 z-20 hidden h-9 w-6 items-center justify-center rounded-none border border-brand-200 bg-surface text-neutral-500 shadow-none transition-[right] duration-300 ease-in-out hover:border-brand-500 hover:text-brand-600 lg:flex"
+        className="absolute top-0 z-20 hidden h-9 w-6 items-center justify-center rounded-none border border-brand-300 bg-surface text-neutral-500 shadow-none transition-[right] duration-300 ease-in-out hover:border-brand-500 hover:text-brand-600 lg:flex"
         style={{ right: open ? "340px" : "0px" }}
       >
         {open ? <ChevronRight size={14} aria-hidden /> : <ChevronLeft size={14} aria-hidden />}

@@ -77,7 +77,7 @@ export default function CommentHoverCard({
       {visible && style && (
         <span
           role="tooltip"
-          className="absolute top-full left-0 z-40 mt-2 w-64 max-w-[80vw] cursor-pointer rounded-none border border-brand-200 bg-surface p-3 text-left shadow-lg"
+          className="absolute top-full left-0 z-40 mt-2 w-64 max-w-[80vw] cursor-pointer rounded-none border border-brand-300 bg-surface p-3 text-left shadow-lg"
           onClick={(e) => {
             e.stopPropagation();
             onNavigate(data.id, rootId);

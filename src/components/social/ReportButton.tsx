@@ -105,7 +105,7 @@ export default function ReportButton({
           <div
             role="dialog"
             aria-label="举报资源"
-            className="fixed z-50 w-72 rounded-none border border-brand-200 bg-surface p-4 shadow-lg"
+            className="fixed z-50 w-72 rounded-none border border-brand-300 bg-surface p-4 shadow-lg"
             style={{ top: pos.top, left: pos.left }}
           >
             <p className="text-sm font-medium text-neutral-900">举报「{resourceTitle}」</p>
@@ -113,7 +113,7 @@ export default function ReportButton({
               <select
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                className="w-full rounded-none border border-brand-200 px-2.5 py-1.5 text-sm outline-none focus:border-brand-500"
+                className="w-full rounded-none border border-brand-300 px-2.5 py-1.5 text-sm outline-none focus:border-brand-500"
               >
                 {REASONS.map((r) => (
                   <option key={r} value={r}>
@@ -127,7 +127,7 @@ export default function ReportButton({
                 rows={3}
                 maxLength={500}
                 placeholder="补充说明（选填）"
-                className="w-full rounded-none border border-brand-200 px-2.5 py-1.5 text-sm outline-none focus:border-brand-500"
+                className="w-full rounded-none border border-brand-300 px-2.5 py-1.5 text-sm outline-none focus:border-brand-500"
               />
             </div>
             <div className="mt-3 flex justify-end gap-2">

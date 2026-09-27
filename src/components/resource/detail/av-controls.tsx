@@ -503,7 +503,7 @@ export default function AvControls({
       </div>
     </div>
   ) : (
-    <div className="rounded-none border border-brand-200 bg-surface p-4 sm:p-5">
+    <div className="rounded-none border border-brand-300 bg-surface p-4 sm:p-5">
       <audio
         ref={mediaRef as RefObject<HTMLAudioElement | null>}
         src={src}
@@ -529,7 +529,7 @@ export default function AvControls({
             type="button"
             onClick={toggle}
             aria-label={playing ? "暂停" : "播放"}
-            className="grid h-11 w-11 shrink-0 place-items-center rounded-none border border-brand-200 bg-brand-50 text-brand-700 transition hover:border-brand-400 hover:bg-brand-100 focus-visible:ring-2 focus-visible:ring-brand-400"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-none border border-brand-300 bg-brand-50 text-brand-700 transition hover:border-brand-500 hover:bg-brand-100 focus-visible:ring-2 focus-visible:ring-brand-400"
           >
             <PlayIcon
               size={18}

@@ -29,9 +29,10 @@ export default function DetailTwocol({
   const isVideo = ctx.meta.kind === "VIDEO";
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-3 border-b border-neutral-100 pb-4">
+      {/* 标题区下横线走点划线（rule-dot-b 自带 1px 透明占位边框，盒模型与原来的 border-b 一致） */}
+      <div className="rule-dot-b mb-5 flex flex-wrap items-end justify-between gap-3 pb-4">
         <div>
-          <span className="inline-flex items-center gap-1 rounded-none border border-brand-200 bg-surface px-2.5 py-0.5 text-[11px] font-medium text-neutral-500">
+          <span className="inline-flex items-center gap-1 rounded-none border border-brand-300 bg-surface px-2.5 py-0.5 text-[11px] font-medium text-neutral-500">
             {typeLabel(detail.type)}
             {detail.category && (
               <>

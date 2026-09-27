@@ -71,7 +71,7 @@ export default function UserHoverCard({
           指针从触发器滑到弹层的整条路径都落在本容器的子树内 → .group 的 :hover 不断。
           弹层头部是链接（进主页），其余部分仅展示。 */}
       <span className="invisible absolute top-full left-0 z-40 block w-56 pt-1.5 opacity-0 transition-[opacity,visibility] duration-150 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
-        <span className="block rounded-none border border-brand-200 bg-surface p-3 shadow-lg">
+        <span className="block rounded-none border border-brand-300 bg-surface p-3 shadow-lg">
           <Link href={`/u/${user.username}`} className="flex items-center gap-2.5">
             <PresenceAvatar
               userId={user.id}
@@ -117,7 +117,7 @@ export default function UserHoverCard({
             </span>
           )}
           {hasStats && (
-            <span className="mt-2.5 flex items-center gap-4 border-t border-neutral-100 pt-2.5">
+            <span className="rule-dot-t mt-2.5 flex items-center gap-4 pt-2.5">
               {stats.map(([label, n]) => (
                 <span key={label} className="text-xs text-neutral-500">
                   {label}{" "}

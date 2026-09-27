@@ -161,7 +161,7 @@ export function FollowControl({
       className={
         variant === "primary"
           ? "rounded-none border border-brand-600 bg-brand-500 px-3 py-1.5 text-xs text-white hover:bg-brand-600"
-          : "rounded-none border border-brand-200 px-3 py-1.5 text-xs text-neutral-700 hover:bg-neutral-100"
+          : "rounded-none border border-brand-300 px-3 py-1.5 text-xs text-neutral-700 hover:bg-neutral-100"
       }
     >
       关注
@@ -172,7 +172,7 @@ export function FollowControl({
 /** 作者名片 + 关注 */
 export function AuthorStrip({ ctx }: { ctx: DetailCtx }) {
   return (
-    <div className="flex items-center justify-between rounded-none border border-brand-200 bg-surface p-3">
+    <div className="flex items-center justify-between rounded-none border border-brand-300 bg-surface p-3">
       <AuthorIdentity a={ctx.detail.author} />
       <FollowControl ctx={ctx} />
     </div>
@@ -243,7 +243,7 @@ export async function ActionBar({ ctx }: { ctx: DetailCtx }) {
 }
 
 const statItem =
-  "flex flex-col items-center gap-0.5 rounded-none border border-brand-200 bg-surface py-3";
+  "flex flex-col items-center gap-0.5 rounded-none border border-brand-300 bg-surface py-3";
 
 /** 下载 / 浏览 / 发布于 三格统计 */
 export function StatGrid({ ctx }: { ctx: DetailCtx }) {
@@ -276,7 +276,7 @@ export function TypeInfoCard({ ctx }: { ctx: DetailCtx }) {
   const { detail, meta } = ctx;
   return (
     <div className="space-y-3">
-      <dl className="space-y-2 rounded-none border border-brand-200 bg-surface p-4 text-sm">
+      <dl className="space-y-2 rounded-none border border-brand-300 bg-surface p-4 text-sm">
         <div className="flex justify-between">
           <dt className="text-neutral-400">类型</dt>
           <dd>
@@ -390,7 +390,7 @@ export function RelatedSection({ ctx }: { ctx: DetailCtx }) {
   const items = ctx.related ?? [];
   if (items.length === 0) return null;
   return (
-    <section className="border-t border-neutral-100 pt-5">
+    <section className="rule-dot-t pt-5">
       <h2 className="text-sm font-semibold text-neutral-400">相关推荐</h2>
       <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-6">
         {items.map((item) => (

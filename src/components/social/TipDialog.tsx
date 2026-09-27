@@ -104,7 +104,7 @@ export default function TipDialog({
               className={`min-h-9 rounded-none border px-3 text-xs tabular-nums transition focus-visible:ring-2 focus-visible:ring-brand-400 ${
                 coin === p
                   ? "border-brand-600 bg-brand-500 font-medium text-white"
-                  : "border-brand-200 bg-surface text-neutral-700 hover:border-brand-500"
+                  : "border-brand-300 bg-surface text-neutral-700 hover:border-brand-500"
               }`}
             >
               {p}

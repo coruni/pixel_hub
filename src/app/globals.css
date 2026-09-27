@@ -38,11 +38,30 @@
   --md-code-bg: var(--brand-200);
   --md-code-fg: var(--brand-900);
   --md-border: #e5e5e5;
-  /* 正文里的分隔线与表格格线：取品牌陶土橙 400 阶。引用 --brand-400 而不是写死色值 ——
+  /* 正文里的**表格格线**：取品牌陶土橙 400 阶。引用 --brand-400 而不是写死色值 ——
      暗色（html.dark）会把它覆盖成 #9a6c4c，这里跟着自动换，无需再写一份 dark 覆盖，
      与上面的 --md-marker 同款做法。原来的 --md-border 中性灰在暖白底 (#faf9f5) 上
-     只有 1.06:1，跟没画一样。 */
+     只有 1.06:1，跟没画一样。
+     【分工】分隔线（.md-body hr）已改走 --rule-dot（brand-300），本 token 现在只管
+     th/td 的格线。格线**不跟着降到 300 阶**：1.65:1 的格线在长表格里成片出现时会糊成一片，
+     看不是边框、看是背景网纹。 */
   --md-rule: var(--brand-400);
+  /* 单边点划线（dot-dash）的图案 —— rule-dot-t / rule-dot-b / rule-dot-rows 三个 utility
+     与 .md-body hr 共用这一份。
+     节奏：6px 划 + 3px 空 + 1px 点（1px 高的色带上正好是一个像素方块）+ 3px 空 = 13px 一周期。
+     颜色取 brand-300：详情页的所有品牌色外框都是这一档，横线跟着同色才不会出现
+     「同一页两种相近的不等橙」。brand-300 已被 html.dark 重定义（#6d4e37），
+     var() 链自动跟随，这里不需要再写一份 dark 覆盖。
+     为什么是「背景色带」而不是 border：CSS 的 border-style 只有 solid / dashed / dotted，
+     没有点划混合；border-image 同样不行 —— 切片后只有上下两边落在渐变上，
+     左右两边取到的是渐变里同一条竖线（实色）。 */
+  --rule-dot: repeating-linear-gradient(
+    to right,
+    var(--brand-300) 0 6px,
+    transparent 6px 9px,
+    var(--brand-300) 9px 10px,
+    transparent 10px 13px
+  );
   /* 代码字体栈唯一来源：前台 .md-body 与编辑器（--crepe-font-code）都引用它，
      值是 Tailwind 默认 mono 栈，与改动前的前台渲染完全一致 */
   --md-font-code: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
@@ -230,6 +249,52 @@ body {
   background-size: 8px 8px;
 }
 
+/* ---------- 单边点划线（dot-dash rule）----------
+   资源详情页的横向分隔线用它：标题区下横线、相关推荐顶线、下载清单行线、分P 列表行线、
+   评论区分隔线。图案本体是 --rule-dot（见 :root），与 .md-body hr 同一份。
+
+   为什么不用 border-style / border-image：CSS 的 border-style 只有 solid / dashed / dotted，
+   没有点划混合；border-image 切片后只有上下两边落在渐变上，左右两边取到的是同一条竖线（实色）。
+   所以走「1px 高的背景色带」——与 .md-body hr 同款做法。
+
+   【不占布局】这三个 utility 替代的是调用点上原本就存在的 1px border（border-t / border-b /
+   divide-y），所以各自带一条 border-*: 1px solid transparent 占位，再让色带落在占位边框的位置上
+   （background-origin: border-box）。盒模型与改动前逐像素一致，页面不会因为换样式而抖动 1px。
+
+   【约束】这三个类会覆盖 background-image，调用点上不能再叠 Tailwind 渐变类
+   （如 bg-[linear-gradient(...)]），否则点划线会被整条盖掉。 */
+@utility rule-dot-t {
+  border-top: 1px solid transparent;
+  background-image: var(--rule-dot);
+  background-origin: border-box;
+  background-repeat: no-repeat;
+  background-position: 0 0;
+  background-size: 100% 1px;
+}
+
+@utility rule-dot-b {
+  border-bottom: 1px solid transparent;
+  background-image: var(--rule-dot);
+  background-origin: border-box;
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 100% 1px;
+}
+
+/* 行间点划线：整条 <ul>/<ol> 上写一个即可，取代 Tailwind 的 divide-y。
+   divide-y 在 v4 里靠 border-*-width 实现，而点划线必须走背景色带（见上），
+   两者不是同一套机制，无法只换颜色 —— 所以这里连占位边框一起复刻。 */
+@utility rule-dot-rows {
+  & > * + * {
+    border-top: 1px solid transparent;
+    background-image: var(--rule-dot);
+    background-origin: border-box;
+    background-repeat: no-repeat;
+    background-position: 0 0;
+    background-size: 100% 1px;
+  }
+}
+
 /* 像素风图标：lucide 线条图标去掉圆头圆角、锐利渲染，与位图字体同一语言 */
 svg.lucide {
   stroke-linecap: butt;
@@ -354,21 +419,15 @@ summary {
   padding-left: 0.6rem;
   color: var(--md-muted);
 }
-/* 分割线：点划线（dot-dash）。CSS 的 border-style 只有 solid / dashed / dotted，
-   没有点划混合，所以用 repeating-linear-gradient 手画一个循环图案：
-   6px 划 + 3px 空 + 1px 点（在 1px 高的线上正好是一个像素方块）+ 3px 空，共 13px 一周期。
-   border 归零后再用 height 1px 的色带代替 —— 走 border 的话图案只能整段一种 style。 */
+/* 分割线：点划线（dot-dash）。图案本体收在 --rule-dot（见 :root），与资源详情页的
+   单边线（rule-dot-t / rule-dot-b / rule-dot-rows）**同一份 token** ——
+   同一页里正文的 <hr> 与页面横线必须完全同色同节奏，否则看着就是「没改干净」。
+   这里 border 归零后改用 height 1px 的色带：走 border 的话图案只能整段一种 style。 */
 .md-body hr {
   margin: 0.7rem 0;
   border: 0;
   height: 1px;
-  background-image: repeating-linear-gradient(
-    to right,
-    var(--md-rule) 0 6px,
-    transparent 6px 9px,
-    var(--md-rule) 9px 10px,
-    transparent 10px 13px
-  );
+  background-image: var(--rule-dot);
 }
 .md-body img {
   max-width: 100%;
