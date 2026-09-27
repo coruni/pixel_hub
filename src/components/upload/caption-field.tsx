@@ -158,14 +158,7 @@ export function CaptionField({
   const has = !!value?.text.trim();
 
   return (
-    <div
-      {...dropProps}
-      /* 整块是投放区：拖进来的高亮就是「松手会替换/载入」的提示，不用额外的虚线框。
-         拖拽不改变布局（只换描边与底色），光标进入时内容不会跳。 */
-      className={`space-y-3 border p-2 transition ${
-        dragging ? "border-brand-500 bg-brand-50" : "border-transparent"
-      }`}
-    >
+    <div className="space-y-3">
       <div className="flex items-baseline justify-between gap-3">
         {/* 不写 `${wizLabel} mb-0`：wizLabel 自带 mb-1，那是同一组属性并存、靠产物顺序定胜负 */}
         <span className="block text-sm font-medium text-neutral-700">{word}</span>
@@ -174,84 +167,95 @@ export function CaptionField({
         </span>
       </div>
 
-      {has && value ? (
-        <>
-          <label className="block">
-            <span className={wizLabel}>格式</span>
-            <select
-              value={value.format}
-              onChange={(e) => onChange({ ...value, format: e.target.value as CaptionFormat })}
-              className={`${boxBase} mt-1.5 w-full px-2.5 py-2 text-sm`}
-            >
-              {CAPTION_FORMATS.map((f) => (
-                <option key={f} value={f}>
-                  {CAPTION_FORMAT_LABEL[f]}
-                </option>
-              ))}
-            </select>
-          </label>
+      {/* 投放区只包**内容区**，不含上面那行「{word} + 提示」——拖拽高亮套到标题上很吵，也不代表
+          能往标题里丢东西。用 outline 而不是 border：outline 不参与布局，而 dashed 边框必须常驻
+          同宽度才不抖（抽屉那块就是这么做的），这里的常态本来没有边框，凭空加一圈占位会移动内容。 */}
+      <div
+        {...dropProps}
+        className={`space-y-3 transition ${
+          dragging && has ? "outline-2 outline-dashed outline-offset-2 outline-brand-500" : ""
+        }`}
+      >
+        {has && value ? (
+          <>
+            <label className="block">
+              <span className={wizLabel}>格式</span>
+              <select
+                value={value.format}
+                onChange={(e) => onChange({ ...value, format: e.target.value as CaptionFormat })}
+                className={`${boxBase} mt-1.5 w-full px-2.5 py-2 text-sm`}
+              >
+                {CAPTION_FORMATS.map((f) => (
+                  <option key={f} value={f}>
+                    {CAPTION_FORMAT_LABEL[f]}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-          <p className="flex items-center gap-1.5 border border-brand-100 bg-brand-50/40 px-3 py-2 text-xs text-neutral-600">
-            <FileText size={13} className="shrink-0" aria-hidden />
-            <span className="truncate">
-              <CaptionStats caption={value} />
-            </span>
-          </p>
+            <p className="flex items-center gap-1.5 border border-brand-100 bg-brand-50/40 px-3 py-2 text-xs text-neutral-600">
+              <FileText size={13} className="shrink-0" aria-hidden />
+              <span className="truncate">
+                <CaptionStats caption={value} />
+              </span>
+            </p>
 
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="ghost" size="xs" onClick={() => fileRef.current?.click()}>
-              更换文件
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="ghost" size="xs" onClick={() => fileRef.current?.click()}>
+                更换文件
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                onClick={() => {
+                  setPasting(true);
+                  setDraftText(value.text);
+                  setNote(null);
+                }}
+              >
+                粘贴编辑
+              </Button>
+              <Button
+                type="button"
+                variant="dangerGhost"
+                size="xs"
+                onClick={() => {
+                  onChange(null);
+                  setPasting(false);
+                  setNote(null);
+                }}
+              >
+                <Trash2 size={13} aria-hidden />
+                清空
+              </Button>
+            </div>
+          </>
+        ) : (
+          /* 空态那块虚线框**自己就是投放区**（拖拽时由它变色，不再套第二层框）：它本来就占满
+             内容区，尺寸与上面 outline 那圈一致，视觉上就是「整块内容区在接文件」 */
+          <div
+            className={`border-2 border-dashed px-4 py-6 text-center transition ${
+              dragging ? "border-brand-500 bg-brand-50" : "border-brand-200 bg-surface"
+            }`}
+          >
+            <FileText size={22} className="mx-auto text-neutral-400" aria-hidden />
+            <p className="mt-2 text-sm text-neutral-700">把 {ext} / .vtt / .ass 文件拖到这里</p>
+            <p className="mt-1 text-[11px] leading-4 text-neutral-400">
+              也可以点下面按钮选择，或直接粘贴文本
+            </p>
             <Button
               type="button"
               variant="ghost"
               size="xs"
-              onClick={() => {
-                setPasting(true);
-                setDraftText(value.text);
-                setNote(null);
-              }}
+              className="mt-3"
+              onClick={() => fileRef.current?.click()}
             >
-              粘贴编辑
-            </Button>
-            <Button
-              type="button"
-              variant="dangerGhost"
-              size="xs"
-              onClick={() => {
-                onChange(null);
-                setPasting(false);
-                setNote(null);
-              }}
-            >
-              <Trash2 size={13} aria-hidden />
-              清空
+              选择文件
             </Button>
           </div>
-        </>
-      ) : (
-        /* 空态的虚线框只负责「说明这里可以放什么」——投放由外层那块统一接，内层不再挂 dropProps */
-        <div
-          className={`border-2 border-dashed px-4 py-6 text-center transition ${
-            dragging ? "border-brand-500 bg-brand-50" : "border-brand-200 bg-surface"
-          }`}
-        >
-          <FileText size={22} className="mx-auto text-neutral-400" aria-hidden />
-          <p className="mt-2 text-sm text-neutral-700">把 {ext} / .vtt / .ass 文件拖到这里</p>
-          <p className="mt-1 text-[11px] leading-4 text-neutral-400">
-            也可以点下面按钮选择，或直接粘贴文本
-          </p>
-          <Button
-            type="button"
-            variant="ghost"
-            size="xs"
-            className="mt-3"
-            onClick={() => fileRef.current?.click()}
-          >
-            选择文件
-          </Button>
-        </div>
-      )}
+        )}
+      </div>
 
       {pasting && (
         <div>

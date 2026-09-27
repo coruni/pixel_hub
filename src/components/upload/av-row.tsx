@@ -174,8 +174,10 @@ export function AvRowEditor({
   return (
     <li
       {...dropProps}
+      /* 拖拽态把边框换成虚线 —— 宽度恒为 1px（与常态一致）：宽度一变行高就变，
+         光标相对位置跟着变，enter/leave 会抖。 */
       className={`border p-2 ${
-        dragging ? "border-brand-500 bg-brand-50" : "border-brand-200 bg-surface"
+        dragging ? "border-dashed border-brand-500 bg-brand-50" : "border-brand-200 bg-surface"
       }`}
     >
       {/* 整行就这一层：编号 · 标题 · 设置入口。其余都在抽屉里 */}

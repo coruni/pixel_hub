@@ -199,13 +199,16 @@ function DrawerBody({
           </label>
 
           {/* 投放区就是这一块：地址框 + 上传按钮 + 说明（见上面 useFileDrop 那段注释）。
-              px/py 给 ring 留出一点内边距（否则高亮贴着文字）；横向用 -mx-2 抵消，
-              让投放区比内容区略宽、更好命中。**不要用 `-m-2`** —— margin 是简写属性，
-              和父级 space-y-4 生成的 margin-top 撞在同一组上，谁生效取决于产物顺序。 */}
+              常态就留出 2px 透明边框，拖拽时只换样式与颜色 —— **边框宽度必须前后一致**，
+              否则内容位移、光标相对位置一变就 enter/leave 抖动；所以 padding 用 1.5(6px)
+              配 2px 边框，正好等于原来的 8px，拖拽前后内容纹丝不动。
+              横向用 -mx-2 抵消：投放区比文字区略宽、更好命中。
+              **不要用 `-m-2`** —— margin 是简写属性，和父级 space-y-4 生成的 margin-top
+              撞在同一组上，谁生效取决于产物顺序。 */}
           <div
             {...dropProps}
-            className={`-mx-2 space-y-2 px-2 py-2 transition ${
-              dragging ? "bg-brand-50 ring-2 ring-inset ring-brand-400" : ""
+            className={`-mx-2 space-y-2 border-2 px-1.5 py-1.5 transition ${
+              dragging ? "border-dashed border-brand-500 bg-brand-50" : "border-transparent"
             }`}
           >
             <div>
