@@ -79,7 +79,7 @@ export default function AvatarForm({
   }, [cropped]);
 
   return (
-    <div className="flex flex-wrap items-center gap-5">
+    <div className="flex flex-wrap items-start md:items-center gap-5">
       <Avatar name={name} username={username} avatarKey={preview ?? avatarKey} size="lg" />
       <form action={formAction} className="min-w-0 flex-1">
         <p className="text-xs leading-5 text-neutral-400">

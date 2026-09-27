@@ -14,6 +14,18 @@
 - 探针要 import 源码时 `@/` 别名在 tsx 下可用，但只用相对路径最稳（`../src/lib/xxx`）。
   数据库是**远端 Supabase**，偶发连不上（`Can't reach database server`），重跑一次即可。
 
+## 数据库迁移顺序（2026-09-27 事故后定规）
+
+- **破坏性迁移（DROP TABLE / DROP COLUMN）必须与代码拆成两个发布批次**：先让不含该引用的代码上线，
+  确认线上跑的是新镜像，再执行 DROP。把两步压进同一个提交 = 假定线上会立刻重建镜像，
+  一旦没重建就是「旧镜像 + 新库」，直接 500。
+  - 实例：`0018_drop_resource_version.sql` 删表后，仍跑 `c2f422c` 之前镜像的容器在
+    `getResourceDetail` 的 `prisma.resource.findFirst()` 里 JOIN `ResourceVersion` →
+    资源详情页全挂。止血办法是把**空表按原 schema 建回去**（放 `$TEMP` 执行，
+    不要往 `prisma/migrations/` 里加与迁移自相矛盾的回滚文件）。
+- 部署形态：**线上是外部主机上的容器**（本机无 docker，仓库内无 compose，只有 `Dockerfile`）。
+  改完代码后要提醒用户重建镜像；我无法从本机触发部署。
+
 ## UI 语言
 
 - 像素风 + Fusion Pixel + 点阵背景 + 赤陶橙 brand + 全站 `rounded-none`。
