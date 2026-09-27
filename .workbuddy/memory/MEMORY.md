@@ -8,7 +8,7 @@
 ## UI 语言
 - 像素风 + Fusion Pixel + 点阵背景 + 赤陶橙 brand + 全站 `rounded-none`；类型图标唯一来源 `resource/type-icon.tsx`。
 - 暗色只覆盖部分阶：brand 50–900、neutral 200–950、red 50/100/200/300/600/700、amber 100/200/300/600/700/900；emerald/sky 无覆盖。提示文字统一 `text-amber-600`。
-- 分隔线统一 `border-*-2 border-dashed border-brand-300`（列表 `divide-y-2 divide-dashed`）；**同组属性别拼**（padding/margin 并存靠产物顺序定胜负，要别的尺寸单写一份）。
+- 分隔线统一 `border-*-2 border-dashed border-brand-300`（列表 `divide-y-2 divide-dashed`）；**同组属性别拼**（padding/margin 并存靠产物顺序定胜负）。
 
 ## 背景层（双槽 + 简洁模式）
 - 双槽 `profileBgPcKey`/`profileBgMobileKey` 各配一份遮罩、**不跨槽回落**；`profileBgOnResource`/`profileBgGlobal`/`bgMinLevel` 共用；遮罩类 `.profile-bg-pc`/`.profile-bg-mobile` 在 `globals.css`。
@@ -26,11 +26,11 @@
 - **标签 slug 相同就是同一个标签**（`/tags/{slug}` 是公开 URL），直接合并；`findOrCreateTag` 命中链 name → slug → create。
 
 ## Markdown
-- `react-markdown` 基线 CommonMark，表格靠 `remark-gfm`（整体开关）；`rte/Markdown.tsx` 的 `gfm?` 默认 false，只资源正文开、评论关。脚注标题的 `sr-only` 仓库没有，要自己写。代码色 token 全在 `:root`（`--md-code-bg`=brand-200、`--md-code-block-bg`=brand-100），别改回中性灰。
+- `react-markdown` 基线 CommonMark，表格靠 `remark-gfm`（整体开关）；`rte/Markdown.tsx` 的 `gfm?` 默认 false，只资源正文开、评论关。脚注标题的 `sr-only` 仓库没有，要自己写。代码色 token 全在 `:root` 且均引 brand 阶，别改回中性灰。
 
 ## 音视频
 - `source` 已删（站内/外链看是否以 `/` 开头）；音频恒 `mode:"direct"`（无嵌入页），VIDEO 保留 embed。播放器时长由媒体元素自报、别删。
-- 字幕与播放项一一对应：`meta.caption` + `tracks[].caption`（读取层兼容旧 `captions[]` 取 `[0]`）。表单字段：`avMode` + 主来源 `avUrl`/`avTitle`/`avCaption` + 其余行 `avTracks`(JSON)；`meta.tracks` 不含主来源那一 P，拼装唯一入口 `avPlaylist()`。
+- 字幕与播放项一一对应：`meta.caption` + `tracks[].caption`（读取层兼容旧 `captions[]` 取 `[0]`）。表单字段：`avMode` + 主来源 `avUrl`/`avTitle`/`avCaption` + 其余行 `avTracks`(JSON)；`meta.tracks` 不含主来源那一 P，拼装唯一入口 `avPlaylist()`。另有 `meta.downloads` 下载源（AV 也能挂，写入侧早已透传，详情页 `DownloadListCard` 统一渲染）。
 - **`av-row.tsx` 只剩「编号 · 标题 · 设置图标」**（行仍可拖放上传）：改标题/地址/上传/字幕全在 `av-item-drawer.tsx`（`open=false` 不渲染），字幕体是 `caption-field.tsx`。**主来源 `avUrl`/`avTitle` 由 `av-section` 隐藏字段提交**（抽屉关着不渲染，挂在行里一关就丢值）。行上仍摊三样：上传进度/结果（抽屉开着归抽屉）、字段错误、有内容没地址的预警。
 - 抽屉坑：① `fixed` 但仍在 `<li>` 子树里 → 行上 `useFileDrop` 要 `disabled: uploading || open`；② `onClose` 需 `useCallback` 稳定，否则 effect 重跑抢焦点。**投放区不许嵌套**：冒泡会让一个 .srt 被内外各接一次；给内层 `stopPropagation` 又会挡掉外层那次 drop，而浏览器 drop 后**不补发 dragleave** → 外层高亮永久卡死，故 hook 刻意不给这个开关。
 - 投放区（拖入即替换）**只有三处**：行 `<li>`（抽屉关着时）、抽屉里「地址框 + 上传按钮」那块、`caption-field.tsx` 的**内容区**（不含上面那行「字幕/歌词 + 提示」）。`av-section` 上没有任何投放区 —— 后两条都是用户明确要求。

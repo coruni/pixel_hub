@@ -16,6 +16,9 @@
 // 没有「时长 / 艺术家 / 分辨率」这类补充字段：它们是自动从一个文件里读出来的资源级元信息，
 // 作者既不需要手填、也不该为「自动读到什么」负责，详情页同样不再展示。上传视频时仍会抽一帧
 // 当封面（见 lib/av-probe.ts），那是唯一保留的自动动作。
+//
+// 播放列表之外还有一块**下载源**清单（meta.downloads，与 IMAGE / ARTICLE / GAME 同源）：
+// 那种「额外分发」的附加文件走那里，不进播放列表、不参与来源校验。
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
@@ -27,6 +30,7 @@ import { capturePoster } from "@/lib/av-probe";
 import { mbText, type UploadLimits } from "@/lib/upload-config";
 import { fieldErr, wizLabel, SectionTitle, STEP } from "./wizard-shared";
 import { AvRowEditor, newRowId, type AvPlayRow } from "./av-row";
+import { AttachmentListEditor, uid, type AttachRow } from "./attachment-list";
 import { Button } from "@/components/ui/Button";
 
 export type AvSectionInitial = {
@@ -37,6 +41,8 @@ export type AvSectionInitial = {
   caption?: CaptionDraft;
   /** 分P / 曲目（**不含主来源**那一 P）；caption 为 null 表示这一项没挂字幕 */
   tracks?: { title: string; url: string; caption?: CaptionDraft | null }[];
+  /** 额外的下载源（meta.downloads）。与播放列表无关，纯附加分发内容 */
+  downloads?: { name: string; url: string; kind?: "file" | "link"; size?: string }[];
 };
 
 /** 初始行：第 1 行恒存在（作者总得有个地方填地址），其余按存量数据铺开 */
@@ -74,6 +80,18 @@ export function AvSection({
   const [rows, setRows] = useState<AvPlayRow[]>(() => initRows(initial));
   /** 正在上传的行 id（可能多行同时传，所以是集合而不是布尔） */
   const [busyIds, setBusyIds] = useState<string[]>([]);
+  /** 下载源清单（meta.downloads）——与播放列表共用同一套多附件编辑器 */
+  const [dlRows, setDlRows] = useState<AttachRow[]>(() =>
+    (initial?.downloads ?? []).map((d) => ({
+      key: uid(),
+      name: d.name,
+      kind: d.kind === "file" ? ("file" as const) : ("link" as const),
+      url: d.url,
+      size: d.size ?? "",
+    })),
+  );
+  /** 清单里的在飞上传数（与各行的 busyIds 一起汇总上报宿主） */
+  const [dlBusy, setDlBusy] = useState(0);
   const [msg, setMsg] = useState<string | null>(null);
 
   const isAudio = avKind === "audio";
@@ -102,10 +120,10 @@ export function AvSection({
     setRows((prev) => [...prev, { id: newRowId(), title: "", url: "", caption: null }]);
   }
 
-  /** 在飞上传数同步给宿主，供提交按钮禁用（与 AttachmentListEditor 同契约） */
+  /** 在飞上传数同步给宿主，供提交按钮禁用（行上传 + 下载源清单上传，与 AttachmentListEditor 同契约） */
   useEffect(() => {
-    onBusyChange?.(busyIds.length);
-  }, [busyIds, onBusyChange]);
+    onBusyChange?.(busyIds.length + dlBusy);
+  }, [busyIds, dlBusy, onBusyChange]);
 
   const setRowBusy = useCallback((id: string, busy: boolean) => {
     setBusyIds((prev) => {
@@ -202,6 +220,25 @@ export function AvSection({
         </div>
 
         {msg && <p className="mt-1.5 text-xs text-amber-600">{msg}</p>}
+
+        {/* 下载源：与 GAME / ARTICLE 用同一个清单编辑器与容器形态（描边盒 + 小标题 + 清单）。
+            与播放列表完全独立 —— 这里放的是「额外分发」的文件（无损音轨、外挂字幕包、
+            离线副本…），不会进播放列表，也不影响上面的来源校验。 */}
+        <div className="mt-4 rounded-none border border-brand-200 p-4">
+          <p className="text-sm font-medium text-neutral-700">下载源</p>
+          <p className="mt-0.5 text-[11px] leading-4 text-neutral-400">
+            可选：额外提供的下载文件或网盘外链（无损音轨、外挂字幕包、离线副本…），不进播放列表。
+          </p>
+          <AttachmentListEditor
+            rows={dlRows}
+            setRows={setDlRows}
+            limits={limits}
+            errors={fieldErrors?.downloads}
+            addLinkLabel="添加附件"
+            showSize={false}
+            onBusyChange={setDlBusy}
+          />
+        </div>
 
         {/* 受控序列化（与 downloads 同款）：地址为空的行不提交，服务端按 avMetaSchema 再校验一次。
             主来源的标题 / 地址 / 字幕与其余行**全部**在这里序列化 —— 行上的编辑控件都收在抽屉里、

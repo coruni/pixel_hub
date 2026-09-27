@@ -1,4 +1,4 @@
-// 统一下载面板 —— IMAGE/ARTICLE/GAME 均按 meta 分发，下载清单只存 meta.downloads；
+// 统一下载面板 —— IMAGE/ARTICLE/GAME/MUSIC/VIDEO 均按 meta 分发，下载清单只存 meta.downloads；
 // 版本历史功能已下线（ResourceVersion 表与 VersionSection 均已移除），本面板即唯一下载入口。
 // 服务端决定渲染什么（null = 无下载）；真正的下载/登录墙由客户端 MetaDownloadButton 处理。
 // 下载次数是资源级单值，标在各清单的区块头（CardHead），不逐行重复。
@@ -76,19 +76,30 @@ function ImageDownloadCard({
   );
 }
 
-/** IMAGE：多附件图包/整套下载清单（新），逐行下载；区别于 GAME 版本表 */
-function ImageDownloadsCard({
+/** 逐行下载清单卡片 —— IMAGE 图包 / ARTICLE 附件 / MUSIC·VIDEO 下载源 / GAME 下载源共用同一形态。
+ *  四个入口原来是四份字面相同的 JSX，收敛在这里；差异只有标题文案与外层留白。 */
+function DownloadListCard({
   ctx,
+  title,
   list,
+  size = "sm",
 }: {
   ctx: DetailCtx;
-  list: Extract<DetailCtx["meta"], { kind: "IMAGE" }>["downloads"];
+  title: string;
+  list: { name: string; kind: "file" | "link"; url: string; size?: string }[];
+  /** lg = 文章那种更松的留白（mt-8 / p-6），其余 mt-6 / p-5 */
+  size?: "sm" | "lg";
 }) {
   const { detail, authed } = ctx;
+  if (list.length === 0) return null;
   return (
-    <section className="mt-6 rounded-none border border-brand-300 bg-surface p-5">
+    <section
+      className={`rounded-none border border-brand-300 bg-surface ${
+        size === "lg" ? "mt-8 p-6" : "mt-6 p-5"
+      }`}
+    >
       <DownloadCountScope initial={detail.downloadCount}>
-        <CardHead title={`图包 / 整套下载（${list.length}）`} fallbackCount={detail.downloadCount} />
+        <CardHead title={title} fallbackCount={detail.downloadCount} />
         <ul className="mt-3 divide-y divide-neutral-100">
           {list.map((a, i) => (
             <li
@@ -117,41 +128,38 @@ function ImageDownloadsCard({
   );
 }
 
+/** IMAGE：多附件图包/整套下载清单（新），逐行下载；区别于 GAME 版本表 */
+function ImageDownloadsCard({
+  ctx,
+  list,
+}: {
+  ctx: DetailCtx;
+  list: Extract<DetailCtx["meta"], { kind: "IMAGE" }>["downloads"];
+}) {
+  return <DownloadListCard ctx={ctx} title={`图包 / 整套下载（${list.length}）`} list={list} />;
+}
+
 /** ARTICLE：文末附件清单，逐行下载（区别于 GAME 版本历史） */
 function ArticleAttachmentsCard({ ctx }: { ctx: DetailCtx }) {
-  const { detail, meta, authed } = ctx;
+  const { meta } = ctx;
   if (meta.kind !== "ARTICLE") return null;
-  const list = meta.downloads;
-  if (list.length === 0) return null;
   return (
-    <section className="mt-8 rounded-none border border-brand-300 bg-surface p-6">
-      <DownloadCountScope initial={detail.downloadCount}>
-        <CardHead title={`附件（${list.length}）`} fallbackCount={detail.downloadCount} />
-        <ul className="mt-3 divide-y divide-neutral-100">
-          {list.map((a, i) => (
-            <li
-              key={i}
-              className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3 first:pt-0 last:pb-0"
-            >
-              <DlBadge kind={a.kind} />
-              <span className="min-w-0 flex-1 truncate text-sm text-neutral-800">{a.name}</span>
-              {a.size && <span className="shrink-0 text-xs text-neutral-400">{a.size}</span>}
-              <MetaDownloadButton
-                resourceId={detail.id}
-                url={a.url}
-                name={a.name}
-                kind={a.kind}
-                label="下载"
-                small
-                loginRequired={detail.loginRequired}
-                authed={authed}
-                callbackPath={`/resources/${detail.slug}`}
-              />
-            </li>
-          ))}
-        </ul>
-      </DownloadCountScope>
-    </section>
+    <DownloadListCard
+      ctx={ctx}
+      title={`附件（${meta.downloads.length}）`}
+      list={meta.downloads}
+      size="lg"
+    />
+  );
+}
+
+/** MUSIC / VIDEO：作者填写的「下载源」清单（meta.downloads 与其它类型同源）。
+ *  与播放列表完全独立 —— 无损音轨、外挂字幕包、离线副本这类额外分发内容放这里。 */
+function AvDownloadsCard({ ctx }: { ctx: DetailCtx }) {
+  const { meta } = ctx;
+  if (meta.kind !== "MUSIC" && meta.kind !== "VIDEO") return null;
+  return (
+    <DownloadListCard ctx={ctx} title={`下载源（${meta.downloads.length}）`} list={meta.downloads} />
   );
 }
 
@@ -163,42 +171,15 @@ function ArticleAttachmentsCard({ ctx }: { ctx: DetailCtx }) {
  *  单独渲染它会丢掉用户在清单里给首条起的标题，表现为「附件有标题却显示游戏本体」。
  *  externalUrl 仍保留在资源表上，供下载计数守卫与 /api/dl 代理使用，但不参与展示。 */
 function GameExternalCard({ ctx }: { ctx: DetailCtx }) {
-  const { detail, authed } = ctx;
-  if (ctx.meta.kind !== "GAME") return null;
-  const rows = ctx.meta.downloads.filter((d) => d.url);
-  if (rows.length === 0) return null;
+  const { meta } = ctx;
+  if (meta.kind !== "GAME") return null;
+  const rows = meta.downloads.filter((d) => d.url);
   return (
-    <section className="mt-6 rounded-none border border-brand-300 bg-surface p-5">
-      <DownloadCountScope initial={detail.downloadCount}>
-        <CardHead
-          title={`游戏下载${rows.length > 1 ? `（${rows.length}）` : ""}`}
-          fallbackCount={detail.downloadCount}
-        />
-        <ul className="mt-3 divide-y divide-neutral-100">
-          {rows.map((r, i) => (
-            <li
-              key={i}
-              className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3 first:pt-0 last:pb-0"
-            >
-              <DlBadge kind={r.kind} />
-              <span className="min-w-0 flex-1 truncate text-sm text-neutral-800">{r.name}</span>
-              {r.size && <span className="shrink-0 text-xs text-neutral-400">{r.size}</span>}
-              <MetaDownloadButton
-                resourceId={detail.id}
-                url={r.url}
-                name={r.name}
-                kind={r.kind}
-                label="下载"
-                small
-                loginRequired={detail.loginRequired}
-                authed={authed}
-                callbackPath={`/resources/${detail.slug}`}
-              />
-            </li>
-          ))}
-        </ul>
-      </DownloadCountScope>
-    </section>
+    <DownloadListCard
+      ctx={ctx}
+      title={`游戏下载${rows.length > 1 ? `（${rows.length}）` : ""}`}
+      list={rows}
+    />
   );
 }
 
@@ -215,5 +196,7 @@ export function DownloadPanel({ ctx }: { ctx: DetailCtx }) {
   if (meta.kind === "ARTICLE") return <ArticleAttachmentsCard ctx={ctx} />;
   // GAME：清单即唯一下载入口
   if (meta.kind === "GAME") return <GameExternalCard ctx={ctx} />;
+  // MUSIC / VIDEO：额外下载源（空清单时卡片自身返回 null）
+  if (meta.kind === "MUSIC" || meta.kind === "VIDEO") return <AvDownloadsCard ctx={ctx} />;
   return null;
 }

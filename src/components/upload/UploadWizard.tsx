@@ -33,7 +33,8 @@ import {
 } from "@/lib/draft";
 import MdEditor from "@/components/rte/MdEditorLazy";
 import MediaPicker from "./media-picker";
-import { ArticleSection, GameSection, ImageSection, type AttachRow } from "./wizard-sections";
+import { ArticleSection, GameSection, ImageSection } from "./wizard-sections";
+import { uid, type AttachRow } from "./attachment-list";
 import { AvSection } from "./av-section";
 import {
   MODE_STEP,
@@ -61,8 +62,8 @@ const TYPES = [
 
 /** 草稿快照 → 附件清单行（解析规则见 lib/draft 的 draftDownloadsOf，坏 JSON 一律当空清单） */
 function downloadsOf(p: DraftPayload): AttachRow[] {
-  return draftDownloadsOf(p).map((d, i) => ({
-    key: `draft-${i}-${d.url}`,
+  return draftDownloadsOf(p).map((d) => ({
+    key: uid(),
     name: d.name,
     kind: d.kind,
     url: d.url,
@@ -660,7 +661,7 @@ function downloadsInit(d: DraftPayload) {
   }));
 }
 
-/** 音乐 / 视频分节的初始值：第一行是主来源，其余从草稿的 avTracks 铺开 */
+/** 音乐 / 视频分节的初始值：第一行是主来源，其余从草稿的 avTracks 铺开，另带下载源清单 */
 function avInitial(d: DraftPayload | null) {
   if (!d) return undefined;
   return {
@@ -668,5 +669,6 @@ function avInitial(d: DraftPayload | null) {
     url: d.avUrl,
     caption: draftCaptionOf(d) ?? undefined,
     tracks: draftTracksOf(d),
+    downloads: downloadsInit(d),
   };
 }

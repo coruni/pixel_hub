@@ -9,7 +9,7 @@ import { makeKey, saveFile } from "@/lib/storage";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
-import { parseMeta, metaHasDownload } from "@/lib/meta";
+import { parseMeta, metaHasDownload, type ResourceMetaKind } from "@/lib/meta";
 import { rateLimit } from "@/lib/rate-limit";
 import { hashIp, ipFromHeaders } from "@/lib/ip";
 import { recordDownload } from "@/lib/download-record";
@@ -648,7 +648,7 @@ export async function deleteCommentAction(
 // 去重口径从 cookie 改为「登录 userId / 匿名 ipHash」的主体级唯一键：cookie 一清就白送一次下载量，
 // 而下载量是结算分来源，等于把激励池敞开。闸门细节见 src/lib/download-record.ts。
 export async function incrementDownloadAction(resourceId: string): Promise<{ ok: boolean }> {
-  // 下载源：GAME 走 externalUrl；IMAGE/ARTICLE 走 meta（download / downloads）
+  // 下载源：GAME 走 externalUrl；IMAGE/ARTICLE/MUSIC/VIDEO 走 meta（download / downloads）
   const resource = await prisma.resource.findUnique({
     where: { id: resourceId },
     select: { id: true, type: true, externalUrl: true, meta: true, authorId: true, status: true },
@@ -656,7 +656,7 @@ export async function incrementDownloadAction(resourceId: string): Promise<{ ok:
   if (!resource) return { ok: false };
   const hasDl =
     !!resource.externalUrl ||
-    metaHasDownload(parseMeta(resource.type as "GAME" | "IMAGE" | "ARTICLE", resource.meta));
+    metaHasDownload(parseMeta(resource.type as ResourceMetaKind, resource.meta));
   if (!hasDl) return { ok: false };
 
   const ip = ipFromHeaders(await headers());
