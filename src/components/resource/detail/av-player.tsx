@@ -5,14 +5,30 @@
 //   嵌入页（mode=embed）：sandbox iframe，禁止 top 导航与弹窗，只放行播放所需脚本
 // 站内来源（/uploads 或 /od 云盘引用）在播放器控件行里嵌一条下载入口：复用 MetaDownloadButton（iconOnly），
 // 与其余类型的登录墙 / 下载计数口径一致（/od 由网关 302 到 Graph 预鉴权链接，本站不转发字节）。
+//
+// 多 P（分P / 曲目）：播放列表由 lib/av-tracks.ts 拼装（存量只有 url 的数据即「单 P」）。
+// 列表长度 1 时这里的分支与改造前完全一致；多 P 才启用客户端切换（嵌入页走 av-embed.tsx）。
 
-import { Clock, ExternalLink, FileAudio, FileVideo, Film, Link2, MonitorPlay, Music2, User } from "lucide-react";
+import {
+  Clock,
+  ExternalLink,
+  FileAudio,
+  FileVideo,
+  Film,
+  Link2,
+  ListMusic,
+  MonitorPlay,
+  Music2,
+  User,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { AV_IFRAME_SANDBOX } from "@/lib/av";
+import { avPlaylist, avUnitLabel } from "@/lib/av-tracks";
 import { DEFAULT_COVER_URL } from "@/lib/default-cover";
 import { AV_CTRL_BTN, AV_CTRL_ON_DARK, AV_CTRL_ON_SURFACE } from "@/lib/ui/cls";
 import { MetaDownloadButton } from "@/components/social/interactions";
 import AvControls from "./av-controls";
+import AvEmbed from "./av-embed";
 import type { DetailCtx } from "./parts";
 
 /** 只对能确定含义的扩展名给「格式」标签；嵌入页地址（挂载的是网页）不参与推断 */
@@ -58,11 +74,18 @@ export function AvPlayerBlock({ ctx }: { ctx: DetailCtx }) {
   const KindIcon = isAudio ? Music2 : Film;
   const kindLabel = isAudio ? "音频" : "视频";
   const FormatIcon = isAudio ? FileAudio : FileVideo;
+  const avKind = isAudio ? "audio" : "video";
 
+  // 播放列表：tracks 优先，否则退回单条主来源（存量数据即单 P）
+  const list = avPlaylist(meta);
+  const multi = list.length > 1;
+  // 下载入口指向第一 P（多 P 时列表里不逐条放下载按钮：每项一个 MetaDownloadButton 会重复渲染
+  // 登录墙/计数逻辑，收益远低于成本）；命名与「是否站内托管」也按第一 P 判定
+  const primaryUrl = list[0]?.url ?? "";
   // 站内路径（/uploads、/od）才提供下载；外链交给「前往来源」按钮，避免把外站当本站文件
-  const localFile = meta.url.startsWith("/");
-  const fileName = meta.url.split("/").pop()?.split("?")[0] ?? `${detail.slug}`;
-  const format = formatOf(meta.url, meta.mode);
+  const localFile = primaryUrl.startsWith("/");
+  const fileName = primaryUrl.split("/").pop()?.split("?")[0] ?? `${detail.slug}`;
+  const format = formatOf(primaryUrl, meta.mode);
   // 封面同时当视频 poster（视频只有一个画面，见 memory：模板层不再单独渲染 Gallery）
   const coverUrl = detail.gallery[0]?.bigUrl ?? DEFAULT_COVER_URL;
   // 下载入口直接嵌进播放器控件行（图标按钮，色调与相邻控件一致）。
@@ -70,7 +93,7 @@ export function AvPlayerBlock({ ctx }: { ctx: DetailCtx }) {
   const downloadSlot = localFile ? (
     <MetaDownloadButton
       resourceId={detail.id}
-      url={meta.url}
+      url={primaryUrl}
       name={fileName}
       kind="file"
       iconOnly
@@ -95,7 +118,14 @@ export function AvPlayerBlock({ ctx }: { ctx: DetailCtx }) {
           {kindLabel}播放
         </h2>
         <div className="flex flex-wrap items-center gap-2">
-          {meta.duration && <Chip Icon={Clock} label="时长" value={meta.duration} />}
+          {multi && (
+            <Chip
+              Icon={ListMusic}
+              label={avUnitLabel(avKind)}
+              value={isAudio ? `${list.length} 首` : `${list.length} P`}
+            />
+          )}
+          {!multi && meta.duration && <Chip Icon={Clock} label="时长" value={meta.duration} />}
           {format && <Chip Icon={FormatIcon} label="格式" value={format} />}
           {isAudio && meta.artist && <Chip Icon={User} label="艺术家" value={meta.artist} />}
           {!isAudio && meta.resolution && <Chip Icon={MonitorPlay} label="画质" value={meta.resolution} />}
@@ -103,35 +133,38 @@ export function AvPlayerBlock({ ctx }: { ctx: DetailCtx }) {
       </div>
 
       <div className="mt-3">
-        {!meta.url ? (
+        {list.length === 0 ? (
           <p className="rounded-none border border-dashed border-brand-200 px-4 py-6 text-center text-sm text-neutral-500">
             作者未提供播放来源
           </p>
-        ) : meta.mode === "embed" && /^https?:\/\//i.test(meta.url) ? (
-          // 嵌入页：sandbox 只放行播放脚本；referrerPolicy 避免把本站地址带给外站
-          <div
-            className={
-              isAudio
-                ? "aspect-video w-full border border-brand-200 bg-neutral-100"
-                : "aspect-video w-full bg-black"
-            }
-          >
-            <iframe
-              src={meta.url}
-              title={`${detail.title} · ${kindLabel}嵌入`}
-              className="h-full w-full"
-              sandbox={AV_IFRAME_SANDBOX}
-              referrerPolicy="no-referrer"
-              loading="lazy"
-              allowFullScreen
-            />
-          </div>
+        ) : meta.mode === "embed" && /^https?:\/\//i.test(list[0].url) ? (
+          multi ? (
+            <AvEmbed items={list} title={detail.title} avKind={avKind} isAudio={isAudio} />
+          ) : (
+            // 单 P 嵌入页：服务端直出，不为此加载客户端组件。
+            // sandbox 只放行播放脚本；referrerPolicy 避免把本站地址带给外站
+            <div
+              className={
+                isAudio
+                  ? "aspect-video w-full border border-brand-200 bg-neutral-100"
+                  : "aspect-video w-full bg-black"
+              }
+            >
+              <iframe
+                src={list[0].url}
+                title={`${detail.title} · ${kindLabel}嵌入`}
+                className="h-full w-full"
+                sandbox={AV_IFRAME_SANDBOX}
+                referrerPolicy="no-referrer"
+                loading="lazy"
+                allowFullScreen
+              />
+            </div>
+          )
         ) : (
-          // key=url：换资源时整体重挂载，避免旧元素的播放进度/音量串到新文件上
           <AvControls
-            key={meta.url}
             kind={meta.kind}
-            src={meta.url}
+            items={list}
             poster={coverUrl}
             title={detail.title}
             downloadSlot={downloadSlot}
@@ -139,12 +172,12 @@ export function AvPlayerBlock({ ctx }: { ctx: DetailCtx }) {
         )}
       </div>
 
-      {!localFile && meta.url && (
+      {!localFile && primaryUrl && (
         <p className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-neutral-500">
           <Link2 size={12} aria-hidden />
           该来源由作者外链提供，本站不托管文件。
           <a
-            href={meta.url}
+            href={primaryUrl}
             target="_blank"
             rel="noreferrer noopener"
             className="inline-flex items-center gap-1 text-brand-700 hover:underline"

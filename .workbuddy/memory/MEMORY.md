@@ -144,4 +144,31 @@
 - 要核对 GFM 产出的真实 class 名（`contains-task-list` / `task-list-item` / `dataFootnotes`），
   用 node 拼 `unified + remark-parse + remark-gfm + remark-rehype` 打印 hast 树即可：
   离线、不用起服务、不落探针文件（`rehype-stringify` 没装，用 `.run(parse(md))` 拿树）。
+- **正文分隔线 / 表格格线的颜色是 `--md-rule`**（= `--brand-400`，亮暗自动跟随，同 `--md-marker`
+  的写法，不需要 dark 覆盖），**不是** `--md-border`（走 `--md-border` 的只剩 `blockquote`
+  的容器描边与编辑器）。分隔线是**点划线**：`border: 0` + `height: 1px` +
+  `repeating-linear-gradient` 画 `6px 划 / 3px 空 / 1px 点 / 3px 空`（CSS 没有 dot-dash 的
+  border-style）；表格格线是 `1px solid var(--md-rule)`，不用点划。
+- **代码（行内 code / pre / 表头）走 `--md-code-bg`（= `--brand-200`）与 `--md-code-fg`
+  （= `--brand-900`）**，两个都引用品牌阶、亮暗自动跟随，**没有 dark 覆盖**。
+  **别再改回中性灰**：`--md-text-lg`(#27272a) 是冷灰黑，压在暖底上发闷；`--md-border`(#e5e5e5)
+  对页面底只有 1.06:1。挑「浅底」档位前先算对比度 —— `brand-100` 只有 1.10:1，比老值还糊。
+
+## 音视频分P / 曲目
+
+- 数据：`meta.tracks`（`{title,url,duration?}`，≤ `AV_TRACKS_MAX` 60）**不含主来源那一 P**；
+  主来源仍是顶层 `url/duration`。存量数据零迁移。
+- **播放列表唯一拼装点 = `src/lib/av-tracks.ts` 的 `avPlaylist()`**（= `[主来源, ...tracks]`）。
+  编号口径：主来源 = P1；**只有分P 时 `tracks[0]` 才是 P1** —— 向导的行号、
+  播放器的列表序号都按这个来，别在别处再写一份拼装逻辑。
+- 文件分工：`detail/av-controls.tsx`（播放器本体）、`av-bar.tsx`（直角滑块）、
+  `av-playlist.tsx`（上一/下一按钮、列表开关、列表本体）、`av-embed.tsx`（**多 P** 嵌入页；
+  单 P 嵌入页由 `av-player` 服务端直出 iframe）、`lib/av-tracks.ts`（纯逻辑 + 标签文案）。
+- **切 P 只改 `src` + `load()`，不要用 `key={src}` 重挂载元素** —— 重挂载会把倍速、音量、
+  列表展开态一起重置。
+- **视频的分P 控件压在画面浮层上**（左侧上一集 / 右侧下一集 / 右上角列表），**不进控件行**：
+  320px 下控件行已经排满，再加三个 36px 按钮必横向溢出。音频放得下 → 留在控件行 + 卡片内列表。
+- 分P 只支持填地址；上传与自动抓取时长/封面只对主来源做。草稿字段 `avTracks`（JSON 原文）。
+- `parseMeta` 的音视频分支在整块 parse 失败后会**丢掉 tracks 再试一次**：tracks 是附加信息，
+  一条脏分P 不该把已落库的 `url` 一起拖进 `AV_META_FALLBACK`。
 

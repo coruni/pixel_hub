@@ -3,6 +3,7 @@
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { articleMetaSchema, avMetaSchema, gameMetaSchema, imageMetaSchema } from "@/lib/meta";
+import { parseAvTracksJson } from "@/lib/av-tracks";
 import { fillDownloadSizes } from "@/lib/download-size";
 import { asciiSlug, randomTail } from "@/lib/slug";
 import { findOrCreateTag, linkTag } from "@/lib/actions/_tags";
@@ -121,6 +122,8 @@ export async function applyResourceEdit(
       artist: str(fd, "artist") || undefined,
       duration: str(fd, "duration") || undefined,
       resolution: str(fd, "resolution") || undefined,
+      // 分P / 曲目（不含主来源），与发布侧同一套 schema
+      tracks: parseAvTracksJson(str(fd, "avTracks")),
       downloads,
     });
     if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };

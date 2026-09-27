@@ -29,8 +29,20 @@
   --md-marker: var(--brand-400);
   --md-link: #a84e31; /* 亮=品牌赤陶橙深阶（对齐暗色浅暖橙），不再用冷 slate 深蓝 */
   --md-link-hover: #8a4129; /* 亮：hover 再深一档（brand-800） */
-  --md-code-bg: #f0e9dd; /* 亮=暖米（对齐暗色暖深棕语义），不再用冷 neutral 灰 */
+  /* 代码（行内 code / 代码块 pre）与表头的暖浅底、代码文字色：都引用品牌阶而不是写死色值，
+     html.dark 会把 --brand-200 变成 #48362a、--brand-900 变成 #f7e2d4，这里自动跟随。
+     原来亮色底是 #f0e9dd（暖米）、文字走 --md-text-lg (#27272a 冷灰黑) —— 底色跟页面底
+     (#faf9f5) 只差 1.15:1，块感几乎没有，冷灰字压在暖米底上还发闷。
+     底色取 200 阶而不是 100 阶：brand-100 (#faece3) 对页面底只有 1.10:1，比改前还更糊；
+     brand-200 (#f4d9c8) 是 1.28:1，能看清是一块代码而不刺眼。 */
+  --md-code-bg: var(--brand-200);
+  --md-code-fg: var(--brand-900);
   --md-border: #e5e5e5;
+  /* 正文里的分隔线与表格格线：取品牌陶土橙 400 阶。引用 --brand-400 而不是写死色值 ——
+     暗色（html.dark）会把它覆盖成 #9a6c4c，这里跟着自动换，无需再写一份 dark 覆盖，
+     与上面的 --md-marker 同款做法。原来的 --md-border 中性灰在暖白底 (#faf9f5) 上
+     只有 1.06:1，跟没画一样。 */
+  --md-rule: var(--brand-400);
   /* 代码字体栈唯一来源：前台 .md-body 与编辑器（--crepe-font-code）都引用它，
      值是 Tailwind 默认 mono 栈，与改动前的前台渲染完全一致 */
   --md-font-code: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
@@ -94,7 +106,7 @@ html.dark {
   --md-muted: #9c978f;
   --md-link: #f0c9b2;
   --md-link-hover: #f7e2d4; /* 暗：hover 提亮至 brand-900 */
-  --md-code-bg: #2d2925;
+  /* --md-code-bg / --md-code-fg 不在这里覆盖：它们引用品牌阶，随上面的 brand 自动反转 */
   --md-border: #3a3631;
 
   --surface: #201b15; /* 卡片/面板暖黑（比页面背景略亮一档） */
@@ -296,15 +308,17 @@ summary {
   padding: 0.1rem 0.3rem;
   font-size: 0.85em;
   font-family: var(--md-font-code);
-  color: var(--md-text-lg); /* 与代码块 pre 同级实色，亮色下深于正文、暗色下亮于正文 */
+  color: var(--md-code-fg); /* 陶土深棕（亮） / 暖白（暗），不再是冷灰黑 */
 }
 .md-body pre {
   overflow-x: auto;
   border-radius: 0;
-  border: 1px solid var(--md-border); /* 像素语言：边框分隔，不靠黑底悬浮 */
-  background: var(--md-code-bg); /* 跟随明暗：亮=暖浅底，暗=暖深底 */
+  /* 比分割线的 --md-rule 深一档（brand-500）：它是压在同样带橙的代码底上的，
+     同一档橙会被自己的底色吃掉（1.70:1），深一档才有 2.31:1 的收边效果。 */
+  border: 1px solid var(--brand-500);
+  background: var(--md-code-bg);
   padding: 0.6rem 0.75rem;
-  color: var(--md-text-lg);
+  color: var(--md-code-fg);
 }
 .md-body pre code {
   background: transparent;
@@ -324,7 +338,7 @@ summary {
 }
 .md-body th,
 .md-body td {
-  border: 1px solid var(--md-border);
+  border: 1px solid var(--md-rule); /* 格线用品牌色，不用 --md-border（暖白底上看不见） */
   padding: 0.3rem 0.55rem;
   text-align: left;
   vertical-align: top;
@@ -340,9 +354,21 @@ summary {
   padding-left: 0.6rem;
   color: var(--md-muted);
 }
+/* 分割线：点划线（dot-dash）。CSS 的 border-style 只有 solid / dashed / dotted，
+   没有点划混合，所以用 repeating-linear-gradient 手画一个循环图案：
+   6px 划 + 3px 空 + 1px 点（在 1px 高的线上正好是一个像素方块）+ 3px 空，共 13px 一周期。
+   border 归零后再用 height 1px 的色带代替 —— 走 border 的话图案只能整段一种 style。 */
 .md-body hr {
   margin: 0.7rem 0;
-  border-color: var(--md-border);
+  border: 0;
+  height: 1px;
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--md-rule) 0 6px,
+    transparent 6px 9px,
+    var(--md-rule) 9px 10px,
+    transparent 10px 13px
+  );
 }
 .md-body img {
   max-width: 100%;
@@ -713,15 +739,15 @@ summary {
   padding: 0.1rem 0.3rem;
   font-size: 0.85em;
   line-height: inherit;
-  color: var(--md-text-lg);
+  color: var(--md-code-fg);
 }
 
 .md-editor .milkdown .ProseMirror pre {
   overflow-x: auto;
-  border: 1px solid var(--md-border);
+  border: 1px solid var(--brand-500);
   background: var(--md-code-bg);
   padding: 0.6rem 0.75rem;
-  color: var(--md-text-lg);
+  color: var(--md-code-fg);
   font-size: 0.85rem;
 }
 .md-editor .milkdown .ProseMirror pre code {

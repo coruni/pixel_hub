@@ -11,7 +11,7 @@
 // 自动读到的值只填「空字段」，用户手改过的字段不再覆盖。
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link2, Trash2, UploadCloud } from "lucide-react";
+import { Link2, Plus, Trash2, UploadCloud } from "lucide-react";
 import {
   avAcceptAttr,
   avExtsSample,
@@ -22,6 +22,8 @@ import {
   type AvMode,
   type AvSource,
 } from "@/lib/av";
+import { serializeAvTracks } from "@/lib/av-tracks";
+import { AV_TRACKS_MAX, type AvTrack } from "@/lib/meta";
 import { capturePoster, probeFile, probeSummary, probeUrl, type AvProbe } from "@/lib/av-probe";
 import { mbText, type UploadLimits } from "@/lib/upload-config";
 import { formatBytes } from "@/lib/format";
@@ -37,10 +39,15 @@ const btnBase =
 /** 可自动抓取的字段 */
 type FieldKey = "duration" | "artist" | "resolution";
 
+/** 分P 编辑行：形状与落库的 AvTrack 保持一致（url 允许暂时为空，序列化时过滤掉） */
+type TrackRow = AvTrack;
+
 export type AvSectionInitial = Partial<Record<FieldKey, string>> & {
   source?: AvSource;
   mode?: AvMode;
   url?: string;
+  /** 分P / 曲目（**不含主来源**那一 P；发布侧存的是 meta.tracks） */
+  tracks?: TrackRow[];
 };
 
 export function AvSection({
@@ -77,10 +84,29 @@ export function AvSection({
     artist: initial?.artist ?? "",
     resolution: initial?.resolution ?? "",
   });
+  // 分P / 曲目（不含主来源那一 P）
+  const [tracks, setTracks] = useState<TrackRow[]>(
+    () => initial?.tracks?.map((t) => ({ title: t.title ?? "", url: t.url ?? "" })) ?? [],
+  );
 
   const isAudio = avKind === "audio";
   const label = avClassFor(avKind);
   const acceptedExts = avExtsSample(avKind, 8);
+  const unit = isAudio ? "曲目" : "分P";
+
+  /** 列表行的展示序号：主来源已填时它是第 2 个起，否则就是第 1 个（与 avPlaylist 的拼装口径一致） */
+  const trackNo = (i: number) => i + (url.trim() ? 2 : 1);
+  const setTrack = (i: number, patch: Partial<TrackRow>) =>
+    setTracks((prev) => prev.map((t, j) => (j === i ? { ...t, ...patch } : t)));
+  const removeTrack = (i: number) => setTracks((prev) => prev.filter((_, j) => j !== i));
+  function addTrack() {
+    if (tracks.length >= AV_TRACKS_MAX - 1) {
+      setMsg(`${unit}最多 ${AV_TRACKS_MAX} 条`);
+      return;
+    }
+    setMsg(null);
+    setTracks((prev) => [...prev, { title: "", url: "" }]);
+  }
 
   // 同步镜像：applyProbe 需要在同一次调用内读到最新值（setState 更新器是延迟执行的）
   const fieldsRef = useRef(fields);
@@ -348,6 +374,70 @@ export function AvSection({
             嵌入页适合分享页地址（如 B 站 / YouTube）；部分站点禁止被嵌套，届时页面会提示打不开。
           </p>
         )}
+      </div>
+
+      {/* ---- 分P / 曲目 ---- */}
+      <div>
+        <span className={wizLabel}>{unit}列表</span>
+        <p className="mb-2 text-[11px] leading-4 text-neutral-400">
+          整张专辑 / 剧集把其余{unit}填在这里，播放器按顺序播放并支持
+          {isAudio ? "上一曲 / 下一曲" : "上一集 / 下一集"}；只填地址（外链或已上传的站内路径）。
+          {/* 序号随上面那栏是否已填而变：主来源为空时这份列表就是第 1 个起（见 avPlaylist） */}
+          {url.trim() ? "上面那栏算第一个。" : "上面那栏留空时，这里从第一个开始算。"}
+        </p>
+        {tracks.length > 0 && (
+          <ul className="space-y-2">
+            {tracks.map((t, i) => (
+              <li
+                key={i}
+                className="grid items-center gap-2 sm:grid-cols-[3.5rem_minmax(0,1fr)_minmax(0,1.5fr)_2.5rem]"
+              >
+                <span className="text-xs tabular-nums text-neutral-400">
+                  {isAudio ? `曲目 ${trackNo(i)}` : `P${trackNo(i)}`}
+                </span>
+                <input
+                  value={t.title}
+                  onChange={(e) => setTrack(i, { title: e.target.value })}
+                  maxLength={120}
+                  placeholder="标题（可留空）"
+                  aria-label={`第 ${trackNo(i)} ${unit}的标题`}
+                  className={wizInput}
+                />
+                <input
+                  value={t.url}
+                  onChange={(e) => setTrack(i, { url: e.target.value })}
+                  maxLength={2000}
+                  placeholder="https://… 或 /uploads/…"
+                  aria-label={`第 ${trackNo(i)} ${unit}的地址`}
+                  className={wizInput}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <Button
+                  type="button"
+                  onClick={() => removeTrack(i)}
+                  aria-label={`删除第 ${trackNo(i)} ${unit}`}
+                  className="rounded-none border border-brand-200 p-2.5 text-neutral-500 hover:border-red-300 hover:text-red-600"
+                >
+                  <Trash2 size={15} />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="mt-2">
+          <Button
+            type="button"
+            onClick={addTrack}
+            className={`${btnBase} border-brand-200 bg-surface text-neutral-600 hover:border-brand-400 hover:text-brand-700`}
+          >
+            <Plus size={14} aria-hidden />
+            添加{unit}
+          </Button>
+        </div>
+        {/* 受控序列化（与 downloads 同款）：地址为空的行不提交，服务端按 avMetaSchema.tracks 再校验一次 */}
+        <input type="hidden" name="avTracks" value={serializeAvTracks(tracks)} />
+        {fieldErr(fieldErrors?.tracks)}
       </div>
 
       {/* ---- 类型补充字段（自动抓取，可手改） ---- */}

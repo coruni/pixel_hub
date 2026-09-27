@@ -6,6 +6,7 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { imageMetaSchema, gameMetaSchema, articleMetaSchema, avMetaSchema } from "@/lib/meta";
+import { parseAvTracksJson } from "@/lib/av-tracks";
 import { fillDownloadSizes } from "@/lib/download-size";
 import { autoSlugBase, randomTail, uniqueSlug } from "@/lib/slug";
 import { revalidatePath } from "next/cache";
@@ -126,6 +127,8 @@ export async function createResourceAction(
       artist: String(fd.get("artist") ?? "").trim() || undefined,
       duration: String(fd.get("duration") ?? "").trim() || undefined,
       resolution: String(fd.get("resolution") ?? "").trim() || undefined,
+      // 分P / 曲目（不含主来源）：坏 JSON 交给 parseAvTracksJson 吞掉，形状由 schema 校验
+      tracks: parseAvTracksJson(String(fd.get("avTracks") ?? "")),
       downloads,
     });
     if (!am.success) return { fieldErrors: am.error.flatten().fieldErrors };

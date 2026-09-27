@@ -27,6 +27,7 @@ import {
   draftHasContent,
   draftPayloadSchema,
   draftTimeText,
+  draftTracksOf,
   type DraftPayload,
 } from "@/lib/draft";
 import MdEditor from "@/components/rte/MdEditorLazy";
@@ -668,5 +669,6 @@ function avInitial(d: DraftPayload | null) {
     duration: d.duration,
     artist: d.artist,
     resolution: d.resolution,
+    tracks: draftTracksOf(d),
   };
 }

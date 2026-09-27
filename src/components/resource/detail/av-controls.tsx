@@ -6,25 +6,21 @@
  * 为什么不用原生 `<audio controls>` / `<video controls>`：UA 外观是「圆角药丸 + 灰渐变底」，
  * 且各浏览器自成一派（Chrome 的 ⋮ 菜单与音量条、Safari 的另一套），既破坏全站直角像素语言，
  * 又因为活在 shadow 内部而无法用 CSS 触及。这里只保留媒体元素本身，控件全部自绘：
- * 可拖拽进度条、可键盘操作的滑块、tabular-nums 时间、音量 / 倍速 / 循环，视频额外有全屏。
+ * 可拖拽进度条、可键盘操作的滑块（滑块本体见 av-bar.tsx）、tabular-nums 时间、音量 / 倍速 / 循环，
+ * 视频额外有全屏。分P 列表的三个部件（上一/下一、列表开关、列表本体）见 av-playlist.tsx。
  *
  * 形态差异：音频没有画面 → 自己画一张直角卡片（边框 + 控件行）；
  * 视频自带黑底与 16:9 画幅 → 不包边框，控件以底部渐变浮层叠在画面上（鼠标静止 2.6s 自动淡出）。
  *
+ * 多 P（分P / 曲目）：`items` 是完整播放列表（长度 1 = 单 P，行为与改造前一致）。
+ * 上一/下一、列表切换都在本组件里做，切换只改 `<video>/<audio>` 的 src 并 `load()`——
+ * 不重新挂载元素，否则列表展开态、倍速、音量会一起被重置。列表最后一项播完自动续下一项（loop 开启时不续）。
+ *
  * 与宿主的契约：`downloadSlot` 是宿主（av-player，服务端组件）注入的控件位——下载入口由宿主渲染
- * （保留登录墙与下载计数的唯一实现），这里只负责把它排进控件行并保证色调一致。
+ * （保留登录墙与下载计数的唯一实现），这里只负责把它排进控件行并保证色调一致。多 P 时它指向第一 P。
  */
 
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type KeyboardEvent,
-  type PointerEvent,
-  type ReactNode,
-  type RefObject,
-} from "react";
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Loader, Maximize, Minimize, Pause, Play, Repeat, Volume1, Volume2, VolumeX } from "lucide-react";
 import {
   AV_CTRL_BTN as BTN_BASE,
@@ -33,6 +29,9 @@ import {
   AV_CTRL_ON_SURFACE as AUDIO_OFF,
   AV_CTRL_ON_SURFACE_ACTIVE as AUDIO_ON,
 } from "@/lib/ui/cls";
+import { avItemLabel, type AvPlayItem } from "@/lib/av-tracks";
+import { AvListToggle, AvStepButton, AvTrackList } from "./av-playlist";
+import Bar from "./av-bar";
 
 /** 倍速档位（循环切换） */
 const RATES = [0.5, 1, 1.25, 1.5, 2];
@@ -52,128 +51,34 @@ function fmt(sec: number): string {
 // —— 控件样式：布局与配色分开，激活态整串替换，避免同属性类名互相覆盖 ——
 // 常量统一放 @/lib/ui/cls（宿主 av-player 渲染的下载控件要用同一套色调，见 props.downloadSlot）
 
-/**
- * 直角滑块：4px 轨道 + 3×12px 方形游标，指针拖动 + 键盘（←→ 5%、Home/End）。
- * `live` 为真时拖动过程即时回调（音量）；否则松手才回调（进度条，避免拖动中反复 seek）。
- */
-function Bar({
-  ratio,
-  buffer = 0,
-  onScrub,
-  label,
-  live,
-  tone,
-  className,
-}: {
-  ratio: number;
-  buffer?: number;
-  onScrub: (r: number) => void;
-  label: string;
-  live?: boolean;
-  tone: "onDark" | "onSurface";
-  className?: string;
-}) {
-  const trackRef = useRef<HTMLDivElement>(null);
-  const draggingRef = useRef(false);
-  const [drag, setDrag] = useState<number | null>(null);
-  const shown = Math.min(1, Math.max(0, drag ?? ratio));
-  const c =
-    tone === "onDark"
-      ? { track: "bg-white/25", buf: "bg-white/40", fill: "bg-brand-500", knob: "bg-white" }
-      : { track: "bg-neutral-200", buf: "bg-neutral-300", fill: "bg-brand-500", knob: "bg-brand-700" };
-
-  const ratioAt = useCallback((clientX: number) => {
-    const el = trackRef.current;
-    if (!el) return 0;
-    const r = el.getBoundingClientRect();
-    return r.width > 0 ? Math.min(1, Math.max(0, (clientX - r.left) / r.width)) : 0;
-  }, []);
-
-  const stopDrag = () => {
-    draggingRef.current = false;
-    setDrag(null);
-  };
-
-  return (
-    <div
-      ref={trackRef}
-      role="slider"
-      tabIndex={0}
-      aria-label={label}
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-valuenow={Math.round(shown * 100)}
-      onPointerDown={(e: PointerEvent<HTMLDivElement>) => {
-        e.currentTarget.setPointerCapture(e.pointerId);
-        draggingRef.current = true;
-        const v = ratioAt(e.clientX);
-        setDrag(v);
-        if (live) onScrub(v);
-      }}
-      onPointerMove={(e: PointerEvent<HTMLDivElement>) => {
-        if (!draggingRef.current) return;
-        const v = ratioAt(e.clientX);
-        setDrag(v);
-        if (live) onScrub(v);
-      }}
-      onPointerUp={(e: PointerEvent<HTMLDivElement>) => {
-        if (!draggingRef.current) return;
-        const v = ratioAt(e.clientX);
-        stopDrag();
-        onScrub(v);
-      }}
-      onPointerCancel={stopDrag}
-      onKeyDown={(e: KeyboardEvent<HTMLDivElement>) => {
-        let next: number | null = null;
-        if (e.key === "ArrowRight" || e.key === "ArrowUp") next = shown + 0.05;
-        else if (e.key === "ArrowLeft" || e.key === "ArrowDown") next = shown - 0.05;
-        else if (e.key === "Home") next = 0;
-        else if (e.key === "End") next = 1;
-        if (next === null) return;
-        e.preventDefault();
-        onScrub(Math.min(1, Math.max(0, next)));
-      }}
-      className={`relative flex cursor-pointer touch-none items-center py-2 outline-none focus-visible:ring-2 focus-visible:ring-brand-400 ${
-        className ?? ""
-      }`}
-    >
-      <span className={`relative h-1 w-full overflow-hidden ${c.track}`}>
-        {buffer > 0 && (
-          <span
-            className={`absolute inset-y-0 left-0 ${c.buf}`}
-            style={{ width: `${Math.min(1, buffer) * 100}%` }}
-          />
-        )}
-        <span className={`absolute inset-y-0 left-0 ${c.fill}`} style={{ width: `${shown * 100}%` }} />
-      </span>
-      <span
-        className={`pointer-events-none absolute top-1/2 h-3 w-[3px] ${c.knob}`}
-        style={{ left: `${shown * 100}%`, transform: "translate(-50%, -50%)" }}
-      />
-    </div>
-  );
-}
-
 /** 音视频播放器本体（MUSIC / VIDEO 共用） */
 export default function AvControls({
   kind,
-  src,
+  items,
   poster,
   title,
   downloadSlot,
 }: {
   kind: "MUSIC" | "VIDEO";
-  src: string;
+  /** 播放列表（长度 1 = 单 P）；宿主已保证非空 */
+  items: AvPlayItem[];
   poster?: string;
   title: string;
   /** 宿主注入的控件位（当前放下载入口）：由 av-player 渲染，色调与播放器控件一致，融进同一行 */
   downloadSlot?: ReactNode;
 }) {
   const isVideo = kind === "VIDEO";
+  const avKind = isVideo ? "video" : "audio";
   const mediaRef = useRef<HTMLMediaElement | null>(null);
   const shellRef = useRef<HTMLDivElement | null>(null);
   const hideRef = useRef<number | null>(null);
+  /** 切 P 后是否要接着播（手动切歌时保留播放态；自然播完自动续下一 P） */
+  const wantPlayRef = useRef(false);
+  /** 跳过首次挂载的 load()：浏览器已经在加载首 P，再 load 一次等于白跑一趟 */
+  const mountedRef = useRef(false);
 
+  const [idx, setIdx] = useState(0);
+  const [listOpen, setListOpen] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [current, setCurrent] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -187,6 +92,39 @@ export default function AvControls({
   const [failed, setFailed] = useState(false);
   // 视频浮层控件的显示态（仅视频用；音频卡片里的控件常驻）
   const [uiOn, setUiOn] = useState(true);
+
+  // items 理论上不会变（详情页一个资源一份列表），但 idx 越界会直接崩在 src 取值上，夹一下更稳
+  const at = Math.min(idx, items.length - 1);
+  const item = items[at];
+  const src = item.url;
+  const multi = items.length > 1;
+  /** 媒体元素的可访问名：多 P 时带上当前 P，屏幕阅读器才知道切到哪一集了 */
+  const mediaLabel = multi ? `${title} · ${avItemLabel(item, at, avKind)}` : title;
+
+  /** 切到第 n P：保留当前播放态（暂停中就仍是暂停），失败态清掉等新源重新判定 */
+  const goTo = (n: number) => {
+    if (n < 0 || n >= items.length || n === at) return;
+    wantPlayRef.current = !(mediaRef.current?.paused ?? true);
+    setIdx(n);
+    setFailed(false);
+  };
+
+  // 换源：清掉旧的进度/缓冲/时长，再 load() 让浏览器重新解析（只改 src 属性不会重置 buffered）
+  useEffect(() => {
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      return;
+    }
+    const m = mediaRef.current;
+    setCurrent(0);
+    setBuffered(0);
+    setDuration(0);
+    setWaiting(false);
+    if (!m) return;
+    m.load();
+    if (wantPlayRef.current) void m.play().catch(() => undefined);
+    wantPlayRef.current = false;
+  }, [src]);
 
   /** 视频控件淡出计时器：指针静止一段时间后收起，避免一直压在画面上 */
   const armHide = () => {
@@ -247,6 +185,12 @@ export default function AvControls({
     setUiOn(true);
   };
   const onEnded = () => {
+    // 多 P：播完自动续下一 P。开了循环时 ended 根本不触发（元素自己循环）——那是「单曲循环」的口径。
+    if (at < items.length - 1) {
+      wantPlayRef.current = true;
+      setIdx(at + 1);
+      return;
+    }
     setPlaying(false);
     clearHide();
     setUiOn(true);
@@ -333,10 +277,16 @@ export default function AvControls({
       ref={shellRef}
       className="relative bg-black"
       onPointerMove={() => {
-        if (!uiOn) reveal();
+        // 列表展开时不让浮层淡出：正看着选集，控件消失会把面板一起带走
+        if (listOpen) {
+          setUiOn(true);
+          clearHide();
+        } else if (!uiOn) reveal();
         else if (playing) armHide();
       }}
-      onFocusCapture={reveal}
+      onFocusCapture={() => {
+        if (!listOpen) reveal();
+      }}
     >
       <div className="relative aspect-video w-full">
         <video
@@ -346,7 +296,7 @@ export default function AvControls({
           preload="metadata"
           playsInline
           loop={loop}
-          aria-label={title}
+          aria-label={mediaLabel}
           className="block h-full w-full bg-black"
           {...mediaEvents}
         />
@@ -369,6 +319,68 @@ export default function AvControls({
             />
           </span>
         </button>
+
+        {/* 多 P 浮层：上一/下一在画面两侧、列表开关在右上角。
+            不放进下方控件行是有原因的——320px 下那一行已经排满，再塞三个按钮必然横向溢出。 */}
+        {multi && (
+          <>
+            <div
+              className={`absolute left-2 top-1/2 -translate-y-1/2 border border-white/25 bg-black/55 transition-opacity ${
+                uiOn ? "opacity-100" : "pointer-events-none opacity-0"
+              }`}
+            >
+              <AvStepButton
+                dir={-1}
+                avKind={avKind}
+                index={at}
+                count={items.length}
+                onGo={goTo}
+                tone="onDark"
+                size="lg"
+              />
+            </div>
+            <div
+              className={`absolute right-2 top-1/2 -translate-y-1/2 border border-white/25 bg-black/55 transition-opacity ${
+                uiOn ? "opacity-100" : "pointer-events-none opacity-0"
+              }`}
+            >
+              <AvStepButton
+                dir={1}
+                avKind={avKind}
+                index={at}
+                count={items.length}
+                onGo={goTo}
+                tone="onDark"
+                size="lg"
+              />
+            </div>
+            <div
+              className={`absolute right-2 top-2 border border-white/25 bg-black/55 transition-opacity ${
+                uiOn ? "opacity-100" : "pointer-events-none opacity-0"
+              }`}
+            >
+              <AvListToggle
+                open={listOpen}
+                index={at}
+                count={items.length}
+                tone="onDark"
+                onToggle={() => setListOpen((v) => !v)}
+              />
+            </div>
+          </>
+        )}
+
+        {multi && listOpen && (
+          <AvTrackList
+            className="absolute right-2 top-14 w-56 max-w-[calc(100%-1rem)]"
+            style={{ maxHeight: "62%" }}
+            items={items}
+            index={at}
+            avKind={avKind}
+            tone="onDark"
+            onPick={goTo}
+          />
+        )}
 
         <div
           className={`absolute inset-x-0 bottom-0 transition-opacity ${
@@ -448,23 +460,45 @@ export default function AvControls({
         src={src}
         preload="metadata"
         loop={loop}
-        aria-label={title}
+        aria-label={mediaLabel}
         className="hidden"
         {...mediaEvents}
       />
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <button
-          type="button"
-          onClick={toggle}
-          aria-label={playing ? "暂停" : "播放"}
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-none border border-brand-200 bg-brand-50 text-brand-700 transition hover:border-brand-400 hover:bg-brand-100 focus-visible:ring-2 focus-visible:ring-brand-400"
-        >
-          <PlayIcon
-            size={18}
-            className={waiting ? "animate-spin motion-reduce:animate-none" : undefined}
-            aria-hidden
-          />
-        </button>
+        <div className="flex shrink-0 items-center gap-0.5">
+          {multi && (
+            <AvStepButton
+              dir={-1}
+              avKind={avKind}
+              index={at}
+              count={items.length}
+              onGo={goTo}
+              tone="onSurface"
+            />
+          )}
+          <button
+            type="button"
+            onClick={toggle}
+            aria-label={playing ? "暂停" : "播放"}
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-none border border-brand-200 bg-brand-50 text-brand-700 transition hover:border-brand-400 hover:bg-brand-100 focus-visible:ring-2 focus-visible:ring-brand-400"
+          >
+            <PlayIcon
+              size={18}
+              className={waiting ? "animate-spin motion-reduce:animate-none" : undefined}
+              aria-hidden
+            />
+          </button>
+          {multi && (
+            <AvStepButton
+              dir={1}
+              avKind={avKind}
+              index={at}
+              count={items.length}
+              onGo={goTo}
+              tone="onSurface"
+            />
+          )}
+        </div>
         <span className="shrink-0 text-xs tabular-nums text-neutral-500">
           {fmt(current)} / {total}
         </span>
@@ -505,9 +539,29 @@ export default function AvControls({
           >
             <Repeat size={16} aria-hidden />
           </button>
+          {multi && (
+            <AvListToggle
+              open={listOpen}
+              index={at}
+              count={items.length}
+              tone="onSurface"
+              onToggle={() => setListOpen((v) => !v)}
+            />
+          )}
           {downloadSlot}
         </div>
       </div>
+      {/* 音频卡片里的列表常驻在卡片内（不像视频那样浮在画面上）：卡片本来就占位，撑开即可 */}
+      {multi && listOpen && (
+        <AvTrackList
+          className="mt-3"
+          items={items}
+          index={at}
+          avKind={avKind}
+          tone="onSurface"
+          onPick={goTo}
+        />
+      )}
       {failed && <p className="mt-2 text-xs text-red-600">播放源加载失败，可下载原件后本地播放。</p>}
     </div>
   );

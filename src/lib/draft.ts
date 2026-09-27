@@ -73,6 +73,7 @@ export const draftPayloadSchema = z.object({
   avSource: text(16),
   avUrl: text(2000),
   avMode: text(16),
+  avTracks: text(20000), // 分P / 曲目 JSON 原文（与 downloads 同款受控序列化）
   duration: text(40),
   artist: text(160),
   resolution: text(40),
@@ -121,6 +122,7 @@ export function draftHasContent(p: DraftPayload): boolean {
     p.resolution,
   ];
   if (texts.some((t) => t.trim() !== "")) return true;
+  if (p.avTracks.trim() !== "" && p.avTracks.trim() !== "[]") return true;
   return p.downloads.trim() !== "" && p.downloads.trim() !== "[]";
 }
 
@@ -166,13 +168,29 @@ export function draftDownloadsOf(p: DraftPayload): DraftDownloadItem[] {
   }
 }
 
-/** 列表摘要：简介 → 正文 → 下载源地址 → 音频地址，都没有则空 */
+/** 草稿里的分P / 曲目清单（avTracks JSON 原文）；坏数据一律回落空数组，绝不抛错 */
+export function draftTracksOf(p: DraftPayload): { title: string; url: string }[] {
+  try {
+    const arr: unknown = JSON.parse(p.avTracks || "[]");
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .filter((t): t is Record<string, unknown> => !!t && typeof t === "object")
+      .map((t) => ({ title: String(t.title ?? ""), url: String(t.url ?? "") }))
+      .filter((t) => t.url.trim() !== "");
+  } catch {
+    return [];
+  }
+}
+
+/** 列表摘要：简介 → 正文 → 下载源地址 → 音视频地址（主来源 / 分P 首条），都没有则空 */
 export function draftExcerptOf(p: DraftPayload, max = 72): string {
   const src =
     p.summary.trim() ||
     plainText(p.description) ||
     draftDownloadsOf(p)[0]?.url.trim() ||
-    p.avUrl.trim();
+    p.avUrl.trim() ||
+    draftTracksOf(p)[0]?.url.trim() ||
+    "";
   if (!src) return "";
   return src.length > max ? `${src.slice(0, max)}…` : src;
 }
@@ -184,7 +202,9 @@ export function draftReadyHint(p: DraftPayload): string | null {
   if (p.description.trim().length < 10) return "还差描述";
   // 发布页已无独立「下载外链」输入，GAME 的下载地址只存在于 downloads 清单里
   if (p.type === "GAME" && !draftDownloadsOf(p).some((d) => d.url.trim())) return "还差下载源";
-  if ((p.type === "MUSIC" || p.type === "VIDEO") && !p.avUrl.trim()) return "还差来源地址";
+  // 主来源可以空——只要分P 里有一条就成立（与 avMetaSchema 的校验口径一致）
+  if ((p.type === "MUSIC" || p.type === "VIDEO") && !p.avUrl.trim() && draftTracksOf(p).length === 0)
+    return "还差来源地址";
   // 封面类（游戏/文章/音乐/视频）封面可选，不据此拦发布；IMAGE 仍需至少一张预览图
   if (!isSingleCoverType(p.type) && !p.coverId && p.media.length === 0) return "还差图片";
   return null;
@@ -245,6 +265,7 @@ export function collectDraft(
     avSource: str("avSource"),
     avUrl: str("avUrl"),
     avMode: str("avMode"),
+    avTracks: str("avTracks"),
     duration: str("duration"),
     artist: str("artist"),
     resolution: str("resolution"),

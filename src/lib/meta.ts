@@ -1,6 +1,7 @@
 // Resource.meta：按类型分型的 JSON 文本。这里统一 zod 校验/解析。
 // 数据库里存 JSON.stringify 的字符串（SQLite 兼容），读取出 parseMeta。
 import { z } from "zod";
+import { AV_CAPTION_TEXT_MAX, AV_CAPTIONS_MAX, CAPTION_FORMATS } from "@/lib/captions";
 
 // 下载地址：http(s) 外链或站内附件 /uploads 路径（与 commonFields.externalUrl 同规则）
 const urlLike = (v: string) => !v || /^https?:\/\/.+/i.test(v) || /^\/[^/].*$/i.test(v);
@@ -95,6 +96,48 @@ export type ArticleMeta = z.infer<typeof articleMetaSchema>;
 export const AV_SOURCES = ["mount", "file"] as const;
 export const AV_MODES = ["direct", "embed"] as const;
 
+/** 分P 上限：够放一张专辑 / 一季剧集，又不至于把 meta 与播放器列表撑爆 */
+export const AV_TRACKS_MAX = 60;
+
+/**
+ * 单个分P / 曲目。**不含主来源那一 P**（主来源仍是顶层 url/duration，见 avMetaSchema）——
+ * 这样存量数据（只有 url）零迁移就是「单 P 资源」，播放列表由 lib/av-tracks.ts 统一拼装。
+ *
+ * 分P 的标题可留空（列表里回退显示「P3 / 曲目 3」）；时长可留空（不会自动抓取，
+ * 抓取只对向导里手动上传的主文件做，见 av-section.tsx）。
+ */
+export const avTrackSchema = z.object({
+  title: z.string().trim().max(120, "标题过长").default(""),
+  url: z
+    .string()
+    .trim()
+    .min(1, "请填写分P 地址")
+    .max(2000, "地址过长")
+    .refine(urlLike, "地址需为 http(s):// 外链或站内文件路径"),
+  duration: z.string().trim().max(20).optional(),
+});
+export type AvTrack = z.infer<typeof avTrackSchema>;
+
+/**
+ * 一份字幕 / 歌词。
+ *
+ * 文本**直接内联在 meta 里**，不存地址：站内云盘引用（/od/…）会 302 到不带 CORS 头的 Graph
+ * 预鉴权链接，客户端拉不到；内联既绕开这一点，也省掉一个「本站转发字节」的代理路由。
+ * 代价是 meta 会变大，所以文本有硬上限（见 AV_CAPTION_TEXT_MAX），且 feedSelect 不取 meta。
+ *
+ * 格式由作者在向导里选定（可被内容嗅探纠偏），解析在浏览器做（见 lib/captions.ts）。
+ * `label` 是多语言 / 多版本时的展示名（可空，空则回退「字幕 1」）。
+ */
+export const avCaptionSchema = z.object({
+  label: z.string().trim().max(60).default(""),
+  format: z.enum(CAPTION_FORMATS).default("srt"),
+  text: z
+    .string()
+    .min(1, "字幕内容为空")
+    .max(AV_CAPTION_TEXT_MAX, `单份字幕文本不能超过 ${AV_CAPTION_TEXT_MAX} 字符`),
+});
+export type AvCaption = z.infer<typeof avCaptionSchema>;
+
 export const avMetaSchema = z
   .object({
     source: z.enum(AV_SOURCES).default("mount"),
@@ -103,31 +146,46 @@ export const avMetaSchema = z
     artist: z.string().trim().max(80).optional(), // 音乐：艺术家（自动读取）
     duration: z.string().trim().max(20).optional(), // 时长，如 3:42
     resolution: z.string().trim().max(20).optional(), // 视频：分辨率，如 1080p
+    /** 分P / 曲目（不含主来源）；空数组 = 单 P 资源，与存量数据同形 */
+    tracks: z.array(avTrackSchema).max(AV_TRACKS_MAX, `分P 不能超过 ${AV_TRACKS_MAX} 条`).default([]),
+    /** 字幕 / 歌词（整份资源共用；音频显示为滚动歌词，视频叠在画面上） */
+    captions: z
+      .array(avCaptionSchema)
+      .max(AV_CAPTIONS_MAX, `字幕不能超过 ${AV_CAPTIONS_MAX} 条`)
+      .default([]),
     downloads: z.array(articleItemSchema).max(20).default([]),
   })
   .superRefine((d, cx) => {
-    if (!d.url)
+    // 主来源可以为空——只要有分P 就成立（作者可能把每一集都填进分P 列表里）
+    if (!d.url && d.tracks.length === 0)
       cx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["url"],
         message: d.source === "file" ? "请上传音频/视频文件" : "请填写在线音频/视频地址",
       });
-    else if (!urlLike(d.url))
+    else if (d.url && !urlLike(d.url))
       cx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["url"],
         message: "地址需为 http(s):// 外链或站内文件路径",
       });
-    else if (d.source === "mount" && !/^https?:\/\/.+/i.test(d.url))
+    else if (d.url && d.source === "mount" && !/^https?:\/\/.+/i.test(d.url))
       cx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["url"],
         message: "在线挂载需填写 http(s):// 开头的外部地址",
       });
-    else if (d.mode === "embed" && !/^https?:\/\/.+/i.test(d.url))
+    else if (d.url && d.mode === "embed" && !/^https?:\/\/.+/i.test(d.url))
       cx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["url"],
+        message: "嵌入页挂载需填写 http(s):// 开头的页面地址",
+      });
+    // 嵌入页的分P 也是挂 iframe，站内路径会被浏览器当相对地址解析 → 一律要求绝对页面地址
+    if (d.mode === "embed" && d.tracks.some((t) => !/^https?:\/\/.+/i.test(t.url)))
+      cx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["tracks"],
         message: "嵌入页挂载需填写 http(s):// 开头的页面地址",
       });
   });
@@ -138,6 +196,8 @@ export const AV_META_FALLBACK: AvMeta = {
   source: "mount",
   mode: "direct",
   url: "",
+  tracks: [],
+  captions: [],
   downloads: [],
 };
 
@@ -178,9 +238,25 @@ export function parseMeta(kind: ResourceMetaKind, raw: string | null): ResourceM
   }
   // 音视频共用同一套 schema：source/mode/url + 各自的补充字段
   if (kind === "MUSIC" || kind === "VIDEO") {
-    const r = avMetaSchema.safeParse(obj);
-    const data = r.success ? r.data : AV_META_FALLBACK;
-    return kind === "MUSIC" ? { kind: "MUSIC", ...data } : { kind: "VIDEO", ...data };
+    // tracks / captions 都是附加信息：**一条脏分P 或超长字幕不该把主来源一起拖没**——
+    // 历史数据里 url 已经落库，若整块回落到 AV_META_FALLBACK，播放卡会直接变成
+    // 「作者未提供播放来源」。所以逐级降级：先丢字幕（长文本最容易被旧上限卡住），
+    // 再丢分P，仍失败才走兜底。
+    const attempts = [
+      obj,
+      { ...(obj as object), captions: [] },
+      { ...(obj as object), tracks: [], captions: [] },
+    ];
+    let data: AvMeta | null = null;
+    for (const candidate of attempts) {
+      const r = avMetaSchema.safeParse(candidate);
+      if (r.success) {
+        data = r.data;
+        break;
+      }
+    }
+    const meta = data ?? AV_META_FALLBACK;
+    return kind === "MUSIC" ? { kind: "MUSIC", ...meta } : { kind: "VIDEO", ...meta };
   }
   const r = imageMetaSchema.safeParse(obj);
   return { kind: "IMAGE", ...(r.success ? r.data : imageMetaSchema.parse({})) };
