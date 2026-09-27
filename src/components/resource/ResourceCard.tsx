@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Download, Heart, MessageSquare, Star } from "lucide-react";
+import { Download, Heart, MessageSquare, Pin, Sparkles, Star } from "lucide-react";
 import type { FeedCard } from "@/lib/queries";
 import { formatCount } from "@/lib/format";
 import { CARD_DEFAULT_ASPECT, CARD_RATIOS, TYPE_LABEL, type CardRatio } from "@/lib/display";
@@ -75,6 +75,31 @@ export default function ResourceCard({
         />
         <span className="sr-only">{TYPE_LABEL[item.type] ?? item.type}</span>
       </span>
+
+      {/* 右上角运营标记（仅管理员可设，见 lib/actions/moderation.ts）：置顶 / 精华。
+          挂在封面固定深底上，所以取亮阶文字；两个都显示时竖排，不挤占标题区。 */}
+      {(item.pinned || item.featured) && (
+        <span className="absolute right-2 top-2 flex flex-col items-end gap-1">
+          {item.pinned && (
+            <span
+              title="置顶"
+              className="inline-flex items-center gap-1 rounded-none border border-brand-500 bg-stone-900/85 px-1.5 py-0.5 text-[10px] font-medium text-brand-200"
+            >
+              <Pin size={11} aria-hidden />
+              置顶
+            </span>
+          )}
+          {item.featured && (
+            <span
+              title="精华"
+              className="inline-flex items-center gap-1 rounded-none border border-amber-400 bg-stone-900/85 px-1.5 py-0.5 text-[10px] font-medium text-amber-300"
+            >
+              <Sparkles size={11} aria-hidden />
+              精华
+            </span>
+          )}
+        </span>
+      )}
 
       {/* 底部渐变 + 全覆盖信息。遮罩用固定 px 高度（非 %）：卡片统一比例后信息带等高，px 版不随比例变化 */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-[linear-gradient(to_top,rgba(0,0,0,.92)_0px,rgba(0,0,0,.92)_68px,transparent_68px)] px-3 pb-2 pt-9">

@@ -41,8 +41,12 @@
 - 两槽**不做跨槽回落**：只设了桌面端时移动端就是素底，不拿横图去填竖屏。
 - 遮罩类唯一事实来源：`globals.css` 的 `.profile-bg-pc`（左右两条带，中段 alpha 0）/
   `.profile-bg-mobile`（**整张均匀半透明 alpha 0.5，不分区域**）；显示切换靠 Tailwind
-  `hidden sm:block` / `sm:hidden`。移动端默认值同时存在于 `upload-config.ts` 的
-  `PROFILE_BG_MOBILE_MASK_DEFAULT`，两处必须同步改。
+  `hidden sm:block` / `sm:hidden`。
+- **遮罩默认值分槽，取默认值必须先问槽位**：`safeBgMask(raw, slot)` 的 `slot` 不能省
+  （`PROFILE_BG_MASK_DEFAULTS` 是唯一映射）。返回值是**内联** `--profile-bg-mask` 传下去的，
+  内联优先级高于 `.profile-bg-*` 类自带的那份默认值 —— 传错槽位不会报错，只是静默套上另一端
+  形状（本次事故：移动端永远显示桌面端左右两条带）。`isValidBgMask` 只管形状、不掺默认值，
+  填的恰好是另一端形状也算合法。
 - 设置页 `ProfileBgForm.tsx` 里 `BgSlotForm` 是两槽共用的槽组件；两槽的字段名映射收在
   `lib/actions/settings.ts` 的 `bgKeyData` / `bgMaskData` / `bgKeyOf`（Prisma update 是强类型的，
   不能拼动态键名）。
@@ -50,4 +54,52 @@
   一条不分断点的 `body:has([data-profile-bg-owner]) [data-profile-bg-global]` 会让
   「只设了桌面端」的用户在移动端把自己的全局背景也隐掉。现为 `-pc` / `-mobile` 两组属性 +
   两个互补媒体查询（`min-width: 40rem` 与 `width < 40rem`）。
+
+## 资源运营标记：置顶 / 精华（2026-09-27 起）
+
+- **仅管理员**可设（用 `adminOnly` 而不是 `staff`）。字段 `Resource.pinnedAt` / `featuredAt`
+  （`DateTime?`，null = 未标记）；**故意不加索引**，理由写在 schema 注释里。
+- **置顶是 `getFeed` 的第一排序键**：`pinnedAt DESC NULLS LAST`，latest / popular / downloads
+  三种 sort 都吃这一层。`nulls: "last"` 必须显式写 —— Postgres 的 DESC 默认 NULLS FIRST，
+  漏掉会把绝大多数未置顶的行排到前面，置顶反而沉底。
+- **keyset 游标必须与 orderBy 同构**：`FeedCursor` 多了 `p`（pinnedAt 毫秒），`cursorAfter`
+  拆成「置顶层 + `secondaryAfter`（原逻辑）」。以后改任何排序键，这两处要一起改，
+  否则症状是「翻页重复 / 漏行 / 直接空白」，且不报错。
+- `FeedParams.pinFirst`（默认 true）只在**按内容打分**的位置关掉：`getRelated` 的三个候选池、
+  `popularFallback`。置顶插进候选池首位会盖掉相关性。
+- 首页挑选位（hero / featured 块）用 `ids` 拉回后**按挑选顺序重排**，不受置顶影响。
+- 前台展示收在四处，改配色别漏：卡片角标 `ResourceCard`（封面深底 → 亮阶）、列表行卡
+  `ResourceRow`（浅底 → 语义阶）、详情页 `detail/parts.tsx` 的 `DetailMarks`（四个模板共用，
+  banner 传 `tone="dark"`）。
+- 「精华」连带发 FEATURED 积分：去重靠 `awardPoints` 的 `(userId, reason, refId)` 唯一索引，
+  取消再设不会重发；管理员给自己资源点精华会被 `NO_SELF_BENEFIT` 拦（既有口径）。
+- 「加入专题」= `actions/home.ts` 的 `addResourceToFeaturedSectionAction`：追加进**第一个**
+  `featured` 板块的 `featuredIds`（上限 24，与 `home-config.ts` 的 `featuredCfg` 同步）；
+  没有 featured 板块时明确报错，不偷偷塞进 hero。
+
+## Prisma 事务铁律：事务内不许用 `create().catch()` 兜唯一键冲突（2026-09-27 事故）
+
+- Postgres 的交互式事务是「一条语句报错 → 整个事务立刻 aborted」，**之后每条语句都返回
+  25P02（commands ignored until end of transaction block），与 JS 层有没有 catch 无关**。
+  所以在 `prisma.$transaction(async (tx) => ...)` 里写 `tx.x.create(...).catch(() => null)`
+  不是「容错」，是**把事务尸体留着继续用**：错误点在 A，报错点却在之后的 B，
+  `PrismaClientUnknownRequestError` 会把真正的根因盖掉，排查方向直接跑偏。
+- 需要「冲突就跳过」时用 **`createMany({ data: [...], skipDuplicates: true })`**
+  （PG 落成 `ON CONFLICT DO NOTHING`，冲突不报错也不中断事务），靠返回的 `count` 判断是否真插入，
+  必要再回查一次拿目标行。参考实现：`src/lib/actions/_tags.ts` 的 `findOrCreateTag` / `linkTag`。
+- 「find-or-create」必须**按所有唯一键查**，不能只查一个：Tag 的 `name` 与 `slug` 都是唯一键，
+  只查 name 会漏掉 slug 撞车（用户同时填「云」和「yun」→ 拼音 slug 都是 yun）。
+- 同理，关联表（`TagOnResource`，复合主键）写之前要按**解析出来的 id** 去重，
+  而不是按用户输入的名字去重 —— 两个不同的名字可能指向同一行。
+
+## 标签的同一性口径：slug 相同就是同一个标签（2026-09-27 用户明确）
+
+- **名字不同、但翻译/拼音出来的 slug 相同 → 直接合并**，不报错、不建第二个词条。
+  理由：`/tags/{slug}` 是公开 URL，slug 撞车在 URL 维度就是同一个标签
+  （例：「中国」与「中华」都译成 `china`）。
+- 写入侧落点：`src/lib/actions/_tags.ts` 的 `findOrCreateTag` —— 命中链 **name → slug → create**，
+  name 优先（作者手填的名字能对上就按名字），对不上再按 slug 归并。
+- 管理后台 `renameTagAction`（`lib/actions/taxonomy.ts`）：**不再因 slug 撞车报错**，
+  统一判断合并目标 —— name 变了且被占用 → 目标；否则 nextSlug 撞上既存标签 → 目标；
+  命中走 `mergeTagInto()`（转挂关联 + count 净增 + 删源 + audit），未命中才 `update`。
 

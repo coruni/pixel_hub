@@ -51,8 +51,8 @@ export default async function GlobalProfileBgLoader() {
     <GlobalProfileBg
       pcUrl={pcUrl}
       mobileUrl={mobileUrl}
-      pcMask={safeBgMask(me.profileBgMask)}
-      mobileMask={safeBgMask(me.profileBgMobileMask)}
+      pcMask={safeBgMask(me.profileBgMask, "pc")}
+      mobileMask={safeBgMask(me.profileBgMobileMask, "mobile")}
       myUsername={me.username}
     />
   );

@@ -11,8 +11,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { makeKey, saveFile, delFile } from "@/lib/storage";
 import {
   MIB,
-  PROFILE_BG_MASK_DEFAULT,
-  PROFILE_BG_MOBILE_MASK_DEFAULT,
+  PROFILE_BG_MASK_DEFAULTS,
   WATERMARK_POSITIONS,
   WATERMARK_TEXT_MAX,
   isValidBgMask,
@@ -339,11 +338,12 @@ export async function removeHeroAction(_fd?: FormData): Promise<void> {
 //   ③ **门槛在服务端重算**。客户端只是不渲染入口，绕过前端也必须传不上来 —— 与前台渲染
 //      共用 profileBgUnlocked()，口径只有一份。
 
-/** 槽位 → 该槽的遮罩默认值（用户填的与**本槽**默认值逐字相同就落 null = 继续跟随默认） */
-const BG_MASK_DEFAULT: Record<ProfileBgSlot, string> = {
-  pc: PROFILE_BG_MASK_DEFAULT,
-  mobile: PROFILE_BG_MOBILE_MASK_DEFAULT,
-};
+/**
+ * 槽位 → 该槽的遮罩默认值（用户填的与**本槽**默认值逐字相同就落 null = 继续跟随默认）。
+ * 直接复用 upload-config 里那份唯一事实来源，不再本地复制一份字面量映射 ——
+ * 复制出来的第二份迟早会与渲染侧的口径对不上（本次「移动端用了 PC 遮罩」就是这么来的）。
+ */
+const BG_MASK_DEFAULT = PROFILE_BG_MASK_DEFAULTS;
 
 /**
  * 槽位 → 图片列的 update 片段。写成两个字面量分支而不是动态键名：Prisma 的 update 入参是强类型的，

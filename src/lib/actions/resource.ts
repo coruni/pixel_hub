@@ -11,6 +11,7 @@ import { autoSlugBase, randomTail, uniqueSlug } from "@/lib/slug";
 import { revalidatePath } from "next/cache";
 import { resourceTextFields, urlLike } from "@/lib/resource-fields";
 import { applyResourceEdit, type ResourceEditState } from "@/lib/actions/_resource-edit";
+import { findOrCreateTag, linkTag } from "@/lib/actions/_tags";
 import { getUploadLimits } from "@/lib/upload-limits";
 import { ARTICLE_MEDIA_MAX, isSingleCoverType } from "@/lib/upload-config";
 import { TYPE_LABEL } from "@/lib/display";
@@ -236,24 +237,21 @@ export async function createResourceAction(
       });
 
       // 标签（建/取 Tag 关联，唯一计数；slug 已在事务外翻译好，见上 tagEntries）
+      //
+      // 全程走 _tags.ts 的 findOrCreateTag / linkTag，**不用 create + catch 兜唯一键冲突**：
+      // 事务里任何语句报错都会把 Postgres 事务打成 aborted，之后的语句全部 25P02，
+      // catch 只吞掉 JS 错误、救不回事务，还会把真正的报错点盖成「媒体认领失败」。
+      //
+      // linkedIds 去重是必须的：两个不同的输入名可能解析到**同一个** Tag 行
+      // （如同时填了「云」和「yun」，拼音 slug 都是 yun），不去重就会撞 (resourceId, tagId) 唯一键。
+      const linkedIds = new Set<string>();
       for (const { name, slugName } of tagEntries) {
-        // 命中顺序：新译英文 slug → 既存同名标签（改译前遗留的中文 slug 老标签，避免撞 name 唯一键建同名词条）→ 新建
-        const tag =
-          (await tx.tag.findUnique({ where: { slug: slugName } })) ??
-          (await tx.tag.findUnique({ where: { name } })) ??
-          (await tx.tag.create({ data: { slug: slugName, name } }).catch(async () => {
-            // 并发下 create 撞唯一键：抓回先建好的同 slug/同名标签
-            return (
-              (await tx.tag.findUnique({ where: { slug: slugName } })) ??
-              (await tx.tag.findUnique({ where: { name } }))
-            );
-          }));
-        if (!tag) continue; // 兜底失败才走到（理论上不可达），放弃本条关联不阻塞发布
-        const link = await tx.tagOnResource
-          .create({ data: { resourceId: r.id, tagId: tag.id } })
-          .catch(() => null); // 并发去重
+        const tag = await findOrCreateTag(tx, name, slugName);
+        if (!tag || linkedIds.has(tag.id)) continue;
+        linkedIds.add(tag.id);
         // 只有真正建立了关联才计数，重复关联不重复加
-        if (link) await tx.tag.update({ where: { id: tag.id }, data: { count: { increment: 1 } } });
+        if (await linkTag(tx, r.id, tag.id))
+          await tx.tag.update({ where: { id: tag.id }, data: { count: { increment: 1 } } });
       }
 
       // 认领已上传的媒体并排序（只认领本人上传、未被占用的孤儿媒体；防把他人素材挂进自己资源）

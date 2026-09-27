@@ -8,6 +8,7 @@ import { prisma } from "@/lib/db/prisma";
 import { TAXONOMY_CACHE_TAG } from "@/lib/queries";
 import { asciiSlug, autoSlugBase, randomTail } from "@/lib/slug";
 import { adminOnly, audit } from "@/lib/actions/_guards";
+import { linkTag } from "@/lib/actions/_tags";
 
 type Result = { ok: true } | { ok: false; error: string };
 
@@ -146,6 +147,45 @@ export async function deleteCategoryAction(input: { id: string }): Promise<Resul
 
 // ---------- 标签 ----------
 
+/**
+ * 把 `from` 标签合并进 `to`：资源关联转挂（已存在的关联跳过，不重复计数）、
+ * `Tag.count` 加净增、删掉 `from`。
+ *
+ * 触发条件有两条，语义是同一个 —— **这个标签想拥有的唯一键已经属于别人**：
+ *   ① 改成的名字已被占用；
+ *   ② 算出来的 slug 已被占用。后者是「**名字不一样、但翻译出来的 slug 一样**」
+ *      （如「中国」与「中华」都译成 china）—— 在 URL 维度它们本来就是同一个标签，
+ *      不该并存两个词条，直接合并。
+ * 两者都比对「另一个标签」，那个就是合并的目标行（保留目标的名字与 slug，源标签删除）。
+ */
+async function mergeTagInto(
+  adminId: string,
+  from: { id: string; name: string; count: number },
+  to: { id: string; name: string },
+  why: string,
+): Promise<void> {
+  const moved = await prisma.$transaction(async (tx) => {
+    const links = await tx.tagOnResource.findMany({
+      where: { tagId: from.id },
+      select: { resourceId: true },
+    });
+    let n = 0;
+    for (const l of links) if (await linkTag(tx, l.resourceId, to.id)) n++;
+    await tx.tagOnResource.deleteMany({ where: { tagId: from.id } });
+    if (n > 0) await tx.tag.update({ where: { id: to.id }, data: { count: { increment: n } } });
+    await tx.tag.delete({ where: { id: from.id } });
+    return n;
+  });
+  await audit(
+    adminId,
+    "DELETE_TAG",
+    "TAG",
+    from.id,
+    `合并标签 ${from.name}(${from.count}) → ${to.name}（${why}），源标签已删除，转挂 ${moved} 条资源`,
+  );
+  revalidateAll();
+}
+
 export async function renameTagAction(input: {
   id: string;
   name?: string;
@@ -160,68 +200,41 @@ export async function renameTagAction(input: {
   if (!rawName) return { ok: false, error: "标签名不能为空" };
   const nameChanged = rawName !== t.name;
 
-  // 改名为已存在的标签名 → 合并（资源关联转挂目标，计数加净增，删旧）
-  if (nameChanged) {
-    const byName = await prisma.tag.findUnique({ where: { name: rawName } });
-    if (byName) {
-      await prisma.$transaction(async (tx) => {
-        const links = await tx.tagOnResource.findMany({
-          where: { tagId: t.id },
-          select: { resourceId: true },
-        });
-        const ids = links.map((l) => l.resourceId);
-        const existing = await tx.tagOnResource.findMany({
-          where: { tagId: byName.id, resourceId: { in: ids } },
-          select: { resourceId: true },
-        });
-        const fresh = ids.filter((id) => !existing.some((e) => e.resourceId === id));
-        for (const id of fresh) {
-          await tx.tagOnResource.create({ data: { resourceId: id, tagId: byName.id } });
-        }
-        await tx.tagOnResource.deleteMany({ where: { tagId: t.id } });
-        await tx.tag.update({
-          where: { id: byName.id },
-          data: { count: { increment: fresh.length } },
-        });
-        await tx.tag.delete({ where: { id: t.id } });
-      });
-      await audit(
-        admin.id,
-        "DELETE_TAG",
-        "TAG",
-        t.id,
-        `合并标签 ${t.name}(${t.count}) → ${rawName}，源标签已删除`,
-      );
-      revalidateAll();
-      return { ok: true };
-    }
-  }
-
   // slug 仅当改动过该字段时才处理：
   // - 显式清空（空串）= 按（新）名称「翻译 → 拼音」重新生成；
-  // - 非空 = 走 asciiSlug（汉字转拼音）并校验全局唯一；
+  // - 非空 = 走 asciiSlug（汉字转拼音）；
   // - 未传（只改了名称、没碰 slug 字段）= 保留现有 slug，不重新生成。
+  // 这里**只校验格式，不校验唯一性** —— 撞车不报错，交给下面按「合并」处理。
   let nextSlug = t.slug;
   const rawSlug = input.slug?.trim();
   if (rawSlug !== undefined) {
     if (rawSlug === "") {
       nextSlug = (await autoSlugBase(rawName)) || t.slug;
-      if (nextSlug !== t.slug) {
-        const bySlug = await prisma.tag.findFirst({ where: { slug: nextSlug, id: { not: t.id } } });
-        if (bySlug) return { ok: false, error: `自动生成的 slug「${nextSlug}」已被标签「${bySlug.name}」占用` };
-      }
     } else {
       const s = asciiSlug(rawSlug);
       if (!s) return { ok: false, error: "slug 需含字母或数字" };
-      if (s !== t.slug) {
-        const clash = await prisma.tag.findFirst({ where: { slug: s, id: { not: t.id } } });
-        if (clash) return { ok: false, error: `slug「${s}」已被标签「${clash.name}」占用` };
-        nextSlug = s;
-      }
+      nextSlug = s;
     }
   }
 
   if (!nameChanged && nextSlug === t.slug) return { ok: true };
+
+  // 撞上另一个标签 → 合并，而不是报错。名字优先（改名的意图更明确），
+  // 其次按 slug：名字变了但翻译出的 slug 与既存标签相同，就是同一个标签。
+  const target =
+    (nameChanged ? await prisma.tag.findUnique({ where: { name: rawName } }) : null) ??
+    (nextSlug !== t.slug
+      ? await prisma.tag.findFirst({ where: { slug: nextSlug, id: { not: t.id } } })
+      : null);
+  if (target) {
+    await mergeTagInto(
+      admin.id,
+      { id: t.id, name: t.name, count: t.count },
+      { id: target.id, name: target.name },
+      target.name === rawName ? `与标签「${target.name}」同名` : `slug「${nextSlug}」与标签「${target.name}」相同`,
+    );
+    return { ok: true };
+  }
 
   await prisma.tag.update({ where: { id: t.id }, data: { name: rawName, slug: nextSlug } });
   await audit(admin.id, "EDIT_TAG", "TAG", t.id, `重命名标签 ${t.name} → ${rawName}`);

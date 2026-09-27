@@ -5,6 +5,7 @@ import { z } from "zod";
 import { articleMetaSchema, avMetaSchema, gameMetaSchema, imageMetaSchema } from "@/lib/meta";
 import { fillDownloadSizes } from "@/lib/download-size";
 import { asciiSlug, randomTail } from "@/lib/slug";
+import { findOrCreateTag, linkTag } from "@/lib/actions/_tags";
 import { MAX_TAGS, resourceTextFields, urlLike } from "@/lib/resource-fields";
 import { ARTICLE_MEDIA_MAX, isSingleCoverType } from "@/lib/upload-config";
 import { TYPE_LABEL } from "@/lib/display";
@@ -196,21 +197,20 @@ export async function applyResourceEdit(
   }
 
   const have = new Set(existing.filter((l) => keep.has(l.tag.name)).map((l) => l.tag.name));
+  const linkedIds = new Set(existing.filter((l) => keep.has(l.tag.name)).map((l) => l.tagId));
   // 这里只做同步的 asciiSlug（汉字→拼音），**不发翻译请求** —— 本函数整体跑在调用方的 DB 事务里，
-  // 逐条翻译可能各等数秒超时，会把事务挂住。改稿新建的标签用拼音 slug，后续发布同名标签时
-  // 发布侧的 `findUnique({ where: { name } })` 兜底会命中并复用，不会产生同名词条。
+  // 逐条翻译可能各等数秒超时，会把事务挂住。
+  //
+  // 同样**不能**用 create + catch 兜唯一键：事务里报错就是整个事务 aborted（25P02），
+  // catch 救不回来，后面的媒体同步会以 UnknownRequestError 炸掉并盖住根因。详见 _tags.ts。
   for (const name of desired) {
     if (have.has(name)) continue;
-    const tag =
-      (await tx.tag.findUnique({ where: { name } })) ??
-      (await tx.tag
-        .create({ data: { name, slug: asciiSlug(name) || `tag-${randomTail()}` } })
-        .catch(() => tx.tag.findUnique({ where: { name } })));
-    if (!tag) continue;
-    const link = await tx.tagOnResource
-      .create({ data: { resourceId: id, tagId: tag.id } })
-      .catch(() => null);
-    if (link) await tx.tag.update({ where: { id: tag.id }, data: { count: { increment: 1 } } });
+    const tag = await findOrCreateTag(tx, name, asciiSlug(name) || `tag-${randomTail()}`);
+    // linkedIds 去重：不同名字可能落到同一个 Tag 行（「云」与「yun」拼音 slug 同为 yun）
+    if (!tag || linkedIds.has(tag.id)) continue;
+    linkedIds.add(tag.id);
+    if (await linkTag(tx, id, tag.id))
+      await tx.tag.update({ where: { id: tag.id }, data: { count: { increment: 1 } } });
   }
 
   // —— 媒体：认领新上传、移除被删、重排、设封面（复用发布侧的防 IDOR 认领规则）——

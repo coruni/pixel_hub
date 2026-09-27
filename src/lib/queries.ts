@@ -25,6 +25,13 @@ export type FeedItem = {
   downloadCount: number;
   loginRequired: boolean;
   nsfw: boolean;
+  /**
+   * 运营标记（仅管理员可设）。
+   * `pinned` 只作展示用 —— 排序已在 getFeed 里按 pinnedAt 处理；`featured` 驱动卡片/详情角标。
+   * 这里给布尔而不是时间戳：前台卡片不需要「什么时候标的」。
+   */
+  pinned: boolean;
+  featured: boolean;
   category: { slug: string; name: string } | null;
   tags: { slug: string; name: string }[];
   author: { username: string; name: string | null; nameColor: string | null };
@@ -50,6 +57,9 @@ export type FeedCard = {
   downloadCount: number;
   loginRequired: boolean;
   nsfw: boolean;
+  /** 运营标记（仅管理员可设），卡片据此显示角标；见 FeedItem 的同名字段 */
+  pinned: boolean;
+  featured: boolean;
   category: { slug: string; name: string } | null;
   author: { username: string; name: string | null; nameColor: string | null };
   cover: {
@@ -74,6 +84,8 @@ export function toFeedCard(i: FeedItem): FeedCard {
     downloadCount: i.downloadCount,
     loginRequired: i.loginRequired,
     nsfw: i.nsfw,
+    pinned: i.pinned,
+    featured: i.featured,
     category: i.category,
     author: i.author,
     cover: i.cover,
@@ -110,6 +122,15 @@ export type FeedParams = {
   withTags?: boolean;
   /** D9：显式覆盖 NSFW 可见性；缺省按当前登录态（登录可见全站，游客只见 SFW） */
   includeNsfw?: boolean;
+  /**
+   * 是否把管理员置顶的资源排到最前。**默认 true** —— 「置顶」的产品语义就是「不受排序方式影响，
+   * 永远在最上面」，所以全站列表默认都吃这一层。
+   *
+   * 只有按内容本身打分的场景要显式关掉（相关推荐 getRelated / 猜你喜欢 popularFallback）：
+   * 那里排序代表「与当前内容/用户的契合度」，置顶插到首位等于把相关性盖掉，
+   * 用户会看到一堆和当前页无关的东西。
+   */
+  pinFirst?: boolean;
 };
 
 const coverSelect = {
@@ -146,6 +167,9 @@ type FeedRow = {
   downloadCount: number;
   loginRequired: boolean;
   nsfw: boolean;
+  /** 运营标记的**原始时间戳**：一是转成前台布尔，二是当 keyset 游标的第一键（见 toFeedCursor） */
+  pinnedAt: Date | null;
+  featuredAt: Date | null;
   category: { slug: string; name: string } | null;
   /**
    * 可选：只有 `withTags: true` 的调用才取这个关联（见 feedTagsSelect）。
@@ -179,6 +203,8 @@ const feedSelect = {
   downloadCount: true,
   loginRequired: true,
   nsfw: true,
+  pinnedAt: true,
+  featuredAt: true,
   coverMedia: { select: coverSelect },
   author: { select: { username: true, name: true, nameColor: true } },
   category: { select: { slug: true, name: true } },
@@ -213,6 +239,11 @@ function toFeedItem(r: FeedRow): FeedItem {
     downloadCount: r.downloadCount,
     loginRequired: r.loginRequired,
     nsfw: r.nsfw,
+    // 用 `!!` 而不是 `!== null`：有几处调用点把外层的 select 结果 `as FeedRow` 传进来（类型断言，
+    // 编译器不校验字段是否真选了）。那种路径下这两个字段会是 undefined，而 `undefined !== null`
+    // 恒为 true —— 会把「没置顶的内容」全标成置顶。
+    pinned: !!r.pinnedAt,
+    featured: !!r.featuredAt,
     category: r.category ? { slug: r.category.slug, name: r.category.name } : null,
     // 未取 tags 时（绝大多数调用）这里是空数组；只有 withTags 路径会带上真实标签
     tags: r.tags?.map((t) => ({ slug: t.tag.slug, name: t.tag.name })) ?? [],
@@ -343,19 +374,31 @@ export async function getFeed(
   }
 
   // 排序带 id 决胜：同值时结果稳定（分页翻页不跳动）
-  const orderBy: Prisma.ResourceOrderByWithRelationInput[] =
-    params.sort === "popular"
+  //
+  // 【置顶是第一排序键】管理员标记过置顶的资源（Resource.pinnedAt）在**所有**排序里都排最前
+  // —— 「置顶」的语义就是「不受排序方式影响，永远在最上面」。
+  // `nulls: "last"` 必须显式写：Postgres 的 DESC 默认 NULLS FIRST，不写会把绝大多数
+  // **未置顶**的行排到前面，置顶反而沉底。
+  const pinOrder: Prisma.ResourceOrderByWithRelationInput = {
+    pinnedAt: { sort: "desc", nulls: "last" },
+  };
+  const orderBy: Prisma.ResourceOrderByWithRelationInput[] = [
+    ...(params.pinFirst === false ? [] : [pinOrder]),
+    ...((params.sort === "popular"
       ? [{ likeCount: "desc" }, { publishedAt: "desc" }, { id: "desc" }]
       : params.sort === "downloads"
         ? [{ downloadCount: "desc" }, { publishedAt: "desc" }, { id: "desc" }]
-        : [{ publishedAt: "desc" }, { createdAt: "desc" }, { id: "desc" }];
+        : [{ publishedAt: "desc" }, { createdAt: "desc" }, { id: "desc" }]) as Prisma.ResourceOrderByWithRelationInput[]),
+  ];
 
   // —— keyset（游标）分页 ——
   // 有 cursor 时不再用 skip：把「上一页最后一条」的位置展开成 keyset 条件，窗口永远从
   // 数据本身锚定，翻页期间有新内容插入也不会重复/漏（offset 分页做不到）。
   // 前提：资源流的排序键全在 Resource 主表上（author / tags 只是过滤，不参与排序）。
+  // 游标条件必须**与 orderBy 同构**：只有启用了置顶排序时才包上 pinnedAt 那层，
+  // 否则 pinFirst: false 的调用会拿到「只取未置顶行」的条件，翻页直接空白。
   if (params.cursor) {
-    const after = cursorAfter(params.cursor, params.sort);
+    const after = cursorAfter(params.cursor, params.sort, params.pinFirst !== false);
     where.AND = Array.isArray(where.AND) ? [...where.AND, after] : [after];
   }
 
@@ -390,11 +433,45 @@ function toFeedCursor(row: FeedRow, sort: SortKey | undefined): FeedCursor {
           : (row.publishedAt?.getTime() ?? 0),
     t: row.publishedAt ? row.publishedAt.getTime() : null,
     id: row.id,
+    // 置顶区的位置：null 表示这一行没置顶（= 已翻出置顶区）。见 cursorAfter 的两层条件。
+    p: row.pinnedAt ? row.pinnedAt.getTime() : null,
   };
 }
 
 /**
- * keyset 条件：`ORDER BY 主排序键 DESC, publishedAt DESC, id DESC` 之后「严格排在游标之后」的行。
+ * keyset 条件：按 orderBy 的字典序取「严格排在游标之后」的行。分两层，与 orderBy 一一对应：
+ *   ① 置顶层 `pinnedAt DESC NULLS LAST`（本函数前半段）；
+ *   ② 次级层（主排序键 / publishedAt / id，见 secondaryAfter）。
+ * 调用点传 `pinFirst === false` 时只算第二层 —— 与那边 orderBy 不带 pinOrder 是同一条约束，
+ * 两边必须一起改，否则会「排了不跳」或「跳了不排」。
+ */
+function cursorAfter(
+  c: FeedCursor,
+  sort: SortKey | undefined,
+  pinFirst: boolean,
+): Prisma.ResourceWhereInput {
+  const inner = secondaryAfter(c, sort);
+  if (!pinFirst) return inner;
+
+  // 游标本身未置顶 → 它已越过整个置顶区，后面只剩「未置顶」的行
+  if (c.p === null) return { AND: [{ pinnedAt: null }, inner] };
+
+  const at = new Date(c.p);
+  return {
+    OR: [
+      // 置顶时间更早的行。`{ lt: at }` 对 NULL 恒为 UNKNOWN → 天然只命中真·置顶行，
+      // 不会把未置顶的行误收进来（那些靠下面第二条捞）。
+      { pinnedAt: { lt: at } },
+      // 全部未置顶的行：它们整体排在置顶区之后，无论次级键取值如何都在游标之后
+      { pinnedAt: null },
+      // 同一置顶时刻 → 交给次级键继续比较
+      { AND: [{ pinnedAt: at }, inner] },
+    ],
+  };
+}
+
+/**
+ * 次级 keyset 条件：`ORDER BY 主排序键 DESC, publishedAt DESC, id DESC` 之后「严格排在游标之后」的行。
  *
  * 展开成字典序比较：(m1 < c1) OR (m1 = c1 AND m2 < c2) OR (m1 = c1 AND m2 = c2 AND m3 < c3)。
  * 三个键的降序组合已唯一确定一行（id 是主键），所以用 `lt` 而非 `lte` —— lte 会把游标那行
@@ -407,7 +484,7 @@ function toFeedCursor(row: FeedRow, sort: SortKey | undefined): FeedCursor {
  * publishedAt 可空，而 `lt` 对 NULL 恒为 UNKNOWN（Postgres 的 DESC 默认 NULLS FIRST），
  * 所以必须显式区分「游标还在时间区」「已进入 null 区」两种情形，否则 null 段的行会被整段跳过。
  */
-function cursorAfter(c: FeedCursor, sort: SortKey | undefined): Prisma.ResourceWhereInput {
+function secondaryAfter(c: FeedCursor, sort: SortKey | undefined): Prisma.ResourceWhereInput {
   const major: "likeCount" | "downloadCount" | "publishedAt" =
     sort === "popular" ? "likeCount" : sort === "downloads" ? "downloadCount" : "publishedAt";
 
@@ -622,6 +699,9 @@ export async function getRelated(resource: RelatedSeed): Promise<FeedCard[]> {
   };
 
   const poolRequests: Promise<{ items: FeedItem[] }>[] = [];
+  // 三个候选池都关掉「置顶优先」（pinFirst: false）：这里的排序代表「与当前资源的契合度」，
+  // 最终还要按 relatedScore 重排；让置顶占据候选池首位等于把相关性挤掉，
+  // 用户会在「相关内容」里看到一堆无关的置顶资源。
   if (resource.category) {
     poolRequests.push(
       getFeed({
@@ -629,6 +709,7 @@ export async function getRelated(resource: RelatedSeed): Promise<FeedCard[]> {
         sort: "popular",
         pageSize: LIMIT * 2,
         withTags: true, // relatedScore 要按共享标签打分
+        pinFirst: false,
       }),
     );
   }
@@ -639,6 +720,7 @@ export async function getRelated(resource: RelatedSeed): Promise<FeedCard[]> {
         sort: "popular",
         pageSize: LIMIT * 2,
         withTags: true, // relatedScore 要按共享标签打分
+        pinFirst: false,
       }),
     );
   }
@@ -646,7 +728,7 @@ export async function getRelated(resource: RelatedSeed): Promise<FeedCard[]> {
   // 这个池同样要进 relatedScore，所以也得带 tags —— 漏掉它会让兜底池的共享标签权重恒为 0，
   // 打分悄悄偏向其它两个池，是那种「不报错但排序变了」的隐性 bug。
   poolRequests.push(
-    getFeed({ type: resource.type, sort: "popular", pageSize: LIMIT * 2, withTags: true }),
+    getFeed({ type: resource.type, sort: "popular", pageSize: LIMIT * 2, withTags: true, pinFirst: false }),
   );
   const pools = await Promise.all(poolRequests);
   for (const { items } of pools) push(items);
@@ -842,6 +924,8 @@ const recSelect = {
   downloadCount: true,
   loginRequired: true,
   nsfw: true,
+  pinnedAt: true,
+  featuredAt: true,
   coverMedia: { select: coverSelect },
   author: { select: { id: true, username: true, name: true, nameColor: true } },
   category: { select: { slug: true, name: true } },
@@ -1069,6 +1153,8 @@ async function popularFallback(opts: RecommendOpts, count: number): Promise<Feed
     pageSize: count,
     categorySlugs: opts.categorySlugs,
     period: opts.period && opts.period !== "all" ? opts.period : undefined,
+    // 「猜你喜欢」是推荐位：让置顶插到最前会让推荐位恒等于几个固定资源，关掉
+    pinFirst: false,
   });
   return items.map(toFeedCard);
 }

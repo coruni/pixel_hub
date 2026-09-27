@@ -57,7 +57,12 @@ export default async function EditResourcePage({ params }: { params: Promise<{ i
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <ContentActions resourceId={resource.id} status={resource.status} />
+          <ContentActions
+            resourceId={resource.id}
+            status={resource.status}
+            pinned={resource.pinnedAt !== null}
+            featured={resource.featuredAt !== null}
+          />
         </div>
       </div>
 

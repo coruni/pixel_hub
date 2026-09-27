@@ -209,6 +209,18 @@ export default async function ContentPage({ searchParams }: { searchParams: Prom
                       {r.title}
                     </Link>
                     <MiniBadge>{TYPE_LABEL[r.type]}</MiniBadge>
+                    {/* 运营标记：与行内动作按钮同源（见 components/admin/buttons.tsx）。
+                        亮色下 brand-700 压 brand-100 只有 4.11:1，所以用 brand-800。 */}
+                    {r.pinnedAt && (
+                      <span className="rounded-none border border-brand-300 bg-brand-100 px-1.5 py-0.5 text-[10px] font-medium text-brand-800">
+                        置顶
+                      </span>
+                    )}
+                    {r.featuredAt && (
+                      <span className="rounded-none border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
+                        精华
+                      </span>
+                    )}
                     {st && (
                       <span
                         className={`rounded-none px-1.5 py-0.5 text-[10px] font-medium ${st.cls}`}
@@ -236,7 +248,12 @@ export default async function ContentPage({ searchParams }: { searchParams: Prom
                   <Pencil size={12} aria-hidden />
                   编辑
                 </Link>
-                <ContentActions resourceId={r.id} status={r.status} />
+                <ContentActions
+                  resourceId={r.id}
+                  status={r.status}
+                  pinned={r.pinnedAt !== null}
+                  featured={r.featuredAt !== null}
+                />
               </li>
             );
           })}

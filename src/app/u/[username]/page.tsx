@@ -162,9 +162,11 @@ export default async function UserPage({
     bgUnlocked && profile.profileBgMobileKey ? publicUrl(profile.profileBgMobileKey) : null;
 
   // 遮罩形状是**该主页主人自己的**设置（在设置页填，桌面端与移动端各一份）。渲染前过一道形状校验：
-  // 填坏 / 库里躺着旧脏值都只退回内置默认遮罩，不会漏出外部请求，也不会让页面崩。
-  const bgPcMask = safeBgMask(profile.profileBgMask);
-  const bgMobileMask = safeBgMask(profile.profileBgMobileMask);
+  // 填坏 / 库里躺着旧脏值都只退回**本槽**的内置默认遮罩，不会漏出外部请求，也不会让页面崩。
+  // slot 参数不能省：两端的默认形状完全不同（横图左右两条带 vs 竖图整张半透明），
+  // 而返回值是内联写的，传错槽位会直接盖掉 CSS 类自带的默认值。
+  const bgPcMask = safeBgMask(profile.profileBgMask, "pc");
+  const bgMobileMask = safeBgMask(profile.profileBgMobileMask, "mobile");
 
   // 头部操作区。编辑 / 打赏紧跟昵称末尾，作为纯图标随昵称行自然换行；
   // 关注按钮独立放在资料区最右侧，不参与昵称长度计算。

@@ -7,12 +7,15 @@ import {
   approveResourceAction,
   rejectResourceAction,
   restoreResource,
+  setResourceFeatured,
+  setResourcePinned,
   setResourceRemoved,
   handleReportBatchAction,
   setUserBanned,
   setUserRole,
   setUserTrusted,
 } from "@/lib/actions/moderation";
+import { addResourceToFeaturedSectionAction } from "@/lib/actions/home";
 import { Button } from "@/components/ui/Button";
 
 export function QueueActions({ resourceId }: { resourceId: string }) {
@@ -50,40 +53,102 @@ export function QueueActions({ resourceId }: { resourceId: string }) {
   );
 }
 
-export function ContentActions({ resourceId, status }: { resourceId: string; status: string }) {
+/**
+ * 内容库行操作。两组：**运营标记**（置顶 / 精华 / 加入专题）与**状态操作**（下架 / 恢复上架）。
+ *
+ * 标记组只在已上架时出现：下架内容本来就不进列表流，置顶它没有意义；「加入专题」同理
+ * —— 首页专题展示的是已上架内容。
+ *
+ * pinned / featured 由服务端把 pinnedAt / featuredAt 转成布尔后传入（日期在这层没用）。
+ * 三个标记动作的权限都在服务端用 adminOnly 再判一次，前端只负责不渲染用不上的按钮。
+ */
+export function ContentActions({
+  resourceId,
+  status,
+  pinned,
+  featured,
+}: {
+  resourceId: string;
+  status: string;
+  pinned: boolean;
+  featured: boolean;
+}) {
   const { run, pending } = useAction();
-  if (status === "PUBLISHED")
-    return (
-      <Button
-        type="button"
-        disabled={pending}
-        onClick={async () => {
-          const ok = await confirmDialog({
-            title: "下架内容",
-            message: "确认下架该内容？作者将收到通知。",
-            confirmLabel: "下架",
-            danger: true,
-          });
-          if (!ok) return;
-          run(() => setResourceRemoved(resourceId));
-        }}
-        variant="danger"
-      >
-        {pending ? "处理中…" : "下架"}
-      </Button>
-    );
-  if (status === "REMOVED")
-    return (
-      <Button
-        type="button"
-        disabled={pending}
-        onClick={() => run(() => restoreResource(resourceId))}
-        variant="ghost"
-      >
-        {pending ? "处理中…" : "恢复上架"}
-      </Button>
-    );
-  return <span className="text-xs text-neutral-400">{status}</span>;
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      {status === "PUBLISHED" && (
+        <>
+          <Button
+            type="button"
+            disabled={pending}
+            size="sm"
+            variant={pinned ? "primary" : "ghost"}
+            title={pinned ? "取消后不再排在各列表最前" : "置顶：在所有列表里都排最前"}
+            onClick={() => run(() => setResourcePinned(resourceId, !pinned))}
+          >
+            {pinned ? "取消置顶" : "置顶"}
+          </Button>
+          <Button
+            type="button"
+            disabled={pending}
+            size="sm"
+            variant={featured ? "warn" : "ghost"}
+            title={
+              featured
+                ? "取消精华角标（已记给作者的贡献分不回收）"
+                : "精华：卡片与详情页显示角标，并给作者记一次贡献分"
+            }
+            onClick={() => run(() => setResourceFeatured(resourceId, !featured))}
+          >
+            {featured ? "取消精华" : "精华"}
+          </Button>
+          <Button
+            type="button"
+            disabled={pending}
+            size="sm"
+            variant="ghost"
+            title="追加到首页「专题」板块"
+            onClick={() => run(() => addResourceToFeaturedSectionAction(resourceId))}
+          >
+            加入专题
+          </Button>
+        </>
+      )}
+
+      {status === "PUBLISHED" ? (
+        <Button
+          type="button"
+          disabled={pending}
+          size="sm"
+          onClick={async () => {
+            const ok = await confirmDialog({
+              title: "下架内容",
+              message: "确认下架该内容？作者将收到通知。",
+              confirmLabel: "下架",
+              danger: true,
+            });
+            if (!ok) return;
+            run(() => setResourceRemoved(resourceId));
+          }}
+          variant="danger"
+        >
+          {pending ? "处理中…" : "下架"}
+        </Button>
+      ) : status === "REMOVED" ? (
+        <Button
+          type="button"
+          disabled={pending}
+          size="sm"
+          onClick={() => run(() => restoreResource(resourceId))}
+          variant="ghost"
+        >
+          {pending ? "处理中…" : "恢复上架"}
+        </Button>
+      ) : (
+        <span className="text-xs text-neutral-400">{status}</span>
+      )}
+    </div>
+  );
 }
 
 export function ReportActions({

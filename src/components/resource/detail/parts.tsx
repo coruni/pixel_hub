@@ -2,7 +2,7 @@
 // 组件均为 server component；内部按钮（关注/点赞/收藏/举报）为客户端交互组件。
 import Link from "next/link";
 import { ButtonLink } from "@/components/ui/ButtonLink";
-import { Bot, CalendarDays, Download, Eye, Heart, Pencil, Star } from "lucide-react";
+import { Bot, CalendarDays, Download, Eye, Heart, Pencil, Pin, Sparkles, Star } from "lucide-react";
 import type { ResourceDetail } from "@/lib/queries";
 import type { parseMeta } from "@/lib/meta";
 import { formatCount, timeAgo } from "@/lib/format";
@@ -33,6 +33,54 @@ export type DetailCtx = {
 
 /** 类型展示名：统一取 TYPE_LABEL，新增类型无需再改这里 */
 export const typeLabel = (t: string) => TYPE_LABEL[t] ?? t;
+
+/**
+ * 详情页标题区的运营标记：置顶 / 精华（仅管理员可设，见 lib/actions/moderation.ts）。
+ *
+ * 四处模板（banner 的两个分支 / post / twocol / article）共用这一个组件 —— 各写一遍的话
+ * 配色与图标迟早只改到其中三处。设计上与本页原有的「类型 / 分类」徽标同高（h-[22px]），
+ * 直接塞进它们所在的那条 flex 行里即可，不额外占一行。
+ *
+ * `tone` 跟随标题所在底色：banner 是深色大图（dark → 亮阶），其余是浅底（light → 语义阶）。
+ * 与资源卡右上角的角标同一套口径（见 components/resource/ResourceCard.tsx）。
+ */
+export function DetailMarks({
+  pinned,
+  featured,
+  tone = "light",
+}: {
+  pinned: boolean;
+  featured: boolean;
+  tone?: "light" | "dark";
+}) {
+  if (!pinned && !featured) return null;
+  const base =
+    "inline-flex h-[22px] items-center gap-1 rounded-none border px-2 text-[11px] font-medium";
+  const pinCls =
+    tone === "dark"
+      ? "border-brand-600 bg-stone-900/85 text-white"
+      : "border-brand-300 bg-brand-100 text-brand-800";
+  const featCls =
+    tone === "dark"
+      ? "border-amber-500 bg-stone-900/85 text-amber-300"
+      : "border-amber-300 bg-amber-100 text-amber-800";
+  return (
+    <>
+      {pinned && (
+        <span className={`${base} ${pinCls}`} title="置顶">
+          <Pin size={12} aria-hidden />
+          置顶
+        </span>
+      )}
+      {featured && (
+        <span className={`${base} ${featCls}`} title="精华">
+          <Sparkles size={12} aria-hidden />
+          精华
+        </span>
+      )}
+    </>
+  );
+}
 
 const callbackPath = (slug: string) => `/resources/${slug}`;
 

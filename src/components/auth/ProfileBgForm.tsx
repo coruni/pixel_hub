@@ -17,9 +17,8 @@ import {
 } from "@/lib/actions/settings";
 import { publicUrl } from "@/lib/storage/url";
 import {
-  PROFILE_BG_MASK_DEFAULT,
+  PROFILE_BG_MASK_DEFAULTS,
   PROFILE_BG_MASK_MAX,
-  PROFILE_BG_MOBILE_MASK_DEFAULT,
   isValidBgMask,
   safeBgMask,
   type ProfileBgSlot,
@@ -45,12 +44,9 @@ import { Button } from "@/components/ui/Button";
 //
 // 遮罩百分比是相对元素自身的，所以小尺寸预览与真实视口的带子比例一致，可以当准样板看。
 
-/** 槽位 → 该槽的遮罩默认值。与 globals.css 的 .profile-bg-* 及 upload-config.ts 的两个
- *  DEFAULT 常量必须一致，所以这里只做映射、不复制字面量。 */
-const SLOT_DEFAULT_MASK: Record<ProfileBgSlot, string> = {
-  pc: PROFILE_BG_MASK_DEFAULT,
-  mobile: PROFILE_BG_MOBILE_MASK_DEFAULT,
-};
+/** 槽位 → 该槽的遮罩默认值。与 globals.css 的 .profile-bg-* 及 upload-config.ts 必须一致，
+ *  所以直接复用那份唯一事实来源，不在这里复制字面量。 */
+const SLOT_DEFAULT_MASK = PROFILE_BG_MASK_DEFAULTS;
 
 /** 槽位 → 前台那道遮罩类的类名（不经过 Tailwind，类名本身写在 globals.css 里） */
 const SLOT_MASK_CLASS: Record<ProfileBgSlot, string> = {
@@ -149,7 +145,7 @@ function BgSlotForm({
             style={
               {
                 backgroundImage: shown ? `url(${shown})` : undefined,
-                "--profile-bg-mask": safeBgMask(maskDraft),
+                "--profile-bg-mask": safeBgMask(maskDraft, slot),
               } as CSSProperties
             }
           >

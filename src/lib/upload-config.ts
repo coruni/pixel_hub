@@ -132,36 +132,59 @@ export const PROFILE_BG_MOBILE_MASK_DEFAULT =
 export const PROFILE_BG_SLOTS = ["pc", "mobile"] as const;
 export type ProfileBgSlot = (typeof PROFILE_BG_SLOTS)[number];
 
+/**
+ * 槽位 → 该槽的遮罩默认值。**遮罩默认值是分槽的，任何「取默认值」的地方都必须先问槽位** ——
+ * 这一份是唯一事实来源，settings.ts 的「与默认值逐字相同就存 null」、设置页的预填值、
+ * 前台渲染点的兜底，全都从这里取，不要再各自复制一份字面量。
+ *
+ * （曾经踩过：渲染侧写了个不带槽位的 `safeBgMask(raw)` 一律返回桌面端默认值，
+ * 而它是通过内联 `--profile-bg-mask` 传下去的 —— 内联变量优先级高于 `.profile-bg-mobile`
+ * 自带的那份默认值，于是移动端永远显示桌面端的左右两条带。）
+ */
+export const PROFILE_BG_MASK_DEFAULTS: Record<ProfileBgSlot, string> = {
+  pc: PROFILE_BG_MASK_DEFAULT,
+  mobile: PROFILE_BG_MOBILE_MASK_DEFAULT,
+};
 
 /** 遮罩值长度上限（只做防呆；默认值约 250 字符，正常改法不会接近它） */
 export const PROFILE_BG_MASK_MAX = 600;
 
 /**
- * 遮罩值形状校验：不合格一律返回内置默认遮罩（**不抛错、也不返回 null**）。
- *
- * 为什么渲染前还要判一次：用户可能填进带 url() 的值，库里也可能躺着旧版本的脏值 ——
- * 渲染点不能因此崩掉、更不能漏出外部请求，所以一律经这道收口。
+ * 遮罩值的**形状**校验（与具体槽位无关，只看这条 CSS 能不能安全地当 mask-image 用）。
  *
  * 只放行渐变写法（字母/数字/空格/.,%()#_-），挡掉 url() / image-set() / var() / @ / ; / { } / < >：
  * 前者能发起外部请求，后者是注入面。遮罩是纯装饰，不需要这些能力。
  */
-export function safeBgMask(raw: string | null | undefined): string {
+function maskShapeOk(v: string): boolean {
+  if (!v || v.length > PROFILE_BG_MASK_MAX) return false;
+  if (!/^(repeating-)?(linear|radial|conic)-gradient\(/i.test(v)) return false;
+  if (!v.endsWith(")")) return false;
+  if (/var\(/i.test(v)) return false;
+  return /^[a-zA-Z0-9\s.,%()#_-]+$/.test(v);
+}
+
+/**
+ * 遮罩值收口：不合格一律返回**本槽**的内置默认遮罩（不抛错、也不返回 null）。
+ *
+ * 为什么渲染前还要判一次：用户可能填进带 url() 的值，库里也可能躺着旧版本的脏值 ——
+ * 渲染点不能因此崩掉、更不能漏出外部请求，所以一律经这道收口。
+ *
+ * `slot` 必传（只在确实与槽位无关的场合才可省）。传错槽位的后果不是报错，而是
+ * 悄悄套上另一端形状的遮罩 —— 因为返回值是内联写的，会盖掉 CSS 类自带的默认值。
+ */
+export function safeBgMask(raw: string | null | undefined, slot: ProfileBgSlot = "pc"): string {
   const v = (raw ?? "").trim();
-  if (!v || v.length > PROFILE_BG_MASK_MAX) return PROFILE_BG_MASK_DEFAULT;
-  if (!/^(repeating-)?(linear|radial|conic)-gradient\(/i.test(v)) return PROFILE_BG_MASK_DEFAULT;
-  if (!v.endsWith(")")) return PROFILE_BG_MASK_DEFAULT;
-  if (/var\(/i.test(v)) return PROFILE_BG_MASK_DEFAULT;
-  if (!/^[a-zA-Z0-9\s.,%()#_-]+$/.test(v)) return PROFILE_BG_MASK_DEFAULT;
-  return v;
+  return maskShapeOk(v) ? v : PROFILE_BG_MASK_DEFAULTS[slot];
 }
 
 /**
  * 用户填的遮罩值能不能存（空串 = 用默认，也算合法）。
- * 与 safeBgMask 是同一个判定的两种用法：渲染要拿到「实际该用的值」，表单只要「合不合法」。
+ * 与 safeBgMask 共用同一份形状判定，但**不掺默认值**：填的恰好是另一端默认形状也是合法的，
+ * 那是用户的正当选择，不该被判成「非法」。
  */
 export function isValidBgMask(raw: string | null | undefined): boolean {
   const v = (raw ?? "").trim();
-  return v === "" || safeBgMask(v) === v;
+  return v === "" || maskShapeOk(v);
 }
 
 /**

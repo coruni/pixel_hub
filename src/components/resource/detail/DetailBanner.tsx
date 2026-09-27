@@ -10,6 +10,7 @@ import {
   AuthorStrip,
   CommentBlock,
   DescriptionBlock,
+  DetailMarks,
   RelatedSection,
   StatGrid,
   TypeInfoCard,
@@ -53,6 +54,8 @@ export default function DetailBanner({
           {detail.category.name}
         </Link>
       )}
+      {/* 运营标记（置顶 / 精华）：banner 是深色大图 → tone="dark" */}
+      <DetailMarks pinned={!!detail.pinnedAt} featured={!!detail.featuredAt} tone="dark" />
     </div>
   );
 

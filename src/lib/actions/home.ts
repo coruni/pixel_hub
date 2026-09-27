@@ -8,6 +8,7 @@ import { publicUrl } from "@/lib/storage";
 import {
   HOME_KIND_META,
   HOME_SECTION_KINDS,
+  parseSectionConfig,
   safeHomeConfig,
   type HomeSectionKind,
 } from "@/lib/home-config";
@@ -149,6 +150,60 @@ export async function reorderHomeSectionsAction(
     return { ok: false, error: "排序保存失败，请刷新后重试" };
   }
   await audit(admin.id, "REORDER_HOME", "HOMESECTION", undefined, clean.join(","));
+  homeRevalidate();
+  return { ok: true };
+}
+
+// ---------- 首页精选位：把资源一键加入「专题」板块 ----------
+
+/** 专题板块最多挑几个资源；**必须与 home-config.ts 的 featuredCfg.featuredIds 上限一致** */
+const FEATURED_MAX = 24;
+
+/**
+ * 把某个资源追加进第一个 `featured` 板块的 `config.featuredIds`。
+ *
+ * 为什么不直接复用 updateHomeSectionAction：那个 action 收的是**整份 config**，调用方得先读、
+ * 改、再整包写回 —— 包一层放这里，调用方只要给一个资源 id，也不会因为漏搬字段而丢配置
+ * （整包覆盖是这种「读改写」最经典的踩坑点）。
+ *
+ * 找不到 featured 板块时**明确报错**，不偷偷塞进 hero：hero 的 featuredIds 上限是 8、
+ * 且它是首屏大图位，语义与「专题」完全不同 —— 自动挑落点会让「点了一下到底改了什么」不可预期。
+ */
+export async function addResourceToFeaturedSectionAction(
+  resourceId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const admin = await adminOnly();
+  if (!admin) return { ok: false, error: "仅管理员可操作" };
+
+  const res = await prisma.resource.findUnique({
+    where: { id: resourceId },
+    select: { id: true, title: true },
+  });
+  if (!res) return { ok: false, error: "资源不存在" };
+
+  // 存在多个专题板块时取最靠上的那个（order 升序）—— 「主专题」最自然的理解
+  const row = await prisma.homeSection.findFirst({
+    where: { kind: "featured" },
+    orderBy: { order: "asc" },
+  });
+  if (!row) return { ok: false, error: "首页还没有「专题」板块，请先到首页装修里添加" };
+
+  const cfg = parseSectionConfig("featured", row.config);
+  // 收窄：parseSectionConfig 的返回类型是按 kind 的宽联合，这里用字段存在性分辨
+  if (!("featuredIds" in cfg)) return { ok: false, error: "板块配置异常，请到首页装修里检查" };
+  if (cfg.featuredIds.includes(resourceId)) return { ok: false, error: "该资源已经在专题里了" };
+  if (cfg.featuredIds.length >= FEATURED_MAX) {
+    return { ok: false, error: `专题最多 ${FEATURED_MAX} 个，请先移除一些` };
+  }
+
+  const next = safeHomeConfig("featured", { ...cfg, featuredIds: [...cfg.featuredIds, resourceId] });
+  if (!next.ok) return { ok: false, error: next.error };
+
+  await prisma.homeSection.update({
+    where: { id: row.id },
+    data: { config: JSON.stringify(next.data) },
+  });
+  await audit(admin.id, "ADD_FEATURED_RESOURCE", "HOMESECTION", row.id, `+ ${res.title}`);
   homeRevalidate();
   return { ok: true };
 }

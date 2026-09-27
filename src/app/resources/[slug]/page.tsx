@@ -169,9 +169,10 @@ export default async function ResourcePage({ params }: PageProps) {
     }
   }
   // 遮罩形状取**作者自己的**设置（与个人主页同一份值，两个槽各一条）—— 同一张图铺在两个页面，
-  // 形状必须一致，否则作者在设置页预览到的和访客在这里看到的是两回事。填坏只退回内置默认遮罩。
-  const bgPcMask = safeBgMask(detail.author.profileBgMask);
-  const bgMobileMask = safeBgMask(detail.author.profileBgMobileMask);
+  // 形状必须一致，否则作者在设置页预览到的和访客在这里看到的是两回事。填坏只退回**本槽**默认遮罩；
+  // slot 不能省，两端默认形状不同，传错会盖掉 CSS 类自带的默认值。
+  const bgPcMask = safeBgMask(detail.author.profileBgMask, "pc");
+  const bgMobileMask = safeBgMask(detail.author.profileBgMobileMask, "mobile");
 
   // 相关推荐只对已发布内容计算（草稿/待审不需要）
   const related =

@@ -29,6 +29,14 @@ export type FeedCursor = {
   t: number | null;
   /** 上一页最后一条的 id（同值决胜键） */
   id: string;
+  /**
+   * 上一页最后一条的 pinnedAt（毫秒时间戳），null 表示该条**未置顶**。
+   *
+   * 置顶是排序的第一键（`pinnedAt DESC NULLS LAST`），所以游标必须带上它，否则翻页时
+   * 分不清「当前在置顶区还是普通区」，要么把置顶行重复取回来、要么整段跳过。
+   * 兼容旧游标：字段缺失按 null（= 已越过置顶区）处理 —— 老会话翻一页就自然修正。
+   */
+  p: number | null;
 };
 
 /**
@@ -41,5 +49,7 @@ export function parseFeedCursor(raw: unknown): FeedCursor | null {
   if (typeof c.id !== "string" || !c.id || c.id.length > 64) return null;
   if (typeof c.k !== "number" || !Number.isFinite(c.k)) return null;
   if (c.t !== null && (typeof c.t !== "number" || !Number.isFinite(c.t))) return null;
-  return { k: c.k, t: c.t as number | null, id: c.id };
+  // p 允许缺失/为 null（旧版游标没有这个字段），但不能是别的脏类型
+  if (c.p != null && (typeof c.p !== "number" || !Number.isFinite(c.p))) return null;
+  return { k: c.k, t: c.t as number | null, id: c.id, p: (c.p as number | null) ?? null };
 }

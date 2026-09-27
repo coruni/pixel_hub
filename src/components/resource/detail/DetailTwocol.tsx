@@ -8,6 +8,7 @@ import {
   AuthorStrip,
   CommentBlock,
   DescriptionBlock,
+  DetailMarks,
   RelatedSection,
   StatGrid,
   TypeInfoCard,
@@ -44,6 +45,13 @@ export default function DetailTwocol({
               </>
             )}
           </span>
+          {/* 运营标记（置顶 / 精华）单独一行：上面那条把「类型 · 分类」合成了一个 span，
+              标记塞进去会连成一句「文章 · 分类 置顶 精华」，读起来像分类名的一部分。 */}
+          {(detail.pinnedAt || detail.featuredAt) && (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <DetailMarks pinned={!!detail.pinnedAt} featured={!!detail.featuredAt} />
+            </div>
+          )}
           <h1 className="mt-2 text-2xl font-semibold leading-snug tracking-tight text-neutral-900 sm:text-[1.7rem]">
             {detail.title}
           </h1>

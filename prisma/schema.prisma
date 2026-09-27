@@ -206,6 +206,17 @@ model Resource {
   allowComments  Boolean @default(true)
   externalUrl    String? // D1：游戏/整包外链（网盘/直链）
 
+  // ---- 运营标记（仅管理员可在后台设置；见 lib/actions/moderation.ts）----
+  // 用「时间戳」而不是布尔：既能当开关（null = 未标记），又能按标记时间排序与展示。
+  // pinnedAt 参与资源流的排序（越晚置顶越靠前，见 getFeed 的 orderBy）；
+  // featuredAt 只做展示（卡片/详情角标）+ 首页精选位联动的依据。
+  // 故意**不加索引**：置顶是少量资源的例外状态，排序首位是 pinnedAt 时 Postgres 本就无法
+  // 复用 (status, nsfw, publishedAt…) 那几条索引（会先按 status 过滤再排序），多一条
+  // (status, pinnedAt DESC NULLS LAST) 也只在「置顶资源占多数」时才划算 —— 那是滥用信号，
+  // 不是要优化的目标。等真有几十万行再说。
+  pinnedAt   DateTime?
+  featuredAt DateTime?
+
   // D2 图片四类 / 游戏信息：类型化扩展，值为 JSON 文本（zod 校验后序列化）
   meta String?
 

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Download, Heart } from "lucide-react";
+import { Download, Heart, Pin, Sparkles } from "lucide-react";
 import type { FeedCard } from "@/lib/queries";
 import { formatCount } from "@/lib/format";
 import NicknameText from "@/components/ui/NicknameText";
@@ -41,8 +41,24 @@ export default function ResourceRow({
         )}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium text-neutral-800 group-hover:text-neutral-950">
-          {item.title}
+        <span className="flex min-w-0 items-center gap-1.5">
+          {/* 运营标记（仅管理员可设）：行卡是浅底、且会跟随明暗主题，所以用语义阶
+              （brand/amber 都有暗色覆盖），与 ResourceCard 深底角标同一套口径。 */}
+          {item.pinned && (
+            <span className="inline-flex shrink-0 items-center gap-0.5 rounded-none border border-brand-300 bg-brand-100 px-1 py-0.5 text-[10px] font-medium text-brand-800">
+              <Pin size={10} aria-hidden />
+              置顶
+            </span>
+          )}
+          {item.featured && (
+            <span className="inline-flex shrink-0 items-center gap-0.5 rounded-none border border-amber-300 bg-amber-100 px-1 py-0.5 text-[10px] font-medium text-amber-800">
+              <Sparkles size={10} aria-hidden />
+              精华
+            </span>
+          )}
+          <span className="truncate text-sm font-medium text-neutral-800 group-hover:text-neutral-950">
+            {item.title}
+          </span>
         </span>
         <span className="mt-0.5 block truncate text-[11px] text-neutral-400">
           {/* 行卡是浅底（bg-surface）→ 默认 tone="light"，跟随明暗主题 */}

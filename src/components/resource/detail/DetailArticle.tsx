@@ -7,6 +7,7 @@ import {
   AuthorIdentity,
   CommentBlock,
   DescriptionBlock,
+  DetailMarks,
   FollowControl,
   RelatedSection,
   type DetailCtx,
@@ -49,6 +50,8 @@ export default function DetailArticle({
             {detail.category.name}
           </Link>
         )}
+        {/* 运营标记（置顶 / 精华）：与类型、分类同一条徽标行 */}
+        <DetailMarks pinned={!!detail.pinnedAt} featured={!!detail.featuredAt} />
       </div>
 
       <h1 className="mt-3 text-2xl font-semibold leading-snug tracking-tight text-neutral-900 sm:text-3xl">

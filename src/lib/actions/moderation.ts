@@ -152,6 +152,90 @@ export async function restoreResource(
   return { ok: true };
 }
 
+// ---------- 内容库：置顶 / 精华（仅 ADMIN）----------
+//
+// 两个标记都是运营动作，但语义不同：
+//   - 置顶（pinnedAt）：参与资源流排序，是 getFeed 的**第一排序键**（pinnedAt DESC NULLS LAST），
+//     越晚置顶越靠前 —— 想排定序就按想要的顺序倒着点；
+//   - 精华（featuredAt）：只做展示（卡片 / 详情页角标）+ 首页精选位联动的依据，不影响排序。
+// 都用时间戳而不是布尔：null 即未标记，同时白拿「什么时候标的」，排序与展示都要用。
+//
+// 权限用 adminOnly 而不是 staff：置顶会**直接改变全站排序**，属于站点级干预；
+// 版主能改内容状态就够，排序干预留给管理员（与产品口径「仅管理员可设」一致）。
+
+/** 置顶 / 取消置顶 */
+export async function setResourcePinned(
+  resourceId: string,
+  pinned: boolean,
+): Promise<{ ok: boolean; error?: string }> {
+  const admin = await adminOnly();
+  if (!admin) return { ok: false, error: "仅管理员可操作" };
+  const r = await prisma.resource.updateMany({
+    where: { id: resourceId },
+    data: { pinnedAt: pinned ? new Date() : null },
+  });
+  if (r.count === 0) return { ok: false, error: "资源不存在" };
+  const res = await prisma.resource.findUnique({
+    where: { id: resourceId },
+    select: { title: true },
+  });
+  await audit(
+    admin.id,
+    pinned ? "PIN_RESOURCE" : "UNPIN_RESOURCE",
+    "RESOURCE",
+    resourceId,
+    res?.title,
+  );
+  revalidatePath("/admin/content");
+  // 排序变了 → 所有列表页都可能受影响，走 layout 级失效（与下架/恢复同一口径）
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+/** 精华 / 取消精华（首次设为精华时给作者记一笔 FEATURED 积分） */
+export async function setResourceFeatured(
+  resourceId: string,
+  featured: boolean,
+): Promise<{ ok: boolean; error?: string }> {
+  const admin = await adminOnly();
+  if (!admin) return { ok: false, error: "仅管理员可操作" };
+
+  const row = await prisma.resource.findUnique({
+    where: { id: resourceId },
+    select: { title: true, authorId: true },
+  });
+  if (!row) return { ok: false, error: "资源不存在" };
+
+  await prisma.resource.update({
+    where: { id: resourceId },
+    data: { featuredAt: featured ? new Date() : null },
+  });
+  await audit(
+    admin.id,
+    featured ? "FEATURE_RESOURCE" : "UNFEATURE_RESOURCE",
+    "RESOURCE",
+    resourceId,
+    row.title,
+  );
+
+  // 「被精选」积分只在**首次**设为精华时发一次：幂等键是 awardPoints 内部
+  // (userId, reason, refId) 上的唯一索引，取消再设、并发重复点都会被它挡掉（P2002 静默），
+  // 所以这里不用自己查历史流水。分值为 0 或配置里关了总开关时，它自己会返回 false。
+  // 管理员给自己的资源点精华会被 NO_SELF_BENEFIT 拦下（防自刷），这也是既有口径。
+  if (featured) {
+    await awardPoints({
+      userId: row.authorId,
+      actorId: admin.id,
+      reason: "FEATURED",
+      refId: resourceId,
+    });
+  }
+
+  revalidatePath("/admin/content");
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
 // ---------- 举报 ----------
 // 按「同一目标」批量关闭全部 OPEN 举报，并联动资源状态：
 //   RESOURCE + dismiss  → 若正因举报暂挂 PENDING 则复核通过恢复上架
