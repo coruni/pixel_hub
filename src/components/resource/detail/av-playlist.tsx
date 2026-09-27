@@ -162,11 +162,6 @@ export function AvTrackList({
                 {i + 1}
               </span>
               <span className="min-w-0 flex-1 truncate">{avItemLabel(it, i, avKind)}</span>
-              {it.duration && (
-                <span className={`shrink-0 tabular-nums ${dark ? "text-white/55" : "text-neutral-400"}`}>
-                  {it.duration}
-                </span>
-              )}
             </button>
           </li>
         );

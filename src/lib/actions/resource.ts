@@ -126,9 +126,6 @@ export async function createResourceAction(
       mode: type === "VIDEO" && String(fd.get("avMode") ?? "") === "embed" ? "embed" : "direct",
       title: String(fd.get("avTitle") ?? "").trim(),
       url: String(fd.get("avUrl") ?? "").trim(),
-      artist: String(fd.get("artist") ?? "").trim() || undefined,
-      duration: String(fd.get("duration") ?? "").trim() || undefined,
-      resolution: String(fd.get("resolution") ?? "").trim() || undefined,
       // 主来源（第一 P）自己的字幕 / 歌词
       caption: parseCaptionDraft(String(fd.get("avCaption") ?? "")) ?? undefined,
       // 分P / 曲目（不含主来源）：坏 JSON 交给 parseAvTracksJson 吞掉，形状由 schema 校验

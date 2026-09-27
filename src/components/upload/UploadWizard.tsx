@@ -666,9 +666,6 @@ function avInitial(d: DraftPayload | null) {
   return {
     title: d.avTitle,
     url: d.avUrl,
-    duration: d.duration,
-    artist: d.artist,
-    resolution: d.resolution,
     caption: draftCaptionOf(d) ?? undefined,
     tracks: draftTracksOf(d),
   };

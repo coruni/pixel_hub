@@ -83,9 +83,6 @@ export const draftPayloadSchema = z.object({
   // draftPayloadSchema 一旦 safeParse 失败，parseDraftPayload 会把整条草稿回落成空，
   // 作者填的其它字段一起陪葬。avTracks 同理（它现在也装着其余项的字幕）。
   avCaption: text(1_200_000),
-  duration: text(40),
-  artist: text(160),
-  resolution: text(40),
   // —— 发布选项 ——
   nsfw: flag,
   loginRequired: flag,
@@ -127,9 +124,6 @@ export function draftHasContent(p: DraftPayload): boolean {
     p.changelog,
     p.avUrl,
     p.avTitle,
-    p.duration,
-    p.artist,
-    p.resolution,
   ];
   if (texts.some((t) => t.trim() !== "")) return true;
   if (p.avTracks.trim() !== "" && p.avTracks.trim() !== "[]") return true;
@@ -294,9 +288,6 @@ export function collectDraft(
     avMode: str("avMode"),
     avTracks: str("avTracks"),
     avCaption: str("avCaption"),
-    duration: str("duration"),
-    artist: str("artist"),
-    resolution: str("resolution"),
     nsfw: on("nsfw"),
     loginRequired: on("loginRequired"),
     allowComments: on("allowComments"),

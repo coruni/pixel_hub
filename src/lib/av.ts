@@ -134,5 +134,25 @@ export function avMountPlaceholder(kind: AvKind): string {
     : "https://…/clip.mp4 或 视频页面地址（B站 / YouTube）";
 }
 
+/** 标题长度上限，与 meta.ts 的 avMetaSchema.title / avTrackSchema.title 保持一致 */
+export const AV_TITLE_MAX = 120;
+
+/**
+ * 从上传的文件名取一个默认标题（曲目 / 分P 标题的来源）。
+ *
+ * 只做两件事：去掉后缀、把连续空白压成一个空格 —— 其余一律照抄文件名。
+ * **不替换下划线与连字符**：文件名里的 `_` `-` 可能是有意义的（版本号、编号），
+ * 自动「美化」成空格反而是在替作者改写标题，宁可保守。
+ * 取不出可用名字（如文件名是 `.mp4`）时返回空串，调用方据此跳过自动填充。
+ */
+export function avTitleFromFile(fileName: string): string {
+  const base = (fileName ?? "").split(/[\\/]/).pop() ?? "";
+  return base
+    .replace(/\.[A-Za-z0-9]{1,10}$/, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, AV_TITLE_MAX);
+}
+
 /** 嵌入页 iframe 的 sandbox：允许播放脚本，但禁止 top 导航、弹窗与表单提交 */
 export const AV_IFRAME_SANDBOX = "allow-scripts allow-same-origin allow-presentation";

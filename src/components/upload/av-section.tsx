@@ -13,8 +13,9 @@
 // 播放形态也不再手选：音频**恒站内播放**（不再提供 iframe 形态）；视频保留嵌入页，
 // 形态由地址自动判定（站内路径 / 已知媒体后缀 → 站内播放器，其余 http(s) 页面 → iframe）。
 //
-// 信息抓取：只对**主来源**做（时长 / 艺术家 / 分辨率都是资源级字段，分P 各自填没意义）；
-// 上传完自动读内嵌标签与时长、分辨率，挂载直链时同理。自动值只填「空字段」，用户改过的不再覆盖。
+// 没有「时长 / 艺术家 / 分辨率」这类补充字段：它们是自动从一个文件里读出来的资源级元信息，
+// 作者既不需要手填、也不该为「自动读到什么」负责，详情页同样不再展示。上传视频时仍会抽一帧
+// 当封面（见 lib/av-probe.ts），那是唯一保留的自动动作。
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
@@ -22,23 +23,20 @@ import { avClassFor, avExtsSample, suggestMode, type AvKind } from "@/lib/av";
 import { serializeAvTracks } from "@/lib/av-tracks";
 import { serializeCaptionDraft, type CaptionDraft } from "@/lib/captions";
 import { AV_TRACKS_MAX } from "@/lib/meta";
-import { capturePoster, probeFile, probeSummary, probeUrl, type AvProbe } from "@/lib/av-probe";
+import { capturePoster } from "@/lib/av-probe";
 import { mbText, type UploadLimits } from "@/lib/upload-config";
-import { fieldErr, wizBtn, wizInput, wizLabel, SectionTitle, STEP } from "./wizard-shared";
+import { fieldErr, wizLabel, SectionTitle, STEP } from "./wizard-shared";
 import { AvRowEditor, newRowId, type AvPlayRow } from "./av-row";
 import { Button } from "@/components/ui/Button";
 
-/** 可自动抓取的字段 */
-type FieldKey = "duration" | "artist" | "resolution";
-
-export type AvSectionInitial = Partial<Record<FieldKey, string>> & {
+export type AvSectionInitial = {
   /** 主来源（第一 P）的展示名 */
   title?: string;
   url?: string;
   /** 主来源自己的字幕 / 歌词 */
   caption?: CaptionDraft;
   /** 分P / 曲目（**不含主来源**那一 P）；caption 为 null 表示这一项没挂字幕 */
-  tracks?: { title: string; url: string; duration?: string; caption?: CaptionDraft | null }[];
+  tracks?: { title: string; url: string; caption?: CaptionDraft | null }[];
 };
 
 /** 初始行：第 1 行恒存在（作者总得有个地方填地址），其余按存量数据铺开 */
@@ -76,11 +74,6 @@ export function AvSection({
   const [rows, setRows] = useState<AvPlayRow[]>(() => initRows(initial));
   /** 正在上传的行 id（可能多行同时传，所以是集合而不是布尔） */
   const [busyIds, setBusyIds] = useState<string[]>([]);
-  const [fields, setFields] = useState<Record<FieldKey, string>>({
-    duration: initial?.duration ?? "",
-    artist: initial?.artist ?? "",
-    resolution: initial?.resolution ?? "",
-  });
   const [msg, setMsg] = useState<string | null>(null);
 
   const isAudio = avKind === "audio";
@@ -122,75 +115,24 @@ export function AvSection({
     });
   }, []);
 
-  // —— 主来源的信息抓取 ——
-  // 同步镜像：applyProbe 需要在同一次调用内读到最新值（setState 更新器是延迟执行的）
-  const fieldsRef = useRef(fields);
-  // 记录各字段「上一次自动填的值」：等于该值说明用户没改过，可继续被新文件覆盖
-  const autoRef = useRef<Partial<Record<FieldKey, string>>>({});
   // 抽帧是异步的，回调身份每渲染都在变——用 ref 取最新值，别让闭包拿着旧函数
   const coverFrameRef = useRef(onCoverFrame);
   useEffect(() => {
     coverFrameRef.current = onCoverFrame;
   });
 
-  function setField(k: FieldKey, v: string) {
-    const next = { ...fieldsRef.current, [k]: v };
-    fieldsRef.current = next;
-    setFields(next);
-  }
-
-  /** 用抓取结果补空字段；返回实际写入的部分，供提示文案使用 */
-  const applyProbe = useCallback((p: AvProbe): AvProbe => {
-    const cur = fieldsRef.current;
-    const auto = autoRef.current;
-    const applied: AvProbe = {};
-    const put = (k: FieldKey, v?: string) => {
-      if (!v) return;
-      if (cur[k] && auto[k] !== cur[k]) return; // 用户手改过 → 不覆盖
-      applied[k] = v;
-      auto[k] = v;
-    };
-    put("duration", p.duration);
-    put("artist", p.artist);
-    put("resolution", p.resolution);
-    if (Object.keys(applied).length > 0) {
-      const next = { ...cur, ...applied };
-      fieldsRef.current = next;
-      setFields(next);
-    }
-    return applied;
-  }, []);
-
   const mainUrl = rows[0]?.url ?? "";
   /** 主来源的形态（站内 / 直链 / 嵌入页）；视频才有 embed 的可能 */
   const mode = isAudio ? "direct" : suggestMode(mainUrl, "video");
 
-  // 主来源挂载直链：地址稳定后自动读时长 / 分辨率（嵌入页读不到，直接跳过）。
-  // 音频恒为 direct，这条判断天然只对视频的嵌入页生效。
-  useEffect(() => {
-    if (mode !== "direct") return;
-    const u = mainUrl.trim();
-    if (!/^https?:\/\//i.test(u)) return;
-    let alive = true;
-    const timer = setTimeout(() => {
-      void probeUrl(u, avKind).then((p) => {
-        if (alive) applyProbe(p);
-      });
-    }, 900);
-    return () => {
-      alive = false;
-      clearTimeout(timer);
-    };
-  }, [mainUrl, mode, isAudio, avKind, applyProbe]);
-
-  /** 主来源上传完成：抓内嵌标签 + 抽帧当封面（宿主负责落封面槽） */
+  /**
+   * 主来源上传完成：抽一帧当封面（宿主负责上传并落封面槽）。
+   * 只有视频有画面可抽，音频直接跳过。
+   */
   async function onMainUploaded(file: File) {
-    const posterP = !isAudio && coverFrameRef.current ? capturePoster(file) : null;
-    const probe = await probeFile(file, avKind).catch((): AvProbe => ({}));
-    const summary = probeSummary(applyProbe(probe));
-    if (summary) setMsg(summary);
-    const poster = await posterP;
-    if (poster) coverFrameRef.current?.(poster);
+    if (isAudio || !coverFrameRef.current) return;
+    const poster = await capturePoster(file);
+    if (poster) coverFrameRef.current(poster);
   }
 
   const [main, ...rest] = rows;
@@ -207,16 +149,15 @@ export function AvSection({
       <div>
         <span className={wizLabel}>{unit}列表</span>
         <p className="mb-2 text-[11px] leading-4 text-neutral-400">
-          一行一个播放项，第一行是主来源，其余按顺序播放并支持{isAudio ? "上一曲 / 下一曲" : "上一集 / 下一集"}
-          。地址可以直接粘链接，也可以点框里的上传按钮（单文件 {mbText(limits.attachmentMaxMb)}，
-          支持 {avExtsSample(avKind, 6)}）；歌词 / 字幕跟着自己那一行走，切{unit}即切
-          {isAudio ? "歌词" : "字幕"}。
+          一行一个播放项，第一行是主来源，其余按顺序播放。地址可粘链接、点上传按钮，或把文件拖到那一行上
+          （单文件 {mbText(limits.attachmentMaxMb)}，支持 {avExtsSample(avKind, 5)}），标题会按文件名自动填；
+          {isAudio ? "歌词" : "字幕"}挂在行尾按钮里，随{unit}切换。
           {isAudio
-            ? "音频一律用站内播放器播放。"
+            ? "音频一律用站内播放器。"
             : "站内文件与直链用站内播放器，网页地址（B 站 / YouTube 等）自动改用嵌入页。"}
         </p>
 
-        <ul className="space-y-3">
+        <ul className="space-y-2">
           {main && (
             <AvRowEditor
               key={main.id}
@@ -255,12 +196,8 @@ export function AvSection({
         </ul>
 
         <div className="mt-2 flex flex-wrap items-center gap-3">
-          <Button
-            type="button"
-            onClick={add}
-            className={`${wizBtn} border-brand-200 bg-surface text-neutral-600 hover:border-brand-400 hover:text-brand-700`}
-          >
-            <Plus size={14} aria-hidden />
+          <Button type="button" variant="ghost" size="xs" onClick={add}>
+            <Plus size={13} aria-hidden />
             添加{unit}
           </Button>
           <span className="text-[11px] text-neutral-400">最多 {AV_TRACKS_MAX} 行</span>
@@ -274,54 +211,6 @@ export function AvSection({
         <input type="hidden" name="avCaption" value={serializeCaptionDraft(main?.caption)} />
         <input type="hidden" name="avTracks" value={serializeAvTracks(rest)} />
         {fieldErr(fieldErrors?.tracks)}
-      </div>
-
-      {/* ---- 资源级补充字段（自动抓取，可手改；只属于主来源） ---- */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label className={wizLabel} htmlFor="duration">
-            时长（自动读取）
-          </label>
-          <input
-            id="duration"
-            name="duration"
-            value={fields.duration}
-            onChange={(e) => setField("duration", e.target.value)}
-            maxLength={20}
-            placeholder="3:42"
-            className={wizInput}
-          />
-        </div>
-        <div>
-          <label className={wizLabel} htmlFor="artist">
-            艺术家（自动读取）
-          </label>
-          <input
-            id="artist"
-            name="artist"
-            value={fields.artist}
-            onChange={(e) => setField("artist", e.target.value)}
-            maxLength={80}
-            placeholder="作曲 / 演奏者"
-            className={wizInput}
-          />
-        </div>
-        {!isAudio && (
-          <div>
-            <label className={wizLabel} htmlFor="resolution">
-              分辨率（自动读取）
-            </label>
-            <input
-              id="resolution"
-              name="resolution"
-              value={fields.resolution}
-              onChange={(e) => setField("resolution", e.target.value)}
-              maxLength={20}
-              placeholder="1920×1080 / 4K"
-              className={wizInput}
-            />
-          </div>
-        )}
       </div>
     </section>
   );

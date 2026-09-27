@@ -121,9 +121,6 @@ export async function applyResourceEdit(
       mode: type === "VIDEO" && str(fd, "avMode") === "embed" ? "embed" : "direct",
       title: str(fd, "avTitle"),
       url: str(fd, "avUrl"),
-      artist: str(fd, "artist") || undefined,
-      duration: str(fd, "duration") || undefined,
-      resolution: str(fd, "resolution") || undefined,
       // 主来源（第一 P）自己的字幕 / 歌词
       caption: parseCaptionDraft(str(fd, "avCaption")) ?? undefined,
       // 分P / 曲目（不含主来源），每条自带标题、地址与字幕

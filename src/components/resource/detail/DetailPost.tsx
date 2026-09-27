@@ -58,12 +58,7 @@ function MetaChips({ ctx }: { ctx: DetailCtx }) {
     if (meta.lang) chips.push({ node: meta.lang, cls: "bg-neutral-100 text-neutral-600" });
     if (meta.note) chips.push({ node: meta.note, cls: "bg-neutral-100 text-neutral-600" });
   }
-  if (meta.kind === "MUSIC" || meta.kind === "VIDEO") {
-    if (meta.artist) chips.push({ node: meta.artist, cls: "bg-neutral-100 text-neutral-600" });
-    if (meta.resolution)
-      chips.push({ node: meta.resolution, cls: "bg-neutral-100 text-neutral-600" });
-    if (meta.duration) chips.push({ node: meta.duration, cls: "bg-neutral-100 text-neutral-600" });
-  }
+  // 音视频不再有 chips：时长 / 艺术家 / 分辨率三个字段已取消，播放卡头部只剩格式与字幕角标
   if (chips.length === 0 && detail.tags.length === 0) return null;
   return (
     <div className="flex flex-wrap items-center gap-1.5">

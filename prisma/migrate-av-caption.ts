@@ -1,21 +1,23 @@
-// 一次性数据迁移：音视频 meta 从「资源级字幕数组」改为「每个播放项各带一份字幕 / 歌词」。
+// 一次性数据迁移：把存量音视频 meta 规整成当前 avMetaSchema 的形状。
 //
-// 旧形状：{ mode, source, url, artist, duration, resolution, captions: [{ label, format, text }], tracks: [] }
-// 新形状：{ mode, title, url, artist, duration, resolution, caption?: { format, text },
-//           tracks: [{ title, url, duration?, caption? }] }
+// 旧形状：{ mode, source, url, artist, duration, resolution,
+//           captions: [{ label, format, text }], tracks: [{ title, url, duration }] }
+// 新形状：{ mode, title, url, caption?: { format, text },
+//           tracks: [{ title, url, caption? }] }
 //
-// 脚本做的四件事：
+// 脚本做的六件事：
 //   ① 删掉 source（它只是「作者贴地址还是点上传」的操作差异，落库结果都是同一个 URL）
 //   ② captions 数组的**第一条**提升为主来源（第一 P）的 caption
 //   ③ 补 title（空串）、把 mode 按新口径钉死（MUSIC 恒 direct）
-//   ④ 规整 tracks 的键：只留 title / url / duration / caption
+//   ④ 删掉时长 / 艺术家 / 分辨率三个资源级字段（2026-09-27 整体取消：
+//      它们是「从一个文件里自动读出来」的元信息，作者不该为自动读到什么负责，详情页也不再展示）
+//   ⑤ 规整 tracks 的键：只留 title / url / caption（同理去掉分P 自己的 duration）
+//   ⑥ 注释里提到的旧键之外，**其它未知键（历史演示数据里的 provider / album / license / note）
+//      原样保留** —— 读取层本来就会 strip 掉，这里没必要顺手删库里的东西。
 //
-// 其它未知键（历史演示数据里的 provider / album / note 之类）**原样保留** —— 读取层本来就会
-// 把它们 strip 掉，这里没必要顺手删库里的东西，迁移只做必须做的改写。
-//
-// 为什么可以先不迁移：parseMeta 的读取层已兼容旧结构（captions[0] → caption），迁移只是把库里的
-// 形状规整干净。**但顺序仍是「新代码先上线，再跑这个脚本」** —— 旧镜像读到新数据会认不出
-// captions，字幕会整批消失（见 AGENTS.md「破坏性迁移拆两批」的教训）。
+// 为什么可以先不迁移：parseMeta 的读取层一直兼容旧结构（captions[0] → caption，未知键 strip），
+// 迁移只是把库里的形状规整干净。**字幕部分的顺序仍是「新代码先上线，再跑这个脚本」** ——
+// 旧镜像读到新数据会认不出 captions，字幕会整批消失（见 AGENTS.md「破坏性迁移拆两批」的教训）。
 //
 // **会丢数据的地方**：旧结构一个资源可以挂多条字幕（多语言 / 多版本），新结构一项只带一份，
 // 除第一条外没有归属的曲目。脚本不会静默丢弃 —— 逐条打出「资源 slug / 被丢掉的条数与名称」，
@@ -63,7 +65,6 @@ function migrate(type: string, raw: string | null) {
     .map((t) => ({
       title: typeof t.title === "string" ? t.title : "",
       url: typeof t.url === "string" ? t.url : "",
-      ...(typeof t.duration === "string" && t.duration ? { duration: t.duration } : {}),
       ...(toCaption(t.caption) ? { caption: toCaption(t.caption)! } : {}),
     }));
   const tracksSame =
@@ -72,6 +73,10 @@ function migrate(type: string, raw: string | null) {
   const needs =
     "captions" in obj ||
     "source" in obj ||
+    // 已取消的三个资源级字段：时长 / 艺术家 / 分辨率（tracks 里的 duration 由 tracksSame 覆盖）
+    "duration" in obj ||
+    "artist" in obj ||
+    "resolution" in obj ||
     !hasTitle ||
     obj.mode !== wantMode ||
     !Array.isArray(obj.tracks) ||
@@ -81,6 +86,9 @@ function migrate(type: string, raw: string | null) {
   const next: Record<string, unknown> = { ...obj };
   delete next.captions;
   delete next.source;
+  delete next.duration;
+  delete next.artist;
+  delete next.resolution;
   next.mode = wantMode;
   next.title = hasTitle ? obj.title : "";
   next.tracks = cleanTracks;

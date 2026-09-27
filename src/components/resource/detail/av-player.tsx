@@ -12,17 +12,14 @@
 // 列表长度 1 时这里的分支与改造前完全一致；多 P 才启用客户端切换（嵌入页走 av-embed.tsx）。
 
 import {
-  Clock,
   ExternalLink,
   FileAudio,
   FileVideo,
   Film,
   Link2,
   ListMusic,
-  MonitorPlay,
   Music2,
   Subtitles,
-  User,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { AV_IFRAME_SANDBOX } from "@/lib/av";
@@ -130,7 +127,6 @@ export function AvPlayerBlock({ ctx }: { ctx: DetailCtx }) {
               value={isAudio ? `${list.length} 首` : `${list.length} P`}
             />
           )}
-          {!multi && meta.duration && <Chip Icon={Clock} label="时长" value={meta.duration} />}
           {format && <Chip Icon={FormatIcon} label="格式" value={format} />}
           {captioned.length > 0 && (
             <Chip
@@ -143,8 +139,6 @@ export function AvPlayerBlock({ ctx }: { ctx: DetailCtx }) {
               }
             />
           )}
-          {isAudio && meta.artist && <Chip Icon={User} label="艺术家" value={meta.artist} />}
-          {!isAudio && meta.resolution && <Chip Icon={MonitorPlay} label="画质" value={meta.resolution} />}
         </div>
       </div>
 

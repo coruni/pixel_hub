@@ -128,11 +128,10 @@ export const avCaptionSchema = z.object({
 export type AvCaption = z.infer<typeof avCaptionSchema>;
 
 /**
- * 单个分P / 曲目。**不含主来源那一 P**（主来源仍是顶层 url/duration，见 avMetaSchema）——
+ * 单个分P / 曲目。**不含主来源那一 P**（主来源仍是顶层 url，见 avMetaSchema）——
  * 这样存量数据（只有 url）零迁移就是「单 P 资源」，播放列表由 lib/av-tracks.ts 统一拼装。
  *
- * 分P 的标题可留空（列表里回退显示「P3 / 曲目 3」）；时长可留空（不会自动抓取，
- * 抓取只对向导里手动上传的主文件做，见 av-section.tsx）。
+ * 分P 的标题可留空（列表里回退显示「P3 / 曲目 3」）。
  * `caption` 是**本项自己的**字幕 / 歌词（视频=字幕，音频=歌词），随切 P 一起换。
  */
 export const avTrackSchema = z.object({
@@ -143,7 +142,6 @@ export const avTrackSchema = z.object({
     .min(1, "请填写分P 地址")
     .max(2000, "地址过长")
     .refine(urlLike, "地址需为 http(s):// 外链或站内文件路径"),
-  duration: z.string().trim().max(20).optional(),
   caption: avCaptionSchema.optional(),
 });
 export type AvTrack = z.infer<typeof avTrackSchema>;
@@ -158,9 +156,6 @@ export const avMetaSchema = z
     /** 主来源（第一 P）的展示名；留空时播放列表回退「曲目 1 / P1」（见 av-tracks.ts） */
     title: z.string().trim().max(120, "标题过长").default(""),
     url: z.string().trim().max(2000).default(""),
-    artist: z.string().trim().max(80).optional(), // 音乐：艺术家（自动读取）
-    duration: z.string().trim().max(20).optional(), // 时长，如 3:42
-    resolution: z.string().trim().max(20).optional(), // 视频：分辨率，如 1080p
     /** 主来源（第一 P）自己的字幕 / 歌词；空 = 该项没挂 */
     caption: avCaptionSchema.optional(),
     /** 分P / 曲目（不含主来源）；空数组 = 单 P 资源，与存量数据同形 */

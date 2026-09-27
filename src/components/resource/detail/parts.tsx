@@ -314,11 +314,6 @@ export function TypeInfoCard({ ctx }: { ctx: DetailCtx }) {
             {meta.lang && <KV k="语言" v={meta.lang} />}
           </>
         )}
-        {meta.kind === "MUSIC" && meta.artist && <KV k="艺术家" v={meta.artist} />}
-        {meta.kind === "VIDEO" && meta.resolution && <KV k="画质" v={meta.resolution} />}
-        {(meta.kind === "MUSIC" || meta.kind === "VIDEO") && meta.duration && (
-          <KV k="时长" v={meta.duration} />
-        )}
         {/* 「播放方式」只对视频有意义：音频恒为站内直链播放器（mode 在 parseMeta 里被钉成 direct） */}
         {meta.kind === "VIDEO" && <KV k="播放方式" v={meta.mode === "embed" ? "嵌入页" : "直链"} />}
         {meta.kind === "IMAGE" && meta.isAiGenerated && (

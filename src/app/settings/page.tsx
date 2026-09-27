@@ -126,7 +126,8 @@ export default async function SettingsPage({
     ...(joined ? [{ k: "加入时间", v: joined }] : []),
   ];
 
-  // 8 个 panel：资料 / 装饰 / 通知 / 发布 / 安全 / 第三方 / 外观 / 账号（头像独立在 tab 外常驻）
+  // 7 个 panel：资料 / 装饰 / 通知 / 发布 / 安全 / 外观 / 账号（头像独立在 tab 外常驻）。
+  // 第三方账号（GitHub 绑定）并入「账号」，不单独占一个 tab。
   const tabs = [
     {
       key: "profile",
@@ -283,47 +284,6 @@ export default async function SettingsPage({
       ),
     },
     {
-      key: "third",
-      label: "第三方",
-      panel: (
-        <section className={sectionCls}>
-          <h2 className={sectionTitle}>第三方账号</h2>
-          <div className="mt-4 flex items-center justify-between gap-4">
-            <div className="min-w-0">
-              <p className="text-sm text-neutral-800">GitHub</p>
-              <p className="mt-0.5 text-xs text-neutral-400">
-                {githubAccount
-                  ? "已绑定，可直接使用 GitHub 登录本账号"
-                  : githubEnabled
-                    ? "未绑定"
-                    : "站点未开启 GitHub 登录"}
-              </p>
-            </div>
-            {githubEnabled &&
-              (githubAccount ? (
-                <form action={unbindGitHubAction}>
-                  <Button
-                    type="submit"
-                    className="rounded-none border border-red-200 px-3 py-1.5 text-xs text-red-500 hover:border-red-400 hover:bg-red-50"
-                  >
-                    解绑
-                  </Button>
-                </form>
-              ) : (
-                <form action={startGitHubBindAction}>
-                  <Button
-                    type="submit"
-                    className="rounded-none border border-brand-200 px-3 py-1.5 text-xs text-neutral-600 hover:border-brand-500 hover:text-neutral-900"
-                  >
-                    绑定 GitHub
-                  </Button>
-                </form>
-              ))}
-          </div>
-        </section>
-      ),
-    },
-    {
       key: "appearance",
       label: "外观",
       panel: (
@@ -340,17 +300,56 @@ export default async function SettingsPage({
       key: "account",
       label: "账号",
       panel: (
-        <section className={sectionCls}>
-          <h2 className={sectionTitle}>账号信息</h2>
-          <dl className="mt-4 space-y-2.5">
-            {info.map((row) => (
-              <div key={row.k} className="flex items-baseline justify-between gap-4 text-sm">
-                <dt className="shrink-0 text-xs text-neutral-400">{row.k}</dt>
-                <dd className="min-w-0 truncate text-neutral-800">{row.v}</dd>
+        <>
+          <section className={sectionCls}>
+            <h2 className={sectionTitle}>账号信息</h2>
+            <dl className="mt-4 space-y-2.5">
+              {info.map((row) => (
+                <div key={row.k} className="flex items-baseline justify-between gap-4 text-sm">
+                  <dt className="shrink-0 text-xs text-neutral-400">{row.k}</dt>
+                  <dd className="min-w-0 truncate text-neutral-800">{row.v}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+
+          <section className={sectionCls}>
+            <h2 className={sectionTitle}>第三方账号</h2>
+            <p className={sectionHint}>绑定后可直接用第三方账号登录本账号</p>
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-sm text-neutral-800">GitHub</p>
+                <p className="mt-0.5 text-xs text-neutral-400">
+                  {githubAccount
+                    ? "已绑定，可直接使用 GitHub 登录本账号"
+                    : githubEnabled
+                      ? "未绑定"
+                      : "站点未开启 GitHub 登录"}
+                </p>
               </div>
-            ))}
-          </dl>
-        </section>
+              {githubEnabled &&
+                (githubAccount ? (
+                  <form action={unbindGitHubAction}>
+                    <Button
+                      type="submit"
+                      className="rounded-none border border-red-200 px-3 py-1.5 text-xs text-red-500 hover:border-red-400 hover:bg-red-50"
+                    >
+                      解绑
+                    </Button>
+                  </form>
+                ) : (
+                  <form action={startGitHubBindAction}>
+                    <Button
+                      type="submit"
+                      className="rounded-none border border-brand-200 px-3 py-1.5 text-xs text-neutral-600 hover:border-brand-500 hover:text-neutral-900"
+                    >
+                      绑定 GitHub
+                    </Button>
+                  </form>
+                ))}
+            </div>
+          </section>
+        </>
       ),
     },
   ];

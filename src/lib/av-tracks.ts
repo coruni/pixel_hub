@@ -1,7 +1,7 @@
 // 音视频「分P / 曲目」的共享纯逻辑（详情页播放器、发布向导、服务端 action 共用）。
 // 不依赖 server / node：详情页播放器是客户端组件，这里只能 import 类型与纯函数。
 //
-// 数据形状的两层：meta 顶层的 title/url/duration/caption 是「主来源」（= 第一 P），
+// 数据形状的两层：meta 顶层的 title/url/caption 是「主来源」（= 第一 P），
 // meta.tracks 是「其余 P」。存量数据只有顶层 url → 播放列表长度为 1，行为与改造前完全一致；
 // 列表拼装只在这一个文件里做，播放器 / 向导 / action 都不各自实现一遍。
 
@@ -13,7 +13,6 @@ export type AvPlayItem = {
   /** 空标题表示作者没填，展示侧回退「P3 / 曲目 3」 */
   title: string;
   url: string;
-  duration?: string;
   /**
    * 本项自己的字幕 / 歌词（视频=字幕叠层，音频=滚动歌词）。
    * **一项一份、随切 P 一起换** —— 不再有「整份资源共用一份、多轨切换」的概念。
@@ -23,7 +22,7 @@ export type AvPlayItem = {
 };
 
 /**
- * 播放列表 = 主来源（第一 P，已在顶层 url/duration/caption）+ meta.tracks（其余 P）。
+ * 播放列表 = 主来源（第一 P，已在顶层 url/caption）+ meta.tracks（其余 P）。
  *
  * 「主来源为空但分P 非空」是合法形态（作者可能把每一 P 都填进分P 列表里），此时 tracks 直接
  * 就是整个列表；反过来 tracks 为空就只有主来源一条——存量单 P 数据正好落在这条分支上，
@@ -35,14 +34,10 @@ export function avPlaylist(meta: AvResourceMeta): AvPlayItem[] {
   const tracks = (meta.tracks ?? []).map((t) => ({
     title: t.title,
     url: t.url,
-    duration: t.duration,
     caption: t.caption,
   }));
   if (!meta.url) return tracks;
-  return [
-    { title: meta.title, url: meta.url, duration: meta.duration, caption: meta.caption },
-    ...tracks,
-  ];
+  return [{ title: meta.title, url: meta.url, caption: meta.caption }, ...tracks];
 }
 
 /** 分P 的统称（音频=曲目，视频=分P），用于列表标题、按钮 tooltip 等文案 */
@@ -88,7 +83,7 @@ export function parseAvTracksJson(raw: string | null | undefined): unknown[] {
  * 而落库的 schema 用 `undefined`，中间这层转换就收在这里，别让每个调用方各写一遍。
  */
 export function serializeAvTracks(
-  tracks: { title: string; url: string; duration?: string; caption?: AvCaption | null }[],
+  tracks: { title: string; url: string; caption?: AvCaption | null }[],
 ): string {
   return JSON.stringify(
     tracks
@@ -97,7 +92,6 @@ export function serializeAvTracks(
       .map((t) => ({
         title: t.title.trim(),
         url: t.url.trim(),
-        ...(t.duration ? { duration: t.duration } : {}),
         // 字幕 / 歌词跟着自己那一行走（见 meta.ts 的 avTrackSchema.caption）
         ...(t.caption?.text.trim() ? { caption: t.caption } : {}),
       })),
