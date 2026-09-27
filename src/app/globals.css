@@ -861,9 +861,9 @@ summary {
    【两个槽位、两个类】桌面端与移动端是两张独立的图，按断点互斥显示（display 由 Tailwind 的
    `hidden sm:block` / `sm:hidden` 控制，本文件只管遮罩形状）：
      .profile-bg-pc      —— sm 及以上。左右各一条可见带，贴屏幕边缘最清晰，向屏幕中间淡出到 0。
-     .profile-bg-mobile  —— 小于 sm。改成**上下两端**渐显：竖屏下容器只有 16px 内边距、卡片
-                            基本顶到屏幕两边，左右带会被卡片压住看不见，能露出来的只有页面
-                            顶部（头像区）与底部两段空隙。
+     .profile-bg-mobile  —— 小于 sm。**整张均匀半透明**，不分区域：竖屏下容器只有 16px 内边距、
+                            卡片基本顶到屏幕两边，左右带（乃至上下带）都会被卡片压住、露不出
+                            成形的一条，所以整张给同一个 alpha，当作一层淡底纹铺满整页。
 
    桌面端带子的淡出终点取 24%（视口 1920 时 max-w-7xl 的边落在 16.7%），也就是向内容区里多探
    约 100px —— 淡出发生在正文旁边而不是硬停在容器边上，两边像素对称。
@@ -891,21 +891,11 @@ summary {
   mask-image: var(--profile-bg-mask);
 }
 
-/* 移动端槽的默认遮罩（纵向）。与 .profile-bg-pc 同构、只换轴 —— 理由见上面的注释块。
-   中段 18%..82% 必须完全透明：这层是 fixed 铺满的最底层，中段不透明会从卡片底布的缝隙里
-   透出来，看着像脏了一块。这段必须与 upload-config.ts 的 PROFILE_BG_MOBILE_MASK_DEFAULT 一致。 */
+/* 移动端槽的默认遮罩：**整张均匀半透明**（不分区域）—— 理由见上面的注释块。
+   整张同值时方向无意义，所以省掉 `to bottom`。
+   这段必须与 upload-config.ts 的 PROFILE_BG_MOBILE_MASK_DEFAULT 一致。 */
 .profile-bg-mobile {
-  --profile-bg-mask: linear-gradient(
-    to bottom,
-    rgba(0, 0, 0, 1) 0%,
-    rgba(0, 0, 0, 1) 4%,
-    rgba(0, 0, 0, 0.55) 10%,
-    rgba(0, 0, 0, 0) 18%,
-    rgba(0, 0, 0, 0) 82%,
-    rgba(0, 0, 0, 0.55) 90%,
-    rgba(0, 0, 0, 1) 96%,
-    rgba(0, 0, 0, 1) 100%
-  );
+  --profile-bg-mask: linear-gradient(rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0.5) 100%);
   -webkit-mask-image: var(--profile-bg-mask);
   mask-image: var(--profile-bg-mask);
 }

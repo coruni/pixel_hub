@@ -35,7 +35,7 @@ model User {
   // 桌面端与移动端是**两个独立槽位**、各一张图：横图在竖屏被 cover 会裁掉大半，共用一张必然
   // 牺牲其中一端，所以分成两列，互不影响（只设一端时另一端就是没背景，不做跨槽回落）。
   profileBgPcKey String? // 桌面端（sm 及以上）：左右两侧经横向遮罩渐显，贴屏幕边缘最清晰
-  profileBgMobileKey String? // 移动端（小于 sm）：上下两端经纵向遮罩渐显
+  profileBgMobileKey String? // 移动端（小于 sm）：整张均匀半透明遮罩（不分区域，当作一层淡底纹）
   profileBgOnResource Boolean @default(true) // 【两槽共用】是否把这背景展示给**其他访客**在资源详情页看到（默认展示；个人主页始终展示。未勾选时本人自己仍能看到）
   profileBgGlobal Boolean @default(false) // 【两槽共用】全局显示：铺到除后台外的所有页面（默认关；关闭时只在个人主页 + 资源详情页铺设）
   profileBgMask String? // 桌面端自定义的遮罩形状（CSS mask-image 值）。null = 用内置默认（upload-config.ts 的 PROFILE_BG_MASK_DEFAULT）

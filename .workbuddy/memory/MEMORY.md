@@ -39,8 +39,10 @@
   （`profileBgMask` / `profileBgMobileMask`）；`profileBgOnResource`、`profileBgGlobal`、
   等级门槛 `profile.bgMinLevel` **两槽共用**（语义：两张背景作为一个整体对外可见 / 不可见）。
 - 两槽**不做跨槽回落**：只设了桌面端时移动端就是素底，不拿横图去填竖屏。
-- 遮罩类唯一事实来源：`globals.css` 的 `.profile-bg-pc`（左右两条带）/ `.profile-bg-mobile`
-  （上下两端）；显示切换靠 Tailwind `hidden sm:block` / `sm:hidden`。
+- 遮罩类唯一事实来源：`globals.css` 的 `.profile-bg-pc`（左右两条带，中段 alpha 0）/
+  `.profile-bg-mobile`（**整张均匀半透明 alpha 0.5，不分区域**）；显示切换靠 Tailwind
+  `hidden sm:block` / `sm:hidden`。移动端默认值同时存在于 `upload-config.ts` 的
+  `PROFILE_BG_MOBILE_MASK_DEFAULT`，两处必须同步改。
 - 设置页 `ProfileBgForm.tsx` 里 `BgSlotForm` 是两槽共用的槽组件；两槽的字段名映射收在
   `lib/actions/settings.ts` 的 `bgKeyData` / `bgMaskData` / `bgKeyOf`（Prisma update 是强类型的，
   不能拼动态键名）。

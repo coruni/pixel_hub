@@ -209,59 +209,64 @@ function BgSlotForm({
         <p className="mt-1.5 text-[11px] text-neutral-400">单张最大 {maxMb}MB，不支持 GIF。</p>
       </form>
 
-      {/* 遮罩形状：只在已经有背景图时出现 —— 没图时调形状看不到任何变化，只会让人困惑。 */}
-      {imageKey && (
-        <form action={mkAction} className="mt-3">
-          <label htmlFor={`bg-mask-${slot}`} className="block text-xs text-neutral-700">
-            遮罩形状
-          </label>
-          <p className="mt-1 text-[11px] leading-4 text-neutral-400">{maskHint}</p>
-          <textarea
-            id={`bg-mask-${slot}`}
-            name="bgMask"
-            rows={3}
-            maxLength={PROFILE_BG_MASK_MAX}
-            spellCheck={false}
-            value={maskDraft}
-            onChange={(e) => setMaskDraft(e.target.value)}
-            aria-invalid={!maskUsable}
-            aria-describedby={`bg-mask-status-${slot}`}
-            className={`${INPUT} mt-2 text-[11px] leading-5`}
-          />
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <Button type="submit" variant="primary" size="md" disabled={mkPending || !maskUsable}>
-              {mkPending ? "保存中…" : "保存遮罩"}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="md"
-              disabled={maskDraft === defMask}
-              onClick={() => setMaskDraft(defMask)}
-            >
-              填回默认值
-            </Button>
-          </div>
-          <p id={`bg-mask-status-${slot}`} className="mt-1.5 text-[11px] leading-4">
-            {!maskUsable ? (
-              <span className="text-amber-700">
-                值不可用，保存会被拒绝：需要一条以 linear-gradient( / radial-gradient( /
-                conic-gradient( 开头、以 ) 结尾的值。
-              </span>
-            ) : mkState.error ? (
-              <span className="text-red-500">{mkState.error}</span>
-            ) : mkState.ok && !maskDirty ? (
-              <span className="text-emerald-600">✓ 已更新</span>
-            ) : maskDirty ? (
-              <span className="text-neutral-400">有未保存的修改。</span>
-            ) : (
-              <span className="text-neutral-400">
-                {maskDraft.trim() === defMask ? "当前为默认形状。" : "已保存为自定义形状。"}
-              </span>
-            )}
+      {/* 遮罩形状：**始终可调**，不要求先有图。形状是纯 CSS 渐变、与图无关，逼用户先传图才能试
+          形状只会让人以为必须先上传；服务端也不看有没有图（saveProfileBgMask 只校形状）。
+          没图时预览是空的（下面给一行说明），但值照样存得下，上传后立刻生效。 */}
+      <form action={mkAction} className="mt-3">
+        <label htmlFor={`bg-mask-${slot}`} className="block text-xs text-neutral-700">
+          遮罩形状
+        </label>
+        <p className="mt-1 text-[11px] leading-4 text-neutral-400">{maskHint}</p>
+        {!imageKey && (
+          <p className="mt-1 text-[11px] leading-4 text-neutral-500">
+            这一端还没有背景图，预览是空的；形状可以先存下来，上传后立刻套用。
           </p>
-        </form>
-      )}
+        )}
+        <textarea
+          id={`bg-mask-${slot}`}
+          name="bgMask"
+          rows={3}
+          maxLength={PROFILE_BG_MASK_MAX}
+          spellCheck={false}
+          value={maskDraft}
+          onChange={(e) => setMaskDraft(e.target.value)}
+          aria-invalid={!maskUsable}
+          aria-describedby={`bg-mask-status-${slot}`}
+          className={`${INPUT} mt-2 text-[11px] leading-5`}
+        />
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <Button type="submit" variant="primary" size="md" disabled={mkPending || !maskUsable}>
+            {mkPending ? "保存中…" : "保存遮罩"}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="md"
+            disabled={maskDraft === defMask}
+            onClick={() => setMaskDraft(defMask)}
+          >
+            填回默认值
+          </Button>
+        </div>
+        <p id={`bg-mask-status-${slot}`} className="mt-1.5 text-[11px] leading-4">
+          {!maskUsable ? (
+            <span className="text-amber-700">
+              值不可用，保存会被拒绝：需要一条以 linear-gradient( / radial-gradient( /
+              conic-gradient( 开头、以 ) 结尾的值。
+            </span>
+          ) : mkState.error ? (
+            <span className="text-red-500">{mkState.error}</span>
+          ) : mkState.ok && !maskDirty ? (
+            <span className="text-emerald-600">✓ 已更新</span>
+          ) : maskDirty ? (
+            <span className="text-neutral-400">有未保存的修改。</span>
+          ) : (
+            <span className="text-neutral-400">
+              {maskDraft.trim() === defMask ? "当前为默认形状。" : "已保存为自定义形状。"}
+            </span>
+          )}
+        </p>
+      </form>
     </section>
   );
 }
@@ -359,9 +364,9 @@ export default function ProfileBgForm({
         title="移动端"
         hint="窄屏（< 640px）显示，铺在页面顶部与底部的留白里"
         previewBoxCls="aspect-[9/16] w-[11rem] max-w-full"
-        advice="建议 9:16 竖图（≥ 1080×1920），主体放在上下两端。"
-        maskHint="控制背景「哪几块看得见」。默认是上下两端、中间留白给正文；
-          中间那段必须保持完全透明（rgba(0, 0, 0, 0)），否则会透到正文卡片底下。"
+        advice="建议 9:16 竖图（≥ 1080×1920），全图均匀可见，主体放中间即可。"
+        maskHint="控制背景的可见度。默认整张均匀半透明（0.5），不分区域；
+          调大更明显、调小更含蓄。注意整张都是非全透明时，卡片之间的空隙里也会看到这层背景。"
         imageKey={mobileKey}
         maskValue={bgMobileMask}
         maxMb={maxMb}

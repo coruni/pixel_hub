@@ -541,7 +541,7 @@ export async function updateProfileBgGlobalAction(
 // 同样**独立于上传动作**：调形状不该逼用户重选一遍图。
 // 空串 = 回到**本槽**内置默认，存 null 而不是把默认值抄一份进库 —— 这样以后调默认值，
 // 没自定义过的用户会跟着一起变；抄进库的那些则永远停在旧值上，事后无法区分。
-// 两槽的形状必须分开存：桌面端是左右两条带、移动端是上下两端（见 globals.css），
+// 两槽的形状必须分开存：桌面端是左右两条带、移动端是整张均匀半透明（见 globals.css），
 // 同一条值换个屏幕方向就完全不成立。
 async function saveProfileBgMask(
   userId: string,
