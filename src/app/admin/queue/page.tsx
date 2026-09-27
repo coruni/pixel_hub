@@ -8,6 +8,7 @@ import { TYPE_LABEL } from "@/lib/display";
 import { str, type SP } from "@/lib/search-params";
 import { QueueActions } from "@/components/admin/buttons";
 import SpotActions from "@/components/admin/spot-actions";
+import ResourceFlagsForm from "@/components/admin/ResourceFlagsForm";
 import { QueueMediaStrip } from "@/components/admin/QueueMediaStrip";
 
 export const metadata: Metadata = { title: "审核队列" };
@@ -120,6 +121,24 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
                         直发
                       </span>
                     )}
+                    {/* 只显示偏离默认值的标注（默认＝不 NSFW / 不需登录 / 允许评论）：
+                        全默认时这里什么都不出现，否则每条都挂三个灰徽章，等于没有信息。
+                        三组色阶在 .dark 下都有覆盖，不会在暗色里糊成亮底。 */}
+                    {r.nsfw && (
+                      <span className="rounded-none border border-red-300 bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-700">
+                        NSFW
+                      </span>
+                    )}
+                    {r.loginRequired && (
+                      <span className="rounded-none border border-brand-300 bg-brand-100 px-1.5 py-0.5 text-[10px] font-medium text-brand-800">
+                        下载需登录
+                      </span>
+                    )}
+                    {!r.allowComments && (
+                      <span className="rounded-none border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                        禁止评论
+                      </span>
+                    )}
                   </div>
                   <p className="mt-1 text-xs text-neutral-500">
                     作者{" "}
@@ -148,6 +167,18 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
               ) : (
                 <p className="mt-3 text-xs text-neutral-400">无预览图（纯外链内容）</p>
               )}
+
+              {/* 可见性标注就地修改：待审核与直发抽查两个视图共用。它与旁边的
+                  「通过 / 打回 / 下架」是两条独立写入路径，互不牵连 —— 改完标注不通过，
+                  改动照样落库（审核员可能就是要先修正再决定）。 */}
+              <ResourceFlagsForm
+                resourceId={r.id}
+                values={{
+                  nsfw: r.nsfw,
+                  loginRequired: r.loginRequired,
+                  allowComments: r.allowComments,
+                }}
+              />
             </li>
           ))}
         </ul>

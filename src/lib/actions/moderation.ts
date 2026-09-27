@@ -104,6 +104,68 @@ export async function rejectResourceAction(
   return { ok: true };
 }
 
+// ---------- 审核队列：就地修正可见性标注 ----------
+//
+// 审核时最常见的两种「标注错」：该打 NSFW 没打、外链/成人向内容没要求登录。此前只能跳去
+// /admin/content/{id}/edit 那个整页表单 —— 标题、正文、媒体、标签全得原样带一遍，为了改一个布尔
+// 不值当，而漏改的代价是把该遮的内容直接放上站。
+//
+// 只开这三个布尔，**不开**文本 / 媒体 / 类型 / 分类：改那些要跑整条改稿校验（meta 形状、标签同步、
+// 媒体认领），在审核路径上重演一遍就是让两套写库逻辑分叉。它们仍走编辑页。
+//
+// 权限用 staff（版主 + 管理员）而不是 adminOnly：通过 / 打回本来就归版主，判定标注与之同级；
+// 置顶 / 精华那种会改变全站排序的站点级干预才是 adminOnly。
+const FLAG_KEYS = ["nsfw", "loginRequired", "allowComments"] as const;
+
+/** 仅供审计日志的人话名（不是 UI 文案的事实来源 —— 那边是 wizard-shared 的 PUBLISH_OPTIONS） */
+const FLAG_LABEL: Record<(typeof FLAG_KEYS)[number], string> = {
+  nsfw: "NSFW",
+  loginRequired: "下载需登录",
+  allowComments: "允许评论",
+};
+
+export async function setResourceFlags(
+  resourceId: string,
+  flags: Record<(typeof FLAG_KEYS)[number], boolean>,
+): Promise<{ ok: boolean; error?: string }> {
+  const admin = await staff();
+  if (!admin) return { ok: false, error: "无权限" };
+
+  // 逐字段显式取值而不是 spread 入参：入参是不可信输入，多带一个键就会被一并写进库
+  const data = {
+    nsfw: flags.nsfw === true,
+    loginRequired: flags.loginRequired === true,
+    allowComments: flags.allowComments === true,
+  };
+
+  const before = await prisma.resource.findUnique({
+    where: { id: resourceId },
+    select: { title: true, nsfw: true, loginRequired: true, allowComments: true },
+  });
+  if (!before) return { ok: false, error: "资源不存在" };
+
+  // 三个键是一次性提交的，但只把真正变了的写进审计 —— 否则日志会被「点了一次没改动」的操作淹没
+  const changed = FLAG_KEYS.filter((k) => before[k] !== data[k]);
+  if (changed.length === 0) return { ok: true };
+
+  await prisma.resource.update({ where: { id: resourceId }, data });
+  await audit(
+    admin.id,
+    "EDIT_RESOURCE_FLAGS",
+    "RESOURCE",
+    resourceId,
+    `${before.title}：${changed
+      .map((k) => `${FLAG_LABEL[k]} ${before[k] ? "开" : "关"} → ${data[k] ? "开" : "关"}`)
+      .join("；")}`,
+  );
+
+  revalidatePath("/admin/queue");
+  revalidatePath("/admin/content");
+  // NSFW / 登录可见会改变前台的可见性与列表构成，与下架 / 恢复同一口径
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
 // ---------- 内容库：下架 / 恢复 ----------
 export async function setResourceRemoved(
   resourceId: string,

@@ -29,7 +29,11 @@
 ## UI 语言
 
 - 像素风 + Fusion Pixel + 点阵背景 + 赤陶橙 brand + 全站 `rounded-none`。
-- 暗色主题只覆盖 brand / neutral / red / amber 四组语义阶；**emerald / sky 等没有暗色覆盖**，
+- 暗色主题只覆盖 brand / neutral / red / amber 四组语义阶，**且这四组也不是每个阶都覆盖**：
+  `brand` 50–900 齐全；`neutral` 只有 200–950（**缺 50 / 100**）；`red` 只有 50/100/200/300/600/700
+  （缺 400/500/800/900）；`amber` 只有 100/200/300/600/700/900（缺 50/400/500/800）。
+  所以 `bg-neutral-100` 这类写法在暗色下仍是亮底 —— `admin/content` 的 DRAFT 徽章就是这么写的（存量）。
+  新建组件的底色 / 文字色请只取上列已覆盖的阶；emerald / sky 完全没有覆盖，
   在会跟随明暗的 surface 上当正文色用会糊（卡片封面那种固定深底才可以用亮阶）。
 - 类型图标唯一事实来源：`src/components/resource/type-icon.tsx`（TYPE_ICON / TYPE_BADGE_TONE / TypeIcon）。
 
@@ -76,6 +80,17 @@
 - 「加入专题」= `actions/home.ts` 的 `addResourceToFeaturedSectionAction`：追加进**第一个**
   `featured` 板块的 `featuredIds`（上限 24，与 `home-config.ts` 的 `featuredCfg` 同步）；
   没有 featured 板块时明确报错，不偷偷塞进 hero。
+
+## 后台权限口径：staff vs adminOnly
+
+- **`staff`（版主 + 管理员）= 内容治理日常**：审核通过 / 打回、下架 / 恢复、举报处理，
+  以及**审核队列里就地修正可见性标注**（`setResourceFlags`：nsfw / loginRequired / allowComments）。
+- **`adminOnly` = 站点级干预**：置顶 / 精华（会改变全站排序）、用户角色 / 封禁 / 免审。
+- 三个可见性开关的 **UI 文案事实来源是 `src/components/upload/wizard-shared.tsx` 的
+  `PUBLISH_OPTIONS`**，审核面板 `components/admin/ResourceFlagsForm.tsx` 直接复用它，
+  不要另写一份（`moderation.ts` 里那份 `FLAG_LABEL` 只服务审计日志的人话描述，不算第二来源）。
+- 后台写布尔开关一律**逐字段显式取值**，不要 spread 传入对象 —— server action 的入参是
+  不可信输入，多带一个键就会被一并写进库。
 
 ## Prisma 事务铁律：事务内不许用 `create().catch()` 兜唯一键冲突（2026-09-27 事故）
 
