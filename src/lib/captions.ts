@@ -1,7 +1,8 @@
 // 「字幕 / 歌词」的解析与表单序列化纯逻辑 —— 详情页播放器（client）与发布向导共用。
 // 服务端 action 只用它的 JSON 解析 / 序列化，不引 node，因此浏览器与 RSC 两侧都能 import。
 //
-// 数据形状：字幕文本**不落存储、不发额外请求**，直接内联在资源 meta 里（meta.captions[].text）。
+// 数据形状：字幕文本**不落存储、不发额外请求**，直接内联在资源 meta 里
+//（主来源在 meta.caption，各曲目/分P 在自己的 meta.tracks[].caption，**一项一份**）。
 // 这么定有三个理由：
 //   ① `<track>` 只吃 WebVTT，srt / lrc 必须自己解析，本来就走不上「交给浏览器拉 src」那条路；
 //   ② 站内文件的云盘引用（/od/…）由网关 302 到 Graph 的预鉴权链接，那个响应不带 CORS 头，
@@ -35,34 +36,50 @@ export const AV_CAPTION_TEXT_MAX = 160_000;
 /** 单份字幕的行数上限（渲染保护）：超出部分直接丢，避免异常数据把播放器卡死 */
 export const CAPTION_CUE_MAX = 3000;
 
-/** 每份资源可挂的字幕条数（多语言 / 多版本） */
-export const AV_CAPTIONS_MAX = 6;
+/**
+ * 一份资源可挂的**字幕文本总量**上限（字符）。
+ *
+ * 口径沿革：字幕曾是一个「整份资源共用、最多 6 条」的数组（6 × 160K = 960K），
+ * 现在改成**每个播放项各带一份**（见 meta.ts 的 avTrackSchema.caption），
+ * 条目数上限跟着 tracks 走（60），但**总体积必须继续卡住** —— 60 × 160K = 9.6M 字符的 meta
+ * 会让详情页每次多带近 10MB。这里沿用改造前的总量口径，能力不缩水也不膨胀。
+ */
+export const AV_CAPTION_TOTAL_MAX = 960_000;
 
-/** 一套字幕的编辑形状（向导的行、meta.captions 的元素；两边形状必须一致，靠 action 的赋值互校） */
-export type CaptionDraft = { label: string; format: CaptionFormat; text: string };
+/**
+ * 一套字幕的编辑形状（向导的行、meta 里的 caption；两边形状必须一致，靠 action 的赋值互校）。
+ *
+ * 没有 `label`：字幕已与播放项一一对应（一个曲目/分P 一份），
+ * 「多语言 / 多版本」的区分名失去意义 —— 切换靠切播放项，不靠切轨。
+ */
+export type CaptionDraft = { format: CaptionFormat; text: string };
 
 // ---------- 表单受控序列化（与 downloads / tracks 同款） ----------
 
-/** 解析隐藏字段里的字幕 JSON；坏 JSON / 非数组一律空数组，绝不抛错 */
-export function parseAvCaptionsJson(raw: string | null | undefined): unknown[] {
-  if (!raw) return [];
+/**
+ * 解析隐藏字段里的单份字幕 JSON；坏 JSON / 形状不对一律返回 null，绝不抛错。
+ * 返回 null 表示「这一项没有字幕」，与「解析失败」在调用侧同义 —— 都不该拦提交。
+ */
+export function parseCaptionDraft(raw: string | null | undefined): CaptionDraft | null {
+  if (!raw) return null;
   try {
     const v: unknown = JSON.parse(raw);
-    return Array.isArray(v) ? v : [];
+    if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+    const o = v as Record<string, unknown>;
+    const text = typeof o.text === "string" ? o.text : "";
+    if (!text.trim()) return null;
+    return { format: isCaptionFormat(o.format) ? o.format : "srt", text };
   } catch {
-    return [];
+    return null;
   }
 }
 
-/** 序列化：丢掉没文本的行（用户加了行还没导内容），并截断到上限 */
-export function serializeAvCaptions(list: CaptionDraft[]): string {
-  return JSON.stringify(
-    list
-      .filter((c) => c.text.trim())
-      .slice(0, AV_CAPTIONS_MAX)
-      .map((c) => ({ label: c.label.trim(), format: c.format, text: c.text })),
-  );
+/** 序列化单份字幕：没文本时输出空串（宿主据此判断「该项无字幕」） */
+export function serializeCaptionDraft(c: CaptionDraft | null | undefined): string {
+  if (!c || !c.text.trim()) return "";
+  return JSON.stringify({ format: c.format, text: c.text });
 }
+
 
 // ---------- 格式识别 ----------
 

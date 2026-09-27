@@ -1,8 +1,10 @@
 // 音视频播放卡 —— 详情页专用（服务端组件，无客户端状态；播放控件在 av-controls.tsx）。
 //
-// 两种来源形态对应两种播放方式：
+// 两种播放方式（形态由地址自动判定，见 lib/av.ts 的 suggestMode）：
 //   直链（mode=direct）：自建播放器（自绘控件，替代原生 controls），preload=metadata 只取时长与首帧
 //   嵌入页（mode=embed）：sandbox iframe，禁止 top 导航与弹窗，只放行播放所需脚本
+// **嵌入页仅服务 VIDEO** —— 音频没有嵌入页形态（parseMeta 把 MUSIC 的 mode 恒归 direct）；
+// 音频的站内播放器是唯一形态，没有 iframe 分支。
 // 站内来源（/uploads 或 /od 云盘引用）在播放器控件行里嵌一条下载入口：复用 MetaDownloadButton（iconOnly），
 // 与其余类型的登录墙 / 下载计数口径一致（/od 由网关 302 到 Graph 预鉴权链接，本站不转发字节）。
 //
@@ -80,6 +82,8 @@ export function AvPlayerBlock({ ctx }: { ctx: DetailCtx }) {
   // 播放列表：tracks 优先，否则退回单条主来源（存量数据即单 P）
   const list = avPlaylist(meta);
   const multi = list.length > 1;
+  // 挂了字幕 / 歌词的播放项（每项一份，见 meta.ts 的 avTrackSchema.caption）
+  const captioned = list.filter((it) => it.caption?.text.trim());
   // 下载入口指向第一 P（多 P 时列表里不逐条放下载按钮：每项一个 MetaDownloadButton 会重复渲染
   // 登录墙/计数逻辑，收益远低于成本）；命名与「是否站内托管」也按第一 P 判定
   const primaryUrl = list[0]?.url ?? "";
@@ -128,12 +132,14 @@ export function AvPlayerBlock({ ctx }: { ctx: DetailCtx }) {
           )}
           {!multi && meta.duration && <Chip Icon={Clock} label="时长" value={meta.duration} />}
           {format && <Chip Icon={FormatIcon} label="格式" value={format} />}
-          {meta.captions.length > 0 && (
+          {captioned.length > 0 && (
             <Chip
               Icon={Subtitles}
               label={isAudio ? "歌词" : "字幕"}
               value={
-                meta.captions.length > 1 ? `${meta.captions.length} 条` : meta.captions[0].format.toUpperCase()
+                captioned.length > 1
+                  ? `${captioned.length} 项`
+                  : captioned[0].caption!.format.toUpperCase()
               }
             />
           )}
@@ -149,17 +155,11 @@ export function AvPlayerBlock({ ctx }: { ctx: DetailCtx }) {
           </p>
         ) : meta.mode === "embed" && /^https?:\/\//i.test(list[0].url) ? (
           multi ? (
-            <AvEmbed items={list} title={detail.title} avKind={avKind} isAudio={isAudio} />
+            <AvEmbed items={list} title={detail.title} avKind={avKind} />
           ) : (
             // 单 P 嵌入页：服务端直出，不为此加载客户端组件。
             // sandbox 只放行播放脚本；referrerPolicy 避免把本站地址带给外站
-            <div
-              className={
-                isAudio
-                  ? "aspect-video w-full border border-brand-300 bg-neutral-100"
-                  : "aspect-video w-full bg-black"
-              }
-            >
+            <div className="aspect-video w-full bg-black">
               <iframe
                 src={list[0].url}
                 title={`${detail.title} · ${kindLabel}嵌入`}
@@ -177,17 +177,16 @@ export function AvPlayerBlock({ ctx }: { ctx: DetailCtx }) {
             items={list}
             poster={coverUrl}
             title={detail.title}
-            captions={meta.captions}
             downloadSlot={downloadSlot}
           />
         )}
       </div>
 
-      {/* 嵌入页的字幕由来源站点自己的播放器控制，站内挂的这份用不上——说清楚，别让作者以为挂丢了 */}
-      {meta.mode === "embed" && meta.captions.length > 0 && (
+      {/* 嵌入页的字幕由来源站点自己的播放器控制，站内挂的这几份用不上——说清楚，别让作者以为挂丢了 */}
+      {meta.mode === "embed" && captioned.length > 0 && (
         <p className="mt-3 flex items-start gap-1.5 text-xs text-neutral-500">
           <Subtitles size={12} className="mt-0.5 shrink-0" aria-hidden />
-          嵌入页播放时字幕由来源站点控制，这里挂载的 {meta.captions.length} 条不会显示。
+          嵌入页播放时字幕由来源站点控制，这里挂载的 {captioned.length} 份不会显示。
         </p>
       )}
 

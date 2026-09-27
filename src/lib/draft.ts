@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { isCaptionFormat, type CaptionDraft } from "@/lib/captions";
+import { parseCaptionDraft, type CaptionDraft } from "@/lib/captions";
 import { isSingleCoverType } from "@/lib/upload-config";
 
 /**
@@ -71,14 +71,18 @@ export const draftPayloadSchema = z.object({
   changelog: text(4000),
   isAiGenerated: flag,
   original: flag,
-  avSource: text(16),
   avUrl: text(2000),
+  /** 主来源（第一 P）的展示名 —— 播放项列表的第一行的标题 */
+  avTitle: text(160),
   avMode: text(16),
-  avTracks: text(20000), // 分P / 曲目 JSON 原文（与 downloads 同款受控序列化）
-  // 字幕 / 歌词 JSON 原文。上限按「6 份 × 单份 160K 字符」再留 JSON 转义的余量
-  //（换行与引号会被转义膨胀约两成）——**宁可放宽也不能收紧**：draftPayloadSchema 一旦
-  // safeParse 失败，parseDraftPayload 会把整条草稿回落成空，作者填的其它字段一起陪葬。
-  avCaptions: text(1_200_000),
+  // 分P / 曲目 JSON 原文（与 downloads 同款受控序列化）。**字幕内联在每一行里**，
+  // 所以这个字段的体积上限跟着字幕走，不是「一行几百字节」那么小 —— 见下面的 avCaption。
+  avTracks: text(1_200_000),
+  // 主来源那一份字幕 / 歌词的 JSON 原文。上限按 AV_CAPTION_TOTAL_MAX（960K 字符）再留
+  // JSON 转义的余量（换行与引号会被转义膨胀约两成）——**宁可放宽也不能收紧**：
+  // draftPayloadSchema 一旦 safeParse 失败，parseDraftPayload 会把整条草稿回落成空，
+  // 作者填的其它字段一起陪葬。avTracks 同理（它现在也装着其余项的字幕）。
+  avCaption: text(1_200_000),
   duration: text(40),
   artist: text(160),
   resolution: text(40),
@@ -122,13 +126,13 @@ export function draftHasContent(p: DraftPayload): boolean {
     p.note,
     p.changelog,
     p.avUrl,
+    p.avTitle,
     p.duration,
     p.artist,
     p.resolution,
   ];
   if (texts.some((t) => t.trim() !== "")) return true;
   if (p.avTracks.trim() !== "" && p.avTracks.trim() !== "[]") return true;
-  if (p.avCaptions.trim() !== "" && p.avCaptions.trim() !== "[]") return true;
   return p.downloads.trim() !== "" && p.downloads.trim() !== "[]";
 }
 
@@ -136,6 +140,7 @@ export function draftHasContent(p: DraftPayload): boolean {
 export function draftTitleOf(p: DraftPayload): string {
   const t = p.title.trim();
   if (t) return t;
+  if (p.avTitle.trim()) return p.avTitle.trim();
   if (p.avUrl.trim()) return p.avUrl.trim();
   return "未命名草稿";
 }
@@ -174,14 +179,22 @@ export function draftDownloadsOf(p: DraftPayload): DraftDownloadItem[] {
   }
 }
 
-/** 草稿里的分P / 曲目清单（avTracks JSON 原文）；坏数据一律回落空数组，绝不抛错 */
-export function draftTracksOf(p: DraftPayload): { title: string; url: string }[] {
+/** 草稿里的分P / 曲目清单（avTracks JSON 原文）；坏数据一律回落空数组，绝不抛错。
+ *  **不含主来源那一 P**（它在 avUrl / avTitle / avCaption 三个字段里），与 meta.tracks 同口径。 */
+export function draftTracksOf(
+  p: DraftPayload,
+): { title: string; url: string; caption: CaptionDraft | null }[] {
   try {
     const arr: unknown = JSON.parse(p.avTracks || "[]");
     if (!Array.isArray(arr)) return [];
     return arr
       .filter((t): t is Record<string, unknown> => !!t && typeof t === "object")
-      .map((t) => ({ title: String(t.title ?? ""), url: String(t.url ?? "") }))
+      .map((t) => ({
+        title: String(t.title ?? ""),
+        url: String(t.url ?? ""),
+        // 字幕跟着行；坏形状由 parseCaptionDraft 吞掉（返回 null = 这一项没挂）
+        caption: parseCaptionDraft(JSON.stringify(t.caption ?? null)),
+      }))
       .filter((t) => t.url.trim() !== "");
   } catch {
     return [];
@@ -189,24 +202,11 @@ export function draftTracksOf(p: DraftPayload): { title: string; url: string }[]
 }
 
 /**
- * 草稿里的字幕 / 歌词清单（avCaptions JSON 原文）；坏数据一律回落空数组，绝不抛错。
- * 格式字段同时兜一层 `isCaptionFormat` —— 草稿可能来自改动前的旧版本或手改过的 localStorage。
+ * 主来源（第一 P）的字幕 / 歌词 —— 草稿里单独存一格（avCaption JSON 原文），
+ * 与「其余项的字幕内联在 avTracks 里」是同一份 shapes，只是位置不同（理由见 meta.ts）。
  */
-export function draftCaptionsOf(p: DraftPayload): CaptionDraft[] {
-  try {
-    const arr: unknown = JSON.parse(p.avCaptions || "[]");
-    if (!Array.isArray(arr)) return [];
-    return arr
-      .filter((c): c is Record<string, unknown> => !!c && typeof c === "object")
-      .map((c) => ({
-        label: String(c.label ?? ""),
-        format: isCaptionFormat(c.format) ? c.format : "srt",
-        text: String(c.text ?? ""),
-      }))
-      .filter((c) => c.text.trim() !== "");
-  } catch {
-    return [];
-  }
+export function draftCaptionOf(p: DraftPayload): CaptionDraft | null {
+  return parseCaptionDraft(p.avCaption);
 }
 
 /** 列表摘要：简介 → 正文 → 下载源地址 → 音视频地址（主来源 / 分P 首条），都没有则空 */
@@ -289,11 +289,11 @@ export function collectDraft(
     changelog: str("changelog"),
     isAiGenerated: on("isAiGenerated"),
     original: on("original"),
-    avSource: str("avSource"),
     avUrl: str("avUrl"),
+    avTitle: str("avTitle"),
     avMode: str("avMode"),
     avTracks: str("avTracks"),
-    avCaptions: str("avCaptions"),
+    avCaption: str("avCaption"),
     duration: str("duration"),
     artist: str("artist"),
     resolution: str("resolution"),

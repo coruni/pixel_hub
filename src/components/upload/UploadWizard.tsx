@@ -23,7 +23,7 @@ import {
   DRAFT_AUTOSAVE_DELAY,
   DRAFT_AUTOSAVE_INTERVAL,
   collectDraft,
-  draftCaptionsOf,
+  draftCaptionOf,
   draftDownloadsOf,
   draftHasContent,
   draftPayloadSchema,
@@ -660,17 +660,16 @@ function downloadsInit(d: DraftPayload) {
   }));
 }
 
-/** 音乐 / 视频分节的初始值 */
+/** 音乐 / 视频分节的初始值：第一行是主来源，其余从草稿的 avTracks 铺开 */
 function avInitial(d: DraftPayload | null) {
   if (!d) return undefined;
   return {
-    source: (d.avSource === "file" ? "file" : "mount") as "file" | "mount",
-    mode: (d.avMode === "embed" ? "embed" : "direct") as "embed" | "direct",
+    title: d.avTitle,
     url: d.avUrl,
     duration: d.duration,
     artist: d.artist,
     resolution: d.resolution,
+    caption: draftCaptionOf(d) ?? undefined,
     tracks: draftTracksOf(d),
-    captions: draftCaptionsOf(d),
   };
 }

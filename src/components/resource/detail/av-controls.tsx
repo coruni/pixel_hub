@@ -16,7 +16,8 @@
  * 上一/下一、列表切换都在本组件里做，切换只改 `<video>/<audio>` 的 src 并 `load()`——
  * 不重新挂载元素，否则列表展开态、倍速、音量会一起被重置。列表最后一项播完自动续下一项（loop 开启时不续）。
  *
- * 字幕 / 歌词（见 av-captions.tsx）：**整份资源共用一份 cue 列表**，不按 P 分。
+ * 字幕 / 歌词（见 av-captions.tsx）：**跟着播放项走** —— 每首曲目 / 每个分P 各带一份，
+ * 切 P 即换字幕，没有「整份资源共用一份、多轨切换」的概念。
  * 视频渲染成压在画面上的叠层（开关放在右上角浮层，和分P 列表开关并排 ——
  * 底下那行控件在 320px 已经排满，塞不进第三个按钮）；
  * 音频渲染成卡片内的滚动歌词板（开关进控件行，那行本来就是 flex-wrap）。
@@ -36,9 +37,8 @@ import {
   AV_CTRL_ON_SURFACE_ACTIVE as AUDIO_ON,
 } from "@/lib/ui/cls";
 import { avItemLabel, type AvPlayItem } from "@/lib/av-tracks";
-import type { CaptionDraft } from "@/lib/captions";
 import { AvListToggle, AvStepButton, AvTrackList } from "./av-playlist";
-import { CaptionControls, CaptionLayer, captionName, cueAt, LyricsPanel, useAvCaptions } from "./av-captions";
+import { CaptionControls, CaptionLayer, captionName, cueAt, LyricsPanel, useAvCaption } from "./av-captions";
 import Bar from "./av-bar";
 
 /** 倍速档位（循环切换） */
@@ -65,7 +65,6 @@ export default function AvControls({
   items,
   poster,
   title,
-  captions,
   downloadSlot,
 }: {
   kind: "MUSIC" | "VIDEO";
@@ -73,8 +72,6 @@ export default function AvControls({
   items: AvPlayItem[];
   poster?: string;
   title: string;
-  /** 字幕 / 歌词（整份资源共用；空数组 = 作者没挂，控件行与浮层都不出现相关按钮） */
-  captions: CaptionDraft[];
   /** 宿主注入的控件位（当前放下载入口）：由 av-player 渲染，色调与播放器控件一致，融进同一行 */
   downloadSlot?: ReactNode;
 }) {
@@ -112,11 +109,10 @@ export default function AvControls({
   /** 媒体元素的可访问名：多 P 时带上当前 P，屏幕阅读器才知道切到哪一集了 */
   const mediaLabel = multi ? `${title} · ${avItemLabel(item, at, avKind)}` : title;
 
-  // —— 字幕 / 歌词：解析按轨 memo（见 useAvCaptions），只有「当前显示第几行」跟着播放时间走 ——
-  const cap = useAvCaptions(captions);
-  const capName = captionName(cap.current, cap.index, cap.count, avKind);
-  /** 这份字幕有没有实际内容（空文本 / 坏数据解析后可能啥都没有，那就不给它按钮） */
-  const capReady = cap.parsed.cues.length > 0 || cap.parsed.lines.length > 0;
+  // —— 字幕 / 歌词：**当前播放项自己的那一份**，切 P 时 item 变、解析跟着变（见 useAvCaption）——
+  const cap = useAvCaption(item.caption);
+  const capName = captionName(avKind);
+  const capReady = cap.ready;
   const cueIdx = cueAt(cap.parsed, current, cap.on);
   const cueText = cueIdx >= 0 ? cap.parsed.cues[cueIdx].text : null;
 
@@ -397,12 +393,9 @@ export default function AvControls({
             {capReady && (
               <CaptionControls
                 on={cap.on}
-                index={cap.index}
-                count={cap.count}
                 name={capName}
                 tone="onDark"
                 onToggle={cap.toggle}
-                onCycle={cap.cycle}
                 size="lg"
               />
             )}
@@ -600,12 +593,9 @@ export default function AvControls({
           {capReady && (
             <CaptionControls
               on={cap.on}
-              index={cap.index}
-              count={cap.count}
               name={capName}
               tone="onSurface"
               onToggle={cap.toggle}
-              onCycle={cap.cycle}
             />
           )}
           {downloadSlot}

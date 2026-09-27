@@ -7,7 +7,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { imageMetaSchema, gameMetaSchema, articleMetaSchema, avMetaSchema } from "@/lib/meta";
 import { parseAvTracksJson } from "@/lib/av-tracks";
-import { parseAvCaptionsJson } from "@/lib/captions";
+import { parseCaptionDraft } from "@/lib/captions";
 import { fillDownloadSizes } from "@/lib/download-size";
 import { autoSlugBase, randomTail, uniqueSlug } from "@/lib/slug";
 import { revalidatePath } from "next/cache";
@@ -120,18 +120,19 @@ export async function createResourceAction(
     if (!am.success) return { fieldErrors: am.error.flatten().fieldErrors };
     metaStr = JSON.stringify(am.data);
   } else if (type === "MUSIC" || type === "VIDEO") {
-    // 音视频：来源（在线挂载 / 上传文件）+ 播放形态（直链 / 嵌入页），URL 与字段由 avMetaSchema 统一校验
+    // 音视频：地址 + 按列表铺开的播放项（第一行是主来源，其余进 tracks），形状由 avMetaSchema 统一校验。
+    // 音频没有嵌入页形态，写入侧就把 mode 钉成 direct —— 与读侧的 parseMeta 归一化同一口径。
     const am = avMetaSchema.safeParse({
-      source: String(fd.get("avSource") ?? "mount") === "file" ? "file" : "mount",
-      mode: String(fd.get("avMode") ?? "direct") === "embed" ? "embed" : "direct",
+      mode: type === "VIDEO" && String(fd.get("avMode") ?? "") === "embed" ? "embed" : "direct",
+      title: String(fd.get("avTitle") ?? "").trim(),
       url: String(fd.get("avUrl") ?? "").trim(),
       artist: String(fd.get("artist") ?? "").trim() || undefined,
       duration: String(fd.get("duration") ?? "").trim() || undefined,
       resolution: String(fd.get("resolution") ?? "").trim() || undefined,
+      // 主来源（第一 P）自己的字幕 / 歌词
+      caption: parseCaptionDraft(String(fd.get("avCaption") ?? "")) ?? undefined,
       // 分P / 曲目（不含主来源）：坏 JSON 交给 parseAvTracksJson 吞掉，形状由 schema 校验
       tracks: parseAvTracksJson(String(fd.get("avTracks") ?? "")),
-      // 字幕 / 歌词：文本直接内联进 meta（见 lib/captions.ts 的文件头），同样先吞坏 JSON
-      captions: parseAvCaptionsJson(String(fd.get("avCaptions") ?? "")),
       downloads,
     });
     if (!am.success) return { fieldErrors: am.error.flatten().fieldErrors };

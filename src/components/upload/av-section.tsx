@@ -2,54 +2,55 @@
 
 // 音乐 / 视频分节 —— 发布向导与后台改稿共用。
 //
-// 两种上传模式（用户要的「上传模式选择」）：
-//   ① 在线挂载：只填地址，不落存储；直链用原生播放器，页面地址用 iframe 嵌入
-//   ② 上传文件：文件走上传接口，去向由服务端按运行配置决定，前端不判断
-// 两种模式互斥由 source 单选控制，切换时保留已填 URL，避免手滑丢输入。
+// 表单形状就是一个「播放项」列表，与 lib/av-tracks.ts 的 avPlaylist 完全同构：
+//   第 1 行 = 主来源（落 meta.title / meta.url / meta.caption）
+//   其余行 = 分P / 曲目（落 meta.tracks[]，每行含自己的标题、地址与字幕）
+// 每行都是「标题 | 链接（框内嵌上传按钮）| 删除」，歌词 / 字幕挂在行下面 —— 一项一份。
 //
-// 信息抓取：选文件后自动读取内嵌标签（音频 ID3/MP4）与时长、分辨率；挂载直链时读时长与分辨率。
-// 自动读到的值只填「空字段」，用户手改过的字段不再覆盖。
+// 没有「上传模式」选择：地址框里既能手填链接，也能点旁边的按钮上传文件（上传完回填站内地址）。
+// 站内路径与 http(s) 外链由 URL 形态自解释，不需要作者再声明一次。
+//
+// 播放形态也不再手选：音频**恒站内播放**（不再提供 iframe 形态）；视频保留嵌入页，
+// 形态由地址自动判定（站内路径 / 已知媒体后缀 → 站内播放器，其余 http(s) 页面 → iframe）。
+//
+// 信息抓取：只对**主来源**做（时长 / 艺术家 / 分辨率都是资源级字段，分P 各自填没意义）；
+// 上传完自动读内嵌标签与时长、分辨率，挂载直链时同理。自动值只填「空字段」，用户改过的不再覆盖。
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link2, Plus, Trash2, UploadCloud } from "lucide-react";
-import {
-  avAcceptAttr,
-  avExtsSample,
-  avMountPlaceholder,
-  avClassFor,
-  suggestMode,
-  type AvKind,
-  type AvMode,
-  type AvSource,
-} from "@/lib/av";
+import { Plus } from "lucide-react";
+import { avClassFor, avExtsSample, suggestMode, type AvKind } from "@/lib/av";
 import { serializeAvTracks } from "@/lib/av-tracks";
-import type { CaptionDraft } from "@/lib/captions";
-import { AV_TRACKS_MAX, type AvTrack } from "@/lib/meta";
+import { serializeCaptionDraft, type CaptionDraft } from "@/lib/captions";
+import { AV_TRACKS_MAX } from "@/lib/meta";
 import { capturePoster, probeFile, probeSummary, probeUrl, type AvProbe } from "@/lib/av-probe";
 import { mbText, type UploadLimits } from "@/lib/upload-config";
-import { formatBytes } from "@/lib/format";
-import { uploadAttachment } from "@/lib/upload-attachment-client";
-import { useFileDrop } from "@/lib/hooks/use-file-drop";
-import { fieldErr, wizBtn as btnBase, wizInput, wizLabel, SectionTitle, STEP } from "./wizard-shared";
-import { AttachmentUpload } from "./AttachmentUpload";
-import { CaptionSection } from "./caption-section";
+import { fieldErr, wizBtn, wizInput, wizLabel, SectionTitle, STEP } from "./wizard-shared";
+import { AvRowEditor, newRowId, type AvPlayRow } from "./av-row";
 import { Button } from "@/components/ui/Button";
 
 /** 可自动抓取的字段 */
 type FieldKey = "duration" | "artist" | "resolution";
 
-/** 分P 编辑行：形状与落库的 AvTrack 保持一致（url 允许暂时为空，序列化时过滤掉） */
-type TrackRow = AvTrack;
-
 export type AvSectionInitial = Partial<Record<FieldKey, string>> & {
-  source?: AvSource;
-  mode?: AvMode;
+  /** 主来源（第一 P）的展示名 */
+  title?: string;
   url?: string;
-  /** 分P / 曲目（**不含主来源**那一 P；发布侧存的是 meta.tracks） */
-  tracks?: TrackRow[];
-  /** 字幕 / 歌词（文本内联在 meta.captions，不走上传通道） */
-  captions?: CaptionDraft[];
+  /** 主来源自己的字幕 / 歌词 */
+  caption?: CaptionDraft;
+  /** 分P / 曲目（**不含主来源**那一 P）；caption 为 null 表示这一项没挂字幕 */
+  tracks?: { title: string; url: string; duration?: string; caption?: CaptionDraft | null }[];
 };
+
+/** 初始行：第 1 行恒存在（作者总得有个地方填地址），其余按存量数据铺开 */
+function initRows(initial?: AvSectionInitial): AvPlayRow[] {
+  const rows: AvPlayRow[] = [
+    { id: "r0", title: initial?.title ?? "", url: initial?.url ?? "", caption: initial?.caption ?? null },
+  ];
+  (initial?.tracks ?? []).forEach((t, i) =>
+    rows.push({ id: `r${i + 1}`, title: t.title ?? "", url: t.url ?? "", caption: t.caption ?? null }),
+  );
+  return rows;
+}
 
 export function AvSection({
   avKind,
@@ -64,7 +65,7 @@ export function AvSection({
   initial?: AvSectionInitial;
   fieldErrors?: Record<string, string[]>;
   limits: UploadLimits;
-  /** 在飞上传数（0/1）：宿主据此禁用提交，避免「文件还在传就点了发布」 */
+  /** 在飞上传数（0/1/…）：宿主据此禁用提交，避免「文件还在传就点了发布」 */
   onBusyChange?: (busy: number) => void;
   /**
    * 视频抽帧得到的封面（JPEG File）。宿主负责上传并落到「封面」槽位。
@@ -72,43 +73,56 @@ export function AvSection({
    */
   onCoverFrame?: (file: File) => void;
 }) {
-  const [source, setSource] = useState<AvSource>(initial?.source ?? "mount");
-  const [mode, setMode] = useState<AvMode>(initial?.mode ?? "direct");
-  const [url, setUrl] = useState(initial?.url ?? "");
-  // 用户手动切过播放形态后，不再被 URL 变化自动覆盖（自动识别只做建议）
-  const [modeTouched, setModeTouched] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState<number | null>(null);
-  const [msg, setMsg] = useState<string | null>(null);
+  const [rows, setRows] = useState<AvPlayRow[]>(() => initRows(initial));
+  /** 正在上传的行 id（可能多行同时传，所以是集合而不是布尔） */
+  const [busyIds, setBusyIds] = useState<string[]>([]);
   const [fields, setFields] = useState<Record<FieldKey, string>>({
     duration: initial?.duration ?? "",
     artist: initial?.artist ?? "",
     resolution: initial?.resolution ?? "",
   });
-  // 分P / 曲目（不含主来源那一 P）
-  const [tracks, setTracks] = useState<TrackRow[]>(
-    () => initial?.tracks?.map((t) => ({ title: t.title ?? "", url: t.url ?? "" })) ?? [],
-  );
+  const [msg, setMsg] = useState<string | null>(null);
 
   const isAudio = avKind === "audio";
   const label = avClassFor(avKind);
-  const acceptedExts = avExtsSample(avKind, 8);
   const unit = isAudio ? "曲目" : "分P";
 
-  /** 列表行的展示序号：主来源已填时它是第 2 个起，否则就是第 1 个（与 avPlaylist 的拼装口径一致） */
-  const trackNo = (i: number) => i + (url.trim() ? 2 : 1);
-  const setTrack = (i: number, patch: Partial<TrackRow>) =>
-    setTracks((prev) => prev.map((t, j) => (j === i ? { ...t, ...patch } : t)));
-  const removeTrack = (i: number) => setTracks((prev) => prev.filter((_, j) => j !== i));
-  function addTrack() {
-    if (tracks.length >= AV_TRACKS_MAX - 1) {
-      setMsg(`${unit}最多 ${AV_TRACKS_MAX} 条`);
+  const patch = useCallback((id: string, next: Partial<AvPlayRow>) => {
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...next } : r)));
+  }, []);
+
+  /** 删行：最后一行不真删，只清空 —— 列表至少留一行给作者填地址 */
+  const remove = useCallback((id: string) => {
+    setMsg(null);
+    setRows((prev) => {
+      if (prev.length <= 1) return prev.map((r) => (r.id === id ? { id: r.id, title: "", url: "", caption: null } : r));
+      return prev.filter((r) => r.id !== id);
+    });
+  }, []);
+
+  function add() {
+    if (rows.length >= AV_TRACKS_MAX) {
+      setMsg(`${unit}最多 ${AV_TRACKS_MAX} 行`);
       return;
     }
     setMsg(null);
-    setTracks((prev) => [...prev, { title: "", url: "" }]);
+    setRows((prev) => [...prev, { id: newRowId(), title: "", url: "", caption: null }]);
   }
 
+  /** 在飞上传数同步给宿主，供提交按钮禁用（与 AttachmentListEditor 同契约） */
+  useEffect(() => {
+    onBusyChange?.(busyIds.length);
+  }, [busyIds, onBusyChange]);
+
+  const setRowBusy = useCallback((id: string, busy: boolean) => {
+    setBusyIds((prev) => {
+      const has = prev.includes(id);
+      if (busy === has) return prev; // 值没变就不造新数组，避免无谓重渲染
+      return busy ? [...prev, id] : prev.filter((x) => x !== id);
+    });
+  }, []);
+
+  // —— 主来源的信息抓取 ——
   // 同步镜像：applyProbe 需要在同一次调用内读到最新值（setState 更新器是延迟执行的）
   const fieldsRef = useRef(fields);
   // 记录各字段「上一次自动填的值」：等于该值说明用户没改过，可继续被新文件覆盖
@@ -130,7 +144,7 @@ export function AvSection({
     const cur = fieldsRef.current;
     const auto = autoRef.current;
     const applied: AvProbe = {};
-    const put = (k: "duration" | "artist" | "resolution", v?: string) => {
+    const put = (k: FieldKey, v?: string) => {
       if (!v) return;
       if (cur[k] && auto[k] !== cur[k]) return; // 用户手改过 → 不覆盖
       applied[k] = v;
@@ -147,10 +161,15 @@ export function AvSection({
     return applied;
   }, []);
 
-  // 挂载直链：地址稳定后自动读时长 / 分辨率（嵌入页读不到，直接跳过）
+  const mainUrl = rows[0]?.url ?? "";
+  /** 主来源的形态（站内 / 直链 / 嵌入页）；视频才有 embed 的可能 */
+  const mode = isAudio ? "direct" : suggestMode(mainUrl, "video");
+
+  // 主来源挂载直链：地址稳定后自动读时长 / 分辨率（嵌入页读不到，直接跳过）。
+  // 音频恒为 direct，这条判断天然只对视频的嵌入页生效。
   useEffect(() => {
-    if (source !== "mount" || mode !== "direct") return;
-    const u = url.trim();
+    if (mode !== "direct") return;
+    const u = mainUrl.trim();
     if (!/^https?:\/\//i.test(u)) return;
     let alive = true;
     const timer = setTimeout(() => {
@@ -162,77 +181,19 @@ export function AvSection({
       alive = false;
       clearTimeout(timer);
     };
-  }, [url, mode, source, avKind, applyProbe]);
+  }, [mainUrl, mode, isAudio, avKind, applyProbe]);
 
-  function onUrl(next: string) {
-    setUrl(next);
-    if (!modeTouched) setMode(suggestMode(next, avKind));
-    if (msg) setMsg(null);
-  }
-
-  function pickSource(next: AvSource) {
-    setSource(next);
-    setMsg(null);
-    if (next === "file" && mode === "embed") setMode("direct");
-  }
-
-  function pickMode(next: AvMode) {
-    setModeTouched(true);
-    setMode(next);
-  }
-
-  async function onFile(file: File | null) {
-    if (!file) return;
-    setUploading(true);
-    setProgress(0);
-    setMsg(null);
-    // 抓取（本地、快）与上传（可能很慢）并行，谁先完成都不互相阻塞
-    const probeP = probeFile(file, avKind).catch((): AvProbe => ({}));
-    let done: { url: string; name: string; size: number } | null = null;
-    try {
-      done = await uploadAttachment(file, setProgress, isAudio ? "music" : "video");
-      setUrl(done.url);
-      setSource("file");
-      setMode("direct");
-      setModeTouched(true);
-      setMsg(`已上传 ${done.name}（${formatBytes(done.size)}）`);
-    } catch (e) {
-      setMsg(e instanceof Error ? e.message : `${label}上传失败，请重试`);
-    } finally {
-      setUploading(false);
-      setProgress(null);
-    }
-    // 元数据抓取与封面抽帧都放到「已上传」回执之后：大视频读时长要等 loadedmetadata，
-    // 最坏等到 12s 超时——卡在校验里会让按钮一直停在「上传中…」，像卡死。
-    if (!done) return;
-    // 两者互不依赖，并行跑。宿主没接 onCoverFrame（例如后台改稿页）就整段跳过，白抽一帧没意义。
+  /** 主来源上传完成：抓内嵌标签 + 抽帧当封面（宿主负责落封面槽） */
+  async function onMainUploaded(file: File) {
     const posterP = !isAudio && coverFrameRef.current ? capturePoster(file) : null;
-    const summary = probeSummary(applyProbe(await probeP));
-    if (summary) setMsg(`已上传 ${done.name}（${formatBytes(done.size)}），${summary}`);
+    const probe = await probeFile(file, avKind).catch((): AvProbe => ({}));
+    const summary = probeSummary(applyProbe(probe));
+    if (summary) setMsg(summary);
     const poster = await posterP;
-    // 抽到的帧交给宿主上传并落到「封面」槽位；本组件不持有封面状态
     if (poster) coverFrameRef.current?.(poster);
   }
 
-  /** 文件选择器与投放区共用同一条入口；音视频只取第一个文件 */
-  function onFiles(files: FileList) {
-    void onFile(files[0] ?? null);
-  }
-
-  /** 拖入区域即上传，与文章/游戏的附件投放区同一套交互。
-      音视频是单文件字段，上传中不接受新的拖入（与文件选择器的 disabled 语义对齐），
-      否则并发的第二次上传会先一步把 uploading 置回 false，提交按钮提前解锁。 */
-  const { dragging, dropProps } = useFileDrop({ onFiles, disabled: uploading });
-
-  // 把「是否还有上传在飞」同步给宿主，供提交按钮禁用（与 AttachmentListEditor 同契约）
-  useEffect(() => {
-    onBusyChange?.(uploading ? 1 : 0);
-  }, [uploading, onBusyChange]);
-
-  function clearUrl() {
-    setUrl("");
-    setMsg(null);
-  }
+  const [main, ...rest] = rows;
 
   return (
     <section className="mt-4 space-y-4 rounded-none border border-brand-200 bg-surface p-5">
@@ -243,208 +204,79 @@ export function AvSection({
         {isAudio ? "音频" : "视频"}信息
       </SectionTitle>
 
-      {/* ---- 上传模式选择 ---- */}
-      <div>
-        <span className={wizLabel}>上传模式</span>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {(
-            [
-              {
-                k: "mount" as const,
-                icon: Link2,
-                title: "在线挂载",
-                desc: "只填外部地址，文件不进本站存储",
-              },
-              {
-                k: "file" as const,
-                icon: UploadCloud,
-                title: "上传文件",
-                desc: `上传到站内存储，单文件 ${mbText(limits.attachmentMaxMb)}`,
-              },
-            ] satisfies { k: AvSource; icon: typeof Link2; title: string; desc: string }[]
-          ).map((o) => (
-            <Button
-              key={o.k}
-              type="button"
-              onClick={() => pickSource(o.k)}
-              aria-pressed={source === o.k}
-              className={`${btnBase} items-start gap-3 p-3 text-left ${
-                source === o.k
-                  ? "border-brand-600 bg-brand-500 text-white"
-                  : "border-brand-200 bg-surface text-neutral-500 hover:border-brand-400 hover:text-neutral-800"
-              }`}
-            >
-              <o.icon size={18} className="mt-0.5 shrink-0" aria-hidden />
-              <span className="min-w-0">
-                <span className="block text-sm font-medium leading-tight">{o.title}</span>
-                <span className="mt-0.5 block text-[11px] font-normal opacity-75">{o.desc}</span>
-              </span>
-            </Button>
-          ))}
-        </div>
-        <input type="hidden" name="avSource" value={source} />
-      </div>
-
-      {/* ---- 地址 / 文件 ---- */}
-      <div>
-        <label className={wizLabel} htmlFor="avUrl">
-          {source === "mount" ? `${label}地址` : "站内文件"} *
-        </label>
-        <div className="flex flex-wrap items-center gap-2">
-          <input
-            id="avUrl"
-            name="avUrl"
-            value={url}
-            onChange={(e) => onUrl(e.target.value)}
-            placeholder={
-              source === "mount"
-                ? avMountPlaceholder(avKind)
-                : uploading
-                  ? "上传中…"
-                  : "点右侧上传，或粘贴已上传的站内路径"
-            }
-            className={`${wizInput} min-w-0 flex-1`}
-            autoComplete="off"
-            spellCheck={false}
-          />
-          {url && (
-            <Button
-              type="button"
-              onClick={clearUrl}
-              aria-label="清空地址"
-              className="rounded-none border border-brand-200 p-2.5 text-neutral-500 hover:border-red-300 hover:text-red-600"
-            >
-              <Trash2 size={15} />
-            </Button>
-          )}
-        </div>
-        {fieldErr(fieldErrors?.url)}
-
-        {source === "file" && (
-          <div className="mt-2">
-            <AttachmentUpload
-              variant="dropzone"
-              onFiles={onFiles}
-              limits={limits}
-              /* accept 必须走音视频白名单：附件表里没有 m4a/aac/opus/m4v/mov/ogv，
-                 而服务端对 kind=music|video 是按 avExtsFor(kind) 放行的——
-                 两边不一致时，合法的音视频在文件选择器里根本选不中。 */
-              accept={avAcceptAttr(avKind)}
-              uploading={uploading}
-              /* 单文件字节进度：走 percent（0..100）。传 progress({done,total}) 会被
-                 当成「第 n / 共 m 个文件」渲染成「上传中 45/100…」，语义完全错位。 */
-              percent={progress}
-              dragging={dragging}
-              dropProps={dropProps}
-              label={url ? `拖入或点击更换${label}文件` : `拖入或点击上传${label}文件`}
-              hint={`仅 ${acceptedExts}`}
-            />
-          </div>
-        )}
-        {msg && <p className="mt-1.5 text-xs text-amber-600">{msg}</p>}
-      </div>
-
-      {/* ---- 播放形态 ---- */}
-      <div>
-        <span className={wizLabel}>播放形态</span>
-        <div className="flex flex-wrap gap-2">
-          {(
-            [
-              { k: "direct" as const, text: `直链播放（站内播放器）` },
-              { k: "embed" as const, text: "嵌入页播放（iframe）" },
-            ] satisfies { k: AvMode; text: string }[]
-          ).map((o) => (
-            <Button
-              key={o.k}
-              type="button"
-              onClick={() => pickMode(o.k)}
-              aria-pressed={mode === o.k}
-              className={`${btnBase} ${
-                mode === o.k
-                  ? "border-brand-600 bg-brand-50 text-brand-700"
-                  : "border-brand-200 bg-surface text-neutral-500 hover:border-brand-400 hover:text-neutral-800"
-              }`}
-            >
-              {o.text}
-            </Button>
-          ))}
-          <input type="hidden" name="avMode" value={mode} />
-        </div>
-        {mode === "embed" && (
-          <p className="mt-1.5 text-[11px] leading-4 text-neutral-400">
-            嵌入页适合分享页地址（如 B 站 / YouTube）；部分站点禁止被嵌套，届时页面会提示打不开。
-          </p>
-        )}
-      </div>
-
-      {/* ---- 分P / 曲目 ---- */}
       <div>
         <span className={wizLabel}>{unit}列表</span>
         <p className="mb-2 text-[11px] leading-4 text-neutral-400">
-          整张专辑 / 剧集把其余{unit}填在这里，播放器按顺序播放并支持
-          {isAudio ? "上一曲 / 下一曲" : "上一集 / 下一集"}；只填地址（外链或已上传的站内路径）。
-          {/* 序号随上面那栏是否已填而变：主来源为空时这份列表就是第 1 个起（见 avPlaylist） */}
-          {url.trim() ? "上面那栏算第一个。" : "上面那栏留空时，这里从第一个开始算。"}
+          一行一个播放项，第一行是主来源，其余按顺序播放并支持{isAudio ? "上一曲 / 下一曲" : "上一集 / 下一集"}
+          。地址可以直接粘链接，也可以点框里的上传按钮（单文件 {mbText(limits.attachmentMaxMb)}，
+          支持 {avExtsSample(avKind, 6)}）；歌词 / 字幕跟着自己那一行走，切{unit}即切
+          {isAudio ? "歌词" : "字幕"}。
+          {isAudio
+            ? "音频一律用站内播放器播放。"
+            : "站内文件与直链用站内播放器，网页地址（B 站 / YouTube 等）自动改用嵌入页。"}
         </p>
-        {tracks.length > 0 && (
-          <ul className="space-y-2">
-            {tracks.map((t, i) => (
-              <li
-                key={i}
-                className="grid items-center gap-2 sm:grid-cols-[3.5rem_minmax(0,1fr)_minmax(0,1.5fr)_2.5rem]"
-              >
-                <span className="text-xs tabular-nums text-neutral-400">
-                  {isAudio ? `曲目 ${trackNo(i)}` : `P${trackNo(i)}`}
-                </span>
-                <input
-                  value={t.title}
-                  onChange={(e) => setTrack(i, { title: e.target.value })}
-                  maxLength={120}
-                  placeholder="标题（可留空）"
-                  aria-label={`第 ${trackNo(i)} ${unit}的标题`}
-                  className={wizInput}
-                />
-                <input
-                  value={t.url}
-                  onChange={(e) => setTrack(i, { url: e.target.value })}
-                  maxLength={2000}
-                  placeholder="https://… 或 /uploads/…"
-                  aria-label={`第 ${trackNo(i)} ${unit}的地址`}
-                  className={wizInput}
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-                <Button
-                  type="button"
-                  onClick={() => removeTrack(i)}
-                  aria-label={`删除第 ${trackNo(i)} ${unit}`}
-                  className="rounded-none border border-brand-200 p-2.5 text-neutral-500 hover:border-red-300 hover:text-red-600"
-                >
-                  <Trash2 size={15} />
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
-        <div className="mt-2">
+
+        <ul className="space-y-3">
+          {main && (
+            <AvRowEditor
+              key={main.id}
+              row={main}
+              label={isAudio ? `曲目 1` : `P1`}
+              avKind={avKind}
+              unit={unit}
+              limits={limits}
+              isMain
+              canRemove={rows.length > 1}
+              urlName="avUrl"
+              titleName="avTitle"
+              fieldErrors={fieldErrors}
+              captionErrorKey="caption"
+              onPatch={(p) => patch(main.id, p)}
+              onRemove={() => remove(main.id)}
+              onUploaded={(f) => void onMainUploaded(f)}
+              onBusy={setRowBusy}
+            />
+          )}
+          {rest.map((r, i) => (
+            <AvRowEditor
+              key={r.id}
+              row={r}
+              label={isAudio ? `曲目 ${i + 2}` : `P${i + 2}`}
+              avKind={avKind}
+              unit={unit}
+              limits={limits}
+              fieldErrors={fieldErrors}
+              captionErrorKey={`tracks.${i}.caption`}
+              onPatch={(p) => patch(r.id, p)}
+              onRemove={() => remove(r.id)}
+              onBusy={setRowBusy}
+            />
+          ))}
+        </ul>
+
+        <div className="mt-2 flex flex-wrap items-center gap-3">
           <Button
             type="button"
-            onClick={addTrack}
-            className={`${btnBase} border-brand-200 bg-surface text-neutral-600 hover:border-brand-400 hover:text-brand-700`}
+            onClick={add}
+            className={`${wizBtn} border-brand-200 bg-surface text-neutral-600 hover:border-brand-400 hover:text-brand-700`}
           >
             <Plus size={14} aria-hidden />
             添加{unit}
           </Button>
+          <span className="text-[11px] text-neutral-400">最多 {AV_TRACKS_MAX} 行</span>
         </div>
-        {/* 受控序列化（与 downloads 同款）：地址为空的行不提交，服务端按 avMetaSchema.tracks 再校验一次 */}
-        <input type="hidden" name="avTracks" value={serializeAvTracks(tracks)} />
+
+        {msg && <p className="mt-1.5 text-xs text-amber-600">{msg}</p>}
+
+        {/* 受控序列化（与 downloads 同款）：地址为空的行不提交，服务端按 avMetaSchema 再校验一次。
+            主来源的地址 / 标题是具名输入框（avUrl / avTitle），这里只补它那份字幕与其余行。 */}
+        <input type="hidden" name="avMode" value={mode} />
+        <input type="hidden" name="avCaption" value={serializeCaptionDraft(main?.caption)} />
+        <input type="hidden" name="avTracks" value={serializeAvTracks(rest)} />
         {fieldErr(fieldErrors?.tracks)}
       </div>
 
-      {/* ---- 字幕 / 歌词 ---- */}
-      <CaptionSection avKind={avKind} initial={initial?.captions} fieldErrors={fieldErrors} />
-
-      {/* ---- 类型补充字段（自动抓取，可手改） ---- */}
+      {/* ---- 资源级补充字段（自动抓取，可手改；只属于主来源） ---- */}
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label className={wizLabel} htmlFor="duration">

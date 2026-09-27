@@ -4,7 +4,7 @@ import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { articleMetaSchema, avMetaSchema, gameMetaSchema, imageMetaSchema } from "@/lib/meta";
 import { parseAvTracksJson } from "@/lib/av-tracks";
-import { parseAvCaptionsJson } from "@/lib/captions";
+import { parseCaptionDraft } from "@/lib/captions";
 import { fillDownloadSizes } from "@/lib/download-size";
 import { asciiSlug, randomTail } from "@/lib/slug";
 import { findOrCreateTag, linkTag } from "@/lib/actions/_tags";
@@ -113,20 +113,21 @@ export async function applyResourceEdit(
     if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
     metaStr = JSON.stringify(parsed.data);
   } else if (type === "MUSIC" || type === "VIDEO") {
-    // 音视频改稿：与发布侧同一套 schema（source/mode/url + 类型补充字段 + 下载清单）
+    // 音视频改稿：与发布侧同一套 schema（地址 + 播放项列表 + 类型补充字段 + 下载清单）。
+    // 音频没有嵌入页形态，写入侧把 mode 钉成 direct，与读侧 parseMeta 的归一化同一口径。
     const { value: downloads, error } = await readDownloads(fd);
     if (error) return { fieldErrors: { downloads: [error] } };
     const parsed = avMetaSchema.safeParse({
-      source: str(fd, "avSource") === "file" ? "file" : "mount",
-      mode: str(fd, "avMode") === "embed" ? "embed" : "direct",
+      mode: type === "VIDEO" && str(fd, "avMode") === "embed" ? "embed" : "direct",
+      title: str(fd, "avTitle"),
       url: str(fd, "avUrl"),
       artist: str(fd, "artist") || undefined,
       duration: str(fd, "duration") || undefined,
       resolution: str(fd, "resolution") || undefined,
-      // 分P / 曲目（不含主来源），与发布侧同一套 schema
+      // 主来源（第一 P）自己的字幕 / 歌词
+      caption: parseCaptionDraft(str(fd, "avCaption")) ?? undefined,
+      // 分P / 曲目（不含主来源），每条自带标题、地址与字幕
       tracks: parseAvTracksJson(str(fd, "avTracks")),
-      // 字幕 / 歌词（文本内联在 meta 里）
-      captions: parseAvCaptionsJson(str(fd, "avCaptions")),
       downloads,
     });
     if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };

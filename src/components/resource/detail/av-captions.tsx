@@ -3,10 +3,13 @@
 /**
  * 字幕 / 歌词的展示层 —— 详情页的音视频播放器共用（音频卡片、视频浮层）。
  *
- * 数据来自 `meta.captions`（随详情页内联下来，不发任何请求），解析在 `lib/captions.ts`。
+ * 数据来自当前播放项自己的 `caption`（主来源在 meta.caption，其余在 meta.tracks[].caption），
+ * 随详情页内联下来，不发任何请求；解析在 `lib/captions.ts`。
+ * **切播放项即换字幕**，没有「多轨切换」这回事 —— 作者想给某首曲子上歌词，就填在那一行里。
+ *
  * 三块：
- *   `useAvCaptions`   选轨 + 开关 + 解析（按轨 memo，别在每次 timeupdate 时重解析）
- *   `CaptionControls` 控件行 / 画面浮层上的开关（多轨时多一个循环切轨的小按钮）
+ *   `useAvCaption`    解析当前项那唯一一份字幕 + 开关（按 caption memo，别在每次 timeupdate 时重解析）
+ *   `CaptionControls` 控件行 / 画面浮层上的开关
  *   `CaptionLayer`    视频：压在画面底部的字幕叠层
  *   `LyricsPanel`     音频：卡片内的滚动歌词板（当前行高亮、点击跳转、自动居中）
  *
@@ -26,98 +29,66 @@ import {
 import type { AvKind } from "@/lib/av";
 import {
   AV_BTN as BTN,
-  AV_BTN_HEIGHT,
   AV_BTN_SIZE as SIZE,
   AV_TONE as TONE,
   type AvBtnSize,
   type AvTone,
 } from "./av-btn";
 
-/** 轨道展示名：作者填了就用，没填按类型回退「歌词 / 字幕」（多轨才带序号） */
-export function captionName(
-  caption: CaptionDraft | undefined,
-  index: number,
-  count: number,
-  avKind: AvKind,
-): string {
-  const named = caption?.label.trim();
-  if (named) return named;
-  const base = avKind === "audio" ? "歌词" : "字幕";
-  return count > 1 ? `${base} ${index + 1}` : base;
+/** 字幕的展示名（没有「第几条」了，就叫歌词 / 字幕） */
+export function captionName(avKind: AvKind): string {
+  return avKind === "audio" ? "歌词" : "字幕";
 }
 
 /**
- * 字幕轨状态。`on` 默认开 —— 作者既然传了字幕，默认就该显示；
+ * 当前播放项的字幕状态。`on` 默认开 —— 作者既然给这一项挂了字幕，默认就该显示；
  * 关掉是「我读得懂原文，别挡画面」的少数情况，所以开关只关不记忆。
+ * 切播放项时开关状态跟着延续（作者视角：我刚说了不要字幕）。
  */
-export function useAvCaptions(captions: CaptionDraft[]) {
-  const [index, setIndex] = useState(0);
-  const [on, setOn] = useState(true);
-  // captions 是服务端来的固定数组，但 idx 越界会在取 current 时炸，夹一下更稳
-  const at = Math.min(index, Math.max(0, captions.length - 1));
-  const current = captions[at];
+export function useAvCaption(caption?: CaptionDraft) {
+  const [off, setOff] = useState(false);
+  // caption 来自服务端 props，引用稳定；只有切 P 时才换新对象
   const parsed = useMemo(
-    () => (current ? parseCaption(current.text, current.format) : NO_CAPTION),
-    [current],
+    () => (caption?.text.trim() ? parseCaption(caption.text, caption.format) : NO_CAPTION),
+    [caption],
   );
+  /** 这份字幕有没有实际内容（空文本 / 坏数据解析后可能啥都没有，那就不给它按钮） */
+  const ready = parsed.cues.length > 0 || parsed.lines.length > 0;
   return {
-    count: captions.length,
-    index: at,
-    current,
     parsed,
-    on: on && captions.length > 0,
-    toggle: () => setOn((v) => !v),
-    cycle: () => setIndex((i) => (captions.length > 0 ? (i + 1) % captions.length : 0)),
+    ready,
+    on: ready && !off,
+    toggle: () => setOff((v) => !v),
   };
 }
 
-/** 字幕 / 歌词开关；多轨且开启时并排一个「2/3」循环切轨按钮 */
+/** 字幕 / 歌词开关 */
 export function CaptionControls({
   on,
-  index,
-  count,
   name,
   tone,
   onToggle,
-  onCycle,
   size = "md",
 }: {
   on: boolean;
-  index: number;
-  count: number;
-  /** 当前轨展示名，进 aria-label 与 title（切轨是循环的，得让用户知道现在在哪条） */
+  /** 展示名，进 aria-label 与 title */
   name: string;
   tone: AvTone;
   onToggle: () => void;
-  onCycle: () => void;
   size?: AvBtnSize;
 }) {
   const text = on ? `关闭${name}` : `显示${name}`;
   return (
-    <span className="inline-flex items-center gap-0.5">
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-pressed={on}
-        aria-label={text}
-        title={text}
-        className={`${BTN} ${SIZE[size]} ${on ? TONE[tone].on : TONE[tone].off}`}
-      >
-        <Subtitles size={16} aria-hidden />
-      </button>
-      {count > 1 && on && (
-        <button
-          type="button"
-          onClick={onCycle}
-          aria-label={`切换到下一条字幕（当前 ${name}）`}
-          title={`切换到下一条字幕（当前 ${name}）`}
-          // 序号与分P 列表开关同款：一眼看出「有几条、现在是第几条」
-          className={`inline-flex shrink-0 items-center justify-center gap-1 rounded-none px-1.5 text-xs tabular-nums transition focus-visible:ring-2 focus-visible:ring-brand-400 ${AV_BTN_HEIGHT[size]} ${TONE[tone].off}`}
-        >
-          {index + 1}/{count}
-        </button>
-      )}
-    </span>
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={on}
+      aria-label={text}
+      title={text}
+      className={`${BTN} ${SIZE[size]} ${on ? TONE[tone].on : TONE[tone].off}`}
+    >
+      <Subtitles size={16} aria-hidden />
+    </button>
   );
 }
 

@@ -1,16 +1,17 @@
 // 音视频（MUSIC / VIDEO）演示数据 —— 用于验收前台展示效果。
 //
 // 背景：库里 MUSIC / VIDEO 两条类型原本是 0 条，前台（/browse 的类型页签、资源详情页播放卡、
-// 首页「为你推荐 / 精选内容」）没有任何音视频可看。本脚本灌一批覆盖「来源 × 播放形态 × 边界」的
-// 资源，一次跑完就能把各分支都在真实页面上看到。
+// 首页「为你推荐 / 精选内容」）没有任何音视频可看。本脚本灌一批覆盖「托管位置 × 播放形态 ×
+// 单曲/多P × 字幕 × 边界」的资源，一次跑完就能把各分支都在真实页面上看到。
 //
-// 覆盖矩阵：
-//   1 音乐 · 在线挂载 · 直链      → 原生 <audio> 播放器 + 外链「前往来源」
-//   2 音乐 · 在线挂载 · 嵌入页    → sandbox iframe（网易云外链播放器）
-//   3 音乐 · 上传文件 · 站内托管  → 原生播放 + 「下载音频」+ 下载清单（走统一登录墙/计数）
-//   4 视频 · 在线挂载 · 直链      → 原生 <video> 播放器
-//   5 视频 · 在线挂载 · 嵌入页    → sandbox iframe（B站播放器）
-//   6 视频 · 上传文件 · 站内托管  → 原生播放 + 「下载视频」+ 下载清单
+// 覆盖矩阵（meta 形状见 src/lib/meta.ts 的 avMetaSchema；**没有 source 字段**，
+// 站内 / 外链由 URL 是否以 / 开头判定；音频没有嵌入页形态，mode 只对 VIDEO 有意义）：
+//   1 音乐 · 外链直链            → 站内自绘播放器 + 外链「前往来源」
+//   2 音乐 · 多曲目 + 每曲歌词    → 播放列表切曲 + 音频歌词板随之更换
+//   3 音乐 · 站内托管            → 自绘播放器 + 「下载原件」+ 下载清单（走统一登录墙/计数）
+//   4 视频 · 外链直链 + 字幕      → 自绘播放器 + 画面底部字幕叠层
+//   5 视频 · 嵌入页（B站）        → sandbox iframe + 「嵌入页字幕不显示」提示
+//   6 视频 · 站内托管 + 多分P     → 列表切 P + 每 P 自己的字幕
 //   7 视频 · 无播放来源（url 空） → 「作者未提供播放来源」空态
 //
 // 用法（幂等，可反复跑）：
@@ -23,7 +24,9 @@
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import type { z } from "zod";
 import { prisma } from "../src/lib/db/prisma";
+import { avMetaSchema } from "../src/lib/meta";
 import { parseId3 } from "../src/lib/av-probe";
 import { syncResourceSearch } from "../src/lib/search";
 
@@ -78,11 +81,63 @@ const EXT_VIDEO_SRC = [
 /** 外链直链音频 */
 const EXT_AUDIO_URL = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3";
 
-/** 嵌入页地址（都实测无 X-Frame-Options，可被 sandbox iframe 挂载） */
-const EMBED_AUDIO_URL =
-  "https://music.163.com/outchain/player?type=2&id=186016&auto=0&height=66";
+/** 多曲目演示：三首不同的公开样例音频（主来源取第 1 首，其余进 tracks） */
+const TRACK_URLS = [
+  EXT_AUDIO_URL,
+  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
+  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
+];
+
+/** 三份演示歌词（LRC）。一首一份，随切曲一起换 */
+const LRC_TEXTS = [
+  [
+    "[00:00.00]Pixel Radio · 曲目 1",
+    "[00:04.20]像素色的清晨 屏幕还没醒",
+    "[00:12.60]光标在闪 像一盏小灯",
+    "[00:21.00]把音量拧到刚好 让整间屋子发声",
+    "[00:34.50]这是今天的第一首歌",
+  ].join("\n"),
+  [
+    "[00:00.00]Pixel Radio · 曲目 2",
+    "[00:05.40]午后的风 从窗口斜着进来",
+    "[00:14.80]旧唱片转得慢 灰尘在光里浮",
+    "[00:26.10]别急着按下一首",
+    "[00:38.70]让这一段多待一会儿",
+  ].join("\n"),
+  [
+    "[00:00.00]Pixel Radio · 曲目 3",
+    "[00:06.00]深夜电台 只剩下一个人听",
+    "[00:17.30]信号穿过雨 音质有点毛",
+    "[00:29.90]但正是这层毛边 让歌变得可信",
+    "[00:44.20]晚安 明天见",
+  ].join("\n"),
+];
+
+/** 视频嵌入页地址（实测无 X-Frame-Options，可被 sandbox iframe 挂载） */
 const EMBED_VIDEO_URL =
   "https://player.bilibili.com/player.html?bvid=BV1GJ411x7h7&page=1&high_quality=1";
+
+/** 演示字幕（SRT）—— 直链视频用，验证画面底部叠层 */
+const SRT_TEXT = [
+  "1",
+  "00:00:01,000 --> 00:00:05,000",
+  "像素样片 · 第一句字幕",
+  "",
+  "2",
+  "00:00:05,500 --> 00:00:09,500",
+  "字幕随播放进度切换",
+].join("\n");
+
+/** 演示字幕（WebVTT）—— 多分P 视频的第二 P 用，验证切 P 换字幕 */
+const VTT_TEXT = [
+  "WEBVTT",
+  "",
+  "00:00:01.000 --> 00:00:05.000",
+  "第二 P · 自己的字幕",
+  "",
+  "00:00:05.500 --> 00:00:09.500",
+  "切 P 会整体换掉",
+].join("\n");
 
 function daysAgo(n: number, hour = 12): Date {
   const d = new Date();
@@ -95,6 +150,13 @@ function humanSize(bytes: number): string {
   return bytes >= 1024 * 1024
     ? `${(bytes / 1024 / 1024).toFixed(1)} MB`
     : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+/** 站点存储 key 取末段当展示名（`a/b/c.mp3` → `c.mp3`）。不用 split().pop()：
+ *  那个在 noUncheckedIndexedAccess 下是 string | undefined，而下载项名要求非空字符串 */
+function baseName(key: string): string {
+  const i = key.lastIndexOf("/");
+  return i >= 0 ? key.slice(i + 1) : key;
 }
 
 function mmss(sec: number): string {
@@ -182,7 +244,13 @@ type DemoItem = {
   description: string;
   categorySlug: string;
   tagSlugs: string[];
-  meta: Record<string, unknown>;
+  /**
+   * 按 avMetaSchema 的**入参**类型约束，而不是 `Record<string, unknown>`：
+   * 库里存的就是这份 JSON 原文，只有 schema 认得的键才会被 parseMeta 读出来，
+   * 写错键名 / 多写一个键（zod 默认 strip）不会报错、页面只会静默降级成「未提供播放来源」。
+   * 用入参类型就是为了让 tsc 在这里拦住。
+   */
+  meta: z.input<typeof avMetaSchema>;
   counts: { view: number; like: number; fav: number };
   publishedAt: Date;
 };
@@ -267,59 +335,67 @@ async function main() {
 
   const items: DemoItem[] = [
     {
-      slug: `${SLUG_PREFIX}music-mount-direct`,
+      slug: `${SLUG_PREFIX}music-direct`,
       type: "MUSIC",
-      title: "像素电台 Vol.1 · 在线挂载直链",
-      summary: "在线挂载 + 直链：浏览器原生音频播放器，外链来源本站不托管。",
+      title: "像素电台 Vol.1 · 外链直链",
+      summary: "外链直链：站内自绘播放器，本站不托管文件。",
       description: [
-        "**验收点：在线挂载 · 直链播放**",
+        "**验收点：外链直链（单曲）**",
         "",
-        "- 播放区应为浏览器原生 `<audio>` 播放器（非 iframe）",
-        "- 顶部信息行：时长 / 来源平台 / 艺术家 · 专辑",
+        "- 播放区应为站内自绘播放器（非 iframe、非原生 controls）",
+        "- 顶部信息行：时长 / 格式 / 艺术家",
         "- 底部提示：以「外链直链」挂载，本站不托管 +「前往来源」链接",
         "- 卡片角标应为音乐图标（brand 色）",
       ].join("\n"),
       categorySlug: "music",
       tagSlugs: ["ost"],
       meta: {
-        source: "mount",
         mode: "direct",
+        title: "像素电台 Vol.1",
         url: EXT_AUDIO_URL,
-        provider: "外链直链",
         artist: "Pixel Radio",
-        album: "Demo Sessions Vol.1",
         duration: "6:12",
-        license: "CC BY 4.0",
-        note: "演示数据：直链音源，使用浏览器原生播放器",
         downloads: [],
       },
       counts: { view: 2431, like: 186, fav: 74 },
       publishedAt: daysAgo(1, 20),
     },
     {
-      slug: `${SLUG_PREFIX}music-mount-embed`,
+      slug: `${SLUG_PREFIX}music-tracks-lrc`,
       type: "MUSIC",
-      title: "像素电台 Vol.2 · 在线挂载嵌入页",
-      summary: "在线挂载 + 嵌入页：外部播放器以 sandbox iframe 挂载。",
+      title: "像素电台 Vol.2 · 三首连播",
+      summary: "多曲目 + 每曲一份 LRC 歌词：切曲即切歌词板。",
       description: [
-        "**验收点：在线挂载 · 嵌入页**",
+        "**验收点：多曲目 + 歌词强相关**",
         "",
-        "- 播放区应为 16:9 的 sandbox iframe（不是原生播放器）",
-        "- 详情信息里「播放方式」应显示「嵌入页」",
-        "- 底部提示应写「嵌入页」并给「前往来源」链接",
+        "- 播放区顶部应显示「曲目 3 首」角标，并出现「歌词 3 项」角标",
+        "- 控件行可上一首 / 下一首，列表里主来源是「曲目 1」",
+        "- 歌词板随切曲整体更换（每首一份，不是共用一份）",
+        "- 点歌词行可跳到该句时间点",
       ].join("\n"),
       categorySlug: "music",
       tagSlugs: ["ost", "piano"],
       meta: {
-        source: "mount",
-        mode: "embed",
-        url: EMBED_AUDIO_URL,
-        provider: "网易云音乐",
-        artist: "云村电台",
-        album: "外链播放器演示",
-        duration: "4:15",
-        license: "",
-        note: "演示数据：嵌入页音源，第三方播放器 iframe",
+        mode: "direct",
+        title: "第一轨 · 像素清晨",
+        url: TRACK_URLS[0],
+        artist: "Pixel Radio",
+        duration: "6:12",
+        caption: { format: "lrc", text: LRC_TEXTS[0] },
+        tracks: [
+          {
+            title: "第二轨 · 午后慢转",
+            url: TRACK_URLS[1],
+            duration: "6:06",
+            caption: { format: "lrc", text: LRC_TEXTS[1] },
+          },
+          {
+            title: "第三轨 · 深夜电台",
+            url: TRACK_URLS[2],
+            duration: "6:34",
+            caption: { format: "lrc", text: LRC_TEXTS[2] },
+          },
+        ],
         downloads: [],
       },
       counts: { view: 1180, like: 92, fav: 38 },
@@ -331,27 +407,24 @@ async function main() {
       title: "站内托管音频 · 上传文件",
       summary: "上传文件 + 站内托管：原生播放，可直接下载原件。",
       description: [
-        "**验收点：上传文件 · 站内托管**",
+        "**验收点：站内托管（音频）**",
         "",
-        "- 播放区为原生 `<audio>`，地址是站内 `/uploads/demo-av/...`",
-        "- 播放区下方应出现「下载音频」按钮 + 「站内托管，可直接下载原件」",
-        "- 下载清单里也有一条同名文件（走统一登录墙与下载计数）",
+        "- 播放区为自绘播放器，地址是站内 `/uploads/demo-av/...`",
+        "- 播放器控件行内应出现「下载原件」图标按钮（站内路径才给）",
+        "- 下载区清单里也有一条同名文件（走统一登录墙与下载计数）",
         "- 「艺术家 / 时长」取自文件本身（ID3 标签 + 帧头估算）",
       ].join("\n"),
       categorySlug: "music",
       tagSlugs: ["ost"],
       meta: {
-        source: "file",
         mode: "direct",
+        title: "站内托管音频",
         url: localAudioUrl,
         artist: audioMeta.artist ?? "SoundHelix",
-        album: audioMeta.album ?? "Demo Sessions",
         duration: audioDuration,
-        license: "CC BY 4.0",
-        note: "演示数据：文件上传后落站内存储",
         downloads: [
           {
-            name: LOCAL_AUDIO_KEY.split("/").pop(),
+            name: baseName(LOCAL_AUDIO_KEY),
             kind: localAudio ? "file" : "link",
             url: localAudioUrl,
             size: localAudio ? humanSize(localAudio.size) : undefined,
@@ -362,87 +435,91 @@ async function main() {
       publishedAt: daysAgo(3, 11),
     },
     {
-      slug: `${SLUG_PREFIX}video-mount-direct`,
+      slug: `${SLUG_PREFIX}video-direct`,
       type: "VIDEO",
-      title: "样片 · 在线挂载直链 1080p",
-      summary: "在线挂载 + 直链：浏览器原生视频播放器。",
+      title: "样片 · 直链 1080p + 字幕",
+      summary: "外链直链：站内自绘播放器 + 画面底部字幕叠层。",
       description: [
-        "**验收点：在线挂载 · 直链播放**",
+        "**验收点：直链播放 + 字幕**",
         "",
-        "- 播放区应为原生 `<video>`（16:9，黑底描边），可播可拖进度",
-        "- 信息行应显示时长 / 画质 / 来源平台",
+        "- 播放区应为自绘播放器（16:9 黑底），可播可拖进度",
+        "- 信息行应显示时长 / 格式 / 画质 / 「字幕 SRT」角标",
+        "- 右上角字幕开关可切显隐；字幕压在画面底部、不挡点画面",
         "- 底部提示：「外链直链」，本站不托管 +「前往来源」",
-        "- 卡片角标应为视频图标（红色）",
       ].join("\n"),
       categorySlug: "video",
       tagSlugs: ["sample-clip"],
       meta: {
-        source: "mount",
         mode: "direct",
+        title: "样片 · 直链 1080p",
         url: extVideo?.url ?? LOCAL_VIDEO_SRC[0].url,
-        provider: "外链直链",
         resolution: extVideo?.resolution ?? "720p",
         duration: extVideo?.duration ?? "0:10",
-        license: "CC BY 4.0",
-        note: "演示数据：直链视频，使用浏览器原生播放器",
+        caption: { format: "srt", text: SRT_TEXT },
         downloads: [],
       },
       counts: { view: 3120, like: 241, fav: 96 },
       publishedAt: daysAgo(4, 19),
     },
     {
-      slug: `${SLUG_PREFIX}video-mount-embed`,
+      slug: `${SLUG_PREFIX}video-embed`,
       type: "VIDEO",
-      title: "B站嵌入 · 在线挂载嵌入页",
-      summary: "在线挂载 + 嵌入页：B站播放器以 sandbox iframe 挂载。",
+      title: "B站嵌入 · 嵌入页播放",
+      summary: "嵌入页：B站播放器以 sandbox iframe 挂载。",
       description: [
-        "**验收点：在线挂载 · 嵌入页**",
+        "**验收点：嵌入页（仅视频有这个形态）**",
         "",
         "- 播放区应为 16:9 sandbox iframe（放行播放脚本，禁止 top 导航与弹窗）",
-        "- 「播放方式」显示「嵌入页」，来源平台显示 B站",
-        "- 底部提示写「嵌入页」并给「前往来源」链接",
+        "- 详情信息里「播放方式」显示「嵌入页」",
+        "- 挂的字幕不生效：下方应有「字幕由来源站点控制」的提示",
       ].join("\n"),
       categorySlug: "video",
       tagSlugs: ["sample-clip"],
       meta: {
-        source: "mount",
         mode: "embed",
+        title: "B站演示视频",
         url: EMBED_VIDEO_URL,
-        provider: "B站",
         resolution: "1080p",
         duration: "3:20",
-        license: "",
-        note: "演示数据：嵌入页视频，第三方播放器 iframe",
+        caption: { format: "srt", text: SRT_TEXT },
         downloads: [],
       },
       counts: { view: 1876, like: 133, fav: 58 },
       publishedAt: daysAgo(5, 16),
     },
     {
-      slug: `${SLUG_PREFIX}video-file-local`,
+      slug: `${SLUG_PREFIX}video-file-local-multi`,
       type: "VIDEO",
-      title: "站内托管视频 · 上传文件",
-      summary: "上传文件 + 站内托管：原生播放，可直接下载原件。",
+      title: "站内托管视频 · 多分P + 各P字幕",
+      summary: "站内托管 + 多分P：切 P 换源，每 P 各自的字幕。",
       description: [
-        "**验收点：上传文件 · 站内托管**",
+        "**验收点：站内托管 + 多分P**",
         "",
-        "- 播放区为原生 `<video>`，地址是站内 `/uploads/demo-av/...`",
-        "- 播放区下方应出现「下载视频」按钮 + 「站内托管，可直接下载原件」",
-        "- 下载清单里也有一条同名文件",
+        "- 播放区为自绘播放器，地址是站内 `/uploads/demo-av/...`，控件行有「下载原件」",
+        "- 顶部信息行应显示「分P 2 P」角标",
+        "- 画面右上角有上一集 / 下一集 / 列表三个浮层按钮",
+        "- 切到 P2 后字幕整体换掉（P1 用 SRT、P2 用 VTT），倍速与音量不应被重置",
       ].join("\n"),
       categorySlug: "video",
       tagSlugs: ["sample-clip"],
       meta: {
-        source: "file",
         mode: "direct",
+        title: "第一段 · 站内托管",
         url: localVideoUrl,
         resolution: videoSource.resolution,
         duration: videoSource.duration,
-        license: "CC BY 4.0",
-        note: "演示数据：文件上传后落站内存储",
+        caption: { format: "srt", text: SRT_TEXT },
+        tracks: [
+          {
+            title: "第二段 · 外链备选源",
+            url: LOCAL_VIDEO_SRC[1].url,
+            duration: LOCAL_VIDEO_SRC[1].duration,
+            caption: { format: "vtt", text: VTT_TEXT },
+          },
+        ],
         downloads: [
           {
-            name: LOCAL_VIDEO_KEY.split("/").pop(),
+            name: baseName(LOCAL_VIDEO_KEY),
             kind: localVideo ? "file" : "link",
             url: localVideoUrl,
             size: localVideo ? humanSize(localVideo.size) : undefined,
@@ -465,7 +542,7 @@ async function main() {
       ].join("\n"),
       categorySlug: "video",
       tagSlugs: ["sample-clip"],
-      meta: { source: "mount", mode: "direct", url: "", license: "", downloads: [] },
+      meta: { mode: "direct", title: "", url: "", downloads: [] },
       counts: { view: 320, like: 18, fav: 5 },
       publishedAt: daysAgo(7, 10),
     },

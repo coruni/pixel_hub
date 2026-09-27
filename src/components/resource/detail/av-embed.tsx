@@ -3,6 +3,9 @@
 /**
  * 嵌入页（iframe）音视频播放器 —— **仅多 P 时启用**。
  *
+ * 只有 VIDEO 会走到这里：MUSIC 的 mode 在 parseMeta 里恒被钉成 direct，音频没有嵌入页形态，
+ * 所以这里也不再有「音频时改成浅底描边」的分支（原 isAudio prop 已删）。
+ *
  * 单 P 的嵌入页由详情页（服务端组件）直接渲染一个 iframe，没必要为此多加载一个客户端组件；
  * 只有需要切 P 时才把 iframe 交给客户端状态管理。sandbox / referrerPolicy 与那份保持一字不差
  * （见 av-player.tsx 的单 P 分支），两处改一处忘一处就会开出多余权限。
@@ -21,12 +24,10 @@ export default function AvEmbed({
   items,
   title,
   avKind,
-  isAudio,
 }: {
   items: AvPlayItem[];
   title: string;
   avKind: AvKind;
-  isAudio: boolean;
 }) {
   const [idx, setIdx] = useState(0);
   const [open, setOpen] = useState(false);
@@ -35,11 +36,7 @@ export default function AvEmbed({
 
   return (
     <div>
-      <div
-        className={
-          isAudio ? "aspect-video w-full border border-brand-300 bg-neutral-100" : "aspect-video w-full bg-black"
-        }
-      >
+      <div className="aspect-video w-full bg-black">
         <iframe
           key={item.url}
           src={item.url}

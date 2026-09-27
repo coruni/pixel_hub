@@ -1,13 +1,17 @@
 // 音视频（音乐 / 视频）资源的共享纯逻辑 —— 不依赖 server / node，发布向导（client）、
 // 详情页（server）与上传接口（route handler）共用同一套判定，避免三处各写一份后缀表。
 //
-// 两个正交维度：
-//   source：mount=在线挂载（只存 URL）｜file=上传文件（落存储 / 云盘后回填站内路径）
-//   mode  ：direct=直链，用原生 <audio>/<video> 播放｜embed=嵌入页，用 iframe 挂载
-// 判定只做「建议」不做封死：直链能不能原生播由扩展名推断，用户可在向导里手动改。
+// 播放形态只有一个维度：
+//   mode：direct=直链，用原生 <audio>/<video> 播放｜embed=嵌入页，用 iframe 挂载
+// **音频恒为 direct**（站内播放器），嵌入页只服务视频（见 lib/meta.ts 的 parseMeta）。
+//
+// 曾经的 source（mount=在线挂载 / file=上传文件）已取消：两者只是「作者贴地址还是点上传」
+// 的操作差异，落库结果都是同一个 URL 字符串。现在表单只有一个地址框（可手填、可上传回填），
+// 站内 / 外链由 URL 形态判定（以 / 开头 = 站内存储）。
+//
+// 形态判定只做「自动推断」不做手选：站内路径与已知媒体后缀 → 直链，其余 http(s) 页面 → 嵌入页。
 
 export type AvKind = "audio" | "video";
-export type AvSource = "mount" | "file";
 export type AvMode = "direct" | "embed";
 
 /** 音乐可上传/可直连的音频后缀（全小写不带点） */
@@ -92,10 +96,17 @@ export function avKindByExt(nameOrUrl: string): AvKind | null {
   return null;
 }
 
-/** 依据 URL 推定播放形态；空地址时沿用 direct（避免未填就跳到 iframe） */
+/**
+ * 依据 URL 自动推断播放形态（表单不再让作者手选）：
+ *   站内路径（`/…`）必然是本站托管的媒体文件 → 直链；
+ *   已知媒体后缀 → 直链；其余 http(s) 地址（B 站 / YouTube 页面等）→ 嵌入页。
+ * 空地址时返回 direct，避免刚贴一半地址就跳去 iframe。
+ */
 export function suggestMode(url: string, kind?: AvKind): AvMode {
-  if (!url.trim()) return "direct";
-  return isDirectAvUrl(url, kind) ? "direct" : "embed";
+  const u = url.trim();
+  if (!u) return "direct";
+  if (u.startsWith("/")) return "direct";
+  return isDirectAvUrl(u, kind) ? "direct" : "embed";
 }
 
 /** 上传/播放时给存储与播放器的 MIME；未知后缀回退 audio/video 通用类型 */
@@ -113,11 +124,14 @@ export function avExtsSample(kind: AvKind, n = 6): string {
   return exts.length > n ? `${head} 等` : head;
 }
 
-/** 「挂载在线」输入框占位提示 */
+/**
+ * 地址框的占位提示。音频只会用站内播放器（没有嵌入页形态），所以不引导作者贴网页地址；
+ * 视频则可以贴页面地址，会被自动识别成嵌入页。
+ */
 export function avMountPlaceholder(kind: AvKind): string {
   return kind === "audio"
-    ? "https://…/song.mp3 或 音频页面地址（网易云 / 播客 / 网盘直链）"
-    : "https://…/clip.mp4 或 视频页面地址（B站 / YouTube / 网盘直链）";
+    ? "https://…/song.mp3 或 /uploads/…"
+    : "https://…/clip.mp4 或 视频页面地址（B站 / YouTube）";
 }
 
 /** 嵌入页 iframe 的 sandbox：允许播放脚本，但禁止 top 导航、弹窗与表单提交 */
