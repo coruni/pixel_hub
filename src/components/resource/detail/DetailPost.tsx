@@ -13,7 +13,6 @@ import {
   FollowControl,
   DescriptionBlock,
   RelatedSection,
-  VersionSection,
   typeLabel,
   type DetailCtx,
 } from "./parts";
@@ -166,9 +165,6 @@ export default function DetailPost({
         </div>
       </div>
 
-      <div className="mt-8">
-        <VersionSection ctx={ctx} />
-      </div>
       <div className="mt-8">
         <DescriptionBlock ctx={ctx} />
       </div>

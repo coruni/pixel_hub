@@ -13,7 +13,6 @@ import {
   RelatedSection,
   StatGrid,
   TypeInfoCard,
-  VersionSection,
   typeLabel,
   type DetailCtx,
 } from "./parts";
@@ -133,7 +132,6 @@ export default function DetailBanner({
 
       {/* 描述与评论横跨整条内容宽度（不局限于窄主列） */}
       <div className="mt-6 space-y-5">
-        <VersionSection ctx={ctx} />
         {/* 统一下载面板：贴近描述上方（IMAGE/ARTICLE/GAME externalUrl；无关类型返回 null） */}
         <DownloadPanel ctx={ctx} />
         {/* 操作条贴在描述上边、且在两栏网格之外：放进图集左列时 justify-end

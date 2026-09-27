@@ -544,16 +544,15 @@ export async function activeCloudDrive(): Promise<CloudDrive | null> {
   return prisma.cloudDrive.findFirst({ where: { active: true, enabled: true } });
 }
 
-/** 引用计数：Media.storageKey / Resource.externalUrl / ResourceVersion.url 以 /od/{id}/ 开头合计 */
+/** 引用计数：Media.storageKey / Resource.externalUrl 以 /od/{id}/ 开头合计 */
 export async function countDriveRefs(driveId: string): Promise<number> {
   const prefix = `/od/${driveId}/`;
-  // 合并到单次事务（单连接）执行 3 个 count，降低并发连接占用，避免打爆 Supabase 15 连接池
-  const [media, resources, versions] = await prisma.$transaction([
+  // 合并到单次事务（单连接）执行 2 个 count，降低并发连接占用，避免打爆 Supabase 15 连接池
+  const [media, resources] = await prisma.$transaction([
     prisma.media.count({ where: { storageKey: { startsWith: prefix } } }),
     prisma.resource.count({ where: { externalUrl: { startsWith: prefix } } }),
-    prisma.resourceVersion.count({ where: { url: { startsWith: prefix } } }),
   ]);
-  return media + resources + versions;
+  return media + resources;
 }
 
 /** 删除一条已落库的 /od 引用背后的云文件（best-effort：解析失败/盘已删/404 一律静默） */

@@ -10,6 +10,7 @@ import {
 import { uploadAttachment } from "@/lib/upload-attachment-client";
 import { wizInput, wizLabel, SectionTitle, STEP } from "./wizard-shared";
 import { AttachmentUpload } from "./AttachmentUpload";
+import { formatBytes } from "@/lib/format";
 import { useFileDrop } from "@/lib/hooks/use-file-drop";
 import { SquareCheckbox } from "../admin/SquareCheckbox";
 import { Button } from "@/components/ui/Button";
@@ -103,16 +104,6 @@ export function GameSection({
       </div>
     </section>
   );
-}
-
-function formatBytes(n: number): string {
-  if (!Number.isFinite(n) || n < 0) return "";
-  if (n < 1024) return `${n} B`;
-  const kb = n / 1024;
-  if (kb < 1024) return `${kb.toFixed(1)} KB`;
-  const mb = kb / 1024;
-  if (mb < 1024) return `${mb.toFixed(1)} MB`;
-  return `${(mb / 1024).toFixed(1)} GB`;
 }
 
 /**

@@ -1,12 +1,12 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
 import { after } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { imageMetaSchema, gameMetaSchema, articleMetaSchema, avMetaSchema } from "@/lib/meta";
+import { fillDownloadSizes } from "@/lib/download-size";
 import { autoSlugBase, randomTail, uniqueSlug } from "@/lib/slug";
 import { revalidatePath } from "next/cache";
 import { resourceTextFields, urlLike } from "@/lib/resource-fields";
@@ -95,6 +95,9 @@ export async function createResourceAction(
   } catch {
     downloads = [];
   }
+  // 站内附件体积以存储层为准补一次（发布页的 GAME/ARTICLE 清单没有大小输入框，
+  // 手粘的站内路径与历史数据都会缺）——见 lib/download-size.ts
+  downloads = await fillDownloadSizes(downloads);
 
   let metaStr: string;
   if (type === "IMAGE") {
@@ -268,9 +271,6 @@ export async function createResourceAction(
       if (finalCover)
         await tx.resource.update({ where: { id: r.id }, data: { coverMediaId: finalCover } });
 
-      // 版本记录只在「发布新版本」时由 addVersionAction 创建。
-      // 发布/改稿都不再往 ResourceVersion 写——GAME 的下载源清单存 meta.downloads，
-      // 其余类型的下载源也各有自己的 meta.downloads，版本历史是作者主动声明的东西。
       return r;
     });
   } catch (e) {
@@ -321,65 +321,6 @@ export async function createResourceAction(
   return { ok: true, pending: true, resourceId: resource.id };
 }
 
-// ---------- 版本管理：作者追加新版本 ----------
-
-const versionSchema = z.object({
-  resourceId: z.string().min(1),
-  version: z.string().trim().min(1, "请填写版本号").max(40, "版本号过长"),
-  changelog: z.string().trim().max(2000, "更新日志过长").optional().default(""),
-  url: z
-    .string()
-    .trim()
-    .refine(
-      (v) => !v || /^https?:\/\/.+/i.test(v) || /^\/[^/].*$/i.test(v),
-      "下载地址需以 http(s):// 开头",
-    )
-    .optional()
-    .default(""),
-});
-
-export async function addVersionAction(
-  _prev: ResourceActionState,
-  fd: FormData,
-): Promise<ResourceActionState> {
-  const user = await activeUser();
-  if (!user) return { error: "账号不可用或已被封禁" };
-
-  const parsed = versionSchema.safeParse({
-    resourceId: fd.get("resourceId") ?? "",
-    version: fd.get("version") ?? "",
-    changelog: fd.get("changelog") ?? "",
-    url: fd.get("url") ?? "",
-  });
-  if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
-  const { resourceId, version, changelog, url } = parsed.data;
-
-  const resource = await prisma.resource.findUnique({
-    where: { id: resourceId },
-    select: { id: true, slug: true, authorId: true, type: true, externalUrl: true },
-  });
-  if (!resource) return { error: "资源不存在" };
-  if (resource.authorId !== user.id && user.role !== "ADMIN")
-    return { error: "只有作者可发布新版本" };
-  // GAME 没有版本概念：下载源清单在编辑页维护，不接受「发布新版本」
-  if (resource.type === "GAME") return { error: "游戏下载源请在编辑页维护，无需发布版本" };
-
-  const finalUrl = url || resource.externalUrl;
-  if (!finalUrl) return { fieldErrors: { url: ["请填写该版本的下载地址"] } };
-
-  await prisma.$transaction([
-    prisma.resourceVersion.create({
-      data: { resourceId: resource.id, version, changelog: changelog || null, url: finalUrl },
-    }),
-    prisma.resource.update({
-      where: { id: resource.id },
-      data: { externalUrl: finalUrl },
-    }),
-  ]);
-  revalidatePath(`/resources/${resource.slug}`);
-  return { ok: true };
-}
-
 // ---------- 作者改稿：仅允许编辑自己发布的资源 ----------
 
 export async function updateResourceOwnerAction(
@@ -414,24 +355,5 @@ export async function updateResourceOwnerAction(
 
   revalidatePath(`/resources/${resource.slug}`);
   revalidatePath("/", "layout");
-  return { ok: true };
-}
-
-/** 版本下载计数（会话内不重复计） */
-export async function bumpVersionDownloadAction(versionId: string): Promise<{ ok: boolean }> {
-  const v = await prisma.resourceVersion.findUnique({
-    where: { id: versionId },
-    select: { id: true, url: true, resourceId: true, resource: { select: { externalUrl: true } } },
-  });
-  if (!v) return { ok: false };
-  const ck = await cookies();
-  const marker = ck.get("dl_done")?.value ?? "";
-  if (!marker.includes(versionId)) {
-    await prisma.resourceVersion.update({
-      where: { id: versionId },
-      data: { downloadCount: { increment: 1 } },
-    });
-    ck.set("dl_done", `${marker},${versionId}`.slice(0, 1024), { path: "/", maxAge: 60 * 60 * 24 });
-  }
   return { ok: true };
 }

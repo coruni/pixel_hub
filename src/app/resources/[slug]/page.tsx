@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { getCollections, getRelated, getResourceDetail, type ResourceDetail } from "@/lib/queries";
 import { parseMeta } from "@/lib/meta";
+import { withDownloadSizes } from "@/lib/download-size";
 import { getTheme, detailTemplateFor } from "@/lib/site";
 import { getIncentive } from "@/lib/incentive";
 import { getPointBalance } from "@/lib/points";
@@ -174,9 +175,13 @@ export default async function ResourcePage({ params }: PageProps) {
         })
       : [];
 
+  // meta 里的下载清单体积由存储层权威补齐：作者手填/历史数据可能缺 size，
+  // 而同一份清单里「一个附件有大小、另一个没有」看着就是坏的 —— 见 lib/download-size.ts
+  const meta = await withDownloadSizes(parseMeta(detail.type, detail.meta as string | null));
+
   const ctx: DetailCtx = {
     detail,
-    meta: parseMeta(detail.type, detail.meta as string | null),
+    meta,
     meId,
     authed: !!meId,
     isAuthor: meId === detail.authorId,

@@ -3,6 +3,7 @@
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { articleMetaSchema, avMetaSchema, gameMetaSchema, imageMetaSchema } from "@/lib/meta";
+import { fillDownloadSizes } from "@/lib/download-size";
 import { asciiSlug, randomTail } from "@/lib/slug";
 import { MAX_TAGS, resourceTextFields, urlLike } from "@/lib/resource-fields";
 import { ARTICLE_MEDIA_MAX, isSingleCoverType } from "@/lib/upload-config";
@@ -30,13 +31,17 @@ function str(fd: FormData, key: string): string {
 }
 
 /** 读取各分节受控序列化的 downloads JSON（IMAGE 多附件图包 / ARTICLE 文末清单 / GAME 下载源同源） */
-function readDownloads(fd: FormData): { value: unknown[]; error?: string } {
+async function readDownloads(fd: FormData): Promise<{ value: unknown[]; error?: string }> {
+  let value: unknown[];
   try {
     const v = JSON.parse(str(fd, "downloads") || "[]");
-    return { value: Array.isArray(v) ? v : [] };
+    value = Array.isArray(v) ? v : [];
   } catch {
     return { value: [], error: "附件清单格式不正确" };
   }
+  // 站内附件体积以存储层为准补一次：改稿页的清单没有大小输入框（GAME/ARTICLE 都关掉了
+  // showSize），历史数据与手粘的 /od/ 路径都会缺 —— 见 lib/download-size.ts
+  return { value: await fillDownloadSizes(value) };
 }
 
 /** 取清单里第一条有效 url（GAME 的 externalUrl 由它推导） */
@@ -85,7 +90,7 @@ export async function applyResourceEdit(
   const license = str(fd, "license");
   let metaStr: string | undefined;
   if (type === "IMAGE") {
-    const { value: downloads, error } = readDownloads(fd);
+    const { value: downloads, error } = await readDownloads(fd);
     if (error) return { fieldErrors: { downloads: [error] } };
     const parsed = imageMetaSchema.safeParse({
       isAiGenerated: on(fd, "isAiGenerated"),
@@ -99,14 +104,14 @@ export async function applyResourceEdit(
     if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
     metaStr = JSON.stringify(parsed.data);
   } else if (type === "ARTICLE") {
-    const { value: downloads, error } = readDownloads(fd);
+    const { value: downloads, error } = await readDownloads(fd);
     if (error) return { fieldErrors: { downloads: [error] } };
     const parsed = articleMetaSchema.safeParse({ license, downloads });
     if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
     metaStr = JSON.stringify(parsed.data);
   } else if (type === "MUSIC" || type === "VIDEO") {
     // 音视频改稿：与发布侧同一套 schema（source/mode/url + 类型补充字段 + 下载清单）
-    const { value: downloads, error } = readDownloads(fd);
+    const { value: downloads, error } = await readDownloads(fd);
     if (error) return { fieldErrors: { downloads: [error] } };
     const parsed = avMetaSchema.safeParse({
       source: str(fd, "avSource") === "file" ? "file" : "mount",
@@ -120,7 +125,7 @@ export async function applyResourceEdit(
     if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
     metaStr = JSON.stringify(parsed.data);
   } else {
-    const { value: downloads, error } = readDownloads(fd);
+    const { value: downloads, error } = await readDownloads(fd);
     if (error) return { fieldErrors: { downloads: [error] } };
     // GAME 无版本概念：下载源清单直接存进 meta.downloads（不再写 ResourceVersion 表）。
     // 详情页「游戏下载」与改稿回填都读这一处，downloadCount 走资源级 detail.downloadCount。

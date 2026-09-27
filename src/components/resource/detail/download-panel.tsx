@@ -1,5 +1,5 @@
-// 统一下载面板 —— IMAGE/ARTICLE/GAME 均按 meta 分发，GAME 读 meta.downloads 清单；
-// GAME 不再渲染版本历史（VersionSection 对其返回 null），本面板即唯一下载入口。
+// 统一下载面板 —— IMAGE/ARTICLE/GAME 均按 meta 分发，下载清单只存 meta.downloads；
+// 版本历史功能已下线（ResourceVersion 表与 VersionSection 均已移除），本面板即唯一下载入口。
 // 服务端决定渲染什么（null = 无下载）；真正的下载/登录墙由客户端 MetaDownloadButton 处理。
 // 下载次数是资源级单值，标在各清单的区块头（CardHead），不逐行重复。
 import { Download, ExternalLink, FileText } from "lucide-react";
@@ -213,7 +213,7 @@ export function DownloadPanel({ ctx }: { ctx: DetailCtx }) {
   }
   // ARTICLE 附件清单
   if (meta.kind === "ARTICLE") return <ArticleAttachmentsCard ctx={ctx} />;
-  // GAME：清单即唯一下载入口（VersionSection 对 GAME 隐藏）
+  // GAME：清单即唯一下载入口
   if (meta.kind === "GAME") return <GameExternalCard ctx={ctx} />;
   return null;
 }

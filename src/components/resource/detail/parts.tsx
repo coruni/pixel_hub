@@ -17,7 +17,6 @@ import Markdown from "@/components/rte/Markdown";
 import MarkdownImages from "@/components/rte/MarkdownImages";
 import { FavoriteButton, LikeButton, FollowButton } from "@/components/social/interactions";
 import ReportButton from "@/components/social/ReportButton";
-import { VersionDownloadButton, VersionForm } from "@/components/resource/version";
 import { getUploadLimits } from "@/lib/upload-limits";
 import { getIncentive } from "@/lib/incentive";
 
@@ -34,14 +33,6 @@ export type DetailCtx = {
 
 /** 类型展示名：统一取 TYPE_LABEL，新增类型无需再改这里 */
 export const typeLabel = (t: string) => TYPE_LABEL[t] ?? t;
-
-/**
- * 版本号统一显示为带 v 前缀。
- *
- * 版本号是自由文本，用户按占位符的引导可能已经打了 `v`。这里先剥掉再补，
- * 避免出现 `vv1.2.3`——渲染处兜住比在写入处剥更稳，存量数据也一并治好。
- */
-export const formatVersion = (v: string) => `v${v.trim().replace(/^v/i, "")}`;
 
 const callbackPath = (slug: string) => `/resources/${slug}`;
 
@@ -301,61 +292,6 @@ export function TypeInfoCard({ ctx }: { ctx: DetailCtx }) {
   );
 }
 
-/**
- * 版本历史：列表 + 下载（作者可追加新版本，附件上限提示跟随后台配置）。
- *
- * GAME 不渲染本区块——它没有版本概念，下载源清单由 DownloadPanel 的「游戏下载」完整呈现，
- * 版本号改动走编辑页改下载源清单，不需要「发布新版本」这条独立路径。
- * 早期版本曾把 GAME 的下载源逐条写成 ResourceVersion 并在这里列出来，
- * 导致同一批 URL 在详情页出现两处；现已改为清单只存 meta.downloads。
- */
-export async function VersionSection({ ctx }: { ctx: DetailCtx }) {
-  const { detail, isAuthor } = ctx;
-  // 防御性守卫：GAME 已无「发布新版本」入口，存量版本记录也不再展示
-  if (detail.type === "GAME") return null;
-  const versions = detail.versions;
-  if (versions.length === 0) return null;
-  // 仅作者会看到「发布新版本」表单时才读配置，省一次 DB 查询
-  const L = isAuthor ? await getUploadLimits() : null;
-  return (
-    <section className="rounded-none border border-brand-200 bg-surface p-5">
-      <h2 className="text-sm font-semibold text-neutral-400">版本历史（{versions.length}）</h2>
-      <ul className="mt-3 divide-y divide-neutral-100">
-        {versions.map((v) => (
-          <li
-            key={v.id}
-            className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3 first:pt-0 last:pb-0"
-          >
-            <span className="rounded-none border border-brand-600 bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">
-              {formatVersion(v.version)}
-            </span>
-            <span className="text-xs text-neutral-400">{timeAgo(v.createdAt)}</span>
-            {v.changelog && (
-              <span className="min-w-0 flex-1 whitespace-pre-wrap text-sm leading-6 text-neutral-600">
-                {v.changelog}
-              </span>
-            )}
-            <span className={v.changelog ? "" : "min-w-0 flex-1"} />
-            {v.url && (
-              <VersionDownloadButton versionId={v.id} url={v.url} count={v.downloadCount} />
-            )}
-          </li>
-        ))}
-      </ul>
-      {isAuthor && L && (
-        <div className="mt-4 border-t border-neutral-100 pt-4">
-          <VersionForm
-            resourceId={detail.id}
-            limits={{
-              attachmentMaxMb: L.attachmentMaxMb,
-              attachmentExts: L.attachmentExts,
-            }}
-          />
-        </div>
-      )}
-    </section>
-  );
-}
 
 /** 长描述正文（Markdown 富文本，见 DESIGN 描述=富文本）。
  *  排版即文章正文本身：不套卡片（无边框/底色/内距），也不带小标题 —— 与 DetailArticle

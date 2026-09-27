@@ -6,6 +6,22 @@ export function formatCount(n: number): string {
   return `${(n / 100000000).toFixed(1).replace(/\.0$/, "")}亿`;
 }
 
+/**
+ * 字节数 → 展示文本（B / KB / MB / GB，非整单位保留一位小数）。
+ * 附件体积的唯一口径：上传回执、编辑器里的清单行、详情页下载清单都用它，
+ * 任何一处改了量纲，同一份文件在三处就会显示成不同大小。
+ * 非法值（null / NaN / 负数）返回空串，调用方据此走「不显示」而不是「显示 0 B」。
+ */
+export function formatBytes(n: number | null | undefined): string {
+  if (typeof n !== "number" || !Number.isFinite(n) || n < 0) return "";
+  if (n < 1024) return `${n} B`;
+  const kb = n / 1024;
+  if (kb < 1024) return `${kb.toFixed(1)} KB`;
+  const mb = kb / 1024;
+  if (mb < 1024) return `${mb.toFixed(1)} MB`;
+  return `${(mb / 1024).toFixed(1)} GB`;
+}
+
 export function timeAgo(date: Date | string | null | undefined): string {
   if (!date) return "";
   const d = typeof date === "string" ? new Date(date) : date;

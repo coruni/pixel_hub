@@ -183,7 +183,6 @@ model Resource {
   coverMedia   Media?         @relation("Cover", fields: [coverMediaId], references: [id])
   media        Media[]        @relation("ResourceMedia")
   tags         TagOnResource[]
-  versions     ResourceVersion[]
   comments     Comment[]
   likes        Like[]
   favorites    Favorite[]
@@ -267,19 +266,6 @@ model Media {
   @@index([resourceId])
   @@index([commentId])
   @@index([uploaderId])
-}
-
-model ResourceVersion {
-  id            String @id @default(cuid())
-  resourceId    String
-  resource      Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
-  version       String
-  changelog     String?
-  url           String? // 该版本下载地址（缺省沿用资源 externalUrl）
-  downloadCount Int    @default(0)
-  createdAt     DateTime @default(now())
-
-  @@index([resourceId, createdAt])
 }
 
 model TagOnResource {

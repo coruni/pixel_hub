@@ -516,7 +516,6 @@ export const getResourceDetail = cache(async (slug: string, viewerId?: string) =
           placeholder: true,
         },
       },
-      versions: { orderBy: { createdAt: "desc" }, take: 20 },
       _count: { select: { likes: true } },
     },
   });

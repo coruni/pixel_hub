@@ -21,9 +21,6 @@ const REGISTRY: Record<string, () => Promise<ActionFn>> = {
   deleteComment: async () => (await import("@/lib/actions/social")).deleteCommentAction,
   // 资源
   createResource: async () => (await import("@/lib/actions/resource")).createResourceAction,
-  addVersion: async () => (await import("@/lib/actions/resource")).addVersionAction,
-  bumpVersionDownload: async () =>
-    (await import("@/lib/actions/resource")).bumpVersionDownloadAction,
   // 审核 / 治理
   approveResource: async () => (await import("@/lib/actions/moderation")).approveResourceAction,
   rejectResource: async () => (await import("@/lib/actions/moderation")).rejectResourceAction,
