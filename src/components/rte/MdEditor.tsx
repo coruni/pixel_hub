@@ -134,7 +134,7 @@ export default function MdEditor({
   return (
     <div
       ref={rootRef}
-      className="md-editor relative rounded-none border border-brand-200 bg-surface"
+      className="md-editor relative rounded-none border-2 border-brand-300 bg-surface"
       data-fullscreen={fullscreen || undefined}
       data-compact={compact || undefined}
       style={fullscreen ? undefined : { minHeight }}
@@ -146,7 +146,7 @@ export default function MdEditor({
           onClick={() => setFullscreen((v) => !v)}
           aria-label={fullscreen ? "退出全屏" : "全屏编写"}
           title={fullscreen ? "退出全屏（Esc）" : "全屏编写"}
-          className="absolute right-1.5 top-1.5 z-10 rounded-none border border-brand-200 bg-surface p-1.5 text-neutral-400 transition hover:border-brand-500 hover:text-neutral-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+          className="absolute right-1.5 top-1.5 z-10 rounded-none border border-brand-300 bg-surface p-1.5 text-neutral-400 transition hover:border-brand-500 hover:text-neutral-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
         >
           {fullscreen ? <Minimize2 size={14} aria-hidden /> : <Maximize2 size={14} aria-hidden />}
         </Button>

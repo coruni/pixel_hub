@@ -29,26 +29,23 @@
   --md-marker: var(--brand-400);
   --md-link: #a84e31; /* 亮=品牌赤陶橙深阶（对齐暗色浅暖橙），不再用冷 slate 深蓝 */
   --md-link-hover: #8a4129; /* 亮：hover 再深一档（brand-800） */
-  /* 代码（行内 code / 代码块 pre）与表头的暖浅底、代码文字色：都引用品牌阶而不是写死色值，
-     html.dark 会把 --brand-200 变成 #48362a、--brand-900 变成 #f7e2d4，这里自动跟随。
-     原来亮色底是 #f0e9dd（暖米）、文字走 --md-text-lg (#27272a 冷灰黑) —— 底色跟页面底
-     (#faf9f5) 只差 1.15:1，块感几乎没有，冷灰字压在暖米底上还发闷。
-     底色取 200 阶而不是 100 阶：brand-100 (#faece3) 对页面底只有 1.10:1，比改前还更糊；
-     brand-200 (#f4d9c8) 是 1.28:1，能看清是一块代码而不刺眼。 */
+  /* 代码文字色：引用品牌阶而不是写死色值，html.dark 会把 --brand-900 变成 #f7e2d4，自动跟随。
+     --md-code-bg（brand-200）现在只服务**行内 code**：它没有边框，全靠底色把代码从正文里
+     拎出来，降到 100 阶（对页面底只有 1.10:1）就认不出来了。 */
   --md-code-bg: var(--brand-200);
   --md-code-fg: var(--brand-900);
   --md-border: #e5e5e5;
-  /* 正文里的**表格格线**：取品牌陶土橙 400 阶。引用 --brand-400 而不是写死色值 ——
-     暗色（html.dark）会把它覆盖成 #9a6c4c，这里跟着自动换，无需再写一份 dark 覆盖，
-     与上面的 --md-marker 同款做法。原来的 --md-border 中性灰在暖白底 (#faf9f5) 上
-     只有 1.06:1，跟没画一样。
-     【分工】分隔线（.md-body hr）已改走 --rule-dot（brand-300），本 token 现在只管
-     th/td 的格线。格线**不跟着降到 300 阶**：1.65:1 的格线在长表格里成片出现时会糊成一片，
-     看不是边框、看是背景网纹。 */
-  --md-rule: var(--brand-400);
+  /* **有边框的块**（代码块 pre、表格表头 th）的底色与描边。
+     底色走 brand-100：这些块已经有外框定形，底色只是衬底，不需要 200 阶那么重；
+     描边统一 brand-300（＝ --rule-dot 的色），全页品牌外框同处一档，
+     不再出现「同一页两种相近的橙」。两个 token 都引用品牌阶，暗色自动跟随：
+     --brand-100 → #33281e、--brand-300 → #6d4e37。 */
+  --md-code-block-bg: var(--brand-100);
+  --md-block-border: var(--brand-300);
   /* 单边点划线（dot-dash）的图案 —— rule-dot-t / rule-dot-b / rule-dot-rows 三个 utility
      与 .md-body hr 共用这一份。
-     节奏：6px 划 + 3px 空 + 1px 点（1px 高的色带上正好是一个像素方块）+ 3px 空 = 13px 一周期。
+     节奏：6px 划 + 3px 空 + 1px 点 + 3px 空 = 13px 一周期。点宽 1px，
+     色带高 1px 时就是一个像素方块，`.md-body hr` 拉高到 2px 时变成 2×2 方块。
      颜色取 brand-300：详情页的所有品牌色外框都是这一档，横线跟着同色才不会出现
      「同一页两种相近的不等橙」。brand-300 已被 html.dark 重定义（#6d4e37），
      var() 链自动跟随，这里不需要再写一份 dark 覆盖。
@@ -378,10 +375,9 @@ summary {
 .md-body pre {
   overflow-x: auto;
   border-radius: 0;
-  /* 比分割线的 --md-rule 深一档（brand-500）：它是压在同样带橙的代码底上的，
-     同一档橙会被自己的底色吃掉（1.70:1），深一档才有 2.31:1 的收边效果。 */
-  border: 1px solid var(--brand-500);
-  background: var(--md-code-bg);
+  /* 描边取 brand-300（全页品牌外框同一档），底色取 brand-100 —— 有框在，底色浅也不散 */
+  border: 1px solid var(--md-block-border);
+  background: var(--md-code-block-bg);
   padding: 0.6rem 0.75rem;
   color: var(--md-code-fg);
 }
@@ -403,13 +399,13 @@ summary {
 }
 .md-body th,
 .md-body td {
-  border: 1px solid var(--md-rule); /* 格线用品牌色，不用 --md-border（暖白底上看不见） */
+  border: 1px solid var(--md-block-border); /* 格线用品牌色，不用 --md-border（暖白底上看不见） */
   padding: 0.3rem 0.55rem;
   text-align: left;
   vertical-align: top;
 }
 .md-body th {
-  background: var(--md-code-bg);
+  background: var(--md-code-block-bg);
   color: var(--md-heading);
   font-weight: 600;
 }
@@ -422,11 +418,13 @@ summary {
 /* 分割线：点划线（dot-dash）。图案本体收在 --rule-dot（见 :root），与资源详情页的
    单边线（rule-dot-t / rule-dot-b / rule-dot-rows）**同一份 token** ——
    同一页里正文的 <hr> 与页面横线必须完全同色同节奏，否则看着就是「没改干净」。
-   这里 border 归零后改用 height 1px 的色带：走 border 的话图案只能整段一种 style。 */
+   border 归零后改用色带：走 border 的话图案只能整段一种 style。
+   带高 2px（页面单边线仍是 1px）：正文里的分割线要压得住段落间距，1px 太像纸纹；
+   图案是横向 13px 一周期，加高只是让划/点变粗，节奏不变。 */
 .md-body hr {
   margin: 0.7rem 0;
   border: 0;
-  height: 1px;
+  height: 2px;
   background-image: var(--rule-dot);
 }
 .md-body img {
@@ -646,7 +644,9 @@ summary {
   --crepe-color-surface-low: var(--background);
   --crepe-color-on-surface: var(--foreground);
   --crepe-color-on-surface-variant: var(--md-muted);
-  --crepe-color-outline: var(--brand-200);
+  /* 编辑器内的描边（表格格线、选中/占位框等）：与前台 --md-block-border 同档 brand-300，
+     否则编辑器里插的表格是 200 阶、发布后是 300 阶，所见即所得直接破功 */
+  --crepe-color-outline: var(--brand-300);
   --crepe-color-primary: var(--brand-500);
   --crepe-color-secondary: var(--brand-100);
   --crepe-color-on-secondary: var(--brand-800);
@@ -803,8 +803,9 @@ summary {
 
 .md-editor .milkdown .ProseMirror pre {
   overflow-x: auto;
-  border: 1px solid var(--brand-500);
-  background: var(--md-code-bg);
+  /* 与前台 .md-body pre 同款：brand-300 描边 + brand-100 底 */
+  border: 1px solid var(--md-block-border);
+  background: var(--md-code-block-bg);
   padding: 0.6rem 0.75rem;
   color: var(--md-code-fg);
   font-size: 0.85rem;

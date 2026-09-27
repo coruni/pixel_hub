@@ -1,209 +1,74 @@
 # PixelHub 项目长期约定
 
-## 验证口径（用户明确要求，2026-09-27）
+## 验证口径（用户明确，2026-09-27）
+- 只跑 `npx tsc --noEmit` + `npm run lint`；不写 jsdom/SSR 探针，不做「反证」。原话：「不要做正反验证了 只需要eslint和tsc」。
+- 例外：改 Tailwind class 时用 postcss 编一次 `globals.css` 确认类真产出（静默丢失时看源码无破绽）。v4 产物是美化过的，group 变体是 `:is(:where(.group):hover *)`。
+- 探针一律放 `prisma/_*` 且用完立即删（环境会自动 commit）。**不要整文件跑 `prettier --write`**（大量文件不符 `.prettierrc`，会混进几十行无关 diff），只格式化本次新增文件。
+- DB 是远端 Supabase，偶发 `Can't reach database server`，重跑即可。
 
-- UI / 业务改动**只跑 `tsc --noEmit` + `eslint`**，不要写 jsdom / SSR 探针，也**不要做「反证」**
-  （把源码临时改回旧实现跑一遍看断言变红）那套流程。用户原话：「不要做正反验证了 只需要eslint和tsc」。
-- 例外：改了 Tailwind class 时，用 postcss 编一次 `globals.css` 确认类真的产出（否则样式静默丢失，
-  看源码毫无破绽）。Tailwind v4 的产物是**美化过的**，且 group 变体编译成
-  `:is(:where(.group):hover *)` 形式——按 `.group:hover .child` 去匹配会假失败。
-- 探针文件一律放 `prisma/_*`，用完立即删（环境会自动 commit，脏文件会被带进仓库）。
-- **不要对整文件跑 `prettier --write`**：本仓库有大量文件并不符合仓库 `.prettierrc`（导入折行、
-  单行三元、长 JSX 属性），整文件格式化会把几十行无关改动混进交付 diff。只格式化**本次新增的文件**；
-  改多行的要用小范围补丁（Edit）。
-- 探针要 import 源码时 `@/` 别名在 tsx 下可用，但只用相对路径最稳（`../src/lib/xxx`）。
-  数据库是**远端 Supabase**，偶发连不上（`Can't reach database server`），重跑一次即可。
+## 数据库迁移顺序（2026-09-27 事故）
+- **破坏性迁移（DROP TABLE/COLUMN）与代码分两个发布批次**：先上线不含该引用的代码，确认线上跑新镜像，再 DROP。实例：`0018_drop_resource_version.sql` 后旧镜像 JOIN `ResourceVersion` → 资源详情页全挂；止血是把空表按原 schema 建回（不要往 `prisma/migrations/` 加自相矛盾的回滚）。
+- 线上是外部主机上的容器（本机无 docker、仓库无 compose，只有 `Dockerfile`）。改完要提醒用户重建镜像，我无法从本机部署。
 
-## 数据库迁移顺序（2026-09-27 事故后定规）
-
-- **破坏性迁移（DROP TABLE / DROP COLUMN）必须与代码拆成两个发布批次**：先让不含该引用的代码上线，
-  确认线上跑的是新镜像，再执行 DROP。把两步压进同一个提交 = 假定线上会立刻重建镜像，
-  一旦没重建就是「旧镜像 + 新库」，直接 500。
-  - 实例：`0018_drop_resource_version.sql` 删表后，仍跑 `c2f422c` 之前镜像的容器在
-    `getResourceDetail` 的 `prisma.resource.findFirst()` 里 JOIN `ResourceVersion` →
-    资源详情页全挂。止血办法是把**空表按原 schema 建回去**（放 `$TEMP` 执行，
-    不要往 `prisma/migrations/` 里加与迁移自相矛盾的回滚文件）。
-- 部署形态：**线上是外部主机上的容器**（本机无 docker，仓库内无 compose，只有 `Dockerfile`）。
-  改完代码后要提醒用户重建镜像；我无法从本机触发部署。
-
-## UI 语言
-
+## UI 语言与暗色主题
 - 像素风 + Fusion Pixel + 点阵背景 + 赤陶橙 brand + 全站 `rounded-none`。
-- 暗色主题只覆盖 brand / neutral / red / amber 四组语义阶，**且这四组也不是每个阶都覆盖**：
-  `brand` 50–900 齐全；`neutral` 只有 200–950（**缺 50 / 100**）；`red` 只有 50/100/200/300/600/700
-  （缺 400/500/800/900）；`amber` 只有 100/200/300/600/700/900（缺 50/400/500/800）。
-  所以 `bg-neutral-100` 这类写法在暗色下仍是亮底 —— `admin/content` 的 DRAFT 徽章就是这么写的（存量）。
-  新建组件的底色 / 文字色请只取上列已覆盖的阶；emerald / sky 完全没有覆盖，
-  在会跟随明暗的 surface 上当正文色用会糊（卡片封面那种固定深底才可以用亮阶）。
-- 类型图标唯一事实来源：`src/components/resource/type-icon.tsx`（TYPE_ICON / TYPE_BADGE_TONE / TypeIcon）。
+- 暗色只覆盖 brand/neutral/red/amber 且不齐：brand 50–900 全；neutral 仅 200–950（缺 50/100）；red 仅 50/100/200/300/600/700；amber 仅 100/200/300/600/700/900。`bg-neutral-100` 在暗色下仍是亮底（存量 `admin/content` 的 DRAFT 徽章如此）。emerald/sky 完全没覆盖，只在固定深底上可用。
+- 类型图标唯一来源：`src/components/resource/type-icon.tsx`（TYPE_ICON / TYPE_BADGE_TONE / TypeIcon）。
 
-## 主页背景是「双槽」结构（2026-09-27 起）
+## 主页背景：双槽结构
+- `profileBgPcKey` / `profileBgMobileKey` 各配遮罩 `profileBgMask` / `profileBgMobileMask`；`profileBgOnResource` / `profileBgGlobal` / `profile.bgMinLevel` 两槽共用。**不做跨槽回落**（只设桌面端则移动端素底）。
+- 遮罩类唯一来源 `globals.css` 的 `.profile-bg-pc` / `.profile-bg-mobile`；切换靠 `hidden sm:block` / `sm:hidden`。
+- **`safeBgMask(raw, slot)` 的 slot 不能省**（`PROFILE_BG_MASK_DEFAULTS` 唯一映射）。返回值内联传 `--profile-bg-mask`，压过类自带默认值 —— 传错槽位不报错，只静默套另一端形状。`isValidBgMask` 只管形状、不掺默认值。
+- `ProfileBgForm.tsx` 的 `BgSlotForm` 两槽共用；字段映射收在 `lib/actions/settings.ts` 的 `bgKeyData` / `bgMaskData` / `bgKeyOf`（Prisma update 强类型，不能拼动态键名）。
+- owner 压 global 必须按断点成对写（`:has()` 不看 display）：`-pc` / `-mobile` 两组属性 + `min-width: 40rem` 与 `width < 40rem` 两个媒体查询。
+- 可见性口径（已确认，别再问）：`profileBgGlobal` 是**自见**开关，不推给别人；`profileBgOnResource` 是唯一让访客背景让位的开关（作者本人不受约束，靠 `isOwnResourcePage`）；别人的个人主页 `GlobalProfileBg` 显式 `return null` 不兜底。
 
-- 桌面端 `User.profileBgPcKey` / 移动端 `User.profileBgMobileKey`，**各配一份遮罩**
-  （`profileBgMask` / `profileBgMobileMask`）；`profileBgOnResource`、`profileBgGlobal`、
-  等级门槛 `profile.bgMinLevel` **两槽共用**（语义：两张背景作为一个整体对外可见 / 不可见）。
-- 两槽**不做跨槽回落**：只设了桌面端时移动端就是素底，不拿横图去填竖屏。
-- 遮罩类唯一事实来源：`globals.css` 的 `.profile-bg-pc`（左右两条带，中段 alpha 0）/
-  `.profile-bg-mobile`（**整张均匀半透明 alpha 0.5，不分区域**）；显示切换靠 Tailwind
-  `hidden sm:block` / `sm:hidden`。
-- **遮罩默认值分槽，取默认值必须先问槽位**：`safeBgMask(raw, slot)` 的 `slot` 不能省
-  （`PROFILE_BG_MASK_DEFAULTS` 是唯一映射）。返回值是**内联** `--profile-bg-mask` 传下去的，
-  内联优先级高于 `.profile-bg-*` 类自带的那份默认值 —— 传错槽位不会报错，只是静默套上另一端
-  形状（本次事故：移动端永远显示桌面端左右两条带）。`isValidBgMask` 只管形状、不掺默认值，
-  填的恰好是另一端形状也算合法。
-- 设置页 `ProfileBgForm.tsx` 里 `BgSlotForm` 是两槽共用的槽组件；两槽的字段名映射收在
-  `lib/actions/settings.ts` 的 `bgKeyData` / `bgMaskData` / `bgKeyOf`（Prisma update 是强类型的，
-  不能拼动态键名）。
-- **owner 压 global 的规则必须按断点成对写**：`:has()` 只看元素在不在 DOM 里、不看 display，
-  一条不分断点的 `body:has([data-profile-bg-owner]) [data-profile-bg-global]` 会让
-  「只设了桌面端」的用户在移动端把自己的全局背景也隐掉。现为 `-pc` / `-mobile` 两组属性 +
-  两个互补媒体查询（`min-width: 40rem` 与 `width < 40rem`）。
-- **可见性口径（2026-09-27 用户确认，别再反复问）**：
-  - `profileBgGlobal`（全局显示）是**自见**开关 —— 只让登录者自己在更多页面看到自己的背景，
-    **不会**把谁的背景推给别人。`GlobalProfileBgLoader` 取的就是 session 那个 user。
-  - `profileBgOnResource`（资源页对他人可见）是**唯一**能让访客的背景让位的开关：
-    开着 → 任何人进这个资源页只看到作者的背景，访客自己的全局层被 `:has()` 隐掉；
-    没开 / 作者没图 / 未达等级 → 访客自己的全局背景照常铺（这就是它的兜底语义）。
-  - 作者本人看自己的页面**不受该开关约束**：资源页靠 `isOwnResourcePage`（`meId === authorId`），
-    个人主页无条件铺。开关只约束别人。
-  - 别人的个人主页是唯一的例外：`GlobalProfileBg` 显式 `return null`，不做兜底。
+## 资源运营标记：置顶 / 精华
+- 仅 `adminOnly`。`Resource.pinnedAt` / `featuredAt`（null = 未标记），**故意不加索引**（理由在 schema 注释）。
+- 置顶是 `getFeed` 第一排序键 `pinnedAt DESC NULLS LAST`，三种 sort 都吃；`nulls:"last"` 必须显式写。
+- keyset 游标必须与 orderBy 同构：`FeedCursor.p` + `cursorAfter` 的「置顶层 + secondaryAfter」。改排序键两处一起改，否则翻页重复/漏行/空白且不报错。
+- `pinFirst`（默认 true）只在按内容打分处关掉：`getRelated` 三个候选池、`popularFallback`。首页 hero/featured 用 `ids` 拉回后按挑选顺序重排。
+- 前台展示四处：`ResourceCard` 角标（深底→亮阶）、`ResourceRow`（浅底→语义阶）、`detail/parts.tsx` 的 `DetailMarks`（四模板共用，banner 传 `tone="dark"`）。
+- 精华连带发 FEATURED 积分（去重靠 `awardPoints` 的 `(userId,reason,refId)` 唯一索引；管理员自点被 `NO_SELF_BENEFIT` 拦）。「加入专题」= `actions/home.ts` 的 `addResourceToFeaturedSectionAction`：追加进**第一个** featured 板块（上限 24，同 `home-config.ts` 的 `featuredCfg`）；没有 featured 板块就报错，不塞 hero。
 
-## 资源运营标记：置顶 / 精华（2026-09-27 起）
+## 后台权限：staff vs adminOnly
+- `staff` = 内容治理日常：审核/打回、下架/恢复、举报，以及审核队列就地改可见性（`setResourceFlags`）。
+- `adminOnly` = 站点级干预：置顶/精华、用户角色/封禁/免审。
+- 三个可见性开关的 UI 文案唯一来源 `upload/wizard-shared.tsx` 的 `PUBLISH_OPTIONS`（`ResourceFlagsForm` 直接复用；`moderation.ts` 的 `FLAG_LABEL` 只服务审计日志）。后台写布尔开关逐字段显式取值，不要 spread。
 
-- **仅管理员**可设（用 `adminOnly` 而不是 `staff`）。字段 `Resource.pinnedAt` / `featuredAt`
-  （`DateTime?`，null = 未标记）；**故意不加索引**，理由写在 schema 注释里。
-- **置顶是 `getFeed` 的第一排序键**：`pinnedAt DESC NULLS LAST`，latest / popular / downloads
-  三种 sort 都吃这一层。`nulls: "last"` 必须显式写 —— Postgres 的 DESC 默认 NULLS FIRST，
-  漏掉会把绝大多数未置顶的行排到前面，置顶反而沉底。
-- **keyset 游标必须与 orderBy 同构**：`FeedCursor` 多了 `p`（pinnedAt 毫秒），`cursorAfter`
-  拆成「置顶层 + `secondaryAfter`（原逻辑）」。以后改任何排序键，这两处要一起改，
-  否则症状是「翻页重复 / 漏行 / 直接空白」，且不报错。
-- `FeedParams.pinFirst`（默认 true）只在**按内容打分**的位置关掉：`getRelated` 的三个候选池、
-  `popularFallback`。置顶插进候选池首位会盖掉相关性。
-- 首页挑选位（hero / featured 块）用 `ids` 拉回后**按挑选顺序重排**，不受置顶影响。
-- 前台展示收在四处，改配色别漏：卡片角标 `ResourceCard`（封面深底 → 亮阶）、列表行卡
-  `ResourceRow`（浅底 → 语义阶）、详情页 `detail/parts.tsx` 的 `DetailMarks`（四个模板共用，
-  banner 传 `tone="dark"`）。
-- 「精华」连带发 FEATURED 积分：去重靠 `awardPoints` 的 `(userId, reason, refId)` 唯一索引，
-  取消再设不会重发；管理员给自己资源点精华会被 `NO_SELF_BENEFIT` 拦（既有口径）。
-- 「加入专题」= `actions/home.ts` 的 `addResourceToFeaturedSectionAction`：追加进**第一个**
-  `featured` 板块的 `featuredIds`（上限 24，与 `home-config.ts` 的 `featuredCfg` 同步）；
-  没有 featured 板块时明确报错，不偷偷塞进 hero。
+## Prisma 事务铁律：不许用 `create().catch()` 兜唯一键冲突
+- PG 交互式事务一条语句报错 → 整事务 aborted，后续每条都 25P02，与 JS 层 catch 无关。`.catch(()=>null)` 不是容错，是留着事务尸体继续用，真根因被 `PrismaClientUnknownRequestError` 盖掉。
+- 「冲突就跳过」用 `createMany({ data, skipDuplicates: true })`（ON CONFLICT DO NOTHING），靠 `count` 判断，必要时回查。参考 `lib/actions/_tags.ts` 的 `findOrCreateTag` / `linkTag`。
+- find-or-create 必须按**所有**唯一键查（Tag 的 name 与 slug 都是唯一键）。关联表（`TagOnResource` 复合主键）按解析出的 id 去重，不按用户输入的名字。
 
-## 后台权限口径：staff vs adminOnly
+## 标签同一性：slug 相同即同一标签
+- 名字不同但 slug 相同 → 直接合并（`/tags/{slug}` 是公开 URL）。写入侧 `_tags.ts` 的 `findOrCreateTag`：命中链 name → slug → create。
+- `renameTagAction`（`lib/actions/taxonomy.ts`）不因 slug 撞车报错，统一判断合并目标，命中走 `mergeTagInto()`（转挂 + count 净增 + 删源 + audit）。
 
-- **`staff`（版主 + 管理员）= 内容治理日常**：审核通过 / 打回、下架 / 恢复、举报处理，
-  以及**审核队列里就地修正可见性标注**（`setResourceFlags`：nsfw / loginRequired / allowComments）。
-- **`adminOnly` = 站点级干预**：置顶 / 精华（会改变全站排序）、用户角色 / 封禁 / 免审。
-- 三个可见性开关的 **UI 文案事实来源是 `src/components/upload/wizard-shared.tsx` 的
-  `PUBLISH_OPTIONS`**，审核面板 `components/admin/ResourceFlagsForm.tsx` 直接复用它，
-  不要另写一份（`moderation.ts` 里那份 `FLAG_LABEL` 只服务审计日志的人话描述，不算第二来源）。
-- 后台写布尔开关一律**逐字段显式取值**，不要 spread 传入对象 —— server action 的入参是
-  不可信输入，多带一个键就会被一并写进库。
-
-## Prisma 事务铁律：事务内不许用 `create().catch()` 兜唯一键冲突（2026-09-27 事故）
-
-- Postgres 的交互式事务是「一条语句报错 → 整个事务立刻 aborted」，**之后每条语句都返回
-  25P02（commands ignored until end of transaction block），与 JS 层有没有 catch 无关**。
-  所以在 `prisma.$transaction(async (tx) => ...)` 里写 `tx.x.create(...).catch(() => null)`
-  不是「容错」，是**把事务尸体留着继续用**：错误点在 A，报错点却在之后的 B，
-  `PrismaClientUnknownRequestError` 会把真正的根因盖掉，排查方向直接跑偏。
-- 需要「冲突就跳过」时用 **`createMany({ data: [...], skipDuplicates: true })`**
-  （PG 落成 `ON CONFLICT DO NOTHING`，冲突不报错也不中断事务），靠返回的 `count` 判断是否真插入，
-  必要再回查一次拿目标行。参考实现：`src/lib/actions/_tags.ts` 的 `findOrCreateTag` / `linkTag`。
-- 「find-or-create」必须**按所有唯一键查**，不能只查一个：Tag 的 `name` 与 `slug` 都是唯一键，
-  只查 name 会漏掉 slug 撞车（用户同时填「云」和「yun」→ 拼音 slug 都是 yun）。
-- 同理，关联表（`TagOnResource`，复合主键）写之前要按**解析出来的 id** 去重，
-  而不是按用户输入的名字去重 —— 两个不同的名字可能指向同一行。
-
-## 标签的同一性口径：slug 相同就是同一个标签（2026-09-27 用户明确）
-
-- **名字不同、但翻译/拼音出来的 slug 相同 → 直接合并**，不报错、不建第二个词条。
-  理由：`/tags/{slug}` 是公开 URL，slug 撞车在 URL 维度就是同一个标签
-  （例：「中国」与「中华」都译成 `china`）。
-- 写入侧落点：`src/lib/actions/_tags.ts` 的 `findOrCreateTag` —— 命中链 **name → slug → create**，
-  name 优先（作者手填的名字能对上就按名字），对不上再按 slug 归并。
-- 管理后台 `renameTagAction`（`lib/actions/taxonomy.ts`）：**不再因 slug 撞车报错**，
-  统一判断合并目标 —— name 变了且被占用 → 目标；否则 nextSlug 撞上既存标签 → 目标；
-  命中走 `mergeTagInto()`（转挂关联 + count 净增 + 删源 + audit），未命中才 `update`。
-
-## Markdown 渲染：CommonMark 基线，GFM 只给资源正文（2026-09-27 起）
-
-- 解析器是 **`react-markdown`**，基线 CommonMark，**表格属 GFM 扩展、需 `remark-gfm`**。
-  `.md-body table / th / td` 那套排版一直在 `globals.css` 里，但插件没装 → 样式从未被任何元素
-  命中，表格语法被当普通段落显示成一行 `| a | b |`。
-- `rte/Markdown.tsx` 有 `gfm?: boolean`（**默认 false**）。**只有资源正文**
-  （`resource/detail/parts.tsx` 的 `DescriptionBlock`）开；评论**不开** —— 编辑器那头
-  `Comments.tsx` 的 `COMMENT_FEATURES` 也关了表格，两边必须成对。
-- 资源编辑器 `MdEditor`（Milkdown Crepe）的 `defaultFeatures` 里 **`table: true`**，
-  作者本来就能插表格（查法：`node_modules/@milkdown/crepe/lib/esm/index.js`）。
-- remark-gfm 是**整体开关、挑不出单独表格**，顺带开删除线 / 任务列表 / 裸链 / 脚注，
-  这些都在 `.md-body` 里补了样式。尤其脚注：解析器给标题加 `sr-only` 类，而本仓库没有这个
-  工具类（Tailwind 也不会生成，源码里根本没这个字符串），必须自己写 —— 否则正文尾部会多出
-  一行 "Footnotes"。
-- 要核对 GFM 产出的真实 class 名（`contains-task-list` / `task-list-item` / `dataFootnotes`），
-  用 node 拼 `unified + remark-parse + remark-gfm + remark-rehype` 打印 hast 树即可：
-  离线、不用起服务、不落探针文件（`rehype-stringify` 没装，用 `.run(parse(md))` 拿树）。
-- **正文分隔线 / 表格格线的颜色是 `--md-rule`**（= `--brand-400`，亮暗自动跟随，同 `--md-marker`
-  的写法，不需要 dark 覆盖），**不是** `--md-border`（走 `--md-border` 的只剩 `blockquote`
-  的容器描边与编辑器）。分隔线是**点划线**：`border: 0` + `height: 1px` +
-  `repeating-linear-gradient` 画 `6px 划 / 3px 空 / 1px 点 / 3px 空`（CSS 没有 dot-dash 的
-  border-style）；表格格线是 `1px solid var(--md-rule)`，不用点划。
-- **代码（行内 code / pre / 表头）走 `--md-code-bg`（= `--brand-200`）与 `--md-code-fg`
-  （= `--brand-900`）**，两个都引用品牌阶、亮暗自动跟随，**没有 dark 覆盖**。
-  **别再改回中性灰**：`--md-text-lg`(#27272a) 是冷灰黑，压在暖底上发闷；`--md-border`(#e5e5e5)
-  对页面底只有 1.06:1。挑「浅底」档位前先算对比度 —— `brand-100` 只有 1.10:1，比老值还糊。
+## Markdown 渲染
+- 解析器 `react-markdown`，基线 CommonMark，表格靠 `remark-gfm`。`rte/Markdown.tsx` 的 `gfm?` 默认 false，**只有资源正文**（`resource/detail/parts.tsx` 的 `DescriptionBlock`）开；评论不开（编辑器 `Comments.tsx` 的 `COMMENT_FEATURES` 同样关表格，两边成对）。
+- 资源编辑器 `MdEditor`（Milkdown Crepe）`defaultFeatures` 里 `table: true`。remark-gfm 是整体开关，顺带开删除线/任务列表/裸链/脚注；脚注标题带 `sr-only` 类，本仓库没有该工具类，必须在 `.md-body` 里自己写。
+- 核对 GFM 真实 class（`contains-task-list` / `task-list-item` / `dataFootnotes`）：node 拼 `unified + remark-parse + remark-gfm + remark-rehype`，用 `.run(parse(md))` 打印 hast 树。离线、不落探针。
+- 颜色 token（都在 `:root`，引用品牌阶自动跟随明暗，无 dark 覆盖）：`--md-code-bg` = brand-200 **只给行内 code**（无边框，靠底色辨认，别降到 100 阶）；`--md-code-block-bg` = brand-100 与 `--md-block-border` = brand-300 **给有边框的块**（`pre` 及其编辑器对应规则、`th` 底色、`th/td` 格线）。旧的 `--md-rule` 已删除。`--md-border` 现在只剩 blockquote 描边与编辑器。
+- **「评论框」= `src/components/rte/MdEditor.tsx` 根 div 的 `border-brand-300`**（不在 `Comments.tsx` 里）。同组件的全屏按钮也是 300；`globals.css` 里 `.md-editor .milkdown` 的 `--crepe-color-outline` 也是 300（它管 Crepe 表格格线，必须与前台同档，否则所见即所得破功）。`MdEditor` 被评论框与资源编辑器共用 —— 改它等于同时改两处。**后台 `admin/*` 与登录页的 `border-brand-200` 是另一套「容器描边」口径，不要顺手一起改。**
+- 分隔线 `.md-body hr` = 点划线：`border: 0` + `height: 2px` + `repeating-linear-gradient`（token `--rule-dot`：6px 划/3px 空/1px 点/3px 空），与详情页单边线 `rule-dot-t/b/rows`、评论区横线同一 token（页面单边线仍是 1px）。
+- **别再改回中性灰**：`--md-text-lg`(#27272a) 冷灰压暖底发闷；`--md-border`(#e5e5e5) 对页面底仅 1.06:1。挑「浅底」档位前先算对比度。
 
 ## 音视频分P / 曲目
+- `meta.tracks`（`{title,url,duration?}`，≤ `AV_TRACKS_MAX` 60）**不含主来源那一 P**；主来源仍是顶层 `url/duration`。
+- 播放列表唯一拼装点 `lib/av-tracks.ts` 的 `avPlaylist()`（`[主来源, ...tracks]`）：主来源 = P1，**只有分P 时 `tracks[0]` 才是 P1**。
+- 切 P 只改 `src` + `load()`，不要 `key={src}` 重挂载（会重置倍速/音量/列表展开态）。
+- 视频分P 控件压在画面浮层（左上一集/右下下一集/右上列表），不进控件行（320px 已排满）；音频留在控件行 + 卡片内列表。
+- 分P 只填地址；上传/抓时长封面只对主来源。`parseMeta` 音视频分支整块失败后丢 tracks 再试一次。
 
-- 数据：`meta.tracks`（`{title,url,duration?}`，≤ `AV_TRACKS_MAX` 60）**不含主来源那一 P**；
-  主来源仍是顶层 `url/duration`。存量数据零迁移。
-- **播放列表唯一拼装点 = `src/lib/av-tracks.ts` 的 `avPlaylist()`**（= `[主来源, ...tracks]`）。
-  编号口径：主来源 = P1；**只有分P 时 `tracks[0]` 才是 P1** —— 向导的行号、
-  播放器的列表序号都按这个来，别在别处再写一份拼装逻辑。
-- 文件分工：`detail/av-controls.tsx`（播放器本体）、`av-bar.tsx`（直角滑块）、
-  `av-playlist.tsx`（上一/下一按钮、列表开关、列表本体）、`av-embed.tsx`（**多 P** 嵌入页；
-  单 P 嵌入页由 `av-player` 服务端直出 iframe）、`lib/av-tracks.ts`（纯逻辑 + 标签文案）。
-- **切 P 只改 `src` + `load()`，不要用 `key={src}` 重挂载元素** —— 重挂载会把倍速、音量、
-  列表展开态一起重置。
-- **视频的分P 控件压在画面浮层上**（左侧上一集 / 右侧下一集 / 右上角列表），**不进控件行**：
-  320px 下控件行已经排满，再加三个 36px 按钮必横向溢出。音频放得下 → 留在控件行 + 卡片内列表。
-- 分P 只支持填地址；上传与自动抓取时长/封面只对主来源做。草稿字段 `avTracks`（JSON 原文）。
-- `parseMeta` 的音视频分支在整块 parse 失败后会**丢掉 tracks 再试一次**：tracks 是附加信息，
-  一条脏分P 不该把已落库的 `url` 一起拖进 `AV_META_FALLBACK`。
+## 音视频字幕 / 歌词
+- 字幕文本内联在 `meta.captions[].text`，不存地址、不走上传：`<track>` 只认 WebVTT；站内 `/od/…` 302 到不带 CORS 头的 Graph 链接必失败；文本小。上限 `AV_CAPTION_TEXT_MAX` 160K 字符、`AV_CAPTIONS_MAX` 6 条；`feedSelect` 不取 meta。
+- `src/lib/captions.ts` 是唯一事实来源；依赖单向 `meta.ts → captions.ts`。
+- 支持 vtt/srt/lrc/ass(ssa)/txt，不做 smi/ttml/sub+idx。时间戳按小数位数定标（1=十分秒、2=厘秒=ASS、3=毫秒）；cue 的 end 只收紧不拉长。
+- 自绘不用 `<track>`：视频 = 画面底部叠层（`bottom-14` 让开控件行 + `pointer-events-none`），音频 = 卡片内滚动歌词板。**歌词板自动滚动手算 `scrollTop`，禁止 `scrollIntoView`**（会滚整页）。
+- 开关落位：视频的字幕 + 分P 开关并排右上角浮层；音频进控件行。嵌入页字幕由来源站点控制。按钮原语 `detail/av-btn.tsx`，带文本按钮用 `AV_BTN_HEIGHT`（不要 `AV_BTN_SIZE` + `w-auto`）。
+- `parseMeta` 三级降级：整块 → 丢 captions → 再丢 tracks → 兜底。草稿 `avCaptions` 上限 1.2M 字符（`draftPayloadSchema` 一失败整条草稿回落成空）。
 
-## 音视频字幕 / 歌词（2026-09-27 起）
-
-- **字幕文本内联在 `meta.captions[].text`，不存地址、不走上传通道**。三条理由：`<track>` 只认
-  WebVTT（srt/lrc 反正得自己解析）；站内 `/od/…` 会 302 到**不带 CORS 头**的 Graph 预鉴权链接，
-  客户端 fetch 必失败（内联绕开，也省掉一个转发字节的代理路由）；文本小（一部电影 20–80KB）。
-  代价是 meta 变大 → 单份上限 `AV_CAPTION_TEXT_MAX` 160K 字符、最多 `AV_CAPTIONS_MAX` 6 条，
-  且 `feedSelect` 不取 meta（列表页不会被拖胖）。
-- **`src/lib/captions.ts` 是字幕唯一事实来源**（格式表 / 上限 / 嗅探 / 五种解析器 / 当前行二分 /
-  表单 JSON）。依赖单向：`meta.ts → captions.ts`，**不能反过来**（会循环）。
-- 支持 vtt / srt / lrc / ass(ssa) / txt；**不做** smi / ttml / sub+idx（图形字幕要 OCR）。
-  时间戳统一按**小数位数**定标（1 位=十分秒、2 位=厘秒=ASS、3 位=毫秒）；cue 的 `end` **只收紧不拉长**
-  （srt 的空档是「字幕消失」，lrc 的占位 end 正好被这条规则收成「唱到下一句」）。
-- 渲染**自绘，不用 `<track>`**（原生 cue 样式活在 UA shadow 里，改不动）：视频 = 画面底部叠层
-  （`bottom-14` 让开控件行 + `pointer-events-none` 不挡点画面），音频 = 卡片内滚动歌词板（点行跳转）。
-  **歌词板自动滚动手算 `scrollTop`，禁止 `scrollIntoView`** —— 后者会连整个页面一起滚。
-- 落位：视频的字幕开关 + 分P 列表开关**并排右上角浮层**（底下控件行 320px 排满）；音频进控件行。
-  一个开关既切显隐也切歌词板存亡，不另做折叠。嵌入页字幕由来源站点控制，站内挂的不生效（已提示）。
-- 按钮原语抽到 `detail/av-btn.tsx`；**带文本的按钮（如「3/8」）用 `AV_BTN_HEIGHT`（只取高度）**，
-  不要用 `AV_BTN_SIZE` 再追加 `w-auto` —— 同属性冲突且 Tailwind 产物顺序不保证。
-- `parseMeta` 降级链三级：整块 → 丢 captions → 再丢 tracks → 兜底（字幕长文本最容易被卡住）。
-- 草稿 `avCaptions` 上限给到 1.2M 字符：`draftPayloadSchema` 一失败 `parseDraftPayload` 会把
-  **整条草稿**回落成空，宁可放宽也不能收紧。
-
-## 打赏入口（2026-09-27 口径反转）
-
-- **打赏的唯一入口 = 资源详情页 `ActionBar`**（`detail/parts.tsx`），作品维度：
-  `TipRecord.resourceId = 作品 id`，收款方由服务端从作品反查作者（`sendTipAction`）。
-- **个人主页的「直接打赏作者」入口与 `TipUserButton` 组件、`sendUserTipAction` 已整体删除。**
-  别信 `TipButton.tsx` / `TipUserButton.tsx` 的历史注释里「打赏只在个人主页」那一版 —— 那是上一轮口径，
-  现在反过来：作者维度（`resourceId = null` + 客户端传 toUserId）这条路径不再有 UI 入口，action 也没了。
-- 不出入口的三个条件：**未登录**（打赏要余额，不给点了必然报错的面板；点赞/收藏零成本才给登录链接）、
-  **作者本人**、**激励体系或打赏开关关闭**（`tipFormOf` 返回 undefined）。
-- `ActionBar` 是 async 组件（内部 `await getIncentive()`，走 `cache()` 不额外查库），
-  且被 **post / banner / twocol / article 四个模板共用** —— 改它的可见范围等于改四种类型的详情页。
-
+## 打赏入口
+- 唯一入口 = 资源详情页 `ActionBar`（`detail/parts.tsx`），作品维度：`TipRecord.resourceId` = 作品 id，收款方由服务端反查作者（`sendTipAction`）。**个人主页「直接打赏作者」入口、`TipUserButton`、`sendUserTipAction` 已整体删除**（`TipButton.tsx` 历史注释是上一版口径）。
+- 不出入口：未登录 / 作者本人 / 激励或打赏开关关闭（`tipFormOf` 返回 undefined）。`ActionBar` 是 async 组件，被 post/banner/twocol/article 四模板共用。
