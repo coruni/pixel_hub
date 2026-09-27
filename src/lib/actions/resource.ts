@@ -224,7 +224,9 @@ export async function createResourceAction(
           meta: metaStr,
           externalUrl: effectiveUrl || null,
           loginRequired: fd.get("loginRequired") === "on",
-          allowComments: fd.get("allowComments") !== "off",
+          // 勾选框未勾选时不会出现在 FormData 里，必须判 "on"；
+          // 之前写 `!== "off"` 会把「未勾选」（null）也算成允许评论，导致关闭评论在新建时失效。
+          allowComments: fd.get("allowComments") === "on",
           nsfw: fd.get("nsfw") === "on",
           publishedAt: status === "PUBLISHED" ? new Date() : null,
         },

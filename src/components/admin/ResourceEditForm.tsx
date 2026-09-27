@@ -288,7 +288,16 @@ export function ResourceEditForm({
       {/* 按类型渲染对应分节（与发布向导同一套组件，保证字段/样式/交互一致） */}
       {resource.type === "GAME" && resource.meta.kind === "GAME" && (
         <GameSection
-          downloads={resource.meta.downloads.map((d) => ({ name: d.name, url: d.url }))}
+          initial={{
+            lang: resource.meta.lang,
+            platforms: resource.meta.platforms?.join(", "),
+          }}
+          downloads={resource.meta.downloads.map((d) => ({
+            name: d.name,
+            url: d.url,
+            kind: d.kind,
+            size: d.size,
+          }))}
           fieldErrors={fe}
           limits={limits}
           onBusyChange={setAttachBusy}

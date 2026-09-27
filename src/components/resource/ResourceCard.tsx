@@ -1,29 +1,11 @@
 import Link from "next/link";
-import {
-  Download,
-  Film,
-  Gamepad2,
-  Heart,
-  Image as ImageIcon,
-  MessageSquare,
-  Music,
-  Newspaper,
-  Star,
-} from "lucide-react";
+import { Download, Heart, MessageSquare, Star } from "lucide-react";
 import type { FeedCard } from "@/lib/queries";
 import { formatCount } from "@/lib/format";
 import { CARD_DEFAULT_ASPECT, CARD_RATIOS, TYPE_LABEL, type CardRatio } from "@/lib/display";
 import NicknameText from "@/components/ui/NicknameText";
 import CoverPlaceholder from "./CoverPlaceholder";
-
-/** 类型 → 角标图标/配色；新增类型只改这一张表 */
-const TYPE_BADGE = {
-  GAME: { Icon: Gamepad2, cls: "text-emerald-300" },
-  ARTICLE: { Icon: Newspaper, cls: "text-sky-300" },
-  MUSIC: { Icon: Music, cls: "text-brand-300" },
-  VIDEO: { Icon: Film, cls: "text-red-300" },
-  IMAGE: { Icon: ImageIcon, cls: "text-amber-300" },
-} as const;
+import { TYPE_BADGE_TONE, TypeIcon } from "./type-icon";
 
 /**
  * 统一资源卡（信息全覆盖图，无图下白条）：
@@ -86,10 +68,11 @@ export default function ResourceCard({
         title={TYPE_LABEL[item.type] ?? item.type}
         className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-none border border-brand-600 bg-stone-900/85 px-1.5 py-0.5 text-[10px] font-medium text-white"
       >
-        {(() => {
-          const { Icon, cls } = TYPE_BADGE[item.type] ?? TYPE_BADGE.IMAGE;
-          return <Icon size={11} className={cls} aria-hidden />;
-        })()}
+        <TypeIcon
+          type={item.type}
+          size={11}
+          className={TYPE_BADGE_TONE[item.type] ?? TYPE_BADGE_TONE.IMAGE}
+        />
         <span className="sr-only">{TYPE_LABEL[item.type] ?? item.type}</span>
       </span>
 

@@ -23,6 +23,7 @@ import {
   DRAFT_AUTOSAVE_DELAY,
   DRAFT_AUTOSAVE_INTERVAL,
   collectDraft,
+  draftDownloadsOf,
   draftHasContent,
   draftPayloadSchema,
   draftTimeText,
@@ -56,23 +57,15 @@ const TYPES = [
   { k: "VIDEO", label: "视频", desc: "在线挂载 / 上传视频", Icon: Film },
 ] as const satisfies readonly { k: WizardType; label: string; desc: string; Icon: typeof Music }[];
 
-/** 草稿快照 → 附件清单行（坏 JSON 一律当空清单） */
+/** 草稿快照 → 附件清单行（解析规则见 lib/draft 的 draftDownloadsOf，坏 JSON 一律当空清单） */
 function downloadsOf(p: DraftPayload): AttachRow[] {
-  try {
-    const arr = JSON.parse(p.downloads || "[]");
-    if (!Array.isArray(arr)) return [];
-    return arr
-      .filter((d): d is Record<string, unknown> => !!d && typeof d === "object")
-      .map((d, i) => ({
-        key: `draft-${i}-${String(d.url ?? "")}`,
-        name: String(d.name ?? ""),
-        kind: d.kind === "file" ? "file" : "link",
-        url: String(d.url ?? ""),
-        size: String(d.size ?? ""),
-      }));
-  } catch {
-    return [];
-  }
+  return draftDownloadsOf(p).map((d, i) => ({
+    key: `draft-${i}-${d.url}`,
+    name: d.name,
+    kind: d.kind,
+    url: d.url,
+    size: d.size,
+  }));
 }
 
 /**
@@ -108,6 +101,11 @@ export default function UploadWizard({
       })()
       : draftFiles;
   const draftCover = draftMedia.find((f) => f.id === draftCoverId)?.id ?? draftMedia[0]?.id ?? "";
+  // 分节组件里的字段大多是非受控输入，切类型会整块卸载重挂载。
+  // 只拿初次传入的 initialDraft 回填，会让「切走再切回」清空已填内容——而自动保存紧接着
+  // 就把空值写进草稿，等于草稿被静默改坏。所以每次保存成功后同步一份最新快照，
+  // 分节重新挂载时按它回填（快照变化不会重挂载，正在编辑的输入不受影响）。
+  const [draftSnap, setDraftSnap] = useState<DraftPayload | null>(d);
   const [type, setType] = useState<WizardType | null>(draftType);
   const [files, setFiles] = useState<Uploaded[]>(draftMedia);
   const [coverId, setCoverId] = useState<string>(draftCover);
@@ -178,6 +176,8 @@ export default function UploadWizard({
         const res = await saveDraftAction({ id: draftId, payload: parsed.data });
         if (res.ok) {
           savedSig.current = sig;
+          // 同步快照：分节组件切类型重挂载时按它回填（见 draftSnap 注释）
+          setDraftSnap(parsed.data);
           setDraftId(res.id);
           setSavedAt(res.savedAt);
           setSaveState("saved");
@@ -527,13 +527,14 @@ export default function UploadWizard({
         </div>
       </section>
 
-      {/* 按类型渲染对应分节 */}
+      {/* 按类型渲染对应分节。回填一律走 draftSnap（最新落库快照），
+          这样「切走再切回」不会把已填内容清空 */}
       {type === "IMAGE" && (
         <ImageSection
           initial={{
-            isAiGenerated: d?.isAiGenerated,
-            original: d?.original,
-            downloads: d ? downloadsInit(d) : undefined,
+            isAiGenerated: draftSnap?.isAiGenerated,
+            original: draftSnap?.original,
+            downloads: draftSnap ? downloadsInit(draftSnap) : undefined,
           }}
           fieldErrors={state.fieldErrors}
           limits={limits}
@@ -542,7 +543,7 @@ export default function UploadWizard({
       )}
       {type === "ARTICLE" && (
         <ArticleSection
-          initial={{ downloads: d ? downloadsInit(d) : undefined }}
+          initial={{ downloads: draftSnap ? downloadsInit(draftSnap) : undefined }}
           fieldErrors={state.fieldErrors}
           limits={limits}
           onBusyChange={setAttachBusy}
@@ -550,11 +551,16 @@ export default function UploadWizard({
       )}
       {type === "GAME" && (
         <GameSection
+          // 语言 / 平台是 GAME 独有的补充字段，草稿里存的是输入框原文，直接回填
+          initial={{ lang: draftSnap?.lang, platforms: draftSnap?.platforms }}
           downloads={
-            d
-              ? downloadsOf(d).map((r) => ({
+            draftSnap
+              ? downloadsOf(draftSnap).map((r) => ({
                 name: r.name || r.url,
                 url: r.url,
+                // kind/size 一并回填：丢了 kind 会把站内附件还原成「外链」
+                kind: r.kind,
+                size: r.size,
               }))
               : undefined
           }
@@ -566,7 +572,7 @@ export default function UploadWizard({
       {type === "MUSIC" && (
         <AvSection
           avKind="audio"
-          initial={avInitial(d)}
+          initial={avInitial(draftSnap)}
           fieldErrors={state.fieldErrors}
           limits={limits}
           onBusyChange={setAttachBusy}
@@ -575,7 +581,7 @@ export default function UploadWizard({
       {type === "VIDEO" && (
         <AvSection
           avKind="video"
-          initial={avInitial(d)}
+          initial={avInitial(draftSnap)}
           fieldErrors={state.fieldErrors}
           limits={limits}
           onBusyChange={setAttachBusy}
@@ -604,7 +610,7 @@ export default function UploadWizard({
       {/* 发布选项（与改稿页共用 PublishOptionGrid：标题独占一行，勾选项在下方网格里） */}
       <section className="mt-4 rounded-none border border-brand-200 bg-surface p-5">
         <SectionTitle n={STEP.OPTIONS}>发布选项</SectionTitle>
-        <PublishOptionGrid checkedOf={(name) => name === "allowComments"} />
+        <PublishOptionGrid checkedOf={(name) => (d ? d[name] : name === "allowComments")} />
       </section>
 
       {/* 提交 */}

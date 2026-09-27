@@ -14,15 +14,29 @@ import { useFileDrop } from "@/lib/hooks/use-file-drop";
 import { SquareCheckbox } from "../admin/SquareCheckbox";
 import { Button } from "@/components/ui/Button";
 
-/** 下载源清单行的初始值（已有清单回填用） */
-export type InitialDownload = { name: string; url: string; note?: string };
+/** 下载源清单行的初始值（已有清单回填用）。kind/size 必须一起带回来：kind 决定详情页
+ *  「附件 / 外链」标识，size 是站内附件上传时记下的体积，缺了就等于把附件降级成外链。 */
+export type InitialDownload = {
+  name: string;
+  url: string;
+  kind?: "file" | "link";
+  size?: string;
+  note?: string;
+};
 
 export function GameSection({
+  initial,
   downloads,
   fieldErrors,
   limits,
   onBusyChange,
 }: {
+  /**
+   * 语言 / 平台回填值。平台按「逗号分隔文本」回填（与输入框、草稿字段同形），
+   * 服务端 gameMetaSchema 会再按 /[,，、\s]+/ 切成数组——回填时务必用逗号，
+   * 用「/」分隔会被切成一个孤立的 "/" 平台。
+   */
+  initial?: { lang?: string; platforms?: string };
   /** 已有下载源（改稿时来自 meta.downloads）；发布时为空 */
   downloads?: InitialDownload[];
   fieldErrors?: Record<string, string[]>;
@@ -35,9 +49,9 @@ export function GameSection({
     (downloads ?? []).map((d) => ({
       key: uid(),
       name: d.name,
-      kind: "link" as const,
+      kind: d.kind === "file" ? ("file" as const) : ("link" as const),
       url: d.url,
-      size: "",
+      size: d.size ?? "",
     })),
   );
 
@@ -52,6 +66,7 @@ export function GameSection({
           <input
             id="lang"
             name="lang"
+            defaultValue={initial?.lang ?? ""}
             maxLength={40}
             placeholder="简体中文 / English…"
             className={wizInput}
@@ -64,8 +79,9 @@ export function GameSection({
           <input
             id="platforms"
             name="platforms"
+            defaultValue={initial?.platforms ?? ""}
             maxLength={100}
-            placeholder="Windows / Android / Switch…"
+            placeholder="Windows, Android, Switch…"
             className={wizInput}
           />
         </div>

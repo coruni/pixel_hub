@@ -143,10 +143,36 @@ function plainText(md: string): string {
     .trim();
 }
 
-/** 列表摘要：简介 → 正文 → 外链/音频地址，都没有则空 */
+export type DraftDownloadItem = { name: string; kind: "file" | "link"; url: string; size: string };
+
+/**
+ * 草稿里的附件/下载源清单解析（GAME 下载源、IMAGE 图包、ARTICLE 文末清单共用同一字段）。
+ * 坏 JSON、非数组、非对象项一律丢弃，绝不抛错——调用方拿到的一定是干净数组。
+ */
+export function draftDownloadsOf(p: DraftPayload): DraftDownloadItem[] {
+  try {
+    const arr: unknown = JSON.parse(p.downloads || "[]");
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .filter((d): d is Record<string, unknown> => !!d && typeof d === "object")
+      .map((d) => ({
+        name: String(d.name ?? ""),
+        kind: d.kind === "file" ? ("file" as const) : ("link" as const),
+        url: String(d.url ?? ""),
+        size: String(d.size ?? ""),
+      }));
+  } catch {
+    return [];
+  }
+}
+
+/** 列表摘要：简介 → 正文 → 下载源地址 → 音频地址，都没有则空 */
 export function draftExcerptOf(p: DraftPayload, max = 72): string {
   const src =
-    p.summary.trim() || plainText(p.description) || p.externalUrl.trim() || p.avUrl.trim();
+    p.summary.trim() ||
+    plainText(p.description) ||
+    draftDownloadsOf(p)[0]?.url.trim() ||
+    p.avUrl.trim();
   if (!src) return "";
   return src.length > max ? `${src.slice(0, max)}…` : src;
 }
@@ -156,7 +182,8 @@ export function draftReadyHint(p: DraftPayload): string | null {
   if (p.title.trim().length < 3) return "还差标题";
   if (!p.categoryId) return "还差分类";
   if (p.description.trim().length < 10) return "还差描述";
-  if (p.type === "GAME" && !p.externalUrl.trim()) return "还差下载外链";
+  // 发布页已无独立「下载外链」输入，GAME 的下载地址只存在于 downloads 清单里
+  if (p.type === "GAME" && !draftDownloadsOf(p).some((d) => d.url.trim())) return "还差下载源";
   if ((p.type === "MUSIC" || p.type === "VIDEO") && !p.avUrl.trim()) return "还差来源地址";
   // 封面类（游戏/文章/音乐/视频）封面可选，不据此拦发布；IMAGE 仍需至少一张预览图
   if (!isSingleCoverType(p.type) && !p.coverId && p.media.length === 0) return "还差图片";

@@ -5,6 +5,19 @@ import { z } from "zod";
 // 下载地址：http(s) 外链或站内附件 /uploads 路径（与 commonFields.externalUrl 同规则）
 const urlLike = (v: string) => !v || /^https?:\/\/.+/i.test(v) || /^\/[^/].*$/i.test(v);
 
+/**
+ * 下载来源判定：**站内存储路径一律算「附件」**（`/od/{driveId}/…` OneDrive 代理、`/uploads/…`
+ * 本地盘、其它 `/xxx` 自描述引用），只有 http(s) 外链才算「外链」。
+ *
+ * 为什么按 URL 重判而不是信存下来的 kind/mode：这几个字段是写入当时记的，历史数据里存在
+ * 「同一批走 OneDrive 的文件，一个记成 file、一个记成 link」的脏值。症状是详情页同一份清单里
+ * 「附件 / 外链」混着显示，且被判成 link 的那条会走新标签页原样打开（拿不到原名、也不经 /api/dl
+ * 计数）。写入与读取两侧都过这一层，存量数据也一并治好，不用改库。
+ */
+export function downloadKindOf(kind: "file" | "link", url: string): "file" | "link" {
+  return url.trim().startsWith("/") ? "file" : kind;
+}
+
 // IMAGE 单条「图包/整套」下载：mode none/file/link。区别于 GAME（无版本/平台表）
 export const imageDownloadSchema = z
   .object({
@@ -20,20 +33,25 @@ export const imageDownloadSchema = z
         path: ["url"],
         message: "选择文件/外链后需填写 http(s):// 或站内附件路径",
       });
-  });
+  })
+  // 站内路径（含 /od/ 云盘引用）统一归为 file，见 downloadKindOf
+  .transform((d) => ({ ...d, mode: d.mode === "none" ? d.mode : downloadKindOf(d.mode, d.url) }));
 
 // ARTICLE 单个附件项（清单行）
-const articleItemSchema = z.object({
-  name: z.string().trim().min(1, "附件名不能为空").max(120, "附件名过长"),
-  kind: z.enum(["file", "link"]),
-  url: z
-    .string()
-    .trim()
-    .min(1, "请填写附件地址")
-    .max(2000, "地址过长")
-    .refine(urlLike, "地址需以 http(s):// 或站内附件路径开头"),
-  size: z.string().max(40).optional(),
-});
+const articleItemSchema = z
+  .object({
+    name: z.string().trim().min(1, "附件名不能为空").max(120, "附件名过长"),
+    kind: z.enum(["file", "link"]),
+    url: z
+      .string()
+      .trim()
+      .min(1, "请填写附件地址")
+      .max(2000, "地址过长")
+      .refine(urlLike, "地址需以 http(s):// 或站内附件路径开头"),
+    size: z.string().max(40).optional(),
+  })
+  // 来源按 URL 重新判定：走 OneDrive（/od/…）与其它站内路径的一律是「附件」
+  .transform((d) => ({ ...d, kind: downloadKindOf(d.kind, d.url) }));
 
 // IMAGE：覆盖原创/AI生成/壁纸素材/截图四类（D2）
 export const imageMetaSchema = z.object({

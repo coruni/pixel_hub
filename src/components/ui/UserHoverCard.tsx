@@ -6,7 +6,6 @@ import PresenceAvatar from "@/components/ui/PresenceAvatar";
 import NicknameText from "@/components/ui/NicknameText";
 import { useLiveOnline } from "@/lib/realtime/use-realtime";
 import { formatCount } from "@/lib/format";
-import { useHoverDelay } from "@/lib/hooks";
 
 export type HoverCardUser = {
   id?: string;
@@ -31,8 +30,21 @@ const ROLE_LABEL: Record<string, string> = {
 };
 
 /**
- * hover 用户头像显示信息卡：包裹任意触发元素（通常是 Avatar），
- * 延迟 300ms 出现，展示昵称/用户名/简介/身份徽标/统计，点击卡片进入主页。
+ * hover 用户头像显示信息卡：包裹任意触发元素（通常是 Avatar），展示昵称/用户名/简介/
+ * 身份徽标/统计，点击卡片进入主页。
+ *
+ * 显隐**纯 CSS**（group-hover / group-focus-within），不用任何鼠标事件。下面三点缺任一条，
+ * 指针从头像移向弹层时都会提前收起（表现就是「弹层点不进去」）：
+ * ① 触发器与弹层之间的 6px 间隙做成**桥接层的 padding**（不是 margin）——绝对定位的 margin
+ *    间隙不属于任何元素的盒，指针划过去时 .group 就丢了 :hover；做成 padding 后这段间隙
+ *    本身就是容器的子孙盒，:hover 沿命中链一路传回 .group。
+ * ② 弹层常驻 DOM、用 visibility 控制显隐：:hover 依赖命中测试，弹层一旦不可命中，指针进到
+ *    弹层上就断链了。所以不能用 display:none，也不能用立即切换的 visibility。
+ * ③ 关侧靠 `transition-[opacity,visibility] duration-150` 撑出 150ms 缓冲：visibility 是离散
+ *    可过渡属性，过渡进度落在 0~1 之间时插值结果仍是 visible —— 也就是「刚离开的 150ms 内
+ *    弹层依然可命中」，足够指针移到弹层上把 :hover 续上。开侧同一过渡即时生效，不影响手感。
+ * 键盘可达性由 group-focus-within 承担：触发器（头像链接）获得焦点即展开，弹层内的链接
+ * 才能被 Tab 到。
  */
 export default function UserHoverCard({
   user,
@@ -44,8 +56,6 @@ export default function UserHoverCard({
   nicknameEnabled?: boolean;
   children: ReactNode;
 }) {
-  const { open, openDelayed, close, setOpen } = useHoverDelay(300);
-
   const roleLabel = user.role ? ROLE_LABEL[user.role] : undefined;
   const liveOnline = useLiveOnline(user.id, user.online ?? false);
   const stats: [string, number][] = [
@@ -55,17 +65,13 @@ export default function UserHoverCard({
   const hasStats = user.resourceCount !== undefined || user.followerCount !== undefined;
 
   return (
-    <span
-      className="relative inline-flex"
-      onMouseEnter={openDelayed}
-      onMouseLeave={close}
-      onFocus={() => setOpen(true)}
-      onBlur={close}
-    >
+    <span className="group relative inline-flex">
       {children}
-      {open && (
-        // 头像+昵称区域是链接（进主页），其余部分仅展示
-        <span className="absolute top-full left-0 z-40 mt-1.5 block w-56 rounded-none border border-brand-200 bg-surface p-3 shadow-lg">
+      {/* 触发器与弹层之间的 6px 桥接区：外层 span 只负责这段 padding，弹层本体在内层 block 里，
+          指针从触发器滑到弹层的整条路径都落在本容器的子树内 → .group 的 :hover 不断。
+          弹层头部是链接（进主页），其余部分仅展示。 */}
+      <span className="invisible absolute top-full left-0 z-40 block w-56 pt-1.5 opacity-0 transition-[opacity,visibility] duration-150 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
+        <span className="block rounded-none border border-brand-200 bg-surface p-3 shadow-lg">
           <Link href={`/u/${user.username}`} className="flex items-center gap-2.5">
             <PresenceAvatar
               userId={user.id}
@@ -128,7 +134,7 @@ export default function UserHoverCard({
             </span>
           )}
         </span>
-      )}
+      </span>
     </span>
   );
 }

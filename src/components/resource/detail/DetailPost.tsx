@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Bot, CalendarDays, Download, Eye } from "lucide-react";
 import { formatCount, timeAgo } from "@/lib/format";
 import Gallery from "@/components/resource/Gallery";
+import TagChip from "@/components/resource/TagChip";
 import { DownloadPanel } from "./download-panel";
 import { AvPlayerBlock } from "./av-player";
 import {
@@ -59,7 +60,8 @@ function MetaChips({ ctx }: { ctx: DetailCtx }) {
   }
   if (meta.kind === "MUSIC" || meta.kind === "VIDEO") {
     if (meta.artist) chips.push({ node: meta.artist, cls: "bg-neutral-100 text-neutral-600" });
-    if (meta.resolution) chips.push({ node: meta.resolution, cls: "bg-neutral-100 text-neutral-600" });
+    if (meta.resolution)
+      chips.push({ node: meta.resolution, cls: "bg-neutral-100 text-neutral-600" });
     if (meta.duration) chips.push({ node: meta.duration, cls: "bg-neutral-100 text-neutral-600" });
   }
   if (chips.length === 0 && detail.tags.length === 0) return null;
@@ -71,13 +73,12 @@ function MetaChips({ ctx }: { ctx: DetailCtx }) {
         </span>
       ))}
       {detail.tags.map((t) => (
-        <Link
+        <TagChip
           key={t.tag.slug}
-          href={`/tags/${t.tag.slug}`}
-          className={`${chipBase} bg-neutral-100 text-neutral-600 hover:bg-neutral-200`}
-        >
-          #{t.tag.name}
-        </Link>
+          slug={t.tag.slug}
+          name={t.tag.name}
+          className="text-[11px] font-medium"
+        />
       ))}
     </div>
   );

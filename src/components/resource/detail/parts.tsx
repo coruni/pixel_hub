@@ -11,6 +11,8 @@ import Comments from "@/components/social/Comments";
 import PresenceAvatar from "@/components/ui/PresenceAvatar";
 import UserHoverCard from "@/components/ui/UserHoverCard";
 import NicknameText from "@/components/ui/NicknameText";
+import { TypeIcon } from "@/components/resource/type-icon";
+import TagChip from "@/components/resource/TagChip";
 import Markdown from "@/components/rte/Markdown";
 import MarkdownImages from "@/components/rte/MarkdownImages";
 import { FavoriteButton, LikeButton, FollowButton } from "@/components/social/interactions";
@@ -227,7 +229,18 @@ export function TypeInfoCard({ ctx }: { ctx: DetailCtx }) {
       <dl className="space-y-2 rounded-none border border-brand-200 bg-surface p-4 text-sm">
         <div className="flex justify-between">
           <dt className="text-neutral-400">类型</dt>
-          <dd className="text-neutral-800">{typeLabel(detail.type)}</dd>
+          <dd>
+            {/* 图标展示（与资源卡角标同一张类型表）：形状本身可辨，类型名走 sr-only + title，
+                不让「类型」只靠一个图形表达；配色取 brand-600——它是 globals.css 里
+                亮暗自适应的语义阶，emerald/sky 那几档没有暗色覆盖，压深底会糊掉 */}
+            <span
+              className="inline-flex items-center text-brand-600"
+              title={typeLabel(detail.type)}
+            >
+              <TypeIcon type={detail.type} size={16} />
+              <span className="sr-only">{typeLabel(detail.type)}</span>
+            </span>
+          </dd>
         </div>
         {detail.category && (
           <div className="flex justify-between">
@@ -280,13 +293,7 @@ export function TypeInfoCard({ ctx }: { ctx: DetailCtx }) {
       {detail.tags.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {detail.tags.map((t) => (
-            <Link
-              key={t.tag.slug}
-              href={`/tags/${t.tag.slug}`}
-              className="rounded-none bg-neutral-100 px-2 py-1 text-xs text-neutral-600 hover:bg-neutral-200"
-            >
-              #{t.tag.name}
-            </Link>
+            <TagChip key={t.tag.slug} slug={t.tag.slug} name={t.tag.name} />
           ))}
         </div>
       )}

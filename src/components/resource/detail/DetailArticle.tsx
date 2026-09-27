@@ -13,6 +13,7 @@ import {
 } from "./parts";
 import { DownloadPanel } from "./download-panel";
 import { AvPlayerBlock } from "./av-player";
+import TagChip from "@/components/resource/TagChip";
 
 /** D · 杂志阅读式 —— 文章专属：编辑部排版（左对齐大标题 + 作者 meta 行 + 阅读列正文），
  *  可带文末附件清单（DownloadPanel），无游戏向版本/信息卡面板 */
@@ -122,13 +123,7 @@ export default function DetailArticle({
       {detail.tags.length > 0 && (
         <div className="mt-6 flex flex-wrap justify-center gap-1.5">
           {detail.tags.map((t) => (
-            <Link
-              key={t.tag.slug}
-              href={`/tags/${t.tag.slug}`}
-              className="rounded-none bg-neutral-100 px-2 py-1 text-xs text-neutral-600 hover:bg-neutral-200"
-            >
-              #{t.tag.name}
-            </Link>
+            <TagChip key={t.tag.slug} slug={t.tag.slug} name={t.tag.name} />
           ))}
         </div>
       )}
