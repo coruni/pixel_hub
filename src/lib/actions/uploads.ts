@@ -44,7 +44,7 @@ export type SaveUploadLimitsInput = {
   avatarMaxMb?: number;
   /** 主页横幅（MB，个人主页 hero） */
   heroImageMaxMb?: number;
-  /** 个人主页背景（MB，仅桌面端一张，单张上限） */
+  /** 个人主页背景（MB，桌面端 / 移动端各一张，共用此单张上限） */
   profileBgMaxMb?: number;
   /** 图集/原图：单个资源图片张数上限（已去掉上界，仅保留 ≥1） */
   galleryImageMaxCount?: number;

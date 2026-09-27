@@ -84,9 +84,11 @@ export default async function SettingsPage({
         watermarkPosition: true,
         colorMode: true,
         profileBgPcKey: true,
+        profileBgMobileKey: true,
         profileBgOnResource: true,
         profileBgGlobal: true,
         profileBgMask: true,
+        profileBgMobileMask: true,
         nameColor: true,
       },
     }),
@@ -170,7 +172,9 @@ export default async function SettingsPage({
 
           <section className={sectionCls}>
             <h2 className={sectionTitle}>主页背景</h2>
-            <p className={sectionHint}>铺满整个屏幕的最底层底图，不会盖住主页横幅。仅桌面端展示</p>
+            <p className={sectionHint}>
+              铺满整个屏幕的最底层底图，不会盖住主页横幅。桌面端与移动端各一张，按屏幕宽度自动切换
+            </p>
             <div className="mt-3">
               <ProfileBgForm
                 unlocked={bgUnlocked}
@@ -179,10 +183,12 @@ export default async function SettingsPage({
                 nextName={summary.next?.name ?? null}
                 toNext={summary.toNext}
                 pcKey={prefs?.profileBgPcKey ?? null}
+                mobileKey={prefs?.profileBgMobileKey ?? null}
                 onResource={prefs?.profileBgOnResource ?? true}
                 global={prefs?.profileBgGlobal ?? false}
                 maxMb={limits.profileBgMaxMb}
                 bgMask={prefs?.profileBgMask ?? null}
+                bgMobileMask={prefs?.profileBgMobileMask ?? null}
               />
             </div>
           </section>

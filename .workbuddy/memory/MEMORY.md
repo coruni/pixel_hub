@@ -32,3 +32,20 @@
 - 暗色主题只覆盖 brand / neutral / red / amber 四组语义阶；**emerald / sky 等没有暗色覆盖**，
   在会跟随明暗的 surface 上当正文色用会糊（卡片封面那种固定深底才可以用亮阶）。
 - 类型图标唯一事实来源：`src/components/resource/type-icon.tsx`（TYPE_ICON / TYPE_BADGE_TONE / TypeIcon）。
+
+## 主页背景是「双槽」结构（2026-09-27 起）
+
+- 桌面端 `User.profileBgPcKey` / 移动端 `User.profileBgMobileKey`，**各配一份遮罩**
+  （`profileBgMask` / `profileBgMobileMask`）；`profileBgOnResource`、`profileBgGlobal`、
+  等级门槛 `profile.bgMinLevel` **两槽共用**（语义：两张背景作为一个整体对外可见 / 不可见）。
+- 两槽**不做跨槽回落**：只设了桌面端时移动端就是素底，不拿横图去填竖屏。
+- 遮罩类唯一事实来源：`globals.css` 的 `.profile-bg-pc`（左右两条带）/ `.profile-bg-mobile`
+  （上下两端）；显示切换靠 Tailwind `hidden sm:block` / `sm:hidden`。
+- 设置页 `ProfileBgForm.tsx` 里 `BgSlotForm` 是两槽共用的槽组件；两槽的字段名映射收在
+  `lib/actions/settings.ts` 的 `bgKeyData` / `bgMaskData` / `bgKeyOf`（Prisma update 是强类型的，
+  不能拼动态键名）。
+- **owner 压 global 的规则必须按断点成对写**：`:has()` 只看元素在不在 DOM 里、不看 display，
+  一条不分断点的 `body:has([data-profile-bg-owner]) [data-profile-bg-global]` 会让
+  「只设了桌面端」的用户在移动端把自己的全局背景也隐掉。现为 `-pc` / `-mobile` 两组属性 +
+  两个互补媒体查询（`min-width: 40rem` 与 `width < 40rem`）。
+

@@ -309,7 +309,7 @@ export default function IncentiveManager({
             id="inc-profile-bg-level"
             label="主页背景解锁等级"
             range="0 = 不限"
-            hint="达到该等级的用户才能在设置页上传个人主页背景（铺满视口的底图，仅桌面端展示）。等级本身不发钱，这里只是拿它当门槛。"
+            hint="达到该等级的用户才能在设置页上传个人主页背景（铺满视口的底图，桌面端与移动端各一张）。等级本身不发钱，这里只是拿它当门槛。"
             {...num("profile.bgMinLevel")}
             options={[
               { value: "0", label: "不限（全员可用）" },

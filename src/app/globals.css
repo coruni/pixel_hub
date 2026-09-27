@@ -850,21 +850,27 @@ summary {
   }
 }
 
-/* ---------- 用户背景遮罩（个人主页 + 资源详情页共用） ----------
+/* ---------- 用户背景遮罩（个人主页 + 资源详情页 + 全站全局层共用） ----------
    背景层是**铺满视口的最底层**（fixed inset-0 + -z-10），不参与页面布局，所以不会覆盖 hero。
    手法与 hero 一致：一张图铺满 + linear-gradient 当 mask；差别只在方向 —— hero 是竖向压暗
-   给文字让位，这里是横向留白给内容让位。
+   给文字让位，这里是留白给内容让位。
 
-   用在两处：① 个人主页（背景属该主页的主人）；② 资源详情页（背景属资源作者 —— 作者没关
-   「在资源详情页也展示」开关、且仍达等级时才铺）。两处都只在 sm 及以上渲染：窄屏没有侧边
-   留白（容器只有 16px 内边距），带子会直接压到卡片下面。
+   用在三处：① 个人主页（背景属该主页的主人）；② 资源详情页（背景属资源作者 —— 作者没关
+   「在资源详情页也展示」开关、且仍达等级时才铺）；③ 全站全局层（根 layout 挂，铺非后台的所有页面）。
 
-   左右各一条可见带，**贴屏幕边缘最清晰，向屏幕中间淡出到 0**。
-   带子的淡出终点取 24%（视口 1920 时 max-w-7xl 的边落在 16.7%），也就是向内容区里多探约 100px
-   —— 淡出发生在正文旁边而不是硬停在容器边上，两边像素对称。
+   【两个槽位、两个类】桌面端与移动端是两张独立的图，按断点互斥显示（display 由 Tailwind 的
+   `hidden sm:block` / `sm:hidden` 控制，本文件只管遮罩形状）：
+     .profile-bg-pc      —— sm 及以上。左右各一条可见带，贴屏幕边缘最清晰，向屏幕中间淡出到 0。
+     .profile-bg-mobile  —— 小于 sm。改成**上下两端**渐显：竖屏下容器只有 16px 内边距、卡片
+                            基本顶到屏幕两边，左右带会被卡片压住看不见，能露出来的只有页面
+                            顶部（头像区）与底部两段空隙。
 
-   形状自 2026-09 起**由用户各自设置**（设置 → 装饰 → 主页背景 → 遮罩形状，存 User.profileBgMask；
-   默认值与校验见 upload-config.ts 的 PROFILE_BG_MASK_DEFAULT / safeBgMask）。本文件保留的这份是
+   桌面端带子的淡出终点取 24%（视口 1920 时 max-w-7xl 的边落在 16.7%），也就是向内容区里多探
+   约 100px —— 淡出发生在正文旁边而不是硬停在容器边上，两边像素对称。
+
+   形状自 2026-09 起**由用户各自设置**（设置 → 装饰 → 主页背景 → 遮罩形状；桌面端存
+   User.profileBgMask、移动端存 User.profileBgMobileMask。默认值与校验见 upload-config.ts 的
+   PROFILE_BG_MASK_DEFAULT / PROFILE_BG_MOBILE_MASK_DEFAULT / safeBgMask）。本文件保留的这两份是
    **默认值与兜底**：渲染点没挂内联变量时用它。 */
 .profile-bg-pc {
   /* 遮罩默认值。用户自定义的值（User.profileBgMask）由渲染点写成内联的 --profile-bg-mask 覆盖 ——
@@ -885,19 +891,53 @@ summary {
   mask-image: var(--profile-bg-mask);
 }
 
+/* 移动端槽的默认遮罩（纵向）。与 .profile-bg-pc 同构、只换轴 —— 理由见上面的注释块。
+   中段 18%..82% 必须完全透明：这层是 fixed 铺满的最底层，中段不透明会从卡片底布的缝隙里
+   透出来，看着像脏了一块。这段必须与 upload-config.ts 的 PROFILE_BG_MOBILE_MASK_DEFAULT 一致。 */
+.profile-bg-mobile {
+  --profile-bg-mask: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 1) 0%,
+    rgba(0, 0, 0, 1) 4%,
+    rgba(0, 0, 0, 0.55) 10%,
+    rgba(0, 0, 0, 0) 18%,
+    rgba(0, 0, 0, 0) 82%,
+    rgba(0, 0, 0, 0.55) 90%,
+    rgba(0, 0, 0, 1) 96%,
+    rgba(0, 0, 0, 1) 100%
+  );
+  -webkit-mask-image: var(--profile-bg-mask);
+  mask-image: var(--profile-bg-mask);
+}
+
 /* 背景优先级：页面自己铺的那层 > 全站「全局显示」层。
    资源详情页上作者背景优先于访客自己的全局背景（作者在自己的页面上话语权更高）；
    个人主页同理（主人背景优先于访客的全局背景）。
 
-   做法：全局层（data-profile-bg-global，挂在根 layout）检测到 DOM 里已经存在
-   一层所有者背景（data-profile-bg-owner，由资源页 / 个人主页在自己铺的那层上标出）时自隐。
+   做法：全局层（data-profile-bg-global-*，挂在根 layout）检测到 DOM 里已经存在
+   一层所有者背景（data-profile-bg-owner-*，由资源页 / 个人主页在自己铺的那层上标出）时自隐。
    用 :has() 而不是 JS 是刻意的 —— 它是渲染期求值，SSR 首帧就成立，
    既不会「先闪一帧全局背景再被盖掉」，也不会在软导航时错帧；且无需复制服务端的
    开关/等级门槛口径（只看渲染结果，上游怎么改这里都不用动）。
 
-   注：owner 标记只挂在「真的有资格铺」的那一层上 —— 页面里 bgUrl 为 null 时压根不渲染该元素，
-   所以 :has() 自然判为「无所有者背景」，全局层照常显示。 */
-body:has([data-profile-bg-owner]) [data-profile-bg-global] {
-  display: none;
+   注：owner 标记只挂在「真的有资格铺」的那一层上 —— 页面里没有背景 URL 时压根不渲染该元素，
+   所以 :has() 自然判为「无所有者背景」，全局层照常显示。
+
+   【为什么按断点拆成两条】**两个槽位是靠 Tailwind 的 `hidden` / `sm:hidden` 互斥显示的，
+   而 `:has()` 看的是「元素在不在 DOM 里」，不看它是不是 display:none。** 若用一条不分断点的
+   规则，就会串槽：作者只设了桌面端那张图时，移动端的 owner 元素照样在 DOM 里（只是被
+   sm:hidden 藏着），于是移动端的全局背景会被无理由隐掉 —— 而它本该照常显示。
+   拆成两对之后，「owner 存在」与「owner 此刻可见」在同一个断点里成立，判定才与眼睛看到的一致。
+
+   断点表达式与 Tailwind v4 的 sm（40rem）严格互补，不留空隙也不重叠。 */
+@media (min-width: 40rem) {
+  body:has([data-profile-bg-owner-pc]) [data-profile-bg-global-pc] {
+    display: none;
+  }
+}
+@media (width < 40rem) {
+  body:has([data-profile-bg-owner-mobile]) [data-profile-bg-global-mobile] {
+    display: none;
+  }
 }
 

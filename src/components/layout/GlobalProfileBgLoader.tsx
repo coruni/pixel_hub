@@ -20,9 +20,22 @@ export default async function GlobalProfileBgLoader() {
 
   const me = await prisma.user.findUnique({
     where: { id: userId },
-    select: { username: true, profileBgPcKey: true, profileBgGlobal: true, profileBgMask: true },
+    select: {
+      username: true,
+      profileBgPcKey: true,
+      profileBgMobileKey: true,
+      profileBgGlobal: true,
+      profileBgMask: true,
+      profileBgMobileMask: true,
+    },
   });
-  if (!me?.profileBgGlobal || !me.profileBgPcKey) return null;
+  if (!me?.profileBgGlobal) return null;
+
+  // 两个槽位**任一有图**就往下走：只设了移动端那张的用户照样该在全站看到它。
+  // 哪一端没图就不渲染哪一层（不做跨槽回落，理由见 GlobalProfileBg 的注释）。
+  const pcUrl = me.profileBgPcKey ? publicUrl(me.profileBgPcKey) : null;
+  const mobileUrl = me.profileBgMobileKey ? publicUrl(me.profileBgMobileKey) : null;
+  if (!pcUrl && !mobileUrl) return null;
 
   // 等级必须**现算**：门槛与档位后台可改，用户也可能掉档。判定复用 profileBgUnlocked()，
   // 与个人主页 / 资源详情页 / 设置页同一个函数，口径只有一份。
@@ -36,8 +49,10 @@ export default async function GlobalProfileBgLoader() {
 
   return (
     <GlobalProfileBg
-      url={publicUrl(me.profileBgPcKey)}
-      mask={safeBgMask(me.profileBgMask)}
+      pcUrl={pcUrl}
+      mobileUrl={mobileUrl}
+      pcMask={safeBgMask(me.profileBgMask)}
+      mobileMask={safeBgMask(me.profileBgMobileMask)}
       myUsername={me.username}
     />
   );

@@ -12,10 +12,12 @@ import { makeKey, saveFile, delFile } from "@/lib/storage";
 import {
   MIB,
   PROFILE_BG_MASK_DEFAULT,
+  PROFILE_BG_MOBILE_MASK_DEFAULT,
   WATERMARK_POSITIONS,
   WATERMARK_TEXT_MAX,
   isValidBgMask,
   profileBgUnlocked,
+  type ProfileBgSlot,
 } from "@/lib/upload-config";
 import { getUploadLimits } from "@/lib/upload-limits";
 import { getIncentive } from "@/lib/incentive";
@@ -322,14 +324,47 @@ export async function removeHeroAction(_fd?: FormData): Promise<void> {
   revalidatePath("/settings");
 }
 
-// ---- 个人主页背景：铺满视口的**最底层**底图（不覆盖 hero，仅桌面端渲染）----
+// ---- 个人主页背景：铺满视口的**最底层**底图（不覆盖 hero）----
+//
+// 【两个槽位，两张图】桌面端 profileBgPcKey（横图，sm 及以上显示）/ 移动端 profileBgMobileKey
+// （竖图，小于 sm 显示），各配一份遮罩（profileBgMask / profileBgMobileMask）。
+// 拆两槽是因为横图在竖屏被 cover 会裁掉左右大半、主体常常直接消失，共用一张必然牺牲其中一端。
+// 两个开关（profileBgOnResource / profileBgGlobal）与等级门槛**两槽共用** —— 语义是
+// 「这两张背景作为一个整体对外可见 / 不可见」，所以下面每个动作都带一个 slot 参数。
 //
 // 三处与头像/横幅不同，都是刻意的：
 //   ① **不做裁剪**。底图是 cover 铺满，被裁掉的恰好是遮罩留白的中间区，裁剪器只会让用户困惑；
-//      改成把遮罩直接套在设置页预览上，所见即所得（遮罩类见 globals.css 的 .profile-bg-pc）。
+//      改成把遮罩直接套在设置页预览上，所见即所得（遮罩类见 globals.css 的 .profile-bg-*）。
 //   ② **不放大小图**。cover 在 CSS 层完成，服务端只按后台格式重压，避免无谓的重采样损失。
 //   ③ **门槛在服务端重算**。客户端只是不渲染入口，绕过前端也必须传不上来 —— 与前台渲染
 //      共用 profileBgUnlocked()，口径只有一份。
+
+/** 槽位 → 该槽的遮罩默认值（用户填的与**本槽**默认值逐字相同就落 null = 继续跟随默认） */
+const BG_MASK_DEFAULT: Record<ProfileBgSlot, string> = {
+  pc: PROFILE_BG_MASK_DEFAULT,
+  mobile: PROFILE_BG_MOBILE_MASK_DEFAULT,
+};
+
+/**
+ * 槽位 → 图片列的 update 片段。写成两个字面量分支而不是动态键名：Prisma 的 update 入参是强类型的，
+ * 动态键名会被判成 string 索引而报错。两槽的字段名差异只在这里出现一次。
+ */
+function bgKeyData(slot: ProfileBgSlot, url: string | null) {
+  return slot === "pc" ? { profileBgPcKey: url } : { profileBgMobileKey: url };
+}
+
+/** 槽位 → 遮罩列的 update 片段（同上，两个字面量分支） */
+function bgMaskData(slot: ProfileBgSlot, v: string | null) {
+  return slot === "pc" ? { profileBgMask: v } : { profileBgMobileMask: v };
+}
+
+/** 槽位 → 该槽当前存着的图（读取片段固定取两列，再由 slot 挑一个，省去动态 select 的类型麻烦） */
+function bgKeyOf(
+  row: { profileBgPcKey: string | null; profileBgMobileKey: string | null } | null,
+  slot: ProfileBgSlot,
+): string | null {
+  return (slot === "pc" ? row?.profileBgPcKey : row?.profileBgMobileKey) ?? null;
+}
 
 /** 服务端权威判定：等级不够直接拒绝，并把「还差哪一档」写进错误文案 */
 async function profileBgGate(userId: string): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -345,14 +380,17 @@ async function profileBgGate(userId: string): Promise<{ ok: true } | { ok: false
   };
 }
 
-export async function uploadProfileBgAction(
-  _prev: SettingsActionState,
+/**
+ * 上传实现：两个槽位共用同一套校验 / 压缩 / 落库 / 清理旧件的流程，唯一差异是写哪一列。
+ * 抽出来而不是复制两遍 —— 复制出来的第二份迟早会漏掉一次格式校验或一次旧文件清理。
+ */
+async function uploadProfileBg(
+  userId: string,
+  username: string,
   fd: FormData,
+  slot: ProfileBgSlot,
 ): Promise<SettingsActionState> {
-  const user = (await auth())?.user;
-  if (!user) return { error: "请先登录" };
-
-  const gate = await profileBgGate(user.id);
+  const gate = await profileBgGate(userId);
   if (!gate.ok) return { error: gate.error };
 
   const L = await getUploadLimits();
@@ -375,19 +413,17 @@ export async function uploadProfileBgAction(
     const key = makeKey("backgrounds", `.${outputExt(L.imageFormat)}`);
     const url = await saveFile(key, out, outputMime(L.imageFormat));
 
-    // 换图后清理旧文件（本地 key 或 chevereto 远端 URL 都尽力删）
+    // 换图后清理旧文件（本地 key 或 chevereto 远端 URL 都尽力删）。**只动本槽那一列** ——
+    // 换桌面端的图不该碰到移动端那张，反之亦然。
     const row = await prisma.user.findUnique({
-      where: { id: user.id },
-      select: { profileBgPcKey: true },
+      where: { id: userId },
+      select: { profileBgPcKey: true, profileBgMobileKey: true },
     });
-    const old = row?.profileBgPcKey;
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { profileBgPcKey: url },
-    });
+    const old = bgKeyOf(row, slot);
+    await prisma.user.update({ where: { id: userId }, data: bgKeyData(slot, url) });
     if (old && old !== url) await delFile(old).catch(() => {});
 
-    revalidatePath(`/u/${user.username}`);
+    revalidatePath(`/u/${username}`);
     revalidatePath("/settings");
     return { ok: true };
   } catch (e) {
@@ -396,30 +432,59 @@ export async function uploadProfileBgAction(
   }
 }
 
-export async function removeProfileBgAction(): Promise<void> {
-  const user = (await auth())?.user;
-  if (!user) return;
-
+/** 移除实现：只清本槽那一列与它的文件，另一槽与两个开关都不受影响 */
+async function removeProfileBg(userId: string, username: string, slot: ProfileBgSlot): Promise<void> {
   const row = await prisma.user.findUnique({
-    where: { id: user.id },
-    select: { profileBgPcKey: true },
+    where: { id: userId },
+    select: { profileBgPcKey: true, profileBgMobileKey: true },
   });
-  const old = row?.profileBgPcKey;
+  const old = bgKeyOf(row, slot);
   if (!old) return;
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { profileBgPcKey: null },
-  });
+  await prisma.user.update({ where: { id: userId }, data: bgKeyData(slot, null) });
   await delFile(old).catch(() => {});
-  revalidatePath(`/u/${user.username}`);
+  revalidatePath(`/u/${username}`);
   revalidatePath("/settings");
 }
 
-// ---- 资源详情页是否展示同款背景 ----
+// ---- 下面是导出的 Server Action：桌面端 / 移动端各三个（上传 / 移除 / 存遮罩，遮罩两个在文件下方）。
+// 用「薄转发 + 内部实现带 slot」而不是把 slot 塞进 FormData：槽位是**路由层信息**（哪个表单提交的），
+// 而它决定写哪一列 —— 能被客户端篡改的字段不该参与这个决定，由 action 自己钉死最稳。
+
+export async function uploadProfileBgAction(
+  _prev: SettingsActionState,
+  fd: FormData,
+): Promise<SettingsActionState> {
+  const user = (await auth())?.user;
+  if (!user) return { error: "请先登录" };
+  return uploadProfileBg(user.id, user.username, fd, "pc");
+}
+
+export async function uploadProfileBgMobileAction(
+  _prev: SettingsActionState,
+  fd: FormData,
+): Promise<SettingsActionState> {
+  const user = (await auth())?.user;
+  if (!user) return { error: "请先登录" };
+  return uploadProfileBg(user.id, user.username, fd, "mobile");
+}
+
+export async function removeProfileBgAction(): Promise<void> {
+  const user = (await auth())?.user;
+  if (!user) return;
+  await removeProfileBg(user.id, user.username, "pc");
+}
+
+export async function removeProfileBgMobileAction(): Promise<void> {
+  const user = (await auth())?.user;
+  if (!user) return;
+  await removeProfileBg(user.id, user.username, "mobile");
+}
+
+// ---- 资源详情页是否展示同款背景（两个槽位共用这一个开关）----
 //
 // **独立于上传动作**：改开关不该强迫用户重新选一遍图，所以它自带一个不含 file 的表单
-// （HTML 表单不能嵌套，它挂在上传 form 之外）。只写这一个布尔，绝不触碰 profileBgPcKey
+// （HTML 表单不能嵌套，它挂在上传 form 之外）。只写这一个布尔，绝不触碰两张图
 // —— 关掉开关不会把图删掉，重新打开就还在。
 export async function updateProfileBgOnResourceAction(
   _prev: SettingsActionState,
@@ -442,9 +507,9 @@ export async function updateProfileBgOnResourceAction(
   }
 }
 
-// ---- 主页背景「全局显示」----
+// ---- 主页背景「全局显示」（两个槽位共用这一个开关）----
 //
-// 同样**独立于上传动作**（自带不含 file 的表单）。只写这一个布尔，绝不触碰 profileBgPcKey。
+// 同样**独立于上传动作**（自带不含 file 的表单）。只写这一个布尔，绝不触碰两张图。
 // 开启后背景铺到全站每一页（后台除外），所以失效范围是**整站** —— 必须用
 // revalidatePath("/", "layout") 清掉所有路由的缓存的 layout，只清 /settings 不够。
 // 与该开关正交的是 profileBgOnResource（只管「其他访客在资源详情页能不能看到」）。
@@ -471,19 +536,20 @@ export async function updateProfileBgGlobalAction(
   }
 }
 
-// ---- 背景遮罩形状（用户自定义）----
+// ---- 背景遮罩形状（用户自定义，两个槽位各一份）----
 //
 // 同样**独立于上传动作**：调形状不该逼用户重选一遍图。
-// 空串 = 回到内置默认，存 null 而不是把默认值抄一份进库 —— 这样以后调默认值，
+// 空串 = 回到**本槽**内置默认，存 null 而不是把默认值抄一份进库 —— 这样以后调默认值，
 // 没自定义过的用户会跟着一起变；抄进库的那些则永远停在旧值上，事后无法区分。
-export async function updateProfileBgMaskAction(
-  _prev: SettingsActionState,
+// 两槽的形状必须分开存：桌面端是左右两条带、移动端是上下两端（见 globals.css），
+// 同一条值换个屏幕方向就完全不成立。
+async function saveProfileBgMask(
+  userId: string,
+  username: string,
   fd: FormData,
+  slot: ProfileBgSlot,
 ): Promise<SettingsActionState> {
-  const user = (await auth())?.user;
-  if (!user) return { error: "请先登录" };
-
-  const gate = await profileBgGate(user.id);
+  const gate = await profileBgGate(userId);
   if (!gate.ok) return { error: gate.error };
 
   const raw = String(fd.get("bgMask") ?? "").trim();
@@ -496,19 +562,38 @@ export async function updateProfileBgMaskAction(
   }
 
   try {
-    // 与内置默认**逐字相同**就存 null（= 继续跟随默认），而不是把默认值抄一份进库：
+    // 与**本槽**的内置默认**逐字相同**就存 null（= 继续跟随默认），而不是把默认值抄一份进库：
     // 否则站点日后调整默认形状时，这些用户会永远停在旧值上，事后也分不清「他就是要这个」还是「他只是没改」。
+    const def = BG_MASK_DEFAULT[slot];
     await prisma.user.update({
-      where: { id: user.id },
-      data: { profileBgMask: !raw || raw === PROFILE_BG_MASK_DEFAULT ? null : raw },
+      where: { id: userId },
+      data: bgMaskData(slot, !raw || raw === def ? null : raw),
     });
-    revalidatePath(`/u/${user.username}`);
+    revalidatePath(`/u/${username}`);
     revalidatePath("/settings");
     return { ok: true };
   } catch (e) {
     console.error("[profile-bg-mask]", e);
     return { error: "保存失败，请重试" };
   }
+}
+
+export async function updateProfileBgMaskAction(
+  _prev: SettingsActionState,
+  fd: FormData,
+): Promise<SettingsActionState> {
+  const user = (await auth())?.user;
+  if (!user) return { error: "请先登录" };
+  return saveProfileBgMask(user.id, user.username, fd, "pc");
+}
+
+export async function updateProfileBgMobileMaskAction(
+  _prev: SettingsActionState,
+  fd: FormData,
+): Promise<SettingsActionState> {
+  const user = (await auth())?.user;
+  if (!user) return { error: "请先登录" };
+  return saveProfileBgMask(user.id, user.username, fd, "mobile");
 }
 
 // ---- 账号安全：改密码 / 换邮箱 ----

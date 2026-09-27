@@ -146,23 +146,32 @@ export default async function ResourcePage({ params }: PageProps) {
   // 不该把自己的背景也藏起来。
   //
   // 【与「全局显示」的优先级】作者背景 > 访客自己的全局背景。这里**不做** JS 去重，
-  // 交给 globals.css 的 `body:has([data-profile-bg-owner]) [data-profile-bg-global]`：
-  // 本层铺了就标 data-profile-bg-owner，全局层随之自隐。纯 CSS 判渲染结果，
+  // 交给 globals.css 里**按断点成对**的 `body:has([data-profile-bg-owner-pc]) [data-profile-bg-global-pc]`
+  // （移动端那对同理）：本层铺了就标对应的 owner 标记，同断点的全局层随之自隐。纯 CSS 判渲染结果，
   // 不用复制服务端的开关/等级口径，软导航也不会错帧。
   const isOwnResourcePage = meId === detail.authorId;
-  let bgUrl: string | null = null;
-  if (detail.author.profileBgPcKey && (detail.author.profileBgOnResource || isOwnResourcePage)) {
+  // 两个槽位各自独立，**不做跨槽回落**：作者只传了桌面端那张时，移动端保持素底，
+  // 而不是把横图硬塞进竖屏（cover 会把它裁得看不出原图，那比素底更像坏了）。
+  let bgPcUrl: string | null = null;
+  let bgMobileUrl: string | null = null;
+  const showBg = detail.author.profileBgOnResource || isOwnResourcePage;
+  if (showBg && (detail.author.profileBgPcKey || detail.author.profileBgMobileKey)) {
     const authorLevel = levelOf(await getPointBalance(detail.authorId), incentive.levels);
     const unlocked = profileBgUnlocked(
       authorLevel,
       incentive.profile.bgMinLevel,
       incentive.enabled,
     );
-    if (unlocked) bgUrl = publicUrl(detail.author.profileBgPcKey);
+    if (unlocked) {
+      if (detail.author.profileBgPcKey) bgPcUrl = publicUrl(detail.author.profileBgPcKey);
+      if (detail.author.profileBgMobileKey)
+        bgMobileUrl = publicUrl(detail.author.profileBgMobileKey);
+    }
   }
-  // 遮罩形状取**作者自己的**设置（与个人主页同一个值）—— 同一张图铺在两个页面，形状必须一致，
-  // 否则作者在设置页预览到的和访客在这里看到的是两回事。填坏只退回内置默认遮罩。
-  const bgMask = safeBgMask(detail.author.profileBgMask);
+  // 遮罩形状取**作者自己的**设置（与个人主页同一份值，两个槽各一条）—— 同一张图铺在两个页面，
+  // 形状必须一致，否则作者在设置页预览到的和访客在这里看到的是两回事。填坏只退回内置默认遮罩。
+  const bgPcMask = safeBgMask(detail.author.profileBgMask);
+  const bgMobileMask = safeBgMask(detail.author.profileBgMobileMask);
 
   // 相关推荐只对已发布内容计算（草稿/待审不需要）
   const related =
@@ -248,15 +257,30 @@ export default async function ResourcePage({ params }: PageProps) {
       rail={rail ?? undefined}
     >
       {/* 作者主页背景：铺满视口的最底层，fixed 脱离 grid 流、不参与布局。
-          与个人主页共用同一个遮罩类 .profile-bg-pc（左右两侧渐显、中间留白），仅桌面端渲染。
-          data-profile-bg-owner 是给全局显示层（根 layout）看的优先级标记：本层存在时，
-          访客自己的全局背景会由 globals.css 的 :has() 规则隐掉 —— 作者优先。 */}
-      {bgUrl && (
+          与个人主页共用同一套遮罩类（桌面端 .profile-bg-pc / 移动端 .profile-bg-mobile），
+          两张图按断点互斥显示。
+          data-profile-bg-owner-pc / -mobile 是给全局显示层（根 layout）看的优先级标记：本层存在时，
+          访客自己的全局背景会由 globals.css 的 :has() 规则隐掉 —— 作者优先。两个槽位分开标记是
+          必须的：断点互斥的显示方式下，只看「元素在不在 DOM 里」会串槽（详见 globals.css）。 */}
+      {bgPcUrl && (
         <div
           aria-hidden
-          data-profile-bg-owner
+          data-profile-bg-owner-pc
           className="profile-bg-pc pointer-events-none fixed inset-0 -z-10 hidden bg-cover bg-center bg-no-repeat sm:block"
-          style={{ backgroundImage: `url(${bgUrl})`, "--profile-bg-mask": bgMask } as CSSProperties}
+          style={{ backgroundImage: `url(${bgPcUrl})`, "--profile-bg-mask": bgPcMask } as CSSProperties}
+        />
+      )}
+      {bgMobileUrl && (
+        <div
+          aria-hidden
+          data-profile-bg-owner-mobile
+          className="profile-bg-mobile pointer-events-none fixed inset-0 -z-10 bg-cover bg-center bg-no-repeat sm:hidden"
+          style={
+            {
+              backgroundImage: `url(${bgMobileUrl})`,
+              "--profile-bg-mask": bgMobileMask,
+            } as CSSProperties
+          }
         />
       )}
       {detailLd && (

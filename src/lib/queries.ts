@@ -490,10 +490,13 @@ export const getResourceDetail = cache(async (slug: string, viewerId?: string) =
           nameColor: true,
           avatarKey: true,
           bio: true,
-          // 资源详情页也要铺作者的主页背景（开关 + 等级门槛在页面里判定），随 author 一次取出
+          // 资源详情页也要铺作者的主页背景（两个槽位 + 一个共用开关；等级门槛在页面里判定），
+          // 随 author 一次取出，避免详情页再查一次 User。
           profileBgPcKey: true,
+          profileBgMobileKey: true,
           profileBgOnResource: true,
           profileBgMask: true,
+          profileBgMobileMask: true,
           role: true,
           trusted: true,
           createdAt: true,
@@ -576,11 +579,13 @@ export const getResourceDetail = cache(async (slug: string, viewerId?: string) =
       nameColor: resource.author.nameColor,
       avatarKey: resource.author.avatarKey ? publicUrl(resource.author.avatarKey) : null,
       bio: resource.author.bio,
-      // 资源页背景用。注意口径：这两个是**未解析的存储 key / 布尔**，页面侧还要 publicUrl()，
+      // 资源页背景用。注意口径：这几个是**未解析的存储 key / 布尔**，页面侧还要 publicUrl()，
       // 与上面 avatarKey（已解析成 URL）不同 —— 别照着 avatarKey 的用法直接塞进 <img src>。
       profileBgPcKey: resource.author.profileBgPcKey,
+      profileBgMobileKey: resource.author.profileBgMobileKey,
       profileBgOnResource: resource.author.profileBgOnResource,
       profileBgMask: resource.author.profileBgMask,
+      profileBgMobileMask: resource.author.profileBgMobileMask,
       role: resource.author.role,
       trusted: resource.author.trusted,
       createdAt: resource.author.createdAt,
@@ -1111,10 +1116,14 @@ export type UserProfile = {
   bio: string | null;
   avatarKey: string | null;
   heroImageKey: string | null;
-  /** 个人主页背景（铺满视口的最底层底图，仅桌面端渲染）；是否真的有资格渲染由 profileBgUnlocked 判定 */
+  /** 个人主页背景**桌面端**图（铺满视口的最底层底图，sm 及以上渲染）；是否真有资格渲染由 profileBgUnlocked 判定 */
   profileBgPcKey: string | null;
-  /** 该用户自定义的背景遮罩（原始值，渲染前经 safeBgMask 收口）；null = 用内置默认 */
+  /** 个人主页背景**移动端**图（小于 sm 渲染；与桌面端是两个独立槽位，不做跨槽回落） */
+  profileBgMobileKey: string | null;
+  /** 该用户自定义的**桌面端**背景遮罩（原始值，渲染前经 safeBgMask 收口）；null = 用内置默认 */
   profileBgMask: string | null;
+  /** 该用户自定义的**移动端**背景遮罩；null = 用内置默认（PROFILE_BG_MOBILE_MASK_DEFAULT） */
+  profileBgMobileMask: string | null;
   /** 昵称特效色 key；实际渲染走 components/ui/Nickname（读激励配置开关） */
   nameColor: string | null;
   role: "USER" | "MODERATOR" | "ADMIN";
@@ -1153,7 +1162,9 @@ export const getProfile = cache(
         avatarKey: true,
         heroImageKey: true,
         profileBgPcKey: true,
+        profileBgMobileKey: true,
         profileBgMask: true,
+        profileBgMobileMask: true,
         nameColor: true,
         role: true,
         trusted: true,
@@ -1188,7 +1199,9 @@ export const getProfile = cache(
       avatarKey: user.avatarKey,
       heroImageKey: user.heroImageKey,
       profileBgPcKey: user.profileBgPcKey,
+      profileBgMobileKey: user.profileBgMobileKey,
       profileBgMask: user.profileBgMask,
+      profileBgMobileMask: user.profileBgMobileMask,
       nameColor: user.nameColor,
       role: user.role,
       trusted: user.trusted,

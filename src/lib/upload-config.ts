@@ -8,7 +8,7 @@
 //   commentImageMaxMb,      // 评论附图单张（1..100）
 //   avatarMaxMb,            // 头像（1..100）
 //   heroImageMaxMb,         // 主页横幅单张（1..100）
-//   profileBgMaxMb,         // 个人主页背景单张（1..100；仅桌面端渲染）
+//   profileBgMaxMb,         // 个人主页背景单张（1..100；桌面端/移动端各一张，共用此上限）
 //   galleryImageMaxCount,   // 图集/原图张数上限（只设下界 1，上不封顶）
 //   commentImageMaxCount,   // 评论附图张数上限
 //   imageFormat,            // 服务端压缩输出格式 webp|jpg|png（webp/png 保留 alpha）
@@ -101,6 +101,33 @@ export function profileBgUnlocked(level: number, minLevel: number, incentiveEnab
  */
 export const PROFILE_BG_MASK_DEFAULT =
   "linear-gradient(to right, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 1) 6%, rgba(0, 0, 0, 0.55) 14%, rgba(0, 0, 0, 0) 24%, rgba(0, 0, 0, 0) 76%, rgba(0, 0, 0, 0.55) 86%, rgba(0, 0, 0, 1) 94%, rgba(0, 0, 0, 1) 100%)";
+
+/**
+ * 主页背景遮罩的默认值 —— **移动端版**（与上面的桌面端版同构，只是换了轴）。
+ *
+ * 换轴是必须的：桌面端有侧边留白，带子贴左右屏幕边缘最自然；移动端容器只有 16px 内边距、
+ * 卡片基本顶到屏幕两边，左右带会直接被卡片压住看不见，只能改成**上下两端**渐显
+ * —— 竖屏下露出来的本来就是页面顶部（头像区）与底部两段空隙。
+ *
+ * 中段（18%..82%）必须保持完全透明，理由与桌面端一致：背景层是 fixed 铺满的最底层，
+ * 中段不透明就会从卡片底布的缝隙里透出来，看着像脏了一块。
+ *
+ * 【必须与 globals.css 的 `.profile-bg-mobile` 保持一致】那边把它声明成 `--profile-bg-mask` 的默认值；
+ * 这里同时是设置页的预填值与「填回默认值」的目标值 —— 改一处必须同步改另一处。
+ */
+export const PROFILE_BG_MOBILE_MASK_DEFAULT =
+  "linear-gradient(to bottom, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 1) 4%, rgba(0, 0, 0, 0.55) 10%, rgba(0, 0, 0, 0) 18%, rgba(0, 0, 0, 0) 82%, rgba(0, 0, 0, 0.55) 90%, rgba(0, 0, 0, 1) 96%, rgba(0, 0, 0, 1) 100%)";
+
+/**
+ * 背景槽位：桌面端（横图，sm 及以上显示）/ 移动端（竖图，小于 sm 显示）。
+ *
+ * 两槽**各有一张图与一份遮罩**，但共用 `profileBgOnResource`、`profileBgGlobal` 两个开关
+ * 与 `profile.bgMinLevel` 等级门槛 —— 语义是「这两张背景作为一个整体对外可见/不可见」。
+ * 设置页 UI、Server Action、前台渲染点都按这个 key 分流，避免各处硬编码字段名。
+ */
+export const PROFILE_BG_SLOTS = ["pc", "mobile"] as const;
+export type ProfileBgSlot = (typeof PROFILE_BG_SLOTS)[number];
+
 
 /** 遮罩值长度上限（只做防呆；默认值约 250 字符，正常改法不会接近它） */
 export const PROFILE_BG_MASK_MAX = 600;
@@ -241,7 +268,7 @@ export type UploadLimits = {
   avatarMaxMb: number;
   /** 主页横幅（个人主页 hero，16:5 裁剪为 1600×500）：单张上限 */
   heroImageMaxMb: number;
-  /** 个人主页背景（仅桌面端渲染）：单张上限（1..100） */
+  /** 个人主页背景（桌面端 / 移动端两个槽位共用此上限）：单张上限（1..100） */
   profileBgMaxMb: number;
   /** 图集 / 原图：单个资源可上传的图片张数上限（IMAGE 类型预览图）；只设下界，无上界 */
   galleryImageMaxCount: number;

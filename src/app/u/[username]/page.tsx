@@ -151,16 +151,20 @@ export default async function UserPage({
   // ——「达到等级才开放」是一致口径，不做「传过就永久保留」的特例。
   //
   // 【与「全局显示」的优先级】主人背景 > 访客自己的全局背景。这里**不做** JS 去重，
-  // 交给 globals.css 的 `body:has([data-profile-bg-owner]) [data-profile-bg-global]`：
-  // 本层铺了就标 data-profile-bg-owner，全局层随之自隐。纯 CSS 判渲染结果，
+  // 交给 globals.css 里**按断点成对**的 `body:has([data-profile-bg-owner-pc]) [data-profile-bg-global-pc]`
+  // （移动端那对同理）：本层铺了就标对应的 owner 标记，同断点的全局层随之自隐。纯 CSS 判渲染结果，
   // 不用复制服务端的开关/等级口径，软导航也不会错帧。
   const bgUnlocked = profileBgUnlocked(levelIndex, incentive.profile.bgMinLevel, incentive.enabled);
-  const bgPcKey = bgUnlocked ? profile.profileBgPcKey : null;
+  // 两个槽位各自独立：只设了桌面端就只有桌面端那层，移动端保持素底（**不做跨槽回落** ——
+  // 把横图硬塞进竖屏会被 cover 裁得看不出原图，那比素底更像坏了）。
+  const bgPcUrl = bgUnlocked && profile.profileBgPcKey ? publicUrl(profile.profileBgPcKey) : null;
+  const bgMobileUrl =
+    bgUnlocked && profile.profileBgMobileKey ? publicUrl(profile.profileBgMobileKey) : null;
 
-  const bgUrl = bgPcKey ? publicUrl(bgPcKey) : null;
-  // 遮罩形状是**该主页主人自己的**设置（User.profileBgMask，在设置页填）。渲染前过一道形状校验：
+  // 遮罩形状是**该主页主人自己的**设置（在设置页填，桌面端与移动端各一份）。渲染前过一道形状校验：
   // 填坏 / 库里躺着旧脏值都只退回内置默认遮罩，不会漏出外部请求，也不会让页面崩。
-  const bgMask = safeBgMask(profile.profileBgMask);
+  const bgPcMask = safeBgMask(profile.profileBgMask);
+  const bgMobileMask = safeBgMask(profile.profileBgMobileMask);
 
   // 头部操作区。编辑 / 打赏紧跟昵称末尾，作为纯图标随昵称行自然换行；
   // 关注按钮独立放在资料区最右侧，不参与昵称长度计算。
@@ -356,16 +360,32 @@ export default async function UserPage({
 
   return (
     <div className={`mx-auto max-w-7xl px-4 py-10 sm:px-6 ${profile.heroImageKey ? "pt-0" : "pt-10"}`}>
-      {/* 主页背景：铺满视口的最底层。用 fixed 而不是插在文档流里 —— 它必须是**全屏**的，
-          而这一层的外层是 max-w-7xl 容器，只有 fixed 能脱离它的宽度约束铺到屏幕两端。
-          只在 sm 及以上渲染：窄屏没有侧边留白，遮罩带会直接压到卡片下面。
-          -z-10 让它落在所有内容（含 hero）之下，且仍在 body 底色之上。 */}
-      {bgUrl && (
+      {/* 主页背景：铺满视口的最底层，桌面端 / 移动端各一张、按断点互斥显示。
+          用 fixed 而不是插在文档流里 —— 它必须是**全屏**的，而这一层的外层是 max-w-7xl 容器，
+          只有 fixed 能脱离它的宽度约束铺到屏幕两端。
+          -z-10 让它落在所有内容（含 hero）之下，且仍在 body 底色之上。
+          两个槽位**各自成对**标记（data-profile-bg-owner-pc / -mobile）：在断点互斥的显示方式下，
+          「owner 存在」必须与「owner 此刻可见」在同一个断点里成立，否则全局层会串槽
+          （只设了桌面端时却把移动端的全局背景一起隐掉）—— 详见 globals.css 的说明。 */}
+      {bgPcUrl && (
         <div
           aria-hidden
-          data-profile-bg-owner
+          data-profile-bg-owner-pc
           className="profile-bg-pc pointer-events-none fixed inset-0 -z-10 hidden bg-cover bg-center bg-no-repeat sm:block"
-          style={{ backgroundImage: `url(${bgUrl})`, "--profile-bg-mask": bgMask } as CSSProperties}
+          style={{ backgroundImage: `url(${bgPcUrl})`, "--profile-bg-mask": bgPcMask } as CSSProperties}
+        />
+      )}
+      {bgMobileUrl && (
+        <div
+          aria-hidden
+          data-profile-bg-owner-mobile
+          className="profile-bg-mobile pointer-events-none fixed inset-0 -z-10 bg-cover bg-center bg-no-repeat sm:hidden"
+          style={
+            {
+              backgroundImage: `url(${bgMobileUrl})`,
+              "--profile-bg-mask": bgMobileMask,
+            } as CSSProperties
+          }
         />
       )}
       {/* 头部：可选 hero 横幅图。移动端背景向下延伸覆盖到统计行底部，整张图用 mask 渐变：
