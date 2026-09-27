@@ -27,3 +27,10 @@ export const AV_TONE = {
 export const AV_BTN =
   "grid shrink-0 place-items-center rounded-none transition focus-visible:ring-2 focus-visible:ring-brand-400";
 export const AV_BTN_SIZE: Record<AvBtnSize, string> = { md: "h-9 w-9", lg: "h-11 w-11" };
+
+/**
+ * 带文本的自适应宽度按钮（如字幕切轨的「2/3」）只取高度。
+ * 不能复用 AV_BTN_SIZE：那里写死了 w-9，再追加 w-auto 是同属性冲突，
+ * 而 Tailwind 同属性类的产物顺序不保证 —— 会随机变成固定 36px 把文本挤出去。
+ */
+export const AV_BTN_HEIGHT: Record<AvBtnSize, string> = { md: "h-9", lg: "h-11" };

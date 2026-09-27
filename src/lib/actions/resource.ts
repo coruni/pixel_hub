@@ -7,6 +7,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { imageMetaSchema, gameMetaSchema, articleMetaSchema, avMetaSchema } from "@/lib/meta";
 import { parseAvTracksJson } from "@/lib/av-tracks";
+import { parseAvCaptionsJson } from "@/lib/captions";
 import { fillDownloadSizes } from "@/lib/download-size";
 import { autoSlugBase, randomTail, uniqueSlug } from "@/lib/slug";
 import { revalidatePath } from "next/cache";
@@ -129,6 +130,8 @@ export async function createResourceAction(
       resolution: String(fd.get("resolution") ?? "").trim() || undefined,
       // 分P / 曲目（不含主来源）：坏 JSON 交给 parseAvTracksJson 吞掉，形状由 schema 校验
       tracks: parseAvTracksJson(String(fd.get("avTracks") ?? "")),
+      // 字幕 / 歌词：文本直接内联进 meta（见 lib/captions.ts 的文件头），同样先吞坏 JSON
+      captions: parseAvCaptionsJson(String(fd.get("avCaptions") ?? "")),
       downloads,
     });
     if (!am.success) return { fieldErrors: am.error.flatten().fieldErrors };

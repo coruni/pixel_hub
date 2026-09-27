@@ -16,6 +16,12 @@
  * 上一/下一、列表切换都在本组件里做，切换只改 `<video>/<audio>` 的 src 并 `load()`——
  * 不重新挂载元素，否则列表展开态、倍速、音量会一起被重置。列表最后一项播完自动续下一项（loop 开启时不续）。
  *
+ * 字幕 / 歌词（见 av-captions.tsx）：**整份资源共用一份 cue 列表**，不按 P 分。
+ * 视频渲染成压在画面上的叠层（开关放在右上角浮层，和分P 列表开关并排 ——
+ * 底下那行控件在 320px 已经排满，塞不进第三个按钮）；
+ * 音频渲染成卡片内的滚动歌词板（开关进控件行，那行本来就是 flex-wrap）。
+ * 同一个开关既切显隐也切歌词板的存亡，不额外做折叠。
+ *
  * 与宿主的契约：`downloadSlot` 是宿主（av-player，服务端组件）注入的控件位——下载入口由宿主渲染
  * （保留登录墙与下载计数的唯一实现），这里只负责把它排进控件行并保证色调一致。多 P 时它指向第一 P。
  */
@@ -30,7 +36,9 @@ import {
   AV_CTRL_ON_SURFACE_ACTIVE as AUDIO_ON,
 } from "@/lib/ui/cls";
 import { avItemLabel, type AvPlayItem } from "@/lib/av-tracks";
+import type { CaptionDraft } from "@/lib/captions";
 import { AvListToggle, AvStepButton, AvTrackList } from "./av-playlist";
+import { CaptionControls, CaptionLayer, captionName, cueAt, LyricsPanel, useAvCaptions } from "./av-captions";
 import Bar from "./av-bar";
 
 /** 倍速档位（循环切换） */
@@ -57,6 +65,7 @@ export default function AvControls({
   items,
   poster,
   title,
+  captions,
   downloadSlot,
 }: {
   kind: "MUSIC" | "VIDEO";
@@ -64,6 +73,8 @@ export default function AvControls({
   items: AvPlayItem[];
   poster?: string;
   title: string;
+  /** 字幕 / 歌词（整份资源共用；空数组 = 作者没挂，控件行与浮层都不出现相关按钮） */
+  captions: CaptionDraft[];
   /** 宿主注入的控件位（当前放下载入口）：由 av-player 渲染，色调与播放器控件一致，融进同一行 */
   downloadSlot?: ReactNode;
 }) {
@@ -100,6 +111,14 @@ export default function AvControls({
   const multi = items.length > 1;
   /** 媒体元素的可访问名：多 P 时带上当前 P，屏幕阅读器才知道切到哪一集了 */
   const mediaLabel = multi ? `${title} · ${avItemLabel(item, at, avKind)}` : title;
+
+  // —— 字幕 / 歌词：解析按轨 memo（见 useAvCaptions），只有「当前显示第几行」跟着播放时间走 ——
+  const cap = useAvCaptions(captions);
+  const capName = captionName(cap.current, cap.index, cap.count, avKind);
+  /** 这份字幕有没有实际内容（空文本 / 坏数据解析后可能啥都没有，那就不给它按钮） */
+  const capReady = cap.parsed.cues.length > 0 || cap.parsed.lines.length > 0;
+  const cueIdx = cueAt(cap.parsed, current, cap.on);
+  const cueText = cueIdx >= 0 ? cap.parsed.cues[cueIdx].text : null;
 
   /** 切到第 n P：保留当前播放态（暂停中就仍是暂停），失败态清掉等新源重新判定 */
   const goTo = (n: number) => {
@@ -212,6 +231,13 @@ export default function AvControls({
     m.currentTime = t;
     setCurrent(t);
   };
+  /** 按绝对秒跳转（歌词行点击）；与进度条不同，这里不经过 0..1 比例换算 */
+  const seekTo = (sec: number) => {
+    const m = mediaRef.current;
+    if (!m || !Number.isFinite(sec)) return;
+    m.currentTime = sec;
+    setCurrent(sec);
+  };
   const changeVolume = (r: number) => {
     const m = mediaRef.current;
     if (!m) return;
@@ -320,8 +346,12 @@ export default function AvControls({
           </span>
         </button>
 
-        {/* 多 P 浮层：上一/下一在画面两侧、列表开关在右上角。
-            不放进下方控件行是有原因的——320px 下那一行已经排满，再塞三个按钮必然横向溢出。 */}
+        {/* 字幕叠层：压在画面底部、控件行之上（bottom-14 正好避开那行渐变浮层）。
+            指针穿透，不挡画面点击。 */}
+        <CaptionLayer text={cap.on ? cueText : null} />
+
+        {/* 多 P 浮层：上一/下一在画面两侧。
+            不放进下方控件行是有原因的——320px 下那一行已经排满，再塞两个按钮必然横向溢出。 */}
         {multi && (
           <>
             <div
@@ -354,20 +384,39 @@ export default function AvControls({
                 size="lg"
               />
             </div>
-            <div
-              className={`absolute right-2 top-2 border border-white/25 bg-black/55 transition-opacity ${
-                uiOn ? "opacity-100" : "pointer-events-none opacity-0"
-              }`}
-            >
+          </>
+        )}
+
+        {/* 右上角：字幕开关 + 分P 列表开关并排（两者都是压在画面上的大按钮，尺寸必须同一档） */}
+        {(multi || capReady) && (
+          <div
+            className={`absolute right-2 top-2 flex items-center gap-0.5 border border-white/25 bg-black/55 px-0.5 transition-opacity ${
+              uiOn ? "opacity-100" : "pointer-events-none opacity-0"
+            }`}
+          >
+            {capReady && (
+              <CaptionControls
+                on={cap.on}
+                index={cap.index}
+                count={cap.count}
+                name={capName}
+                tone="onDark"
+                onToggle={cap.toggle}
+                onCycle={cap.cycle}
+                size="lg"
+              />
+            )}
+            {multi && (
               <AvListToggle
                 open={listOpen}
                 index={at}
                 count={items.length}
                 tone="onDark"
+                size="lg"
                 onToggle={() => setListOpen((v) => !v)}
               />
-            </div>
-          </>
+            )}
+          </div>
         )}
 
         {multi && listOpen && (
@@ -548,9 +597,25 @@ export default function AvControls({
               onToggle={() => setListOpen((v) => !v)}
             />
           )}
+          {capReady && (
+            <CaptionControls
+              on={cap.on}
+              index={cap.index}
+              count={cap.count}
+              name={capName}
+              tone="onSurface"
+              onToggle={cap.toggle}
+              onCycle={cap.cycle}
+            />
+          )}
           {downloadSlot}
         </div>
       </div>
+      {/* 歌词板：与视频的字幕叠层同一份 cue 数据，只是换成可滚动列表。
+          开关就是控件行里那个按钮 —— 关掉即整块收起，不再另做折叠。 */}
+      {cap.on && capReady && (
+        <LyricsPanel className="mt-3" parsed={cap.parsed} active={cueIdx} onSeek={seekTo} />
+      )}
       {/* 音频卡片里的列表常驻在卡片内（不像视频那样浮在画面上）：卡片本来就占位，撑开即可 */}
       {multi && listOpen && (
         <AvTrackList

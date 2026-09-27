@@ -172,3 +172,38 @@
 - `parseMeta` 的音视频分支在整块 parse 失败后会**丢掉 tracks 再试一次**：tracks 是附加信息，
   一条脏分P 不该把已落库的 `url` 一起拖进 `AV_META_FALLBACK`。
 
+## 音视频字幕 / 歌词（2026-09-27 起）
+
+- **字幕文本内联在 `meta.captions[].text`，不存地址、不走上传通道**。三条理由：`<track>` 只认
+  WebVTT（srt/lrc 反正得自己解析）；站内 `/od/…` 会 302 到**不带 CORS 头**的 Graph 预鉴权链接，
+  客户端 fetch 必失败（内联绕开，也省掉一个转发字节的代理路由）；文本小（一部电影 20–80KB）。
+  代价是 meta 变大 → 单份上限 `AV_CAPTION_TEXT_MAX` 160K 字符、最多 `AV_CAPTIONS_MAX` 6 条，
+  且 `feedSelect` 不取 meta（列表页不会被拖胖）。
+- **`src/lib/captions.ts` 是字幕唯一事实来源**（格式表 / 上限 / 嗅探 / 五种解析器 / 当前行二分 /
+  表单 JSON）。依赖单向：`meta.ts → captions.ts`，**不能反过来**（会循环）。
+- 支持 vtt / srt / lrc / ass(ssa) / txt；**不做** smi / ttml / sub+idx（图形字幕要 OCR）。
+  时间戳统一按**小数位数**定标（1 位=十分秒、2 位=厘秒=ASS、3 位=毫秒）；cue 的 `end` **只收紧不拉长**
+  （srt 的空档是「字幕消失」，lrc 的占位 end 正好被这条规则收成「唱到下一句」）。
+- 渲染**自绘，不用 `<track>`**（原生 cue 样式活在 UA shadow 里，改不动）：视频 = 画面底部叠层
+  （`bottom-14` 让开控件行 + `pointer-events-none` 不挡点画面），音频 = 卡片内滚动歌词板（点行跳转）。
+  **歌词板自动滚动手算 `scrollTop`，禁止 `scrollIntoView`** —— 后者会连整个页面一起滚。
+- 落位：视频的字幕开关 + 分P 列表开关**并排右上角浮层**（底下控件行 320px 排满）；音频进控件行。
+  一个开关既切显隐也切歌词板存亡，不另做折叠。嵌入页字幕由来源站点控制，站内挂的不生效（已提示）。
+- 按钮原语抽到 `detail/av-btn.tsx`；**带文本的按钮（如「3/8」）用 `AV_BTN_HEIGHT`（只取高度）**，
+  不要用 `AV_BTN_SIZE` 再追加 `w-auto` —— 同属性冲突且 Tailwind 产物顺序不保证。
+- `parseMeta` 降级链三级：整块 → 丢 captions → 再丢 tracks → 兜底（字幕长文本最容易被卡住）。
+- 草稿 `avCaptions` 上限给到 1.2M 字符：`draftPayloadSchema` 一失败 `parseDraftPayload` 会把
+  **整条草稿**回落成空，宁可放宽也不能收紧。
+
+## 打赏入口（2026-09-27 口径反转）
+
+- **打赏的唯一入口 = 资源详情页 `ActionBar`**（`detail/parts.tsx`），作品维度：
+  `TipRecord.resourceId = 作品 id`，收款方由服务端从作品反查作者（`sendTipAction`）。
+- **个人主页的「直接打赏作者」入口与 `TipUserButton` 组件、`sendUserTipAction` 已整体删除。**
+  别信 `TipButton.tsx` / `TipUserButton.tsx` 的历史注释里「打赏只在个人主页」那一版 —— 那是上一轮口径，
+  现在反过来：作者维度（`resourceId = null` + 客户端传 toUserId）这条路径不再有 UI 入口，action 也没了。
+- 不出入口的三个条件：**未登录**（打赏要余额，不给点了必然报错的面板；点赞/收藏零成本才给登录链接）、
+  **作者本人**、**激励体系或打赏开关关闭**（`tipFormOf` 返回 undefined）。
+- `ActionBar` 是 async 组件（内部 `await getIncentive()`，走 `cache()` 不额外查库），
+  且被 **post / banner / twocol / article 四个模板共用** —— 改它的可见范围等于改四种类型的详情页。
+

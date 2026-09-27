@@ -448,8 +448,8 @@ export function tipPresets(minCoin: number, maxCoin: number, count = 4): number[
 }
 
 /**
- * 打赏面板参数。**「打赏作品」与「直接打赏作者」共用这一份形状** —— 两者 UI 完全一致，
- * 只差提交目标（TipRecord.resourceId 有没有值），所以参数不该各拼一遍。
+ * 打赏面板参数（TipDialog / TipButton 的形状契约）：数量上下限、预设档、币种符号与附言长度上限，
+ * 全部来自后台可配的激励配置。
  * 关闭激励体系或关闭打赏时返回 `undefined`：此时前台**完全不出入口**，不要渲染点了没反应的按钮。
  */
 export type TipForm = {

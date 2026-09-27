@@ -23,18 +23,17 @@ import {
   type AvSource,
 } from "@/lib/av";
 import { serializeAvTracks } from "@/lib/av-tracks";
+import type { CaptionDraft } from "@/lib/captions";
 import { AV_TRACKS_MAX, type AvTrack } from "@/lib/meta";
 import { capturePoster, probeFile, probeSummary, probeUrl, type AvProbe } from "@/lib/av-probe";
 import { mbText, type UploadLimits } from "@/lib/upload-config";
 import { formatBytes } from "@/lib/format";
 import { uploadAttachment } from "@/lib/upload-attachment-client";
 import { useFileDrop } from "@/lib/hooks/use-file-drop";
-import { fieldErr, wizInput, wizLabel, SectionTitle, STEP } from "./wizard-shared";
+import { fieldErr, wizBtn as btnBase, wizInput, wizLabel, SectionTitle, STEP } from "./wizard-shared";
 import { AttachmentUpload } from "./AttachmentUpload";
+import { CaptionSection } from "./caption-section";
 import { Button } from "@/components/ui/Button";
-
-const btnBase =
-  "inline-flex items-center justify-center gap-1.5 rounded-none border px-3 py-2 text-sm transition";
 
 /** 可自动抓取的字段 */
 type FieldKey = "duration" | "artist" | "resolution";
@@ -48,6 +47,8 @@ export type AvSectionInitial = Partial<Record<FieldKey, string>> & {
   url?: string;
   /** 分P / 曲目（**不含主来源**那一 P；发布侧存的是 meta.tracks） */
   tracks?: TrackRow[];
+  /** 字幕 / 歌词（文本内联在 meta.captions，不走上传通道） */
+  captions?: CaptionDraft[];
 };
 
 export function AvSection({
@@ -439,6 +440,9 @@ export function AvSection({
         <input type="hidden" name="avTracks" value={serializeAvTracks(tracks)} />
         {fieldErr(fieldErrors?.tracks)}
       </div>
+
+      {/* ---- 字幕 / 歌词 ---- */}
+      <CaptionSection avKind={avKind} initial={initial?.captions} fieldErrors={fieldErrors} />
 
       {/* ---- 类型补充字段（自动抓取，可手改） ---- */}
       <div className="grid gap-4 sm:grid-cols-2">

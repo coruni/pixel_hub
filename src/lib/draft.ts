@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isCaptionFormat, type CaptionDraft } from "@/lib/captions";
 import { isSingleCoverType } from "@/lib/upload-config";
 
 /**
@@ -74,6 +75,10 @@ export const draftPayloadSchema = z.object({
   avUrl: text(2000),
   avMode: text(16),
   avTracks: text(20000), // 分P / 曲目 JSON 原文（与 downloads 同款受控序列化）
+  // 字幕 / 歌词 JSON 原文。上限按「6 份 × 单份 160K 字符」再留 JSON 转义的余量
+  //（换行与引号会被转义膨胀约两成）——**宁可放宽也不能收紧**：draftPayloadSchema 一旦
+  // safeParse 失败，parseDraftPayload 会把整条草稿回落成空，作者填的其它字段一起陪葬。
+  avCaptions: text(1_200_000),
   duration: text(40),
   artist: text(160),
   resolution: text(40),
@@ -123,6 +128,7 @@ export function draftHasContent(p: DraftPayload): boolean {
   ];
   if (texts.some((t) => t.trim() !== "")) return true;
   if (p.avTracks.trim() !== "" && p.avTracks.trim() !== "[]") return true;
+  if (p.avCaptions.trim() !== "" && p.avCaptions.trim() !== "[]") return true;
   return p.downloads.trim() !== "" && p.downloads.trim() !== "[]";
 }
 
@@ -177,6 +183,27 @@ export function draftTracksOf(p: DraftPayload): { title: string; url: string }[]
       .filter((t): t is Record<string, unknown> => !!t && typeof t === "object")
       .map((t) => ({ title: String(t.title ?? ""), url: String(t.url ?? "") }))
       .filter((t) => t.url.trim() !== "");
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * 草稿里的字幕 / 歌词清单（avCaptions JSON 原文）；坏数据一律回落空数组，绝不抛错。
+ * 格式字段同时兜一层 `isCaptionFormat` —— 草稿可能来自改动前的旧版本或手改过的 localStorage。
+ */
+export function draftCaptionsOf(p: DraftPayload): CaptionDraft[] {
+  try {
+    const arr: unknown = JSON.parse(p.avCaptions || "[]");
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .filter((c): c is Record<string, unknown> => !!c && typeof c === "object")
+      .map((c) => ({
+        label: String(c.label ?? ""),
+        format: isCaptionFormat(c.format) ? c.format : "srt",
+        text: String(c.text ?? ""),
+      }))
+      .filter((c) => c.text.trim() !== "");
   } catch {
     return [];
   }
@@ -266,6 +293,7 @@ export function collectDraft(
     avUrl: str("avUrl"),
     avMode: str("avMode"),
     avTracks: str("avTracks"),
+    avCaptions: str("avCaptions"),
     duration: str("duration"),
     artist: str("artist"),
     resolution: str("resolution"),

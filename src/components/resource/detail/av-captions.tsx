@@ -24,7 +24,14 @@ import {
   type ParsedCaption,
 } from "@/lib/captions";
 import type { AvKind } from "@/lib/av";
-import { AV_BTN as BTN, AV_BTN_SIZE as SIZE, AV_TONE as TONE, type AvBtnSize, type AvTone } from "./av-btn";
+import {
+  AV_BTN as BTN,
+  AV_BTN_HEIGHT,
+  AV_BTN_SIZE as SIZE,
+  AV_TONE as TONE,
+  type AvBtnSize,
+  type AvTone,
+} from "./av-btn";
 
 /** 轨道展示名：作者填了就用，没填按类型回退「歌词 / 字幕」（多轨才带序号） */
 export function captionName(
@@ -104,19 +111,14 @@ export function CaptionControls({
           onClick={onCycle}
           aria-label={`切换到下一条字幕（当前 ${name}）`}
           title={`切换到下一条字幕（当前 ${name}）`}
-          className={`${BTN} ${SIZE[size]} px-1 text-xs tabular-nums ${TONE[tone].off}`}
+          // 序号与分P 列表开关同款：一眼看出「有几条、现在是第几条」
+          className={`inline-flex shrink-0 items-center justify-center gap-1 rounded-none px-1.5 text-xs tabular-nums transition focus-visible:ring-2 focus-visible:ring-brand-400 ${AV_BTN_HEIGHT[size]} ${TONE[tone].off}`}
         >
-          {/* 序号与分P 列表开关同款：一眼看出「有几条、现在是第几条」 */}
-          <SubtrackIndex index={-1} />
+          {index + 1}/{count}
         </button>
       )}
     </span>
   );
-}
-
-// 占位组件：切轨按钮里的序号文本由外层写死太绕，这里保持结构简单
-function SubtrackIndex(_: { index: number }) {
-  return null;
 }
 
 /** 视频字幕叠层。没有当前行（空档 / 关闭 / 播完）就整块不渲染，别留一条空条 */

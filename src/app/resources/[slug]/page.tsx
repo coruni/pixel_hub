@@ -123,7 +123,8 @@ export default async function ResourcePage({ params }: PageProps) {
     getTheme(),
     meId ? getCollections(meId) : Promise.resolve([]),
   ]);
-  // 激励配置（请求级缓存，与 sidebar/首页共用一次查询）：只为详情页取打赏参数
+  // 激励配置（请求级缓存，与 sidebar/首页共用一次查询）：这里只为「作者主页背景」的等级门槛。
+  // 打赏面板参数不经过本页 → ActionBar 自己 await getIncentive()，同一个 cache 实例，不会多查库。
   const incentive = await getIncentive();
 
   if (!detail) notFound();

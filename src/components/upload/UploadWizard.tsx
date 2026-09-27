@@ -23,6 +23,7 @@ import {
   DRAFT_AUTOSAVE_DELAY,
   DRAFT_AUTOSAVE_INTERVAL,
   collectDraft,
+  draftCaptionsOf,
   draftDownloadsOf,
   draftHasContent,
   draftPayloadSchema,
@@ -670,5 +671,6 @@ function avInitial(d: DraftPayload | null) {
     artist: d.artist,
     resolution: d.resolution,
     tracks: draftTracksOf(d),
+    captions: draftCaptionsOf(d),
   };
 }

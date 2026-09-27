@@ -20,7 +20,7 @@ import { createNotification } from "@/lib/notify";
 export type TipInput = {
   fromUserId: string;
   toUserId: string;
-  /** 关联作品（可空 = 直接打赏作者） */
+  /** 关联作品（可空：库里仍有早年「直接打赏作者」留下的无作品记录，读侧要能显示它们） */
   resourceId?: string | null;
   coin: number;
   message?: string | null;

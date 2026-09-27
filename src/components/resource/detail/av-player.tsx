@@ -19,6 +19,7 @@ import {
   ListMusic,
   MonitorPlay,
   Music2,
+  Subtitles,
   User,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -127,6 +128,15 @@ export function AvPlayerBlock({ ctx }: { ctx: DetailCtx }) {
           )}
           {!multi && meta.duration && <Chip Icon={Clock} label="时长" value={meta.duration} />}
           {format && <Chip Icon={FormatIcon} label="格式" value={format} />}
+          {meta.captions.length > 0 && (
+            <Chip
+              Icon={Subtitles}
+              label={isAudio ? "歌词" : "字幕"}
+              value={
+                meta.captions.length > 1 ? `${meta.captions.length} 条` : meta.captions[0].format.toUpperCase()
+              }
+            />
+          )}
           {isAudio && meta.artist && <Chip Icon={User} label="艺术家" value={meta.artist} />}
           {!isAudio && meta.resolution && <Chip Icon={MonitorPlay} label="画质" value={meta.resolution} />}
         </div>
@@ -167,10 +177,19 @@ export function AvPlayerBlock({ ctx }: { ctx: DetailCtx }) {
             items={list}
             poster={coverUrl}
             title={detail.title}
+            captions={meta.captions}
             downloadSlot={downloadSlot}
           />
         )}
       </div>
+
+      {/* 嵌入页的字幕由来源站点自己的播放器控制，站内挂的这份用不上——说清楚，别让作者以为挂丢了 */}
+      {meta.mode === "embed" && meta.captions.length > 0 && (
+        <p className="mt-3 flex items-start gap-1.5 text-xs text-neutral-500">
+          <Subtitles size={12} className="mt-0.5 shrink-0" aria-hidden />
+          嵌入页播放时字幕由来源站点控制，这里挂载的 {meta.captions.length} 条不会显示。
+        </p>
+      )}
 
       {!localFile && primaryUrl && (
         <p className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-neutral-500">

@@ -7,6 +7,10 @@ export const wizInput =
   "w-full rounded-none border border-brand-200 bg-surface px-3.5 py-2.5 text-sm outline-none transition placeholder:text-neutral-400 focus:border-brand-500";
 export const wizLabel = "mb-1 block text-sm font-medium text-neutral-700";
 
+/** 分节内的小按钮（av-section / caption-section 共用一套盒模型，避免两处各写一份字符串） */
+export const wizBtn =
+  "inline-flex items-center justify-center gap-1.5 rounded-none border px-3 py-2 text-sm transition";
+
 /**
  * 表单内分节编号：发布向导（/upload）与改稿页（/admin/content/[id]/edit）共用同一批分节组件，
  * 所以两边必须用同一份编号，从 1 起连号——否则一旦某边多/少一屏就会各自漂移。

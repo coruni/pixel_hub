@@ -13,7 +13,14 @@ import type { CSSProperties } from "react";
 import { ListMusic, SkipBack, SkipForward } from "lucide-react";
 import { avItemLabel, avStepLabel, type AvPlayItem } from "@/lib/av-tracks";
 import type { AvKind } from "@/lib/av";
-import { AV_BTN as BTN, AV_BTN_SIZE as SIZE, AV_TONE as TONE, type AvBtnSize, type AvTone } from "./av-btn";
+import {
+  AV_BTN as BTN,
+  AV_BTN_HEIGHT,
+  AV_BTN_SIZE as SIZE,
+  AV_TONE as TONE,
+  type AvBtnSize,
+  type AvTone,
+} from "./av-btn";
 
 export type { AvTone };
 
@@ -82,7 +89,9 @@ export function AvListToggle({
       aria-expanded={open}
       aria-label={label}
       title={label}
-      className={`inline-flex ${SIZE[size]} shrink-0 items-center justify-center gap-1 rounded-none transition focus-visible:ring-2 focus-visible:ring-brand-400 ${
+      // 宽度自适应：`SIZE` 里写死了 w-9/w-11，而这个按钮里既要放图标又要放「3/8」，
+      // 固定宽度会让文本溢出容器、和相邻按钮视觉重叠。高度仍与方形按钮对齐（见 av-btn.tsx）。
+      className={`inline-flex ${AV_BTN_HEIGHT[size]} shrink-0 items-center justify-center gap-1 rounded-none px-1.5 transition focus-visible:ring-2 focus-visible:ring-brand-400 ${
         open ? TONE[tone].on : TONE[tone].off
       } ${className ?? ""}`}
     >

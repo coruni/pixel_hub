@@ -17,6 +17,8 @@ import Markdown from "@/components/rte/Markdown";
 import MarkdownImages from "@/components/rte/MarkdownImages";
 import { FavoriteButton, LikeButton, FollowButton } from "@/components/social/interactions";
 import ReportButton from "@/components/social/ReportButton";
+import TipButton from "@/components/social/TipButton";
+import { tipFormOf } from "@/lib/points-config";
 import { getUploadLimits } from "@/lib/upload-limits";
 import { getIncentive } from "@/lib/incentive";
 
@@ -178,17 +180,25 @@ export function AuthorStrip({ ctx }: { ctx: DetailCtx }) {
 }
 
 /**
- * 主操作：点赞 / 收藏 / 举报 / 编辑（未登录给登录入口）；下载统一走附件面板。
+ * 主操作：点赞 / 收藏 / 打赏 / 举报 / 编辑（未登录给登录入口）；下载统一走附件面板。
  *
  * 一行「图标 + 文字」的动作条，收在行右端——读者的点赞/收藏是读完之后的顺手动作，
  * 固定在内容右端才符合「翻到哪、点到哪」的操作习惯；做成带框带底的按钮则会在图集下方
  * 堆出一整块视觉重量，把注意力从作品本身抢走。状态靠颜色 + 文案（点赞 ↔ 已赞）双通道表达，
  * 不依赖颜色单通道。动作项样式见 Button 的 `action` 变体。
+ *
+ * 【打赏只在详情页】钱记在这件作品名下（`TipRecord.resourceId = id`），个人主页的作者维度入口已撤掉
+ * ——收款方本来就是同一个人，两个入口只会让人犹豫按哪个。三个不出入口的条件：
+ *   ① 未登录（没有余额可付，给一个点了必然报错的面板不如不给；点赞/收藏零成本，才给登录链接）
+ *   ② 作者本人（服务端也拦「不能打赏自己」，这里不渲染废按钮）
+ *   ③ 激励体系或打赏开关关闭（`tipFormOf` 返回 undefined）
  */
-export function ActionBar({ ctx }: { ctx: DetailCtx }) {
+export async function ActionBar({ ctx }: { ctx: DetailCtx }) {
   const { detail, meId, authed, isAuthor, isStaff } = ctx;
   const path = callbackPath(detail.slug);
   const loginHref = `/login?callbackUrl=${encodeURIComponent(path)}`;
+  // 打赏面板参数与后台配置同源；getIncentive 走 cache()，与页面其它取配置处共用一次查询
+  const tipForm = tipFormOf(await getIncentive());
   return (
     <div>
       <div className="mt-4 flex flex-wrap items-center justify-end gap-x-4 gap-y-0.5">
@@ -206,6 +216,7 @@ export function ActionBar({ ctx }: { ctx: DetailCtx }) {
               collections={ctx.myCollections}
               initialCollectionId={detail.viewer.favoriteCollectionId}
             />
+            {!isAuthor && tipForm && <TipButton resourceId={detail.id} {...tipForm} />}
           </>
         ) : (
           <>

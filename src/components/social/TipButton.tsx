@@ -1,10 +1,13 @@
 "use client";
 
 // 作品维度打赏按钮：钱记在这件作品名下（`TipRecord.resourceId = 作品 id`）。
-// 面板本身在 `TipDialog` —— 与「直接打赏作者」共用同一套 UI 与校验，只换 `onSubmit`。
 //
-// 【为什么不新起一行】打赏与点赞/收藏/关注是同一层的「读完顺手做的事」，
-// 所以它沿用 Button 的 `action` 变体（图标 + 文字，与 ACTION_TEXT 同源），留在 ActionBar 那一行里（计划 §8）。
+// 【全站唯一的打赏入口】打赏只在资源详情页的操作条出现（见 detail/parts.tsx 的 ActionBar）；
+// 个人主页那个「直接打赏作者」的入口已撤掉 —— 收款方本来就是同一个人，两个入口只会让人犹豫按哪个。
+// 面板本身在 `TipDialog`，与提交参数一起由调用方传入，这里只负责按钮 + 打开面板。
+//
+// 【为什么不新起一行】打赏与点赞/收藏是同一层的「读完顺手做的事」，
+// 所以它沿用 Button 的 `action` 变体（图标 + 文字，与 ACTION_TEXT 同源），留在 ActionBar 那一行里。
 // 面板做成自包含的浮层：ActionBar 是 `justify-end` 的单行容器，任何内联展开都会把整行推歪。
 import { useState } from "react";
 import { Coins } from "lucide-react";

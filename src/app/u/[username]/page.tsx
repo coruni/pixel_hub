@@ -7,7 +7,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { getIncentive } from "@/lib/incentive";
 import { getPointBalance } from "@/lib/points";
-import { levelNameOf, levelOf, tipFormOf } from "@/lib/points-config";
+import { levelNameOf, levelOf } from "@/lib/points-config";
 import LevelBadge from "@/components/ui/LevelBadge";
 import {
   getFeed,
@@ -30,7 +30,6 @@ import Nickname from "@/components/ui/Nickname";
 import ResourceGrid from "@/components/resource/ResourceGrid";
 import PresenceAvatar from "@/components/ui/PresenceAvatar";
 import { FollowButton } from "@/components/social/interactions";
-import TipUserButton from "@/components/social/TipUserButton";
 import { Button } from "@/components/ui/Button";
 
 /** 昵称后的纯图标操作：不占额外背景与内边距，仅保留可见焦点和触控尺寸。 */
@@ -168,28 +167,14 @@ export default async function UserPage({
   const bgPcMask = safeBgMask(profile.profileBgMask, "pc");
   const bgMobileMask = safeBgMask(profile.profileBgMobileMask, "mobile");
 
-  // 头部操作区。编辑 / 打赏紧跟昵称末尾，作为纯图标随昵称行自然换行；
-  // 关注按钮独立放在资料区最右侧，不参与昵称长度计算。
-  const tipForm = tipFormOf(incentive);
-  const nameActions = (
-    <span className="inline-flex shrink-0 items-center gap-0.5 align-middle">
-      {profile.isViewer ? (
-        <Link href="/settings" className={iconBtn} title="编辑资料" aria-label="编辑资料">
-          <Pencil size={15} aria-hidden />
-        </Link>
-      ) : (
-        tipForm && (
-          <TipUserButton
-            userId={profile.id}
-            username={profile.username}
-            iconOnly
-            className={iconBtn}
-            {...tipForm}
-          />
-        )
-      )}
-    </span>
-  );
+  // 头部操作区：只留「编辑资料」给本人（纯图标，随昵称行自然换行）。
+  // 打赏入口不在这里 —— 站内打赏只在资源详情页的操作条出现（作品的作者反查得到，
+  // 记在那件作品名下）；作者维度那个入口已撤掉，避免两个入口让人犹豫按哪个。
+  const nameActions = profile.isViewer ? (
+    <Link href="/settings" className={iconBtn} title="编辑资料" aria-label="编辑资料">
+      <Pencil size={15} aria-hidden />
+    </Link>
+  ) : null;
   const followAction = profile.isViewer ? null : me ? (
     <FollowButton targetUserId={profile.id} initialFollowing={profile.following} />
   ) : (
