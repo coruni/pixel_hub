@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { auth } from "@/lib/auth";
 import { NAV_ICON_MAP } from "@/lib/nav-icons";
 import { siteLogo } from "@/lib/site-url";
@@ -11,16 +12,20 @@ import { getIncentive } from "@/lib/incentive";
 import { getUnreadNotificationCount } from "@/lib/notify";
 import type { NavItem } from "@/lib/site-config";
 import { NAV_CONTROL_H } from "@/lib/ui/cls";
+import { SIMPLE_BG_COOKIE, parseSimpleBg } from "@/lib/simple-mode";
 import UserMenu from "./UserMenu";
 import NavCategoriesMenu from "./NavCategoriesMenu";
 import MobileNav from "./MobileNav";
 import SearchBox from "./SearchBox";
+import { SimpleModeToggle } from "./SimpleModeToggle";
 
 const navBtn = "inline-flex items-center gap-1.5 transition hover:text-neutral-900";
 const iconSize = 15;
 
 export default async function Navbar() {
-  const [session, seo] = await Promise.all([auth(), getSeoConfig()]);
+  const [session, seo, cookieStore] = await Promise.all([auth(), getSeoConfig(), cookies()]);
+  // 简洁模式的初值走 cookie（服务端读得到），交给下面的按钮；窄屏那一份在 MobileNav 抽屉里
+  const simpleBgOn = parseSimpleBg(cookieStore.get(SIMPLE_BG_COOKIE)?.value);
   const name = resolveHomeTitle(seo);
   const u = session?.user;
   const isStaff = u?.role === "ADMIN" || u?.role === "MODERATOR";
@@ -104,6 +109,8 @@ export default async function Navbar() {
           {/* 站内搜索（全文检索）：≥sm 行内显示；窄屏在汉堡抽屉顶部提供 */}
           <SearchBox className="hidden w-40 sm:block lg:w-52" placeholder="搜索资源…" />
           {/* 明暗切换已移入「账户设置 → 外观」：配色是低频偏好，且要跟账号走（游客跟随浏览器） */}
+          {/* 简洁模式：访客随手压掉别人的背景图，登录与否都能用；窄屏那一份在汉堡抽屉里 */}
+          <SimpleModeToggle initialOn={simpleBgOn} />
           {/* 小屏汉堡菜单：导航项 + 分类直达（桌面端隐藏） */}
           <MobileNav
             items={items.map((it) => ({
@@ -115,6 +122,7 @@ export default async function Navbar() {
             }))}
             catLabel={cm.label}
             categories={catList}
+            simpleModeOn={simpleBgOn}
           />
           {u ? (
             <UserMenu

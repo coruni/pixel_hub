@@ -1012,3 +1012,21 @@ summary {
   }
 }
 
+/* ---------- 简洁模式：访客把三类背景图整体收掉 ----------
+   背景图与遮罩形状都由**作者**设置，部分组合下正文会被压得看不清。这个开关只服务访客自己：
+   开启后个人主页背景、资源页作者背景、全站全局背景一起隐藏，页面回到纯色底。
+
+   偏好存 cookie、由 layout 在读 cookie 后把属性写到 <html>（属性名见 lib/simple-mode.ts 的
+   SIMPLE_BG_ATTR），因此 SSR 首帧就带着属性 —— 元素从一开始就是 display:none，浏览器不会去下载
+   这些背景图，也不会「先闪一帧背景再消失」。
+
+   【为什么这段故意不放进 @layer】Tailwind 的 `hidden` / `sm:block` 等 display 工具类在 utilities
+   层里，而未分层的规则优先级高于任何 @layer —— 不放进 layer 才能在 sm 以上压住 `sm:block`
+   （桌面端那两张图正是靠 sm:block 显示的）。 */
+html[data-simple-bg] [data-profile-bg-global-pc],
+html[data-simple-bg] [data-profile-bg-global-mobile],
+html[data-simple-bg] [data-profile-bg-owner-pc],
+html[data-simple-bg] [data-profile-bg-owner-mobile] {
+  display: none;
+}
+

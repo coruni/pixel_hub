@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import "./globals.css";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
@@ -9,6 +10,7 @@ import ColorModeSync from "@/components/layout/ColorModeSync";
 import GlobalProfileBgLoader from "@/components/layout/GlobalProfileBgLoader";
 import { auth } from "@/lib/auth";
 import { fromDbColorMode } from "@/lib/color-mode";
+import { SIMPLE_BG_COOKIE, parseSimpleBg } from "@/lib/simple-mode";
 import { siteUrl } from "@/lib/site-url";
 import { getSeoConfig, jsonLd, resolveHomeTitle } from "@/lib/seo-config";
 
@@ -54,7 +56,10 @@ export async function generateMetadata(): Promise<Metadata> {
 const themeInitScript = `try{var e=document.documentElement,m=e.getAttribute("data-color-mode")||"system",d=m==="dark"||(m!=="light"&&window.matchMedia("(prefers-color-scheme: dark)").matches);e.classList.toggle("dark",d);e.style.colorScheme=d?"dark":"light"}catch(err){}`;
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const [session, seo] = await Promise.all([auth(), getSeoConfig()]);
+  const [session, seo, cookieStore] = await Promise.all([auth(), getSeoConfig(), cookies()]);
+  // 简洁模式（访客降噪）：偏好存 cookie，服务端读出来直接落到 <html>，
+  // 首帧就带属性 → 背景层从渲染起就是 display:none，不会先闪一帧背景（见 globals.css 的同名段落）
+  const simpleBg = parseSimpleBg(cookieStore.get(SIMPLE_BG_COOKIE)?.value);
   const title = resolveHomeTitle(seo);
   const websiteLd = seo.structuredData
     ? jsonLd({
@@ -76,6 +81,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       className="h-full antialiased"
       // 游客取 system（跟随浏览器）；已登录取账号上的偏好。首帧脚本据此上 class
       data-color-mode={fromDbColorMode(session?.user?.colorMode)}
+      data-simple-bg={simpleBg ? "1" : undefined}
       suppressHydrationWarning
     >
       <body className="flex min-h-full flex-col bg-background text-neutral-900">

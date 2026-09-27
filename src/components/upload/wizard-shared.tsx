@@ -3,16 +3,15 @@
 import type { ReactNode } from "react";
 import { SquareCheckbox } from "../admin/SquareCheckbox";
 
+/**
+ * 表单输入框（发布向导 / 改稿页的常规字段）。
+ * 【需要别的尺寸就单写一份，别用 className 现拼】这里原本还有一个 `wizInputSm`（列表行用的矮一档，
+ * py-1.5），随「播放项行收进设置抽屉」没了调用点而被删。留下的教训是：`${wizInput} py-1.5` 这种
+ * 写法是 padding 这组属性并存，最终谁生效取决于 Tailwind 产物顺序，靠不住（本仓库吃过这个亏）——
+ * 所以抽屉里的输入盒（av-item-drawer / caption-field 各自的 boxBase）都是单独写的。
+ */
 export const wizInput =
   "w-full rounded-none border border-brand-200 bg-surface px-3.5 py-2.5 text-sm outline-none transition placeholder:text-neutral-400 focus:border-brand-500";
-
-/**
- * 列表行里的紧凑输入框：比 wizInput 矮一档（py-1.5 vs py-2.5）。
- * 单写一份而不是「`${wizInput} py-1.5`」—— 那是 padding 这组属性并存，
- * 最终谁生效取决于 Tailwind 产物顺序，不可靠（本仓库吃过这个亏）。
- */
-export const wizInputSm =
-  "w-full min-w-0 rounded-none border border-brand-200 bg-surface px-2.5 py-1.5 text-sm outline-none transition placeholder:text-neutral-400 focus:border-brand-500";
 
 export const wizLabel = "mb-1 block text-sm font-medium text-neutral-700";
 

@@ -1,9 +1,11 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { ArrowUpRight } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { fromDbColorMode } from "@/lib/color-mode";
+import { SIMPLE_BG_COOKIE, parseSimpleBg } from "@/lib/simple-mode";
 import { prisma } from "@/lib/db/prisma";
 import { getProfile } from "@/lib/queries";
 import { getUploadLimits } from "@/lib/upload-limits";
@@ -20,6 +22,7 @@ import ColorModeForm from "@/components/auth/ColorModeForm";
 import DraftsPanel from "@/components/auth/DraftsPanel";
 import { EmailForm, PasswordForm } from "@/components/auth/security-forms";
 import SettingsTabs from "@/components/auth/SettingsTabs";
+import { SimpleModeRow } from "@/components/layout/SimpleModeToggle";
 import { startGitHubBindAction, unbindGitHubAction } from "@/lib/actions/connections";
 import { countDrafts } from "@/lib/draft-store";
 import { getRuntimeConfig, githubClientId, githubClientSecret } from "@/lib/runtime-config";
@@ -60,13 +63,16 @@ export default async function SettingsPage({
   const session = await auth();
   if (!session?.user) redirect("/login?callbackUrl=/settings");
 
-  const [bind, tabRaw, limits, runtimeCfg] = await Promise.all([
+  const [bind, tabRaw, limits, runtimeCfg, cookieStore] = await Promise.all([
     searchParams.then((s) => s.bind),
     searchParams.then((s) => s.tab),
     getUploadLimits(),
     getRuntimeConfig(),
+    cookies(),
   ]);
   const bindMsg = bind ? (BIND_MESSAGES[bind] ?? null) : null;
+  // 简洁模式（外观面板里的开关）：跟 cookie 走，不是账号字段，所以直接读当前值递给客户端组件
+  const simpleBgOn = parseSimpleBg(cookieStore.get(SIMPLE_BG_COOKIE)?.value);
 
   const me = session.user;
   const profile = await getProfile(me.username, me.id);
@@ -287,13 +293,28 @@ export default async function SettingsPage({
       key: "appearance",
       label: "外观",
       panel: (
-        <section className={sectionCls}>
-          <h2 className={sectionTitle}>配色模式</h2>
-          <p className={sectionHint}>
-            选择站点的明暗配色；换设备登录同样生效。未登录的访客一律跟随浏览器的配色设置
-          </p>
-          <ColorModeForm mode={fromDbColorMode(prefs?.colorMode)} />
-        </section>
+        <>
+          <section className={sectionCls}>
+            <h2 className={sectionTitle}>配色模式</h2>
+            <p className={sectionHint}>
+              选择站点的明暗配色；换设备登录同样生效。未登录的访客一律跟随浏览器的配色设置
+            </p>
+            <ColorModeForm mode={fromDbColorMode(prefs?.colorMode)} />
+          </section>
+
+          <section className={sectionCls}>
+            <h2 className={sectionTitle}>简洁模式</h2>
+            <p className={sectionHint}>
+              隐藏他人设置的背景图（个人主页背景、资源页作者背景、全站全局背景），
+              避免背景压住正文。只影响当前浏览器，点击即时生效、无需保存
+            </p>
+            <SimpleModeRow
+              initialOn={simpleBgOn}
+              label="隐藏全站背景图"
+              className="border border-brand-200 px-3 py-2.5 hover:border-brand-400 hover:bg-brand-50"
+            />
+          </section>
+        </>
       ),
     },
     {

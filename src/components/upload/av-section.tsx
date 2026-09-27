@@ -5,9 +5,9 @@
 // 表单形状就是一个「播放项」列表，与 lib/av-tracks.ts 的 avPlaylist 完全同构：
 //   第 1 行 = 主来源（落 meta.title / meta.url / meta.caption）
 //   其余行 = 分P / 曲目（落 meta.tracks[]，每行含自己的标题、地址与字幕）
-// 每行都是「标题 | 链接（框内嵌上传按钮）| 删除」，歌词 / 字幕挂在行下面 —— 一项一份。
+// 每行在列表里只显示标题 + 行尾设置图标，地址、上传、歌词 / 字幕都在那颗图标打开的抽屉里。
 //
-// 没有「上传模式」选择：地址框里既能手填链接，也能点旁边的按钮上传文件（上传完回填站内地址）。
+// 没有「上传模式」选择：地址框里既能手填链接，也能点上传按钮传文件（上传完回填站内地址）。
 // 站内路径与 http(s) 外链由 URL 形态自解释，不需要作者再声明一次。
 //
 // 播放形态也不再手选：音频**恒站内播放**（不再提供 iframe 形态）；视频保留嵌入页，
@@ -149,9 +149,9 @@ export function AvSection({
       <div>
         <span className={wizLabel}>{unit}列表</span>
         <p className="mb-2 text-[11px] leading-4 text-neutral-400">
-          一行一个播放项，第一行是主来源，其余按顺序播放。地址可粘链接、点上传按钮，或把文件拖到那一行上
-          （单文件 {mbText(limits.attachmentMaxMb)}，支持 {avExtsSample(avKind, 5)}），标题会按文件名自动填；
-          {isAudio ? "歌词" : "字幕"}挂在行尾按钮里，随{unit}切换。
+          一行一个播放项，第一行是主来源，其余按顺序播放。行上只显示标题，改地址、传文件、挂
+          {isAudio ? "歌词" : "字幕"}都点行尾的设置按钮；也可以把文件直接拖到那一行上
+          （单文件 {mbText(limits.attachmentMaxMb)}，支持 {avExtsSample(avKind, 5)}），标题会按文件名自动填。
           {isAudio
             ? "音频一律用站内播放器。"
             : "站内文件与直链用站内播放器，网页地址（B 站 / YouTube 等）自动改用嵌入页。"}
@@ -168,8 +168,6 @@ export function AvSection({
               limits={limits}
               isMain
               canRemove={rows.length > 1}
-              urlName="avUrl"
-              titleName="avTitle"
               fieldErrors={fieldErrors}
               captionErrorKey="caption"
               onPatch={(p) => patch(main.id, p)}
@@ -206,8 +204,11 @@ export function AvSection({
         {msg && <p className="mt-1.5 text-xs text-amber-600">{msg}</p>}
 
         {/* 受控序列化（与 downloads 同款）：地址为空的行不提交，服务端按 avMetaSchema 再校验一次。
-            主来源的地址 / 标题是具名输入框（avUrl / avTitle），这里只补它那份字幕与其余行。 */}
+            主来源的标题 / 地址 / 字幕与其余行**全部**在这里序列化 —— 行上的编辑控件都收在抽屉里、
+            关着时不渲染，字段若挂在那边一关抽屉就丢值。 */}
         <input type="hidden" name="avMode" value={mode} />
+        <input type="hidden" name="avTitle" value={main?.title ?? ""} />
+        <input type="hidden" name="avUrl" value={main?.url ?? ""} />
         <input type="hidden" name="avCaption" value={serializeCaptionDraft(main?.caption)} />
         <input type="hidden" name="avTracks" value={serializeAvTracks(rest)} />
         {fieldErr(fieldErrors?.tracks)}

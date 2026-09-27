@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/lib/auth";
 import { getPointBalance } from "@/lib/points";
@@ -5,6 +6,7 @@ import { levelOf } from "@/lib/points-config";
 import { getIncentive } from "@/lib/incentive";
 import { profileBgUnlocked, safeBgMask } from "@/lib/upload-config";
 import { publicUrl } from "@/lib/storage/url";
+import { SIMPLE_BG_COOKIE, parseSimpleBg } from "@/lib/simple-mode";
 import GlobalProfileBg from "./GlobalProfileBg";
 
 // 主页背景「全局显示」的服务端取数层（客户端渲染见 GlobalProfileBg.tsx）。
@@ -14,6 +16,9 @@ import GlobalProfileBg from "./GlobalProfileBg";
 //
 // 【短路顺序：先开关、再点数】绝大多数用户没开全局，连 getPointBalance 都不会发生。
 export default async function GlobalProfileBgLoader() {
+  // 简洁模式开着时全局层一定不渲染 —— 先短路，连 auth 与几次查询都省掉
+  if (parseSimpleBg((await cookies()).get(SIMPLE_BG_COOKIE)?.value)) return null;
+
   const session = await auth();
   const userId = session?.user?.id;
   if (!userId) return null;

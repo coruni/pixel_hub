@@ -8,6 +8,7 @@ import type { NavCategory } from "./NavCategoriesMenu";
 import { Button } from "@/components/ui/Button";
 import { NAV_ICON_BTN } from "@/lib/ui/cls";
 import SearchBox from "./SearchBox";
+import { SimpleModeRow } from "./SimpleModeToggle";
 
 export type MobileNavItem = {
   id: string;
@@ -22,10 +23,13 @@ export default function MobileNav({
   items,
   catLabel,
   categories,
+  simpleModeOn,
 }: {
   items: MobileNavItem[];
   catLabel: string;
   categories: NavCategory[];
+  /** 简洁模式当前状态（服务端按 cookie 写好，切换后由组件自己维护） */
+  simpleModeOn: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -105,6 +109,16 @@ export default function MobileNav({
                 </ul>
               </div>
             )}
+
+            {/* 简洁模式：抽屉本身盖住了整页，切换后顺手收起抽屉，用户才看得到效果 */}
+            <div className="mt-2 border-t border-brand-100 pt-2">
+              <SimpleModeRow
+                initialOn={simpleModeOn}
+                hint="隐藏全站背景图，正文不再被背景压住"
+                onChanged={close}
+                className="px-3 py-2.5 hover:bg-brand-50"
+              />
+            </div>
           </nav>
         </div>
       )}
