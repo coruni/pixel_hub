@@ -6,6 +6,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { updateRuntimeConfigAction } from "@/lib/actions/runtime-config";
 import SubTabs from "@/components/admin/SubTabs";
+import S3BucketsEditor from "@/components/admin/S3BucketsEditor";
 import type { RuntimeConfig } from "@/lib/runtime-config";
 import { SquareCheckbox } from "@/components/admin/SquareCheckbox";
 import { INPUT, LABEL_STRONG } from "@/lib/ui/cls";
@@ -42,6 +43,8 @@ export default function RuntimeConfigManager({
     s3SecretAccessKey: config.s3SecretAccessKey,
     s3PublicBase: config.s3PublicBase,
     s3AclPrivate: config.s3AclPrivate,
+    s3BucketFull: config.s3BucketFull,
+    s3ExtraBuckets: config.s3ExtraBuckets,
     attachmentCloud: config.attachmentCloud,
     avCloud: config.avCloud,
     smtpHost: config.smtpHost,
@@ -158,6 +161,7 @@ export default function RuntimeConfigManager({
         <h3 className="text-sm font-semibold text-neutral-900">存储</h3>
         <p className="mt-1 text-xs leading-5 text-neutral-400">
           上传文件的存放位置。切换驱动只影响之后的上传，已落库的 URL 不变。
+          S3 可追加多个桶：主桶写满后标记「已满」，上传自动切到下一个备用桶。
         </p>
         <div className="mt-4 space-y-4">
           <div>
@@ -294,6 +298,20 @@ export default function RuntimeConfigManager({
                   spellCheck={false}
                 />
               </div>
+              <label className="flex cursor-pointer items-start gap-2.5">
+                <SquareCheckbox
+                  checked={form.s3BucketFull}
+                  onChange={(next) => set({ s3BucketFull: next })}
+                  ariaLabel="主存储桶已满"
+                  className="mt-0.5"
+                />
+                <span>
+                  <span className="block text-sm text-neutral-900">主桶已满</span>
+                  <span className="mt-0.5 block text-xs text-neutral-400">
+                    勾选后不再往主桶写新文件，上传自动落到下方第一个未满的备用桶。
+                  </span>
+                </span>
+              </label>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label htmlFor="rc-s3-ak" className={LABEL_STRONG}>
@@ -352,6 +370,12 @@ export default function RuntimeConfigManager({
                   </span>
                 </span>
               </label>
+
+              {/* 多桶：主桶写满后追加备用桶并把主桶标记为已满，上传按顺序落到下一个 */}
+              <S3BucketsEditor
+                buckets={form.s3ExtraBuckets}
+                onChange={(next) => set({ s3ExtraBuckets: next })}
+              />
             </>
           )}
 

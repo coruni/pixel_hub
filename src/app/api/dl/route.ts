@@ -3,7 +3,7 @@ import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
-import { getRuntimeConfig } from "@/lib/runtime-config";
+import { getRuntimeConfig, s3BucketSpecs } from "@/lib/runtime-config";
 
 // 下载网关：所有「本站托管的附件」（local /uploads、S3 外链、OneDrive /od 引用）统一经此处，
 // 由服务端在响应里设置 Content-Disposition: attachment; filename*=UTF-8''<原名>，
@@ -31,18 +31,27 @@ const GRAPH_HOSTS = [
   "blob.core.windows.net",
 ];
 
-// 外链白名单基址：后台「站点配置」的 S3 / chevereto 基址（旧 env 回退），运行时动态读取
+// 外链白名单基址：后台「站点配置」的 S3 / chevereto 基址（旧 env 回退），运行时动态读取。
+// 多桶下必须把**每个桶**的公开基址与 Endpoint 都登记进来，否则备用桶里的文件下载会被 403
+// （白名单是唯一的 SSRF 防线，宁可少登记也不能改成「任意 https 直通」）。
 async function externalHosts(): Promise<{ s3: string[]; chevereto: string | null }> {
   const c = await getRuntimeConfig();
   const out = { s3: [] as string[], chevereto: null as string | null };
-  const s3Base = c.s3PublicBase || process.env.S3_PUBLIC_BASE || c.s3Endpoint || process.env.S3_ENDPOINT;
-  if (s3Base) {
+  const hosts = new Set<string>();
+  const addHost = (raw: string) => {
+    if (!raw) return;
     try {
-      out.s3.push(new URL(s3Base).host);
+      hosts.add(new URL(raw).host.toLowerCase());
     } catch {
       /* 忽略非法配置 */
     }
+  };
+  addHost(c.s3PublicBase || process.env.S3_PUBLIC_BASE || "");
+  for (const spec of s3BucketSpecs(c)) {
+    addHost(spec.publicBase);
+    addHost(spec.endpoint);
   }
+  out.s3 = [...hosts];
   const chevBase = c.cheveretoBase || process.env.CHEVERETO_BASE;
   if (chevBase) {
     try {

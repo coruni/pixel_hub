@@ -7,8 +7,46 @@ import { cachedInRequest } from "@/lib/cached-in-request";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { setS3Runtime } from "@/lib/storage/url";
+import { S3_MAX_EXTRA_BUCKETS } from "@/lib/storage/bucket-limits";
 
 export const RUNTIME_CONFIG_KEY = "site-runtime";
+
+/** 备用存储桶上限（后台表单与 schema 共用同一常量，见 storage/bucket-limits） */
+export { S3_MAX_EXTRA_BUCKETS };
+
+/**
+ * 备用存储桶条目。除 `bucket`（必填）与两个开关外，**留空即继承主配置**：
+ * 同一账号多桶只填桶名即可；不同账号/服务商再各自填 Endpoint 与凭据。
+ * `full` = 已满标记：上传时跳过（见 s3UploadBuckets）。
+ */
+function coerceBucketEntry(raw: unknown): S3BucketEntry {
+  const o = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const str = (v: unknown) => (typeof v === "string" ? v : typeof v === "number" ? String(v) : "");
+  return {
+    label: str(o.label),
+    bucket: str(o.bucket),
+    endpoint: str(o.endpoint),
+    region: str(o.region),
+    publicBase: str(o.publicBase),
+    accessKeyId: str(o.accessKeyId),
+    secretAccessKey: str(o.secretAccessKey),
+    aclPrivate: o.aclPrivate === true,
+    full: o.full === true,
+  };
+}
+export const s3BucketEntrySchema = z.object({
+  label: z.string().default(""),
+  bucket: z.string().default(""),
+  endpoint: z.string().default(""),
+  region: z.string().default(""),
+  publicBase: z.string().default(""),
+  accessKeyId: z.string().default(""),
+  secretAccessKey: z.string().default(""),
+  aclPrivate: z.boolean().default(false),
+  full: z.boolean().default(false),
+});
+
+export type S3BucketEntry = z.infer<typeof s3BucketEntrySchema>;
 
 export const runtimeConfigSchema = z.object({
   // ---- 登录：GitHub OAuth App ----
@@ -26,6 +64,19 @@ export const runtimeConfigSchema = z.object({
   s3SecretAccessKey: z.string().default(""),
   s3PublicBase: z.string().default(""),
   s3AclPrivate: z.boolean().default(false),
+  // 主桶「已满」标记 + 备用桶列表：上传按「主桶 → 备用桶 1…N」顺序挑第一个未标记满的
+  // （见 s3UploadBuckets/s3BucketSpecs）。两者都不填时行为与单桶时代完全一致。
+  s3BucketFull: z.boolean().default(false),
+  // 用 preprocess 把每一项**强制掰成合法形状**：脏数据（不是数组、字段类型不对）只影响这一项，
+  // 否则 safeParse 失败会让**整份**运行配置回退默认值 —— 加个桶把站点配置清空是不可接受的失败模式。
+  // 在 preprocess 里**先截断再去重**：写成 `.max(N)` 的话超限会直接让整份 schema 校验失败，
+  // 又绕回「整份配置回退默认值」那条路（实测过）。
+  s3ExtraBuckets: z
+    .preprocess(
+      (v) => (Array.isArray(v) ? v.slice(0, S3_MAX_EXTRA_BUCKETS).map(coerceBucketEntry) : []),
+      z.array(s3BucketEntrySchema),
+    )
+    .default([]),
   // 附件去向：auto=跟随存储驱动（chevereto 默认走云盘，其余走驱动）；on=强制云盘；off=强制存储驱动
   attachmentCloud: z.enum(["auto", "on", "off"]).default("auto"),
   // 音视频去向：音乐/视频资源上传的来源文件走哪（on/off 独立；auto = 跟随 attachmentCloud 的结论）
@@ -74,6 +125,21 @@ export function sanitizeRuntimeConfig(config: RuntimeConfig): RuntimeConfig {
   const esIndex = config.esIndex.trim().replace(/[^a-z0-9_.\-]/gi, "").toLowerCase().slice(0, 100);
   const limitRaw = config.searchCandidateLimit.trim();
   const limit = /^\d+$/.test(limitRaw) ? String(Math.min(50000, Math.max(1000, Number(limitRaw)))) : "";
+  // 备用桶：逐项 trim/钳长后丢掉没填桶名的空行（半填的行不值得落库，UI 侧同样会过滤）
+  const extraBuckets = config.s3ExtraBuckets
+    .map((e) => ({
+      label: e.label.trim().slice(0, 40),
+      bucket: e.bucket.trim().slice(0, 200),
+      endpoint: normUrl(e.endpoint).slice(0, SECRET_MAX),
+      region: e.region.trim().slice(0, 64),
+      publicBase: normUrl(e.publicBase).slice(0, SECRET_MAX),
+      accessKeyId: e.accessKeyId.trim().slice(0, SECRET_MAX),
+      secretAccessKey: e.secretAccessKey.trim().slice(0, SECRET_MAX),
+      aclPrivate: e.aclPrivate === true,
+      full: e.full === true,
+    }))
+    .filter((e) => e.bucket !== "")
+    .slice(0, S3_MAX_EXTRA_BUCKETS);
   return {
     githubId: config.githubId.trim().slice(0, SECRET_MAX),
     githubSecret: config.githubSecret.trim().slice(0, SECRET_MAX),
@@ -87,6 +153,8 @@ export function sanitizeRuntimeConfig(config: RuntimeConfig): RuntimeConfig {
     s3SecretAccessKey: config.s3SecretAccessKey.trim().slice(0, SECRET_MAX),
     s3PublicBase: normUrl(config.s3PublicBase).slice(0, SECRET_MAX),
     s3AclPrivate: config.s3AclPrivate === true,
+    s3BucketFull: config.s3BucketFull === true,
+    s3ExtraBuckets: extraBuckets,
     attachmentCloud: ["auto", "on", "off"].includes(config.attachmentCloud)
       ? config.attachmentCloud
       : "auto",
@@ -126,6 +194,22 @@ export function runtimeConfigIssues(c: RuntimeConfig): string[] {
   ] as const;
   for (const [v, label] of fields) {
     if (v && !URL_RE.test(v)) issues.push(`${label} 不是合法的 http(s) 地址`);
+  }
+  // 备用桶：URL 字段同样要合法；桶名不能带空格/斜杠（会拼坏公开访问基址）
+  c.s3ExtraBuckets.forEach((b, i) => {
+    const who = `备用存储桶 ${i + 1}「${b.label || b.bucket}」`;
+    if (b.endpoint && !URL_RE.test(b.endpoint)) issues.push(`${who} 的 Endpoint 不是合法的 http(s) 地址`);
+    if (b.publicBase && !URL_RE.test(b.publicBase))
+      issues.push(`${who} 的公开访问基址不是合法的 http(s) 地址`);
+    if (!/^[A-Za-z0-9._-]+$/.test(b.bucket))
+      issues.push(`${who} 的桶名含非法字符（只允许字母、数字、. _ -）`);
+  });
+  // 同一 Endpoint 下同名桶重复配置 = 白搭一趟（还会让「满了切下一个」失去意义）
+  const seen = new Set<string>();
+  for (const s of s3BucketSpecs(c)) {
+    const id = `${s.endpoint}|${s.bucket}`.toLowerCase();
+    if (seen.has(id)) issues.push(`存储桶「${s.bucket}」重复配置（Endpoint 相同即为同一个桶）`);
+    seen.add(id);
   }
   return issues;
 }
@@ -176,6 +260,82 @@ export function s3PublicBase(c: RuntimeConfig): string {
     process.env.S3_PUBLIC_BASE ||
     (endpoint ? `${endpoint}/${bucket}` : "")
   ).replace(/\/+$/, "");
+}
+
+/**
+ * 生效的存储桶清单：`[主桶, 备用桶 1…N]`（顺序 = 上传优先级）。
+ *
+ * 备用桶**逐字段继承主配置**（Endpoint / Region / 凭据 / 私有桶），只填桶名即可用同一账号多桶；
+ * 不同服务商再各自覆盖。这样「加一个桶」的最小操作就是填一个桶名，不用把凭据抄一遍。
+ * 主桶桶名为空（未配置 S3）时返回空数组 —— 调用方据此报「未配置 S3」而不是发一个空桶请求。
+ */
+export type S3BucketSpec = {
+  /** 稳定标识：primary | extra:<下标>，用于 client 复用与日志 */
+  id: string;
+  label: string;
+  bucket: string;
+  endpoint: string;
+  region: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  /** 公开访问基址（末尾无斜杠）；空 = 该桶不可用，put 会跳到下一个桶 */
+  publicBase: string;
+  aclPrivate: boolean;
+  /** 已满：配了多桶时跳过此桶 */
+  full: boolean;
+};
+
+export function s3BucketSpecs(c: RuntimeConfig): S3BucketSpec[] {
+  const endpoint = s3Endpoint(c);
+  const region = c.s3Region || process.env.S3_REGION || "auto";
+  const accessKeyId = c.s3AccessKeyId || process.env.S3_ACCESS_KEY_ID || "";
+  const secretAccessKey = c.s3SecretAccessKey || process.env.S3_SECRET_ACCESS_KEY || "";
+  const specs: S3BucketSpec[] = [];
+  const bucket = s3Bucket(c);
+  if (bucket) {
+    specs.push({
+      id: "primary",
+      label: "主存储桶",
+      bucket,
+      endpoint,
+      region,
+      accessKeyId,
+      secretAccessKey,
+      publicBase: s3PublicBase(c),
+      aclPrivate: c.s3AclPrivate === true,
+      full: c.s3BucketFull === true,
+    });
+  }
+  c.s3ExtraBuckets.forEach((e, i) => {
+    const ep = (e.endpoint || endpoint).replace(/\/+$/, "");
+    specs.push({
+      id: `extra:${i}`,
+      label: e.label || `备用桶 ${i + 1}`,
+      bucket: e.bucket,
+      endpoint: ep,
+      region: e.region || region,
+      accessKeyId: e.accessKeyId || accessKeyId,
+      secretAccessKey: e.secretAccessKey || secretAccessKey,
+      publicBase: (e.publicBase || (ep ? `${ep}/${e.bucket}` : "")).replace(/\/+$/, ""),
+      // 私有桶只能「跟随主配置」而不能被单独关掉：公开基址指 CDN 的部署里，
+      // 备用桶若漏设 public-read 反而更安全，不该让一个漏勾的开关把对象公开出去。
+      aclPrivate: e.aclPrivate === true || c.s3AclPrivate === true,
+      full: e.full === true,
+    });
+  });
+  return specs;
+}
+
+/**
+ * 上传候选桶（按优先级）：跳过所有标记「已满」的桶。
+ * 全满时抛错而不是硬塞进满桶 —— 让失败信息是「所有桶都满了」，而不是存储服务商的配额报错。
+ */
+export function s3UploadBuckets(c: RuntimeConfig): S3BucketSpec[] {
+  const all = s3BucketSpecs(c);
+  const open = all.filter((s) => !s.full);
+  if (all.length > 0 && open.length === 0)
+    throw new Error("所有存储桶都已标记「已满」：请在后台新增存储桶或取消已满标记");
+  return open;
 }
 
 /** 附件是否走云盘（OneDrive）：on/off 强制；auto 跟随存储驱动——chevereto 默认走云盘，其余走驱动 */
@@ -283,7 +443,8 @@ export const getRuntimeConfig = cache(async (): Promise<RuntimeConfig> => {
   const cfg = await readCachedRuntimeConfig();
   // 同步 s3 运行时镜像：driver=s3 且算出公开基址才镜像，否则清掉（切驱动后残留会拼错 URL）
   if (cfg.storageDriver === "s3") {
-    const base = s3PublicBase(cfg);
+    // 取**生效链第一个桶**的基址：有主桶时与旧行为逐字相同；只配了备用桶（无主桶）时也指向对的那个桶
+    const base = s3BucketSpecs(cfg)[0]?.publicBase ?? "";
     setS3Runtime(base ? { driver: "s3", base } : null);
   } else {
     setS3Runtime(null);
