@@ -5,6 +5,11 @@
 // 为什么主桶仍留在上面那一组固定的输入框里：单桶是绝大多数部署的现状，把它塞进列表会
 // 让「什么都没配」的升级路径多出一层折叠/空态。这里只负责**增量**部分，且不引任何
 // 服务端模块（S3_MAX_EXTRA_BUCKETS 来自 storage/bucket-limits），免得把 prisma 打进浏览器包。
+//
+// 每个备用桶都是**完全独立的一份配置**：只填桶名 = 同账号多桶（其余继承主桶）；
+// 换成别人的账号/服务商，就把 Endpoint、Region、凭据、公开基址各填各的。
+// 可见性与寻址风格用下拉而不是勾选框：这两项都要能表达「跟随主桶」，
+// 布尔分不出「没填」和「填了否」。
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { SquareCheckbox } from "@/components/admin/SquareCheckbox";
@@ -21,7 +26,8 @@ export function emptyBucketEntry(): S3BucketEntry {
     publicBase: "",
     accessKeyId: "",
     secretAccessKey: "",
-    aclPrivate: false,
+    aclMode: "",
+    urlStyle: "",
     full: false,
   };
 }
@@ -29,9 +35,12 @@ export function emptyBucketEntry(): S3BucketEntry {
 export default function S3BucketsEditor({
   buckets,
   onChange,
+  primaryAclPrivate,
 }: {
   buckets: S3BucketEntry[];
   onChange: (next: S3BucketEntry[]) => void;
+  /** 主桶是否为私有桶：用于把「跟随主桶」的**实际结果**直接写在选项里 */
+  primaryAclPrivate: boolean;
 }) {
   const patch = (i: number, next: Partial<S3BucketEntry>) =>
     onChange(buckets.map((b, j) => (j === i ? { ...b, ...next } : b)));
@@ -76,15 +85,7 @@ export default function S3BucketsEditor({
                 ) : (
                   <span className="text-[11px] text-amber-600">未填桶名 · 保存时忽略</span>
                 )}
-                <span className="ml-auto flex items-center gap-3">
-                  <label className="flex cursor-pointer items-center gap-2">
-                    <SquareCheckbox
-                      checked={b.full}
-                      onChange={(next) => patch(i, { full: next })}
-                      ariaLabel={`标记备用桶 ${i + 1} 已满`}
-                    />
-                    <span className="text-xs text-neutral-600">已满</span>
-                  </label>
+                <span className="ml-auto">
                   <Button type="button" onClick={() => remove(i)} variant="dangerGhost">
                     <Trash2 size={12} aria-hidden /> 删除
                   </Button>
@@ -135,7 +136,7 @@ export default function S3BucketsEditor({
                       className={INPUT}
                       autoComplete="off"
                       spellCheck={false}
-                      placeholder="留空 = 与主桶同一 Endpoint"
+                      placeholder="留空 = 与主桶同一 Endpoint；换服务商时必填"
                     />
                   </div>
                   <div>
@@ -201,17 +202,56 @@ export default function S3BucketsEditor({
                   />
                 </div>
 
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor={`s3b-${i}-acl`} className={LABEL_STRONG}>
+                      可见性
+                    </label>
+                    <select
+                      id={`s3b-${i}-acl`}
+                      value={b.aclMode}
+                      onChange={(e) => patch(i, { aclMode: e.target.value as S3BucketEntry["aclMode"] })}
+                      className={INPUT}
+                    >
+                      <option value="">
+                        跟随主桶（当前：{primaryAclPrivate ? "私有桶" : "公开桶"}）
+                      </option>
+                      <option value="public">公开桶（上传时设 public-read）</option>
+                      <option value="private">私有桶（不设 ACL，需 CDN 反代）</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor={`s3b-${i}-style`} className={LABEL_STRONG}>
+                      寻址风格
+                    </label>
+                    <select
+                      id={`s3b-${i}-style`}
+                      value={b.urlStyle}
+                      onChange={(e) => patch(i, { urlStyle: e.target.value as S3BucketEntry["urlStyle"] })}
+                      className={INPUT}
+                    >
+                      <option value="">path-style（与主桶一致）</option>
+                      <option value="virtual">virtual-host style</option>
+                    </select>
+                  </div>
+                </div>
+                <p className="text-[11px] leading-4 text-neutral-400">
+                  MinIO / R2 与多数 S3 兼容网关需要 path-style（
+                  <code>endpoint/bucket/key</code>）；阿里云 OSS 等只认 virtual-host style（
+                  <code>bucket.endpoint/key</code>），连不上时切过去试试。
+                </p>
+
                 <label className="flex cursor-pointer items-start gap-2.5">
                   <SquareCheckbox
-                    checked={b.aclPrivate}
-                    onChange={(next) => patch(i, { aclPrivate: next })}
-                    ariaLabel={`备用桶 ${i + 1} 为私有桶`}
+                    checked={b.full}
+                    onChange={(next) => patch(i, { full: next })}
+                    ariaLabel={`标记备用桶 ${i + 1} 已满`}
                     className="mt-0.5"
                   />
                   <span>
-                    <span className="block text-sm text-neutral-900">私有桶</span>
+                    <span className="block text-sm text-neutral-900">已满</span>
                     <span className="mt-0.5 block text-xs text-neutral-400">
-                      上传时不设置 public-read ACL。主桶勾了私有桶时备用桶同样生效（不会单独放开）。
+                      勾选后不再往这个桶写新文件（读取与下载旧文件不受影响）。
                     </span>
                   </span>
                 </label>

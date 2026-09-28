@@ -23,20 +23,29 @@ import {
   type S3BucketSpec,
 } from "@/lib/runtime-config";
 
-/** 同一份凭据/端点复用同一个 client（连接池跨请求保留）；签名变了就换新的 */
+/** 同一份配置复用同一个 client（连接池跨请求保留）；任一字段变了就换新的 */
 const clients = new Map<string, S3Client>();
+/** 上限：配置改一次就多一个签名，不做回收会随进程寿命无界增长（超出丢最旧的，重建只是丢连接池） */
+const MAX_CLIENTS = 32;
 
 function s3(cfg: S3BucketSpec): S3Client {
-  const sig = [cfg.endpoint, cfg.region, cfg.accessKeyId, cfg.secretAccessKey].join("|");
+  // pathStyle 也进签名：同一个端点/凭据下两种寻址方式发出的请求 URL 不同，不能共用实例
+  const sig = [cfg.endpoint, cfg.region, cfg.accessKeyId, cfg.secretAccessKey, cfg.pathStyle].join("|");
   let client = clients.get(sig);
   if (!client) {
     client = new S3Client({
       region: cfg.region,
       endpoint: cfg.endpoint || undefined,
-      forcePathStyle: true, // MinIO/R2 需要 path-style
+      // path-style（endpoint/bucket/key）是 MinIO/R2 与多数 S3 兼容网关的要求；
+      // 少数只认 virtual-host style（bucket.endpoint/key）的服务商可在后台按桶切换。
+      forcePathStyle: cfg.pathStyle,
       credentials: { accessKeyId: cfg.accessKeyId, secretAccessKey: cfg.secretAccessKey },
     });
     clients.set(sig, client);
+    if (clients.size > MAX_CLIENTS) {
+      const oldest = clients.keys().next().value;
+      if (oldest !== undefined) clients.delete(oldest);
+    }
   }
   return client;
 }

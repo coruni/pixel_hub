@@ -21,6 +21,12 @@
 - `pinnedAt`/`featuredAt`（null=未标记、不加索引）是 `getFeed` 第一排序键（`nulls:"last"` 必写）；`pinFirst` 只在按内容打分处关。keyset 游标必须与 orderBy 同构（`FeedCursor.p` + `cursorAfter`）。
 - 置顶/精华角标共四处：`ResourceCard` / `ResourceRow` / `DetailMarks`（四模板共用，banner 传 `tone="dark"`）；精华发 FEATURED 积分（唯一索引去重）；「加入专题」进第一个 featured 板块（上限 24）。
 
+## 存储 / S3 多桶
+- 落库一律是**完整 URL**（s3 的 `put` 返回 `${publicBase}/${key}`，不是相对 key）→ 桶信息自带在 URL 里，加桶/换桶不影响存量数据，`publicUrl` 对 URL 原样返回。但 `get`/`size`/`del` 必须反解出桶，唯一入口 `storage/s3-key.ts` 的 `resolveS3Target(key, specs)`（纯函数：命中公开基址或 `Endpoint/Bucket` 取**最长**命中；相对 key 归主桶；陌生域 best-effort 兜主桶）。
+- 生效桶链唯一入口 `s3BucketSpecs`/`s3UploadBuckets`（runtime-config）：备用桶**逐字段继承**主配置（Endpoint/Region/凭据/公开基址），留空即继承、填了即独立 —— **每个桶可以是不同账号/密钥甚至不同服务商**；只有 `bucket` 必填。可见性 `aclMode`、寻址风格 `urlStyle` 是**三态**（`""` = 跟随主桶 / `public`|`private` / `virtual`）；`""` 必须存在，布尔表达不了「没填」。上传按「主桶 → 备用桶 1…N」取第一个未标 `full` 的，写失败自动换下一个（缺 publicBase 的桶**先跳过**，否则会留下删不掉的孤儿对象），全满则抛明确错误。两桶 publicBase 相同会串桶（反解按最长命中）→ `runtimeConfigIssues` 已拦。
+- 后台字段 `s3BucketFull` + `s3ExtraBuckets`（上限 8，常量在 `storage/bucket-limits.ts`；客户端组件只 import 这个常量，**类型**才能 import runtime-config，否则 prisma 进浏览器包）。`/api/dl` 白名单要把每个桶的 publicBase **和** Endpoint 主机都登记，否则备用桶里的文件下载 403。
+- 旧实现删 S3 对象时把整条 URL 当 Key 传（等于没删），现由反解修好。
+
 ## Prisma
 - 事务内**不许 `create().catch()` 兜唯一键冲突**：PG 报错即整事务 aborted（之后全 25P02）。用 `createMany({skipDuplicates:true})` 靠 `count` 判断（见 `_tags.ts`）。find-or-create 按**所有**唯一键查；关联表按解析出的 id 去重。
 - **标签 slug 相同就是同一个标签**（`/tags/{slug}` 是公开 URL），直接合并；`findOrCreateTag` 命中链 name → slug → create。

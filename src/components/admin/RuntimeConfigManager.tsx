@@ -375,6 +375,7 @@ export default function RuntimeConfigManager({
               <S3BucketsEditor
                 buckets={form.s3ExtraBuckets}
                 onChange={(next) => set({ s3ExtraBuckets: next })}
+                primaryAclPrivate={form.s3AclPrivate}
               />
             </>
           )}

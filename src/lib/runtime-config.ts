@@ -14,14 +14,35 @@ export const RUNTIME_CONFIG_KEY = "site-runtime";
 /** 备用存储桶上限（后台表单与 schema 共用同一常量，见 storage/bucket-limits） */
 export { S3_MAX_EXTRA_BUCKETS };
 
+/** 备用桶可见性三态："" 继承主桶 | public 强制公开 | private 强制私有 */
+export type S3AclMode = "" | "public" | "private";
+/** 备用桶寻址风格："" = path-style（与主桶一致）| virtual = virtual-host style */
+export type S3UrlStyle = "" | "virtual";
+
+const ACL_MODES = new Set<string>(["public", "private"]);
+const URL_STYLES = new Set<string>(["virtual"]);
+
 /**
- * 备用存储桶条目。除 `bucket`（必填）与两个开关外，**留空即继承主配置**：
- * 同一账号多桶只填桶名即可；不同账号/服务商再各自填 Endpoint 与凭据。
+ * 备用存储桶条目，**逐字段可覆盖，留空即继承主桶**：
+ * - 同一个账号多桶：只填 `bucket` 即可；
+ * - 不同账号 / 不同服务商：Endpoint、Region、Access Key、Secret、公开基址各自填自己的。
+ *
+ * `aclMode` / `urlStyle` 是**三态**而不是布尔：布尔分不出「没填」和「填了 false」，
+ * 而这两个值都必须能表达「跟随主桶」（换服务商后主桶的设置未必适用）。
  * `full` = 已满标记：上传时跳过（见 s3UploadBuckets）。
  */
 function coerceBucketEntry(raw: unknown): S3BucketEntry {
   const o = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const str = (v: unknown) => (typeof v === "string" ? v : typeof v === "number" ? String(v) : "");
+  // aclMode 优先；老条目只有布尔 aclPrivate，等于 true 时解释为「强制私有」（与旧行为一致）
+  const rawAcl = str(o.aclMode).trim();
+  const aclMode: S3AclMode = ACL_MODES.has(rawAcl)
+    ? (rawAcl as S3AclMode)
+    : o.aclPrivate === true
+      ? "private"
+      : "";
+  const rawStyle = str(o.urlStyle).trim();
+  const urlStyle: S3UrlStyle = URL_STYLES.has(rawStyle) ? "virtual" : "";
   return {
     label: str(o.label),
     bucket: str(o.bucket),
@@ -30,10 +51,12 @@ function coerceBucketEntry(raw: unknown): S3BucketEntry {
     publicBase: str(o.publicBase),
     accessKeyId: str(o.accessKeyId),
     secretAccessKey: str(o.secretAccessKey),
-    aclPrivate: o.aclPrivate === true,
+    aclMode,
+    urlStyle,
     full: o.full === true,
   };
 }
+
 export const s3BucketEntrySchema = z.object({
   label: z.string().default(""),
   bucket: z.string().default(""),
@@ -42,7 +65,8 @@ export const s3BucketEntrySchema = z.object({
   publicBase: z.string().default(""),
   accessKeyId: z.string().default(""),
   secretAccessKey: z.string().default(""),
-  aclPrivate: z.boolean().default(false),
+  aclMode: z.enum(["", "public", "private"]).default(""),
+  urlStyle: z.enum(["", "virtual"]).default(""),
   full: z.boolean().default(false),
 });
 
@@ -126,20 +150,19 @@ export function sanitizeRuntimeConfig(config: RuntimeConfig): RuntimeConfig {
   const limitRaw = config.searchCandidateLimit.trim();
   const limit = /^\d+$/.test(limitRaw) ? String(Math.min(50000, Math.max(1000, Number(limitRaw)))) : "";
   // 备用桶：逐项 trim/钳长后丢掉没填桶名的空行（半填的行不值得落库，UI 侧同样会过滤）
-  const extraBuckets = config.s3ExtraBuckets
-    .map((e) => ({
-      label: e.label.trim().slice(0, 40),
-      bucket: e.bucket.trim().slice(0, 200),
-      endpoint: normUrl(e.endpoint).slice(0, SECRET_MAX),
-      region: e.region.trim().slice(0, 64),
-      publicBase: normUrl(e.publicBase).slice(0, SECRET_MAX),
-      accessKeyId: e.accessKeyId.trim().slice(0, SECRET_MAX),
-      secretAccessKey: e.secretAccessKey.trim().slice(0, SECRET_MAX),
-      aclPrivate: e.aclPrivate === true,
-      full: e.full === true,
-    }))
-    .filter((e) => e.bucket !== "")
-    .slice(0, S3_MAX_EXTRA_BUCKETS);
+  const extraBuckets: S3BucketEntry[] = config.s3ExtraBuckets.map((e): S3BucketEntry => ({
+    label: e.label.trim().slice(0, 40),
+    bucket: e.bucket.trim().slice(0, 200),
+    endpoint: normUrl(e.endpoint).slice(0, SECRET_MAX),
+    region: e.region.trim().slice(0, 64),
+    publicBase: normUrl(e.publicBase).slice(0, SECRET_MAX),
+    accessKeyId: e.accessKeyId.trim().slice(0, SECRET_MAX),
+    secretAccessKey: e.secretAccessKey.trim().slice(0, SECRET_MAX),
+    aclMode: e.aclMode === "public" || e.aclMode === "private" ? e.aclMode : "",
+    urlStyle: e.urlStyle === "virtual" ? "virtual" : "",
+    full: e.full === true,
+  }));
+  const keptBuckets = extraBuckets.filter((e) => e.bucket !== "").slice(0, S3_MAX_EXTRA_BUCKETS);
   return {
     githubId: config.githubId.trim().slice(0, SECRET_MAX),
     githubSecret: config.githubSecret.trim().slice(0, SECRET_MAX),
@@ -154,7 +177,7 @@ export function sanitizeRuntimeConfig(config: RuntimeConfig): RuntimeConfig {
     s3PublicBase: normUrl(config.s3PublicBase).slice(0, SECRET_MAX),
     s3AclPrivate: config.s3AclPrivate === true,
     s3BucketFull: config.s3BucketFull === true,
-    s3ExtraBuckets: extraBuckets,
+    s3ExtraBuckets: keptBuckets,
     attachmentCloud: ["auto", "on", "off"].includes(config.attachmentCloud)
       ? config.attachmentCloud
       : "auto",
@@ -206,10 +229,22 @@ export function runtimeConfigIssues(c: RuntimeConfig): string[] {
   });
   // 同一 Endpoint 下同名桶重复配置 = 白搭一趟（还会让「满了切下一个」失去意义）
   const seen = new Set<string>();
+  // 公开基址相同的两个桶在**反解**（get/size/del 从 URL 认桶）时无法区分，删除会打到错的桶 —— 必须拦
+  const bases = new Map<string, string>();
   for (const s of s3BucketSpecs(c)) {
     const id = `${s.endpoint}|${s.bucket}`.toLowerCase();
-    if (seen.has(id)) issues.push(`存储桶「${s.bucket}」重复配置（Endpoint 相同即为同一个桶）`);
+    if (seen.has(id)) {
+      // 同一个桶配了两遍：报一条就够，不必再连带报一次「基址相同」
+      issues.push(`存储桶「${s.bucket}」重复配置（Endpoint 相同即为同一个桶）`);
+      continue;
+    }
     seen.add(id);
+
+    const base = s.publicBase.toLowerCase();
+    if (!base) continue; // 算不出基址的桶本来就不会被写（上传时跳过），不报
+    const prev = bases.get(base);
+    if (prev) issues.push(`存储桶「${s.bucket}」与「${prev}」的公开访问基址相同，无法区分文件属于哪个桶`);
+    else bases.set(base, s.bucket);
   }
   return issues;
 }
@@ -265,8 +300,9 @@ export function s3PublicBase(c: RuntimeConfig): string {
 /**
  * 生效的存储桶清单：`[主桶, 备用桶 1…N]`（顺序 = 上传优先级）。
  *
- * 备用桶**逐字段继承主配置**（Endpoint / Region / 凭据 / 私有桶），只填桶名即可用同一账号多桶；
- * 不同服务商再各自覆盖。这样「加一个桶」的最小操作就是填一个桶名，不用把凭据抄一遍。
+ * 备用桶**逐字段继承主配置**（Endpoint / Region / 凭据 / 可见性 / 寻址风格），只填桶名即可用
+ * 同一账号多桶；换了账号或服务商就把对应字段各填各的。这样「加一个桶」的最小操作是填一个桶名，
+ * 而「加一个别人的桶」要把凭据填全 —— 没有中间态，不会半继承出一个连不上的配置。
  * 主桶桶名为空（未配置 S3）时返回空数组 —— 调用方据此报「未配置 S3」而不是发一个空桶请求。
  */
 export type S3BucketSpec = {
@@ -280,7 +316,10 @@ export type S3BucketSpec = {
   secretAccessKey: string;
   /** 公开访问基址（末尾无斜杠）；空 = 该桶不可用，put 会跳到下一个桶 */
   publicBase: string;
+  /** 私有桶：上传时不设 public-read ACL（公开基址需指向 CDN） */
   aclPrivate: boolean;
+  /** path-style 寻址（`endpoint/bucket/key`）；false = virtual-host style（`bucket.endpoint/key`） */
+  pathStyle: boolean;
   /** 已满：配了多桶时跳过此桶 */
   full: boolean;
 };
@@ -303,6 +342,7 @@ export function s3BucketSpecs(c: RuntimeConfig): S3BucketSpec[] {
       secretAccessKey,
       publicBase: s3PublicBase(c),
       aclPrivate: c.s3AclPrivate === true,
+      pathStyle: true, // 主桶沿用升级前的 path-style 行为，不因多桶改造而变
       full: c.s3BucketFull === true,
     });
   }
@@ -317,9 +357,13 @@ export function s3BucketSpecs(c: RuntimeConfig): S3BucketSpec[] {
       accessKeyId: e.accessKeyId || accessKeyId,
       secretAccessKey: e.secretAccessKey || secretAccessKey,
       publicBase: (e.publicBase || (ep ? `${ep}/${e.bucket}` : "")).replace(/\/+$/, ""),
-      // 私有桶只能「跟随主配置」而不能被单独关掉：公开基址指 CDN 的部署里，
-      // 备用桶若漏设 public-read 反而更安全，不该让一个漏勾的开关把对象公开出去。
-      aclPrivate: e.aclPrivate === true || c.s3AclPrivate === true,
+      // 三态：显式选了公开/私有就用自己的，没选才跟随主桶。
+      // （布尔时代的规则是「只能更严不能更松」，但换了服务商后主桶的私有设定未必适用，
+      //  所以「跟随」必须是一个可选项，而不是唯一的默认。）
+      aclPrivate: e.aclMode === "private" ? true : e.aclMode === "public" ? false : c.s3AclPrivate === true,
+      // 空 = 与主桶一致的 path-style：大多数 S3 兼容实现（MinIO/R2/多数网关）都要它，
+      // 少数只认 virtual-host 的服务商才需要显式选另一项
+      pathStyle: e.urlStyle !== "virtual",
       full: e.full === true,
     });
   });
