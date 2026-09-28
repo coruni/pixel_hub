@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { auth } from "@/lib/auth";
-import { getRuntimeConfigWithVersion } from "@/lib/runtime-config";
+import { getRuntimeConfigWithVersion, s3HasCapacityLimit } from "@/lib/runtime-config";
+import { s3UsageSnapshot } from "@/lib/storage/bucket-usage";
 import { getSeoWithVersion } from "@/lib/seo-config";
 import { siteUrl as siteUrlOf } from "@/lib/site-url";
 import RuntimeConfigManager from "@/components/admin/RuntimeConfigManager";
@@ -16,6 +17,13 @@ export default async function AdminRuntimePage() {
   if (session?.user?.role !== "ADMIN") redirect("/admin");
 
   const [runtime, seo] = await Promise.all([getRuntimeConfigWithVersion(), getSeoWithVersion()]);
+
+  // 存储桶用量展示：只在 s3 且真有桶配了容量上限时才算 —— 没配置的部署不该为这个
+  // 多跑一次 Media 全表扫（绝大多数部署属于这种）。
+  const usage =
+    runtime.config.storageDriver === "s3" && s3HasCapacityLimit(runtime.config)
+      ? Object.fromEntries(await s3UsageSnapshot())
+      : undefined;
 
   return (
     <div>
@@ -49,6 +57,7 @@ export default async function AdminRuntimePage() {
                 config={runtime.config}
                 version={runtime.version}
                 siteUrl={siteUrlOf()}
+                usage={usage}
               />
             </>
           ),

@@ -7,12 +7,14 @@ import { cachedInRequest } from "@/lib/cached-in-request";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { setS3Runtime } from "@/lib/storage/url";
-import { S3_MAX_EXTRA_BUCKETS } from "@/lib/storage/bucket-limits";
+import { S3_MAX_EXTRA_BUCKETS, gbToBytes, isInvalidGb } from "@/lib/storage/bucket-limits";
 
 export const RUNTIME_CONFIG_KEY = "site-runtime";
 
 /** 备用存储桶上限（后台表单与 schema 共用同一常量，见 storage/bucket-limits） */
 export { S3_MAX_EXTRA_BUCKETS };
+/** 容量上限换算（GB 字符串 ↔ 字节）：后台客户端组件也用，唯一实现在 storage/bucket-limits */
+export { gbToBytes };
 
 /** 备用桶可见性三态："" 继承主桶 | public 强制公开 | private 强制私有 */
 export type S3AclMode = "" | "public" | "private";
@@ -30,6 +32,8 @@ const URL_STYLES = new Set<string>(["virtual"]);
  * `aclMode` / `urlStyle` 是**三态**而不是布尔：布尔分不出「没填」和「填了 false」，
  * 而这两个值都必须能表达「跟随主桶」（换服务商后主桶的设置未必适用）。
  * `full` = 已满标记：上传时跳过（见 s3UploadBuckets）。
+ * `maxGb` = 容量上限（GB，字符串数字，空 = 不限）：上传前按用量预检，超限自动跳下一个桶
+ * （见 storage/bucket-usage）。它和 `full` 是两回事：`full` 是人工永久开关，`maxGb` 是算出来的。
  */
 function coerceBucketEntry(raw: unknown): S3BucketEntry {
   const o = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
@@ -53,6 +57,7 @@ function coerceBucketEntry(raw: unknown): S3BucketEntry {
     secretAccessKey: str(o.secretAccessKey),
     aclMode,
     urlStyle,
+    maxGb: typeof o.maxGb === "string" ? o.maxGb : typeof o.maxGb === "number" ? String(o.maxGb) : "",
     full: o.full === true,
   };
 }
@@ -67,6 +72,8 @@ export const s3BucketEntrySchema = z.object({
   secretAccessKey: z.string().default(""),
   aclMode: z.enum(["", "public", "private"]).default(""),
   urlStyle: z.enum(["", "virtual"]).default(""),
+  /** 容量上限（GB）；"" = 不限。存字符串的理由同 searchCandidateLimit：输入框零转换、能表达「空」 */
+  maxGb: z.string().default(""),
   full: z.boolean().default(false),
 });
 
@@ -91,6 +98,15 @@ export const runtimeConfigSchema = z.object({
   // 主桶「已满」标记 + 备用桶列表：上传按「主桶 → 备用桶 1…N」顺序挑第一个未标记满的
   // （见 s3UploadBuckets/s3BucketSpecs）。两者都不填时行为与单桶时代完全一致。
   s3BucketFull: z.boolean().default(false),
+  // 主桶容量上限（GB）；"" = 不限。填了才会启用「上传前用量预检」（见 storage/bucket-usage）
+  // preprocess 的理由同 coerceBucketEntry：这个字段必须**永远能通过校验**，类型不对就归成 ""，
+  // 绝不能让一个数字/空值把整份运行配置打回默认值。
+  s3MaxGb: z
+    .preprocess(
+      (v) => (typeof v === "string" ? v : typeof v === "number" ? String(v) : ""),
+      z.string(),
+    )
+    .default(""),
   // 用 preprocess 把每一项**强制掰成合法形状**：脏数据（不是数组、字段类型不对）只影响这一项，
   // 否则 safeParse 失败会让**整份**运行配置回退默认值 —— 加个桶把站点配置清空是不可接受的失败模式。
   // 在 preprocess 里**先截断再去重**：写成 `.max(N)` 的话超限会直接让整份 schema 校验失败，
@@ -160,6 +176,9 @@ export function sanitizeRuntimeConfig(config: RuntimeConfig): RuntimeConfig {
     secretAccessKey: e.secretAccessKey.trim().slice(0, SECRET_MAX),
     aclMode: e.aclMode === "public" || e.aclMode === "private" ? e.aclMode : "",
     urlStyle: e.urlStyle === "virtual" ? "virtual" : "",
+    // 容量上限**故意不做合法性收敛**（只 trim + 截长）：非法值静默变成「不限」会让用户
+    // 以为有防线而实际没有 —— 交给 runtimeConfigIssues 在保存时报错，让人当场改。
+    maxGb: e.maxGb.trim().slice(0, 32),
     full: e.full === true,
   }));
   const keptBuckets = extraBuckets.filter((e) => e.bucket !== "").slice(0, S3_MAX_EXTRA_BUCKETS);
@@ -177,6 +196,8 @@ export function sanitizeRuntimeConfig(config: RuntimeConfig): RuntimeConfig {
     s3PublicBase: normUrl(config.s3PublicBase).slice(0, SECRET_MAX),
     s3AclPrivate: config.s3AclPrivate === true,
     s3BucketFull: config.s3BucketFull === true,
+    // 同上：保留用户原值，合法性由 runtimeConfigIssues 判定（见备用桶 maxGb 的注释）
+    s3MaxGb: config.s3MaxGb.trim().slice(0, 32),
     s3ExtraBuckets: keptBuckets,
     attachmentCloud: ["auto", "on", "off"].includes(config.attachmentCloud)
       ? config.attachmentCloud
@@ -226,7 +247,10 @@ export function runtimeConfigIssues(c: RuntimeConfig): string[] {
       issues.push(`${who} 的公开访问基址不是合法的 http(s) 地址`);
     if (!/^[A-Za-z0-9._-]+$/.test(b.bucket))
       issues.push(`${who} 的桶名含非法字符（只允许字母、数字、. _ -）`);
+    if (isInvalidGb(b.maxGb)) issues.push(`${who} 的容量上限不是合法的正数（留空表示不限容量）`);
   });
+  if (isInvalidGb(c.s3MaxGb))
+    issues.push("主存储桶的容量上限不是合法的正数（留空表示不限容量）");
   // 同一 Endpoint 下同名桶重复配置 = 白搭一趟（还会让「满了切下一个」失去意义）
   const seen = new Set<string>();
   // 公开基址相同的两个桶在**反解**（get/size/del 从 URL 认桶）时无法区分，删除会打到错的桶 —— 必须拦
@@ -320,6 +344,8 @@ export type S3BucketSpec = {
   aclPrivate: boolean;
   /** path-style 寻址（`endpoint/bucket/key`）；false = virtual-host style（`bucket.endpoint/key`） */
   pathStyle: boolean;
+  /** 容量上限（字节，0 = 不限）：上传前按用量预检，装不下就跳到下一个桶 */
+  maxBytes: number;
   /** 已满：配了多桶时跳过此桶 */
   full: boolean;
 };
@@ -343,6 +369,7 @@ export function s3BucketSpecs(c: RuntimeConfig): S3BucketSpec[] {
       publicBase: s3PublicBase(c),
       aclPrivate: c.s3AclPrivate === true,
       pathStyle: true, // 主桶沿用升级前的 path-style 行为，不因多桶改造而变
+      maxBytes: gbToBytes(c.s3MaxGb),
       full: c.s3BucketFull === true,
     });
   }
@@ -364,6 +391,7 @@ export function s3BucketSpecs(c: RuntimeConfig): S3BucketSpec[] {
       // 空 = 与主桶一致的 path-style：大多数 S3 兼容实现（MinIO/R2/多数网关）都要它，
       // 少数只认 virtual-host 的服务商才需要显式选另一项
       pathStyle: e.urlStyle !== "virtual",
+      maxBytes: gbToBytes(e.maxGb),
       full: e.full === true,
     });
   });
@@ -380,6 +408,14 @@ export function s3UploadBuckets(c: RuntimeConfig): S3BucketSpec[] {
   if (all.length > 0 && open.length === 0)
     throw new Error("所有存储桶都已标记「已满」：请在后台新增存储桶或取消已满标记");
   return open;
+}
+
+/**
+ * 是否有任何桶配了容量上限。没配就完全不用查用量 —— 让「不配置 = 与升级前零差别」成立，
+ * 而不是给每个部署都加一次 Media 全表扫。
+ */
+export function s3HasCapacityLimit(c: RuntimeConfig): boolean {
+  return s3BucketSpecs(c).some((s) => s.maxBytes > 0);
 }
 
 /** 附件是否走云盘（OneDrive）：on/off 强制；auto 跟随存储驱动——chevereto 默认走云盘，其余走驱动 */

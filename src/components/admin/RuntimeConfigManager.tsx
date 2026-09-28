@@ -11,6 +11,7 @@ import type { RuntimeConfig } from "@/lib/runtime-config";
 import { SquareCheckbox } from "@/components/admin/SquareCheckbox";
 import { INPUT, LABEL_STRONG } from "@/lib/ui/cls";
 import { Button } from "@/components/ui/Button";
+import { formatBytes } from "@/lib/storage/bucket-limits";
 
 const DRIVERS = [
   { value: "local", label: "本地磁盘（public/uploads）" },
@@ -22,10 +23,16 @@ export default function RuntimeConfigManager({
   config,
   version,
   siteUrl,
+  usage,
 }: {
   config: RuntimeConfig;
   version: number;
   siteUrl: string;
+  /**
+   * 各桶已用字节数（key = 运行时桶 id：`primary` / `extra:<下标>`）。
+   * 只在「s3 驱动 + 至少一个桶配了容量上限」时由服务端传入 —— 纯展示，不参与保存。
+   */
+  usage?: Record<string, number>;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -44,6 +51,7 @@ export default function RuntimeConfigManager({
     s3PublicBase: config.s3PublicBase,
     s3AclPrivate: config.s3AclPrivate,
     s3BucketFull: config.s3BucketFull,
+    s3MaxGb: config.s3MaxGb,
     s3ExtraBuckets: config.s3ExtraBuckets,
     attachmentCloud: config.attachmentCloud,
     avCloud: config.avCloud,
@@ -356,6 +364,38 @@ export default function RuntimeConfigManager({
                   placeholder="留空用 Endpoint/Bucket 拼接；私有桶填 CDN 地址"
                 />
               </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="rc-s3-maxgb" className={LABEL_STRONG}>
+                    容量上限（GB）
+                  </label>
+                  <input
+                    id="rc-s3-maxgb"
+                    value={form.s3MaxGb}
+                    onChange={(e) => set({ s3MaxGb: e.target.value })}
+                    className={INPUT}
+                    autoComplete="off"
+                    spellCheck={false}
+                    inputMode="decimal"
+                    placeholder="留空 = 不限；填 10 表示 10 GB"
+                  />
+                </div>
+                <div>
+                  <span className={LABEL_STRONG}>当前已用</span>
+                  <p className="mt-1 text-xs leading-5 text-neutral-500">
+                    {usage
+                      ? `已用 ${formatBytes(usage.primary ?? 0)}${
+                          form.s3MaxGb.trim() ? ` / 上限 ${form.s3MaxGb.trim()} GB` : "（未设上限）"
+                        }`
+                      : "—（配了容量上限后才会统计）"}
+                  </p>
+                </div>
+              </div>
+              <p className="text-[11px] leading-4 text-neutral-400">
+                填了上限就按「已用 + 本次大小」在写入前预检，超限自动落到下一个备用桶 ——
+                免费额度用完但服务商仍照写照计费（绑卡后不报错）的情况只有这里能挡住。
+                统计的是已入库媒体原图的字节数（不含缩略图、不含云盘与本地文件），是近似值，请留出余量。
+              </p>
               <label className="flex cursor-pointer items-start gap-2.5">
                 <SquareCheckbox
                   checked={form.s3AclPrivate}
@@ -376,6 +416,7 @@ export default function RuntimeConfigManager({
                 buckets={form.s3ExtraBuckets}
                 onChange={(next) => set({ s3ExtraBuckets: next })}
                 primaryAclPrivate={form.s3AclPrivate}
+                usage={usage}
               />
             </>
           )}

@@ -14,7 +14,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { SquareCheckbox } from "@/components/admin/SquareCheckbox";
 import { INPUT, LABEL_STRONG } from "@/lib/ui/cls";
-import { S3_MAX_EXTRA_BUCKETS } from "@/lib/storage/bucket-limits";
+import { S3_MAX_EXTRA_BUCKETS, formatBytes, gbToBytes } from "@/lib/storage/bucket-limits";
 import type { S3BucketEntry } from "@/lib/runtime-config";
 
 export function emptyBucketEntry(): S3BucketEntry {
@@ -28,6 +28,7 @@ export function emptyBucketEntry(): S3BucketEntry {
     secretAccessKey: "",
     aclMode: "",
     urlStyle: "",
+    maxGb: "",
     full: false,
   };
 }
@@ -36,22 +37,35 @@ export default function S3BucketsEditor({
   buckets,
   onChange,
   primaryAclPrivate,
+  usage,
 }: {
   buckets: S3BucketEntry[];
   onChange: (next: S3BucketEntry[]) => void;
   /** 主桶是否为私有桶：用于把「跟随主桶」的**实际结果**直接写在选项里 */
   primaryAclPrivate: boolean;
+  /**
+   * 各桶已用字节数，key 是运行时的桶 id（`extra:<下标>`）。
+   * 只在「s3 驱动 + 至少一个桶配了容量上限」时才由服务端传入 —— 仅用于展示，
+   * 未保存的新行自然取不到值（保存后页面刷新即对齐）。
+   */
+  usage?: Record<string, number>;
 }) {
   const patch = (i: number, next: Partial<S3BucketEntry>) =>
     onChange(buckets.map((b, j) => (j === i ? { ...b, ...next } : b)));
   const remove = (i: number) => onChange(buckets.filter((_, j) => j !== i));
+  const usedBytes = (i: number) => usage?.[`extra:${i}`] ?? 0;
+  /** 已达上限：预览「上传时会跳过」的桶，和运行时预检同一套判据 */
+  const overCap = (i: number) => {
+    const cap = gbToBytes(buckets[i].maxGb);
+    return cap > 0 && usedBytes(i) >= cap;
+  };
 
   return (
     <div className="border-t border-dashed border-brand-300 pt-4">
       <div className="flex flex-wrap items-center gap-2">
         <h4 className="text-sm font-semibold text-neutral-900">备用存储桶</h4>
         <span className="text-[11px] text-neutral-400">
-          上传顺序：主桶 → 备用桶 1…N，标记「已满」的整桶跳过
+          上传顺序：主桶 → 备用桶 1…N，标记「已满」或已达容量上限的整桶跳过
         </span>
         <span className="ml-auto">
           <Button
@@ -80,6 +94,8 @@ export default function S3BucketsEditor({
                 </span>
                 {b.full ? (
                   <span className="text-[11px] text-amber-600">已满 · 上传时跳过</span>
+                ) : overCap(i) ? (
+                  <span className="text-[11px] text-amber-600">已达容量上限 · 上传时跳过</span>
                 ) : b.bucket.trim() ? (
                   <span className="text-[11px] text-neutral-400">参与上传</span>
                 ) : (
@@ -204,6 +220,45 @@ export default function S3BucketsEditor({
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
+                    <label htmlFor={`s3b-${i}-cap`} className={LABEL_STRONG}>
+                      容量上限（GB）
+                    </label>
+                    <input
+                      id={`s3b-${i}-cap`}
+                      value={b.maxGb}
+                      onChange={(e) => patch(i, { maxGb: e.target.value })}
+                      className={INPUT}
+                      autoComplete="off"
+                      spellCheck={false}
+                      inputMode="decimal"
+                      placeholder="留空 = 不限；填 10 表示 10 GB"
+                    />
+                  </div>
+                  <div>
+                    <span className={LABEL_STRONG}>当前已用</span>
+                    <p className="mt-1 text-xs leading-5 text-neutral-500">
+                      {usage ? (
+                        <>
+                          已用 {formatBytes(usedBytes(i))}
+                          {b.maxGb.trim()
+                            ? ` / 上限 ${b.maxGb.trim()} GB`
+                            : "（未设上限，不会因容量被跳过）"}
+                        </>
+                      ) : (
+                        "—（配了容量上限后才会统计）"
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <p className="text-[11px] leading-4 text-neutral-400">
+                  填了上限就按「已用 + 本次大小」在写入前预检，超限直接跳到下一个桶 ——
+                  免费额度用完但服务商照写照计费（绑卡后不会报错）的情况只有这个能挡住。
+                  统计的是已入库媒体原图的字节数（不含缩略图、不含云盘与本地文件），
+                  是近似值，请留出余量。
+                </p>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
                     <label htmlFor={`s3b-${i}-acl`} className={LABEL_STRONG}>
                       可见性
                     </label>
@@ -264,7 +319,6 @@ export default function S3BucketsEditor({
       <p className="mt-2 text-[11px] leading-4 text-neutral-400">
         最多 {S3_MAX_EXTRA_BUCKETS} 个备用桶。已落库的文件 URL 不变，增删备用桶只影响之后的上传；
         备用桶的公开访问域名会自动加入下载白名单。
-      </p>
-    </div>
+      </p>    </div>
   );
 }

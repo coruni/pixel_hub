@@ -26,6 +26,8 @@
 - 生效桶链唯一入口 `s3BucketSpecs`/`s3UploadBuckets`（runtime-config）：备用桶**逐字段继承**主配置（Endpoint/Region/凭据/公开基址），留空即继承、填了即独立 —— **每个桶可以是不同账号/密钥甚至不同服务商**；只有 `bucket` 必填。可见性 `aclMode`、寻址风格 `urlStyle` 是**三态**（`""` = 跟随主桶 / `public`|`private` / `virtual`）；`""` 必须存在，布尔表达不了「没填」。上传按「主桶 → 备用桶 1…N」取第一个未标 `full` 的，写失败自动换下一个（缺 publicBase 的桶**先跳过**，否则会留下删不掉的孤儿对象），全满则抛明确错误。两桶 publicBase 相同会串桶（反解按最长命中）→ `runtimeConfigIssues` 已拦。
 - 后台字段 `s3BucketFull` + `s3ExtraBuckets`（上限 8，常量在 `storage/bucket-limits.ts`；客户端组件只 import 这个常量，**类型**才能 import runtime-config，否则 prisma 进浏览器包）。`/api/dl` 白名单要把每个桶的 publicBase **和** Endpoint 主机都登记，否则备用桶里的文件下载 403。
 - 旧实现删 S3 对象时把整条 URL 当 Key 传（等于没删），现由反解修好。
+- **「满了切下一个」有三个触发点**（s3.ts 文件头有记）：人工 `full` 标记 → **容量预检** → 写入抛错。S3 协议**没有容量查询 API**，所以「桶还能装多少」必须自己算：每桶可配 `s3MaxGb` / `entry.maxGb`（GB 字符串，空=不限，换算 `gbToBytes`），上传前按「已用 + 本次大小」预检，装不下就跳。**这是「免费额度用完但绑了卡、服务商照写照计费且不报错」的唯一防线**（其余两个触发点都覆盖不到）。用量在 `storage/bucket-usage.ts`：按 `Media.size` 反解桶求和 + 60s 进程内快照 + 并发去重 + 写后 `bumpUsage`；`s3HasCapacityLimit()` 为假时零查询（不配置=与升级前零差别）。口径：`used+incoming > cap` 才跳（正好填满允许），`storageKey startsWith "http"` 排除云盘/本地文件，缩略图字节没算（近似值）。
+- **容量上限必须能在保存时报错，不能在 sanitize 里静默收敛**：曾用 `normGb()` 把非法值清成 `""` → 校验函数永远看不到非法值（探针逮到 2 条恒 false 断言），且用户以为有防线其实没有。现在 sanitize 只 trim+截长，`isInvalidGb()` 在 `runtimeConfigIssues` 里报错。
 
 ## Prisma
 - 事务内**不许 `create().catch()` 兜唯一键冲突**：PG 报错即整事务 aborted（之后全 25P02）。用 `createMany({skipDuplicates:true})` 靠 `count` 判断（见 `_tags.ts`）。find-or-create 按**所有**唯一键查；关联表按解析出的 id 去重。

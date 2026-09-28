@@ -6,6 +6,12 @@
 // 「主桶 → 备用桶 1…N」取第一个未标记「已满」的桶（见 runtime-config 的 s3UploadBuckets）。
 // 落库的仍是**完整 URL**，桶信息自带在 URL 里 —— 所以换桶/加桶不影响任何存量数据；
 // 反过来 get/size/del 必须先从 key 反解出「哪个桶 + 桶内 key」，见 resolveTarget。
+//
+// 「满了切下一个」有三个触发点，按发生顺序：
+// 1. `full` 人工标记（永久，配了多桶时才生效）；
+// 2. **容量预检**：桶配了 `maxGb` 且已用 + 本次会超限 → 跳过（见 bucket-usage）；
+// 3. 写入抛错（配额用尽 / 被拒 / 网络）→ 换下一个桶。
+// 只有 3 是服务商告诉我们的，1、2 是自己算的 —— 所以绑卡后「超额静默计费」也能被 2 挡住。
 import {
   S3Client,
   PutObjectCommand,
@@ -16,6 +22,8 @@ import {
 import type { StorageDriver } from "./types";
 import { resolveContentType } from "./mime";
 import { resolveS3Target } from "./s3-key";
+import { s3UsageSnapshot, bumpUsage } from "./bucket-usage";
+import { formatBytes } from "./bucket-limits";
 import {
   getRuntimeConfig,
   s3BucketSpecs,
@@ -70,17 +78,34 @@ export const s3Driver: StorageDriver = {
     const specs = s3UploadBuckets(await getRuntimeConfig());
     if (specs.length === 0) throw new Error("S3 存储未配置：请在后台「站点配置」填写 Bucket");
 
+    // 只有真有桶配了容量上限才查用量：没配的部署一次库都不查，行为与升级前一致
+    const usage = specs.some((s) => s.maxBytes > 0) ? await s3UsageSnapshot() : null;
+    const incoming = buf.length;
+
     const failures: string[] = [];
-    for (const cfg of specs) {
+    for (const bucket of specs) {
       // 缺公开基址就换下一个桶：先落对象再抛错会留下一个没人引用、又删不掉的孤儿
-      if (!cfg.publicBase) {
-        failures.push(`「${cfg.label}」缺少公开访问基址（Public Base）`);
+      if (!bucket.publicBase) {
+        failures.push(`「${bucket.label}」缺少公开访问基址（Public Base）`);
         continue;
       }
+      // 容量预检：判据是「写完之后不超上限」，正好填满允许、超出才跳。
+      // 这是「免费额度用完但服务商照写照计费」（绑卡后不报错）的唯一防线 ——
+      // 其余两个切换触发点（人工 full 标记、写入报错）都覆盖不到它。
+      if (bucket.maxBytes > 0 && usage) {
+        const used = usage.get(bucket.id) ?? 0;
+        if (used + incoming > bucket.maxBytes) {
+          failures.push(
+            `「${bucket.label}」容量不足（已用 ${formatBytes(used)} + 本次 ${formatBytes(incoming)} ` +
+              `> 上限 ${formatBytes(bucket.maxBytes)}）`,
+          );
+          continue;
+        }
+      }
       try {
-        await s3(cfg).send(
+        await s3(bucket).send(
           new PutObjectCommand({
-            Bucket: cfg.bucket,
+            Bucket: bucket.bucket,
             Key: key,
             Body: buf,
             // 必须显式带 ContentType：S3 不会按扩展名猜类型，缺省落成 binary/octet-stream，
@@ -88,15 +113,16 @@ export const s3Driver: StorageDriver = {
             // 按 key 扩展名兜底 —— 见 ./mime。
             ContentType: resolveContentType(contentType, key),
             // 公开桶直链可读；私有桶需把公开访问基址指向 CDN
-            ACL: cfg.aclPrivate ? undefined : "public-read",
+            ACL: bucket.aclPrivate ? undefined : "public-read",
           }),
         );
+        bumpUsage(bucket.id, incoming);
         // 落库即完整 URL：桶信息自带，读/删时无需再查配置（换桶也不影响存量）
-        return `${cfg.publicBase}/${key}`;
+        return `${bucket.publicBase}/${key}`;
       } catch (e) {
         // 桶满 / 配额 / 网络等一律换下一个桶；全部失败时把每个桶的原因一起抛出，便于定位
-        failures.push(`「${cfg.label}」${errorText(e)}`);
-        console.warn(`[s3] 写入桶「${cfg.label}」失败，尝试下一个桶：`, e);
+        failures.push(`「${bucket.label}」${errorText(e)}`);
+        console.warn(`[s3] 写入桶「${bucket.label}」失败，尝试下一个桶：`, e);
       }
     }
     throw new Error(`S3 上传失败（已尝试 ${specs.length} 个存储桶）：${failures.join("；")}`);
