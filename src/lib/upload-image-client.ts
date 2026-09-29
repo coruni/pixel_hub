@@ -1,5 +1,7 @@
 "use client";
 
+import { sortFilesByNameNaturally } from "@/lib/natural-sort";
+
 // 图片上传客户端：`/api/upload` 的**唯一**调用口（发布向导 /upload 与后台改稿页共用）。
 //
 // 为什么单独抽一层，而不是在组件里直接 fetch：
@@ -265,11 +267,16 @@ export async function uploadImageFile(
 }
 
 /**
- * 批量上传：按批切分、批内并发受限；成功项保持与入参同序。
+ * 批量上传：按批切分、批内并发受限；成功项保持与「自然排序后的入参」同序。
  *
  * 每个请求带 BATCH_SIZE 张（服务端一次就能处理整批并回等长数组），批次之间最多
  * `UPLOAD_CONCURRENCY` 个在飞。这样既不会「一张一个请求」把请求数放大 N 倍，
  * 也不会一次把十几张图打满源站、让后面的请求熬完反代的超时预算。
+ *
+ * **顺序保证**：拖拽 / 选择多图时，浏览器给的 FileList 顺序是混沌的（与文件管理器
+ * 展示顺序不一致，不同浏览器甚至相反），直接按它上传会让图集 / 封面顺序乱掉。
+ * 这里在切批前先按**文件名自然排序**（`img1 < img2 < … < img10`，而非字典序的
+ * `img1 < img10 < img2`），再靠绝对下标回填保证 good 与排序后的顺序一致。
  *
  * `onProgress` 按「已完成张数」回调。服务端没有字节级进度可读，不编造虚假百分比。
  */
@@ -278,24 +285,26 @@ export async function uploadImageFiles(
   maxCount: number,
   opts?: { concurrency?: number; onProgress?: (p: UploadProgress) => void },
 ): Promise<ImageUploadBatchResult> {
-  const total = files.length;
+  // 入参顺序混沌（见函数注释），先按文件名自然排序，得到稳定可预期的顺序
+  const ordered = sortFilesByNameNaturally(files);
+  const total = ordered.length;
   let done = 0;
   const emit = (index: number, phase: UploadProgress["phase"]) =>
     opts?.onProgress?.({
       done,
       total,
       index,
-      name: files[Math.min(index, total - 1)]?.name ?? "",
+      name: ordered[Math.min(index, total - 1)]?.name ?? "",
       phase,
     });
 
   // 切成批次：最后一批可能不满 BATCH_SIZE
   const batches: { start: number; files: File[] }[] = [];
   for (let i = 0; i < total; i += BATCH_SIZE) {
-    batches.push({ start: i, files: files.slice(i, i + BATCH_SIZE) });
+    batches.push({ start: i, files: ordered.slice(i, i + BATCH_SIZE) });
   }
 
-  // 批内结果：按绝对下标回填，保证 good 与入参同序（首图要当封面）
+  // 批内结果：按绝对下标回填，保证 good 与自然排序后的顺序同序（首图要当封面）
   const results: ImageUploadOutcome[] = new Array(total);
   const limit = Math.max(1, Math.min(opts?.concurrency ?? UPLOAD_CONCURRENCY, batches.length));
   let cursor = 0;
@@ -328,7 +337,7 @@ export async function uploadImageFiles(
   const bad: { name: string; error: string }[] = [];
   results.forEach((r, i) => {
     if (r.ok) good.push(r.item);
-    else bad.push({ name: files[i]!.name, error: r.error });
+    else bad.push({ name: ordered[i]!.name, error: r.error });
   });
   return { good, bad };
 }
