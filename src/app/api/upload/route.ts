@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { processImage, publicUrl } from "@/lib/media/process";
 import { compressConfigOf } from "@/lib/media/compress";
+import { findReusableImage, sha256Hex } from "@/lib/media/checksum";
 import { resolveWatermark } from "@/lib/media/watermark";
 import { rateLimit } from "@/lib/rate-limit";
 import { sameOrigin } from "@/lib/origin";
@@ -91,7 +92,12 @@ export async function POST(req: NextRequest) {
         results.push({ name, ok: false, error: "不支持的图片格式（仅 png/jpg/webp/gif/avif）" });
         continue;
       }
-      const p = await processImage(buf, compressConfigOf(L), watermark);
+      // 去重指纹取**压缩前**的源字节：sharp 会把图重编码（尺寸/质量/格式都可能变），
+      // 落库的 size 是压缩产物的，「同名 + 同大小」在图片链路上不成立 —— 见 lib/media/checksum.ts
+      const checksum = sha256Hex(buf);
+      const reuse = await findReusableImage(session.user.id, checksum, "gallery");
+      // 命中：跳过 sharp 与三次落盘（这才是单张图最贵的一段），只补一条新记录指向同一批存储对象
+      const p = reuse ?? (await processImage(buf, compressConfigOf(L), watermark));
       const media = await prisma.media.create({
         data: {
           kind: "GALLERY",
@@ -105,6 +111,7 @@ export async function POST(req: NextRequest) {
           size: p.size,
           mime: p.mime,
           fileName: `${name.replace(/[\\/]/g, "_")}.${p.ext}`,
+          checksum,
           status: "READY",
         },
       });
@@ -112,6 +119,7 @@ export async function POST(req: NextRequest) {
         id: media.id,
         ok: true,
         name,
+        deduped: !!reuse,
         thumbUrl: media.thumbKey ? publicUrl(media.thumbKey) : null,
         bigUrl: media.bigKey ? publicUrl(media.bigKey) : null,
         origUrl: publicUrl(media.storageKey),

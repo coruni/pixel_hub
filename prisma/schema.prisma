@@ -272,6 +272,8 @@ model Media {
   size       Int?
   mime       String?
   fileName   String?
+  // 去重指纹：**压缩前**原始上传字节的 sha256（图集 / 评论附图），见 lib/media/checksum.ts。
+  // 历史行为空 = 不参与去重；size 是压缩产物的字节数，撑不起「同名同大小」那类判定。
   checksum   String?
   sort       Int        @default(0)
   status     MediaStatus @default(PENDING_PROCESS)
@@ -281,6 +283,7 @@ model Media {
   @@index([resourceId])
   @@index([commentId])
   @@index([uploaderId])
+  @@index([uploaderId, checksum]) // 上传去重：uploaderId + checksum 等值查询
 }
 
 model TagOnResource {

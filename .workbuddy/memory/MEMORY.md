@@ -21,6 +21,10 @@
 - `pinnedAt`/`featuredAt`（null=未标记、不加索引）是 `getFeed` 第一排序键（`nulls:"last"` 必写）；`pinFirst` 只在按内容打分处关。keyset 游标必须与 orderBy 同构（`FeedCursor.p` + `cursorAfter`）。
 - 置顶/精华角标共四处：`ResourceCard` / `ResourceRow` / `DetailMarks`（四模板共用，banner 传 `tone="dark"`）；精华发 FEATURED 积分（唯一索引去重）；「加入专题」进第一个 featured 板块（上限 24）。
 
+## 上传 / 去重
+- **图片去重指纹 = 压缩前源字节的 sha256**（`media/checksum.ts`，落在 `Media.checksum`）。附件那套「同用户 + 同名 + 同大小」对图片无效：sharp 会重编码，`Media.size` 是**产物**字节数。命中后**复用旧存储对象、另建一条 Media 记录**（`resourceId`/`commentId` 是单值列，复用同一行会把图从上一个资源抢走）。scope 分 `gallery` / `comment`（后者额外要求 `commentId != null`，别复用「原样落盘未缩图」的附件行）。
+- **共用存储对象是连带约束**：删记录前必须反查引用（`admin-media.ts` 的 `purgeFiles(mediaId, keys)`，被别处引用的 key 不删），桶用量必须按 `storageKey` 去重（否则一张图重复计入、桶提前报满）。新增「多行指同一对象」的写法时要顺着这两处一起看。
+
 ## 存储 / S3 多桶
 - 落库一律是**完整 URL**（s3 的 `put` 返回 `${publicBase}/${key}`，不是相对 key）→ 桶信息自带在 URL 里，加桶/换桶不影响存量数据，`publicUrl` 对 URL 原样返回。但 `get`/`size`/`del` 必须反解出桶，唯一入口 `storage/s3-key.ts` 的 `resolveS3Target(key, specs)`（纯函数：命中公开基址或 `Endpoint/Bucket` 取**最长**命中；相对 key 归主桶；陌生域 best-effort 兜主桶）。
 - 生效桶链唯一入口 `s3BucketSpecs`/`s3UploadBuckets`（runtime-config）：备用桶**逐字段继承**主配置（Endpoint/Region/凭据/公开基址），留空即继承、填了即独立 —— **每个桶可以是不同账号/密钥甚至不同服务商**；只有 `bucket` 必填。可见性 `aclMode`、寻址风格 `urlStyle` 是**三态**（`""` = 跟随主桶 / `public`|`private` / `virtual`）；`""` 必须存在，布尔表达不了「没填」。上传按「主桶 → 备用桶 1…N」取第一个未标 `full` 的，写失败自动换下一个（缺 publicBase 的桶**先跳过**，否则会留下删不掉的孤儿对象），全满则抛明确错误。两桶 publicBase 相同会串桶（反解按最长命中）→ `runtimeConfigIssues` 已拦。

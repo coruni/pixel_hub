@@ -30,6 +30,7 @@ import {
   type ImageCompressConfig,
 } from "@/lib/media/compress";
 import { applyWatermark, resolveWatermark, type WatermarkSpec } from "@/lib/media/watermark";
+import { findReusableImage, sha256Hex } from "@/lib/media/checksum";
 
 async function requiredUser() {
   const s = await auth();
@@ -336,16 +337,41 @@ function sniffImage(buf: Buffer): boolean {
   return false;
 }
 
+/** 评论附图的落盘结果：直接喂给 Media 的字段（checksum = 压缩前源字节指纹，见 media/checksum.ts） */
+type SavedCommentImage = {
+  key: string;
+  width: number;
+  height: number;
+  size: number;
+  mime: string;
+  checksum: string;
+};
+
 async function saveCommentImage(
   file: File,
+  userId: string,
   maxBytes: number,
   cfg: ImageCompressConfig,
   watermark: WatermarkSpec | null,
-): Promise<{ key: string; width: number; height: number; size: number; mime: string } | null> {
+): Promise<SavedCommentImage | null> {
   const buf = Buffer.from(await file.arrayBuffer());
   if (buf.byteLength > maxBytes)
     throw new Error(`单张图片不能超过 ${Math.round(maxBytes / MIB)}MB`);
   if (!sniffImage(buf)) throw new Error("不支持的图片格式");
+  // 去重指纹取**压缩前**的源字节：下面这一步 sharp 会重编码，落库 size 是产物的，
+  // 撑不起「同名 + 同大小」那套判定（见 lib/media/checksum.ts）。
+  // 命中就不必再压一遍、更不必再写一次存储 —— 同一张图重复贴进评论是常见操作。
+  const checksum = sha256Hex(buf);
+  const reuse = await findReusableImage(userId, checksum, "comment");
+  if (reuse)
+    return {
+      key: reuse.storageKey,
+      width: reuse.width,
+      height: reuse.height,
+      size: reuse.size,
+      mime: reuse.mime,
+      checksum,
+    };
   // 水印字号按**输出**画幅定：原图可能远大于 1200，得先算 resize 后的尺寸再叠加，
   // 否则水印在大图上会小得离谱（processImage 里同理，那里用的是同一套派生公式）。
   const oriented = sharp(buf, { failOn: "none" }).rotate();
@@ -365,6 +391,7 @@ async function saveCommentImage(
     height: out.info.height,
     size: out.data.byteLength,
     mime: outputMime(cfg.format),
+    checksum,
   };
 }
 
@@ -432,25 +459,17 @@ export async function addCommentAction(
     wmPref?.watermarkText,
     wmPref?.watermarkPosition ?? "BOTTOM_RIGHT",
   );
-  let saved: { key: string; width: number; height: number; size: number; mime: string }[] = [];
+  let saved: SavedCommentImage[] = [];
   if (images.length > 0) {
     // Chevereto 上传接口一次请求仅接受单个文件：每张图各自走一次独立上传请求，
     // 用 Promise 并行发出多个「单文件」请求并逐个收集成败，互不阻断。
     const pics = images.slice(0, commentMaxCount);
     const settled = await Promise.allSettled(
-      pics.map((f) => saveCommentImage(f, commentMaxBytes, compressCfg, watermark)),
+      pics.map((f) => saveCommentImage(f, user.id, commentMaxBytes, compressCfg, watermark)),
     );
     saved = settled
       .filter(
-        (
-          r,
-        ): r is PromiseFulfilledResult<{
-          key: string;
-          width: number;
-          height: number;
-          size: number;
-          mime: string;
-        }> => r.status === "fulfilled" && !!r.value,
+        (r): r is PromiseFulfilledResult<SavedCommentImage> => r.status === "fulfilled" && !!r.value,
       )
       .map((r) => r.value);
     for (let i = 0; i < settled.length; i += 1) {
@@ -488,6 +507,7 @@ export async function addCommentAction(
           height: m.height,
           size: m.size,
           mime: m.mime,
+          checksum: m.checksum,
           status: "READY" as const,
           sort: i,
         })),

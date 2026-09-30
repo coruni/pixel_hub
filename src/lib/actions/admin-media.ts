@@ -41,9 +41,30 @@ async function checkDeletable(
   return { ok: true, media: m, keys };
 }
 
-/** 删存储文件：云附件引用走 Graph，其余走统一存储层（local 驱动不接受带前导斜杠的路径） */
-async function purgeFiles(keys: string[]): Promise<void> {
+/**
+ * 删存储文件：云附件引用走 Graph，其余走统一存储层（local 驱动不接受带前导斜杠的路径）。
+ *
+ * 先反查引用再删：图片去重会**共用存储对象**（同一张图的多条 Media 记录指向同一批 key，
+ * 见 lib/media/checksum.ts），照着本条记录的 keys 直接删会把另一个资源/评论正在展示的图一起删掉
+ * —— 表现是记录还在、图 404。所以只删「没有别的记录在用」的那些 key。
+ */
+async function purgeFiles(mediaId: string, keys: string[]): Promise<void> {
+  const others = await prisma.media.findMany({
+    where: {
+      NOT: { id: mediaId },
+      OR: [{ storageKey: { in: keys } }, { thumbKey: { in: keys } }, { bigKey: { in: keys } }],
+    },
+    select: { storageKey: true, thumbKey: true, bigKey: true },
+  });
+  const shared = new Set<string>();
+  for (const r of others) {
+    shared.add(r.storageKey);
+    if (r.thumbKey) shared.add(r.thumbKey);
+    if (r.bigKey) shared.add(r.bigKey);
+  }
+
   for (const k of keys) {
+    if (shared.has(k)) continue;
     if (parseCloudRef(k)) {
       await deleteStoredCloudRef(k);
     } else {
@@ -62,7 +83,7 @@ export async function deleteMediaAction(mediaId: string): Promise<{ ok: boolean;
 
   await prisma.media.delete({ where: { id: mediaId } });
   await audit(me.id, "DELETE_MEDIA", "MEDIA", mediaId, check.media.fileName ?? undefined);
-  await purgeFiles(check.keys);
+  await purgeFiles(mediaId, check.keys);
   revalidatePath("/admin/media");
   return { ok: true };
 }
@@ -101,7 +122,7 @@ export async function bulkDeleteOrphanMediaAction(ids: string[]): Promise<BulkMe
       continue;
     }
     await prisma.media.delete({ where: { id } });
-    await purgeFiles(check.keys);
+    await purgeFiles(id, check.keys);
     deleted++;
   }
 

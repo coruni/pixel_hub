@@ -31,7 +31,13 @@ async function compute(): Promise<Map<string, number>> {
     where: { size: { gt: 0 }, storageKey: { startsWith: "http" } },
     select: { storageKey: true, size: true },
   });
+  // 同一物理对象可能挂在多条 Media 记录上：图片去重命中时不重写存储、只补一条指向同一批 key
+  // 的新记录（见 lib/media/checksum.ts）。按 storageKey 去重，否则一张图会被重复计入桶用量，
+  // 把桶提前顶到配置的上限、后续上传被误判为「装不下」。
+  const seen = new Set<string>();
   for (const r of rows) {
+    if (seen.has(r.storageKey)) continue;
+    seen.add(r.storageKey);
     const target = resolveS3Target(r.storageKey, specs);
     if (!target) continue;
     usage.set(target.id, (usage.get(target.id) ?? 0) + (r.size ?? 0));
