@@ -30,7 +30,7 @@ import {
   type ImageCompressConfig,
 } from "@/lib/media/compress";
 import { applyWatermark, resolveWatermark, type WatermarkSpec } from "@/lib/media/watermark";
-import { findReusableImage, sha256Hex } from "@/lib/media/checksum";
+import { findReusableImage, isSha256Hex, sha256Hex } from "@/lib/media/checksum";
 
 async function requiredUser() {
   const s = await auth();
@@ -353,15 +353,16 @@ async function saveCommentImage(
   maxBytes: number,
   cfg: ImageCompressConfig,
   watermark: WatermarkSpec | null,
+  originalChecksum?: string,
 ): Promise<SavedCommentImage | null> {
   const buf = Buffer.from(await file.arrayBuffer());
   if (buf.byteLength > maxBytes)
     throw new Error(`单张图片不能超过 ${Math.round(maxBytes / MIB)}MB`);
   if (!sniffImage(buf)) throw new Error("不支持的图片格式");
-  // 去重指纹取**压缩前**的源字节：下面这一步 sharp 会重编码，落库 size 是产物的，
-  // 撑不起「同名 + 同大小」那套判定（见 lib/media/checksum.ts）。
+  // 去重指纹取**压缩前**的源字节：前端压过图时 files 已是压缩产物，故指纹改由客户端
+  // 算原始字节随附；收不到 / 格式非法时回退「对收到字节取 sha256」（见 lib/media/checksum.ts）。
   // 命中就不必再压一遍、更不必再写一次存储 —— 同一张图重复贴进评论是常见操作。
-  const checksum = sha256Hex(buf);
+  const checksum = isSha256Hex(originalChecksum) ? originalChecksum! : sha256Hex(buf);
   const reuse = await findReusableImage(userId, checksum, "comment");
   if (reuse)
     return {
@@ -433,6 +434,8 @@ export async function addCommentAction(
 
   // 附图（仅主楼，回复不带图）：先落盘，成功与否不阻断文字评论
   const images = fd.getAll("images").filter((f): f is File => f instanceof File && f.size > 0);
+  // 与 images 同序的「压缩前源字节指纹」：前端预压缩时随附；缺失则服务端回退计算
+  const imageChecksums = fd.getAll("checksums").map(String);
   // 后台配置优先：张数上限（0 = 禁止附图，parseUploadLimits 已 clamp 0..20）与单张字节上限
   const L = await getUploadLimits();
   const commentMaxCount = L.commentImageMaxCount;
@@ -465,7 +468,9 @@ export async function addCommentAction(
     // 用 Promise 并行发出多个「单文件」请求并逐个收集成败，互不阻断。
     const pics = images.slice(0, commentMaxCount);
     const settled = await Promise.allSettled(
-      pics.map((f) => saveCommentImage(f, user.id, commentMaxBytes, compressCfg, watermark)),
+      pics.map((f, i) =>
+        saveCommentImage(f, user.id, commentMaxBytes, compressCfg, watermark, imageChecksums[i]),
+      ),
     );
     saved = settled
       .filter(

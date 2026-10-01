@@ -9,6 +9,7 @@ import ImageViewer from "@/components/ui/ImageViewer";
 import MdEditor from "@/components/rte/MdEditorLazy";
 import { useFileDrop } from "@/lib/hooks/use-file-drop";
 import { useFilePaste } from "@/lib/hooks/use-file-paste";
+import { compressImagesForUpload } from "@/lib/media/client-compress";
 import { confirmDialog, toast } from "@/components/ui/feedback";
 import CommentItem, { type ReplyState } from "./comment-item";
 import { CommentsPager } from "./CommentPager";
@@ -234,7 +235,14 @@ export default function Comments({
     fd.set("resourceId", resourceId);
     if (parentId) fd.set("parentId", parentId);
     fd.set("content", value);
-    if (!parentId) for (const f of files) fd.append("images", f);
+    if (!parentId && files.length > 0) {
+      // 主楼附图：上传前在浏览器里先压一遍（重编码 + 按需降采样），指纹随附交给服务端去重
+      const compressed = await compressImagesForUpload(files);
+      for (const c of compressed) {
+        fd.append("images", c.file);
+        fd.append("checksums", c.originalChecksum);
+      }
+    }
     const res = await addCommentAction({}, fd);
     setSending(false);
     if (res.ok) {

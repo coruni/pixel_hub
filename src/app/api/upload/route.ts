@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { processImage, publicUrl } from "@/lib/media/process";
 import { compressConfigOf } from "@/lib/media/compress";
-import { findReusableImage, sha256Hex } from "@/lib/media/checksum";
+import { findReusableImage, isSha256Hex, sha256Hex } from "@/lib/media/checksum";
 import { resolveWatermark } from "@/lib/media/watermark";
 import { rateLimit } from "@/lib/rate-limit";
 import { sameOrigin } from "@/lib/origin";
@@ -76,8 +76,13 @@ export async function POST(req: NextRequest) {
   if (entries.length > MAX_FILES)
     return NextResponse.json({ ok: false, error: `单次最多上传 ${MAX_FILES} 张` }, { status: 400 });
 
+  // 客户端预压缩随附的「压缩前源字节指纹」：与 files 同序。拿不到 / 格式非法时回退为
+  // 「对收到字节取 sha256」（见下方 sha256Hex 兜底）—— 旧客户端与非浏览器调用方也能兼容。
+  const checksums = form.getAll("checksums").map(String);
+
   const results: unknown[] = [];
-  for (const file of entries) {
+  for (let idx = 0; idx < entries.length; idx += 1) {
+    const file = entries[idx]!;
     const buf = Buffer.from(await file.arrayBuffer());
     const name = file.name || "image";
     try {
@@ -92,9 +97,9 @@ export async function POST(req: NextRequest) {
         results.push({ name, ok: false, error: "不支持的图片格式（仅 png/jpg/webp/gif/avif）" });
         continue;
       }
-      // 去重指纹取**压缩前**的源字节：sharp 会把图重编码（尺寸/质量/格式都可能变），
-      // 落库的 size 是压缩产物的，「同名 + 同大小」在图片链路上不成立 —— 见 lib/media/checksum.ts
-      const checksum = sha256Hex(buf);
+      // 去重指纹取**压缩前**的源字节：前端压过图时，files 已是压缩产物，
+      // 故指纹改由客户端算原始字节并随附；收不到则用收到字节兜底（见 lib/media/checksum.ts）。
+      const checksum = isSha256Hex(checksums[idx]) ? checksums[idx]! : sha256Hex(buf);
       const reuse = await findReusableImage(session.user.id, checksum, "gallery");
       // 命中：跳过 sharp 与三次落盘（这才是单张图最贵的一段），只补一条新记录指向同一批存储对象
       const p = reuse ?? (await processImage(buf, compressConfigOf(L), watermark));
