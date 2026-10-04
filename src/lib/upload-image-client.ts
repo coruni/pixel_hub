@@ -1,6 +1,7 @@
 "use client";
 
 import { sortFilesByNameNaturally } from "@/lib/natural-sort";
+import { compressImagesForUpload } from "@/lib/media/client-compress";
 
 // 图片上传客户端：`/api/upload` 的**唯一**调用口（发布向导 /upload 与后台改稿页共用）。
 //
@@ -133,6 +134,9 @@ async function postOnce(
   maxCount: number,
   onProgress?: (percent: number) => void,
 ): Promise<Attempt> {
+  // 前端预压缩：每个文件压一遍（重编码 + 按需降采样），指纹随压缩产物一起发，
+  // 服务端据指纹做去重。任何异常已在工具内降级为原文件，不会拖垮上传主链路。
+  const compressed = await compressImagesForUpload(files);
   const fd = new FormData();
   // 诊断：确认进到这里的到底是不是数组。staging 结束后移除。
   const isArr = Array.isArray(files);
@@ -145,7 +149,10 @@ async function postOnce(
       iterable: typeof (files as unknown as { [Symbol.iterator]?: unknown })?.[Symbol.iterator],
     });
   }
-  for (const f of files) fd.append("files", f);
+  for (const c of compressed) {
+    fd.append("files", c.file);
+    fd.append("checksums", c.originalChecksum);
+  }
   const label = files.map((f) => f.name).join("、");
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), REQUEST_TIMEOUT_MS);

@@ -23,6 +23,8 @@
 
 ## 上传 / 去重
 - **图片去重指纹 = 压缩前源字节的 sha256**（`media/checksum.ts`，落在 `Media.checksum`）。附件那套「同用户 + 同名 + 同大小」对图片无效：sharp 会重编码，`Media.size` 是**产物**字节数。命中后**复用旧存储对象、另建一条 Media 记录**（`resourceId`/`commentId` 是单值列，复用同一行会把图从上一个资源抢走）。scope 分 `gallery` / `comment`（后者额外要求 `commentId != null`，别复用「原样落盘未缩图」的附件行）。
+- **指纹现在由前端算原始字节、随上传提交**：前端 `lib/media/client-compress.ts` 的 `compressImageForUpload` 在压图前先对**原始 File 字节**取 sha256（`crypto.subtle.digest`），压完把 `file` 与 `checksums`（同序）一起发给服务端。服务端 `/api/upload` 与 `saveCommentImage` 收到合法 64-hex 指纹就用它做去重，否则回退 `sha256Hex(收到字节)`。这样老记录（指纹=原图 sha256）与新上传依然能对上，跨版本去重不失效；非安全上下文（非 localhost/https）拿不到 subtle，回退照常。
+- **前端预压缩（2026-10-01 新增）**：目的砍掉 10MB+ 原图的上传体积 / 服务端 sharp 解码压力，并丢 EXIF。规则：≤200KB 不压；gif 不压（canvas 只取首帧会丢动画）；解不出或没压小则降级用原文件。其余图 `createImageBitmap`+canvas 重编码，优先 webp（保透明），老浏览器退回 png（源带透明时）/jpeg（源 jpeg 时，带透明则先铺白底）；最长边 >4096 等比降到 4096 以内（挡 100MP 手机照，正常照片原分辨率归档语义不变）。三个调用点：`upload-image-client.ts` 的 `postOnce`、`MdEditor.tsx` 的 `onUpload`、`Comments.tsx` 的 `post`（主楼附图）。服务端 `processImage` 仍照常出原图/大图/缩略图/水印。
 - **共用存储对象是连带约束**：删记录前必须反查引用（`admin-media.ts` 的 `purgeFiles(mediaId, keys)`，被别处引用的 key 不删），桶用量必须按 `storageKey` 去重（否则一张图重复计入、桶提前报满）。新增「多行指同一对象」的写法时要顺着这两处一起看。
 
 ## 存储 / S3 多桶

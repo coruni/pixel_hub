@@ -20,6 +20,12 @@ export function sha256Hex(buf: Buffer): string {
   return createHash("sha256").update(buf).digest("hex");
 }
 
+/** 合法 sha256 指纹：64 位小写十六进制。用于校验客户端上传时随附的「压缩前源字节指纹」，
+ *  收不到或格式非法时由服务端回退为「对收到字节取 sha256」。 */
+export function isSha256Hex(v: unknown): v is string {
+  return typeof v === "string" && /^[0-9a-f]{64}$/.test(v);
+}
+
 /** 去重范围：图集（/api/upload）与评论附图（addCommentAction）各自一套压缩管线 */
 export type DedupScope = "gallery" | "comment";
 

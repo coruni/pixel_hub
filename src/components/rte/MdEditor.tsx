@@ -8,6 +8,7 @@ import { Maximize2, Minimize2 } from "lucide-react";
 import { Crepe, CrepeFeature } from "@milkdown/crepe";
 import "@milkdown/crepe/theme/common/style.css";
 import "@milkdown/crepe/theme/frame.css";
+import { compressImageForUpload } from "@/lib/media/client-compress";
 
 /** 默认裁剪：LaTeX(Ab/KaTeX)、AI、CodeMirror 代码块编辑器（保留 ProseMirror 原生代码块） */
 const BASE_FEATURES: Partial<Record<CrepeFeature, boolean>> = {
@@ -83,8 +84,10 @@ export default function MdEditor({
           // 行内图/块图共用：走站内 /api/upload 媒体接口，回填原图地址
           [CrepeFeature.ImageBlock]: {
             onUpload: async (file: File) => {
+              const c = await compressImageForUpload(file);
               const fd = new FormData();
-              fd.append("files", file);
+              fd.append("files", c.file);
+              fd.append("checksums", c.originalChecksum);
               try {
                 const res = await fetch("/api/upload?max=1", { method: "POST", body: fd });
                 const data = (await res.json()) as {
