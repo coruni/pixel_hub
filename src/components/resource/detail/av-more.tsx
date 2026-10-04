@@ -4,8 +4,10 @@
  * 播放器控件行里的「更多」溢出菜单 —— 直链播放器的视频 / 音频两种形态共用。
  *
  * 为什么要有它：控件行上的按钮已经多到窄屏一行放不下（320–374px 尤其紧，只能靠折行兜底）。
- * 倍速 / 循环 / 全屏这类「设置项」不是每次播放都要点，收进这里，把行让给播放、跳转、
- * 选集这些高频动作 —— 位置和配色与相邻控件完全一致，只是多一层弹出。
+ * 倍速 / 循环 / 下载原件这类「不是每次播放都要点」的动作收进这里，把行让给播放、跳转、
+ * 选集、全屏这些高频动作 —— 位置和配色与相邻控件完全一致，只是多一层弹出。
+ * 下载原件那行由宿主（av-player）渲染成菜单项并作为 children 传进来
+ * （登录墙 / 下载计数的唯一实现留在 MetaDownloadButton），行样式走 @/lib/ui/cls 的 AV_MORE_ROW*。
  *
  * 状态由宿主持有（`open` / `onToggle` / `onClose`）而不是内部自管：
  * 视频控件会在鼠标静止后自动淡出，宿主必须知道面板开着才能暂停那个计时器 ——
@@ -16,7 +18,14 @@
 
 import { createContext, useContext, useEffect, useRef, type ReactNode } from "react";
 import { Check, MoreHorizontal, type LucideIcon } from "lucide-react";
-import { AV_CTRL_BTN as BTN } from "@/lib/ui/cls";
+import {
+  AV_CTRL_BTN as BTN,
+  AV_MORE_ROW,
+  AV_MORE_ROW_ON_DARK,
+  AV_MORE_ROW_ON_DARK_ACTIVE,
+  AV_MORE_ROW_ON_SURFACE,
+  AV_MORE_ROW_ON_SURFACE_ACTIVE,
+} from "@/lib/ui/cls";
 import { AV_TONE, type AvTone } from "./av-btn";
 
 /** 面板与行的配色跟着控件走，不必逐项传 tone —— 由 AvMoreMenu 注入，AvMoreItem 取用 */
@@ -29,10 +38,14 @@ const PANEL: Record<AvTone, string> = {
 };
 
 const ROW: Record<AvTone, { idle: string; active: string; icon: string }> = {
-  onDark: { idle: "hover:bg-white/15 hover:text-white", active: "bg-white/20 text-white", icon: "text-white/70" },
+  onDark: {
+    idle: AV_MORE_ROW_ON_DARK,
+    active: AV_MORE_ROW_ON_DARK_ACTIVE,
+    icon: "text-white/70",
+  },
   onSurface: {
-    idle: "hover:bg-brand-50 hover:text-brand-700",
-    active: "bg-brand-100 text-brand-800",
+    idle: AV_MORE_ROW_ON_SURFACE,
+    active: AV_MORE_ROW_ON_SURFACE_ACTIVE,
     icon: "text-neutral-500",
   },
 };
@@ -103,7 +116,7 @@ export function AvMoreMenu({
  * 菜单里的一行。`hint` 放右侧的当前值（倍速的「1.25×」），
  * `active` 只给**开关型**项（循环播放）—— 传了它这行就是 `menuitemcheckbox`
  * （`aria-pressed` 在 `menuitem` 上是不合法的，读屏也会当成按下的按钮）；
- * 一次性动作（全屏、倍速）别传 `active`，保持普通 `menuitem`。
+ * 一次性动作（下载原件、倍速）别传 `active`，保持普通 `menuitem`。
  */
 export function AvMoreItem({
   icon: Icon,
@@ -130,9 +143,7 @@ export function AvMoreItem({
         onClick();
         ctx?.close();
       }}
-      className={`flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs transition ${
-        active ? s.active : s.idle
-      }`}
+      className={`${AV_MORE_ROW} ${active ? s.active : s.idle}`}
     >
       {Icon && <Icon size={14} className={`shrink-0 ${s.icon}`} aria-hidden />}
       <span className="min-w-0 flex-1 truncate">{label}</span>

@@ -183,7 +183,7 @@ export function FollowButton({
   );
 }
 
-/** 统一下载按钮（IMAGE 整包 / ARTICLE 附件行 / GAME externalUrl 外链）。
+/** 统一下载按钮（IMAGE 整包 / ARTICLE 附件行 / GAME externalUrl 外链 / 播放器「更多」菜单）。
  *  登录墙与计数语义统一（loginRequired && !authed → 登录链接）。 */
 export function MetaDownloadButton({
   resourceId,
@@ -196,7 +196,7 @@ export function MetaDownloadButton({
   small,
   name,
   kind = "file",
-  iconOnly,
+  menuItem,
   className,
 }: {
   resourceId: string;
@@ -213,9 +213,10 @@ export function MetaDownloadButton({
   name?: string;
   /** file = 本站托管附件（走代理强制原名）；link = 作者外链（原样打开） */
   kind?: "file" | "link";
-  /** 只渲染图标按钮（播放器控件位）；外观（盒模型 + 色调）完全由 className 给出，无障碍名取 label */
-  iconOnly?: boolean;
-  /** 追加类名：iconOnly 时由调用方给完整外观 */
+  /** 渲染成播放器「更多」菜单里的行：`role="menuitem"` + 「图标 + 截断文案」行结构。
+   *  外观（行盒 + 色调）仍全部由 className 给 —— 菜单皮肤在 av-more.tsx，这里不掺和 */
+  menuItem?: boolean;
+  /** 追加类名：menuItem 时由调用方给完整外观（见 @/lib/ui/cls 的 AV_MORE_ROW*） */
   className?: string;
 }) {
   const [n, setN] = useState(count ?? 0);
@@ -236,22 +237,30 @@ export function MetaDownloadButton({
     kind === "file"
       ? `/api/dl?u=${encodeURIComponent(url)}&n=${encodeURIComponent(name ?? "")}`
       : url;
-  // 外观只有一处定义：iconOnly 由调用方给（播放器控件位），否则是既有的翠绿实底（逐字保持原样）
-  const lookCls = iconOnly
+  // 外观只有一处定义：menuItem 由调用方给（播放器「更多」菜单行），否则是既有的翠绿实底（逐字保持原样）
+  const lookCls = menuItem
     ? (className ?? "")
     : `inline-flex items-center gap-1.5 rounded-none border border-emerald-600 bg-emerald-600 font-medium text-white transition hover:bg-emerald-500 disabled:opacity-60 ${
         small ? "px-2.5 py-1 text-xs" : "px-5 py-2 text-sm"
       }${className ? ` ${className}` : ""}`;
-  // 图标模式只出图标（无障碍名走 aria-label），文字模式出「图标 + 文案」
+  // 菜单行按「图标 + 可截断文案」排（与 av-more 的内建行同构）；其余形态是图标 + 文案
   const face = (text: string, size: number) =>
-    iconOnly ? <Download size={16} aria-hidden /> : <><Download size={size} aria-hidden /> {text}</>;
+    menuItem ? (
+      <>
+        <Download size={14} className="shrink-0" aria-hidden />
+        <span className="min-w-0 flex-1 truncate">{text}</span>
+      </>
+    ) : (
+      <>
+        <Download size={size} aria-hidden /> {text}
+      </>
+    );
   if (loginRequired && !authed) {
     return (
       <a
         href={`/login?callbackUrl=${encodeURIComponent(path)}`}
+        role={menuItem ? "menuitem" : undefined}
         className={lookCls}
-        aria-label={iconOnly ? "登录后下载" : undefined}
-        title={iconOnly ? "登录后下载" : undefined}
       >
         {face("登录后下载", small ? 13 : 15)}
       </a>
@@ -283,8 +292,7 @@ export function MetaDownloadButton({
         })
       }
       className={lookCls}
-      aria-label={iconOnly ? label : undefined}
-      title={iconOnly ? label : undefined}
+      role={menuItem ? "menuitem" : undefined}
     >
       {face(
         `${label}${showCount ? ` ${n > 0 ? n : ""}`.trimEnd() : ""}`.trimEnd(),

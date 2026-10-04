@@ -21,15 +21,16 @@
  * 视频字幕是压在画面上的叠层，但开关和别的控件一样在底部控件行；音频的歌词板落在卡片里。
  * 同一个开关既切显隐也切歌词板的存亡，不额外做折叠。
  *
- * **视频画面上一律不留浮层按钮**：上一/下一、字幕开关、选集开关全部在底部控件行
- * （音频那行本来就是 flex-wrap，两种形态的位置就此统一）。倍速 / 循环 / 全屏这类设置项
- * 收进行尾的「更多」菜单（见 av-more.tsx）—— 控件行窄屏一行放不下，折行只能兜底，
- * 让高频动作先占住主行。分P 列表：开关在控件条里，面板自己铺开（窄屏贴底铺满画面、
+ * **视频画面上一律不留浮层按钮**：上一/下一、字幕开关、选集开关、全屏全部在底部控件行
+ * （音频那行本来就是 flex-wrap，两种形态的位置就此统一）。倍速 / 循环 / 下载原件这类
+ * 「一次播放只碰一次」的动作收进行尾的「更多」菜单（见 av-more.tsx）—— 控件行窄屏一行放不下，
+ * 折行只能兜底，让高频动作先占住主行。分P 列表：开关在控件条里，面板自己铺开（窄屏贴底铺满画面、
  * 宽屏右下浮层），打开时控件条整条让位。控件自动淡出（仅视频）由状态驱动 —— 详见下方那个 effect。
  * 「列表 / 更多」两个面板互斥且都会暂停淡出计时：面板开着时控件消失会把面板一起带走。
  *
  * 与宿主的契约：`downloadSlot` 是宿主（av-player，服务端组件）注入的控件位——下载入口由宿主渲染
- * （保留登录墙与下载计数的唯一实现），这里只负责把它排进控件行并保证色调一致。多 P 时它指向第一 P。
+ * （保留登录墙与下载计数的唯一实现），这里只负责把它排进「更多」菜单并保证行样式一致。
+ * 多 P 时它指向第一 P。
  */
 
 import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
@@ -76,7 +77,7 @@ function fmt(sec: number): string {
 }
 
 // —— 控件样式：布局与配色分开，激活态整串替换，避免同属性类名互相覆盖 ——
-// 常量统一放 @/lib/ui/cls（宿主 av-player 渲染的下载控件要用同一套色调，见 props.downloadSlot）
+// 常量统一放 @/lib/ui/cls（宿主 av-player 渲染的菜单行要用 AV_MORE_ROW*，见 props.downloadSlot）
 
 /** 音视频播放器本体（MUSIC / VIDEO 共用） */
 export default function AvControls({
@@ -91,7 +92,7 @@ export default function AvControls({
   items: AvPlayItem[];
   poster?: string;
   title: string;
-  /** 宿主注入的控件位（当前放下载入口）：由 av-player 渲染，色调与播放器控件一致，融进同一行 */
+  /** 宿主注入的控件位（当前放下载入口）：由 av-player 渲染，作为「更多」菜单里的一行插进末尾 */
   downloadSlot?: ReactNode;
 }) {
   const isVideo = kind === "VIDEO";
@@ -507,8 +508,22 @@ export default function AvControls({
                       <VolIcon size={16} aria-hidden />
                     </button>
                   </div>
-                  {downloadSlot}
-                  {/* 设置项收进「更多」：倍速 / 循环 / 全屏都不是每次播放都要点，
+                  {/* 全屏留在主行：播放中随手就要按，收进菜单等于每次多两下点击。
+                      下载原件正相反 —— 一次播放顶多按一次，所以进「更多」（由宿主渲染，见 downloadSlot） */}
+                  <button
+                    type="button"
+                    onClick={() => void toggleFullscreen()}
+                    aria-label={fullscreen ? "退出全屏" : "全屏"}
+                    title={fullscreen ? "退出全屏" : "全屏"}
+                    className={`${BTN_BASE} ${VIDEO_OFF}`}
+                  >
+                    {fullscreen ? (
+                      <Minimize size={16} aria-hidden />
+                    ) : (
+                      <Maximize size={16} aria-hidden />
+                    )}
+                  </button>
+                  {/* 设置项收进「更多」：倍速 / 循环 / 下载原件都不是每次播放都要点，
                       留在主行会把 320–374px 挤到折行 */}
                   <AvMoreMenu open={moreOpen} tone="onDark" onToggle={toggleMore} onClose={closeMore}>
                     <AvMoreItem icon={Gauge} label="播放速度" hint={`${rate}×`} onClick={cycleRate} />
@@ -518,11 +533,7 @@ export default function AvControls({
                       active={loop}
                       onClick={() => setLoop((v) => !v)}
                     />
-                    <AvMoreItem
-                      icon={fullscreen ? Minimize : Maximize}
-                      label={fullscreen ? "退出全屏" : "全屏"}
-                      onClick={() => void toggleFullscreen()}
-                    />
+                    {downloadSlot}
                   </AvMoreMenu>
                 </div>
               </div>
@@ -656,8 +667,7 @@ export default function AvControls({
               onToggle={cap.toggle}
             />
           )}
-          {downloadSlot}
-          {/* 与视频同一套：设置项（倍速 / 循环）收进「更多」 */}
+          {/* 与视频同一套：低频率动作（倍速 / 循环 / 下载原件）收进「更多」 */}
           <AvMoreMenu open={moreOpen} tone="onSurface" onToggle={toggleMore} onClose={closeMore}>
             <AvMoreItem icon={Gauge} label="播放速度" hint={`${rate}×`} onClick={cycleRate} />
             <AvMoreItem
@@ -666,6 +676,7 @@ export default function AvControls({
               active={loop}
               onClick={() => setLoop((v) => !v)}
             />
+            {downloadSlot}
           </AvMoreMenu>
         </div>
       </div>

@@ -63,8 +63,7 @@ export const ACTION_TEXT =
   "inline-flex items-center gap-1.5 rounded-none py-1.5 text-sm text-neutral-500 transition hover:text-neutral-900 focus-visible:underline disabled:opacity-60";
 
 /**
- * 详情页自建音视频播放器的控件样式（av-controls.tsx 与宿主 av-player.tsx 共用：
- * 下载入口由宿主渲染、放进播放器控件位，必须与其余控件像素级一致）。
+ * 详情页自建音视频播放器的控件样式（av-controls.tsx / av-btn.tsx / av-more.tsx 共用）。
  * 盒模型与色调分开：色调按「压在黑色画面上」/「落在暖白卡片里」两套，激活态整串替换避免同属性互相覆盖。
  */
 export const AV_CTRL_BTN =
@@ -73,3 +72,15 @@ export const AV_CTRL_ON_DARK = "text-white/90 hover:bg-white/15 hover:text-white
 export const AV_CTRL_ON_DARK_ACTIVE = "bg-white/20 text-white";
 export const AV_CTRL_ON_SURFACE = "text-neutral-600 hover:bg-brand-50 hover:text-brand-700";
 export const AV_CTRL_ON_SURFACE_ACTIVE = "bg-brand-100 text-brand-700";
+
+/**
+ * 播放器「更多」菜单的行样式（av-more.tsx 与宿主 av-player.tsx 共用：
+ * 下载原件那行由宿主渲染成菜单项，必须与菜单内建行像素级一致）。
+ * 行盒与色调分开，理由同上；色调只给 hover/激活态，常态文字色由面板统一给。
+ */
+export const AV_MORE_ROW =
+  "flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs transition";
+export const AV_MORE_ROW_ON_DARK = "hover:bg-white/15 hover:text-white";
+export const AV_MORE_ROW_ON_DARK_ACTIVE = "bg-white/20 text-white";
+export const AV_MORE_ROW_ON_SURFACE = "hover:bg-brand-50 hover:text-brand-700";
+export const AV_MORE_ROW_ON_SURFACE_ACTIVE = "bg-brand-100 text-brand-800";
