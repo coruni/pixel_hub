@@ -269,7 +269,13 @@ model Media {
   placeholder String?
   width      Int?
   height     Int?
-  size       Int?
+  // 落盘字节数。**必须是浮点**：后台上限 attachmentMaxMb 可配到 250GiB（OneDrive 单文件上限），
+  // 旧列 INT4 只到 2GiB。超限时的表现不是「写不进去」，而是**三处上传入口的去重查询先炸**：
+  //   findFirst({ ..., size: 2544241382 }) → "Unable to fit integer value into an INT4" → 整个请求 500。
+  // double precision 精确表示所有 ≤2^53 的整数（≈9PB），远超本站任何上限。
+  // 不用 BIGINT 是因为 Prisma 对 bigint 列返回 JS BigInt —— size 会进 JSON 响应（三个上传路由都回它）、
+  // 进 Map、参与算术，漏转一处就是运行时崩，风险远大于收益。
+  size       Float?
   mime       String?
   fileName   String?
   // 去重指纹：**压缩前**原始上传字节的 sha256（图集 / 评论附图），见 lib/media/checksum.ts。
