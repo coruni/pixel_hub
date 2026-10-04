@@ -16,7 +16,7 @@
 
 import { useState } from "react";
 import { AV_IFRAME_SANDBOX } from "@/lib/av";
-import { avItemLabel, type AvPlayItem } from "@/lib/av-tracks";
+import { avItemLabel, avUnitLabel, type AvPlayItem } from "@/lib/av-tracks";
 import type { AvKind } from "@/lib/av";
 import { AvListToggle, AvStepButton, AvTrackList } from "./av-playlist";
 
@@ -77,6 +77,7 @@ export default function AvEmbed({
           index={at}
           count={items.length}
           tone="onSurface"
+          label={avUnitLabel(avKind)}
           onToggle={() => setOpen((v) => !v)}
         />
       </div>

@@ -63,13 +63,18 @@ export function AvStepButton({
   );
 }
 
-/** 列表开关（图标 + 「3/8」计数），点击展开/收起分P 列表 */
+/**
+ * 列表开关，点击展开/收起分P 列表。
+ * `label` 是按钮上那截文字（「分P」/「曲目」，宿主用 avUnitLabel 给）——
+ * 早先只有图标 + 计数，结果没人认得出这是选集入口，光看「1/2」会被当成页码。
+ */
 export function AvListToggle({
   open,
   index,
   count,
   tone,
   onToggle,
+  label,
   size = "md",
   className,
 }: {
@@ -78,24 +83,28 @@ export function AvListToggle({
   count: number;
   tone: AvTone;
   onToggle: () => void;
+  /** 按钮上的文字（「分P」/「曲目」）；不传就只出图标 + 计数 */
+  label?: string;
   size?: AvBtnSize;
   className?: string;
 }) {
-  const label = open ? "收起列表" : "展开列表";
+  const a11y = open ? "收起列表" : "展开列表";
+  const hint = label ? `${a11y}（${label}）` : a11y;
   return (
     <button
       type="button"
       onClick={onToggle}
       aria-expanded={open}
-      aria-label={label}
-      title={label}
-      // 宽度自适应：`SIZE` 里写死了 w-9/w-11，而这个按钮里既要放图标又要放「3/8」，
+      aria-label={hint}
+      title={hint}
+      // 宽度自适应：`SIZE` 里写死了 w-9/w-11，而这个按钮里既要放图标又要放文字 +「3/8」，
       // 固定宽度会让文本溢出容器、和相邻按钮视觉重叠。高度仍与方形按钮对齐（见 av-btn.tsx）。
       className={`inline-flex ${AV_BTN_HEIGHT[size]} shrink-0 items-center justify-center gap-1 rounded-none px-1.5 transition focus-visible:ring-2 focus-visible:ring-brand-400 ${
         open ? TONE[tone].on : TONE[tone].off
       } ${className ?? ""}`}
     >
       <ListMusic size={16} aria-hidden />
+      {label && <span className="text-xs">{label}</span>}
       <span className="text-xs tabular-nums">
         {index + 1}/{count}
       </span>

@@ -518,13 +518,15 @@ export default function AvControls({
                       onToggle={cap.toggle}
                     />
                   )}
-                  {/* 选集（分P / 曲目）：与嵌入页播放器同一位置 —— 底部控件行 */}
+                  {/* 选集（分P / 曲目）：与嵌入页播放器同一位置 —— 底部控件行。
+                      `label` 必须给：只出「1/2」的话会被当成页码，看不出这是选集入口 */}
                   {multi && (
                     <AvListToggle
                       open={listOpen}
                       index={at}
                       count={items.length}
                       tone="onDark"
+                      label={avUnitLabel(avKind)}
                       onToggle={toggleList}
                     />
                   )}
@@ -660,6 +662,7 @@ export default function AvControls({
               index={at}
               count={items.length}
               tone="onSurface"
+              label={avUnitLabel(avKind)}
               onToggle={toggleList}
             />
           )}
