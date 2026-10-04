@@ -22,10 +22,11 @@
  * 同一个开关既切显隐也切歌词板的存亡，不额外做折叠。
  *
  * **视频画面上一律不留浮层按钮**：上一/下一、字幕开关、选集开关全部在底部控件行
- * （音频那行本来就是 flex-wrap，两种形态的位置就此统一）。窄屏一行放不下这么多控件，
- * 所以控件行分成「左组 + 右组」两个容器，放不下时右组整体折到第二行。
- * 分P 列表：开关在控件条里，面板自己铺开（窄屏贴底铺满画面、宽屏右下浮层），
- * 打开时控件条整条让位。控件自动淡出（仅视频）由状态驱动 —— 详见下方那个 effect。
+ * （音频那行本来就是 flex-wrap，两种形态的位置就此统一）。倍速 / 循环 / 全屏这类设置项
+ * 收进行尾的「更多」菜单（见 av-more.tsx）—— 控件行窄屏一行放不下，折行只能兜底，
+ * 让高频动作先占住主行。分P 列表：开关在控件条里，面板自己铺开（窄屏贴底铺满画面、
+ * 宽屏右下浮层），打开时控件条整条让位。控件自动淡出（仅视频）由状态驱动 —— 详见下方那个 effect。
+ * 「列表 / 更多」两个面板互斥且都会暂停淡出计时：面板开着时控件消失会把面板一起带走。
  *
  * 与宿主的契约：`downloadSlot` 是宿主（av-player，服务端组件）注入的控件位——下载入口由宿主渲染
  * （保留登录墙与下载计数的唯一实现），这里只负责把它排进控件行并保证色调一致。多 P 时它指向第一 P。
@@ -33,6 +34,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import {
+  Gauge,
   ListMusic,
   Loader,
   Maximize,
@@ -54,6 +56,7 @@ import {
 } from "@/lib/ui/cls";
 import { avItemLabel, avUnitLabel, type AvPlayItem } from "@/lib/av-tracks";
 import { AvListToggle, AvStepButton, AvTrackList } from "./av-playlist";
+import { AvMoreItem, AvMoreMenu } from "./av-more";
 import { CaptionControls, CaptionLayer, captionName, cueAt, LyricsPanel, useAvCaption } from "./av-captions";
 import Bar from "./av-bar";
 
@@ -103,6 +106,7 @@ export default function AvControls({
 
   const [idx, setIdx] = useState(0);
   const [listOpen, setListOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [current, setCurrent] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -180,15 +184,15 @@ export default function AvControls({
 
   // 淡出计时器必须由状态驱动，不能只在 pointermove 里补挂 —— 后者会漏掉「播放不由指针触发」的情况
   // （媒体键、列表自动续播），此后指针不再移动，计时器就永远没人补挂 → 控件永不淡出。
-  // 列表开着时不挂计时：正看着选集，控件消失会把面板一起带走。
+  // 任一面板开着时不挂计时：正看着选集 / 菜单，控件消失会把面板一起带走。
   useEffect(() => {
-    if (!isVideo || listOpen) {
+    if (!isVideo || listOpen || moreOpen) {
       clearHide();
       return;
     }
     if (playing) armHide();
     else clearHide();
-  }, [isVideo, playing, listOpen, armHide, clearHide]);
+  }, [isVideo, playing, listOpen, moreOpen, armHide, clearHide]);
 
   /**
    * 展开 / 收起分P 列表。开关挪到底部控件行后，面板与浮层同生共死，所以这里要顺带管一次计时：
@@ -198,11 +202,34 @@ export default function AvControls({
   const toggleList = () => {
     const next = !listOpen;
     setListOpen(next);
+    if (next) setMoreOpen(false); // 两个面板互斥：同时开着会叠在画面同一角，也说不清谁压谁
     if (!isVideo) return; // 音频卡片里的控件常驻，不涉及淡出
     setUiOn(true);
     if (!next && playing) armHide();
     else clearHide();
   };
+
+  /** 「更多」菜单同理：开关在控件条里，面板弹出期间不让控件淡出 */
+  const toggleMore = () => {
+    const next = !moreOpen;
+    setMoreOpen(next);
+    if (next) setListOpen(false);
+    if (!isVideo) return;
+    setUiOn(true);
+    if (!next && playing) armHide();
+    else clearHide();
+  };
+
+  /**
+   * 面板自己收起的路径（点外部 / Esc）也要把淡出计时补回来：
+   * 那一刻同样没有新的 pointermove，而计时器早被上面的 effect 清掉了。
+   */
+  const closeMore = useCallback(() => {
+    setMoreOpen(false);
+    if (!isVideo) return;
+    setUiOn(true);
+    if (playing) armHide();
+  }, [isVideo, playing, armHide]);
 
   // 全屏状态以 document 为准（Esc 退出、浏览器原生按钮退出都要同步回按钮图标）
   useEffect(() => {
@@ -341,8 +368,8 @@ export default function AvControls({
       ref={shellRef}
       className="relative bg-black"
       onPointerMove={() => {
-        // 列表展开时不让浮层淡出（计时器由上面的 effect 统一管，这里只别去补挂即可）
-        if (listOpen) return;
+        // 面板展开时不让浮层淡出（计时器由上面的 effect 统一管，这里只别去补挂即可）
+        if (listOpen || moreOpen) return;
         // 非播放态（暂停 / 待播 / 播完）控件常驻：只把已经淡出的补回来，不挂计时
         if (!playing) {
           if (!uiOn) {
@@ -354,7 +381,7 @@ export default function AvControls({
         reveal();
       }}
       onFocusCapture={() => {
-        if (!listOpen) reveal();
+        if (!listOpen && !moreOpen) reveal();
       }}
     >
       <div className="relative aspect-video w-full">
@@ -480,35 +507,23 @@ export default function AvControls({
                       <VolIcon size={16} aria-hidden />
                     </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={cycleRate}
-                    aria-label={`播放速度 ${rate} 倍`}
-                    title={`播放速度 ${rate} 倍`}
-                    className={`${BTN_BASE} min-w-[46px] px-1 text-xs tabular-nums ${VIDEO_OFF}`}
-                  >
-                    {rate}×
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setLoop((v) => !v)}
-                    aria-pressed={loop}
-                    aria-label="循环播放"
-                    title="循环播放"
-                    className={`${BTN_BASE} ${loop ? VIDEO_ON : VIDEO_OFF}`}
-                  >
-                    <Repeat size={16} aria-hidden />
-                  </button>
                   {downloadSlot}
-                  <button
-                    type="button"
-                    onClick={() => void toggleFullscreen()}
-                    aria-label={fullscreen ? "退出全屏" : "全屏"}
-                    title={fullscreen ? "退出全屏" : "全屏"}
-                    className={`${BTN_BASE} ${VIDEO_OFF}`}
-                  >
-                    {fullscreen ? <Minimize size={16} aria-hidden /> : <Maximize size={16} aria-hidden />}
-                  </button>
+                  {/* 设置项收进「更多」：倍速 / 循环 / 全屏都不是每次播放都要点，
+                      留在主行会把 320–374px 挤到折行 */}
+                  <AvMoreMenu open={moreOpen} tone="onDark" onToggle={toggleMore} onClose={closeMore}>
+                    <AvMoreItem icon={Gauge} label="播放速度" hint={`${rate}×`} onClick={cycleRate} />
+                    <AvMoreItem
+                      icon={Repeat}
+                      label="循环播放"
+                      active={loop}
+                      onClick={() => setLoop((v) => !v)}
+                    />
+                    <AvMoreItem
+                      icon={fullscreen ? Minimize : Maximize}
+                      label={fullscreen ? "退出全屏" : "全屏"}
+                      onClick={() => void toggleFullscreen()}
+                    />
+                  </AvMoreMenu>
                 </div>
               </div>
             </div>
@@ -624,25 +639,6 @@ export default function AvControls({
           >
             <VolIcon size={16} aria-hidden />
           </button>
-          <button
-            type="button"
-            onClick={cycleRate}
-            aria-label={`播放速度 ${rate} 倍`}
-            title={`播放速度 ${rate} 倍`}
-            className={`${BTN_BASE} min-w-[46px] px-1 text-xs tabular-nums ${AUDIO_OFF}`}
-          >
-            {rate}×
-          </button>
-          <button
-            type="button"
-            onClick={() => setLoop((v) => !v)}
-            aria-pressed={loop}
-            aria-label="循环播放"
-            title="循环播放"
-            className={`${BTN_BASE} ${loop ? AUDIO_ON : AUDIO_OFF}`}
-          >
-            <Repeat size={16} aria-hidden />
-          </button>
           {multi && (
             <AvListToggle
               open={listOpen}
@@ -661,6 +657,16 @@ export default function AvControls({
             />
           )}
           {downloadSlot}
+          {/* 与视频同一套：设置项（倍速 / 循环）收进「更多」 */}
+          <AvMoreMenu open={moreOpen} tone="onSurface" onToggle={toggleMore} onClose={closeMore}>
+            <AvMoreItem icon={Gauge} label="播放速度" hint={`${rate}×`} onClick={cycleRate} />
+            <AvMoreItem
+              icon={Repeat}
+              label="循环播放"
+              active={loop}
+              onClick={() => setLoop((v) => !v)}
+            />
+          </AvMoreMenu>
         </div>
       </div>
       {/* 歌词板：与视频的字幕叠层同一份 cue 数据，只是换成可滚动列表。

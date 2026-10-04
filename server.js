@@ -43,6 +43,19 @@ let handle = (_req, res) => {
 };
 
 const server = http.createServer((req, res) => handle(req, res));
+
+// —— keep-alive 空闲超时必须长于前置代理的空闲超时 ——
+// Node 默认 keepAliveTimeout 只有 5s。线上通常有反代 / CDN 挡在前面，它们会把到源站的
+// 连接留 60s 以上；于是源站会**先**把空闲连接关掉，而代理并不知道，下一个请求依旧往这条
+// 已关闭的 socket 上发 —— 客户端收到的是 RST（DevTools 里 `net::ERR_CONNECTION_RESET`）。
+// 浏览器不会自动重发，用户看到的就是「首屏图片整批加载失败，手动刷新一次又全好了」
+// （刷新时代理已经换了一条新连接）。这里把源站的空闲超时调到比任何常见代理都长，
+// 让**代理先关**、源站不先关，从根上消掉这个竞态。
+// headersTimeout 必须大于 keepAliveTimeout（Node 的约束），留 1s 余量。
+const KEEP_ALIVE_TIMEOUT_MS = 5 * 60_000;
+server.keepAliveTimeout = KEEP_ALIVE_TIMEOUT_MS;
+server.headersTimeout = KEEP_ALIVE_TIMEOUT_MS + 1000;
+
 // httpServer 显式传入：让 Next 把自己的 upgrade 监听挂到本服务器（HMR 依赖它）
 const app = next({ dev, port, httpServer: server });
 const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_PAYLOAD_BYTES });
@@ -161,6 +174,9 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
         /* 已断开 */
       }
     }
+    // idle 连接已被上面的 keepAliveTimeout 拉长到 5 分钟，不主动回收的话 close() 每次都要
+    // 等满下面那个 3s 兜底；先掐掉空闲连接，close() 才不会卡住活跃中的请求。
+    server.closeIdleConnections?.();
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 3000).unref();
   });

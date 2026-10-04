@@ -4,6 +4,7 @@
 - 只跑 `tsc --noEmit` + `eslint`；不写探针、不做反证。探针放 `prisma/_*` 用完立即删（环境会自动 commit）；别整文件跑 `prettier`。DB 是远端 Supabase，偶发断连重跑即可。
 - 改 Tailwind class 用 postcss 实编 `globals.css` 确认产出；探针类名走 `process.argv`；变体类产物里是 `.hover\:x:hover`。
 - **DROP 类破坏性迁移与代码分两批**：先上线不含该引用的代码、确认线上跑新镜像再 DROP。线上是外部主机容器（只有 `Dockerfile`）→ 改完提醒用户重建镜像。
+- **图片「首开全裂、刷新才好」= `net::ERR_CONNECTION_RESET`（连接被掐），不是 404/URL 错**。两层处置：① `server.js` 的 `keepAliveTimeout` 必须**长于前置代理的上游空闲超时**（Node 默认 5s，代理常留 60s+ → 源站先关、代理不知情、请求发到死 socket → RST），已设 5min + `headersTimeout` 加 1s，优雅退出补 `closeIdleConnections()`；② 全站兜底 `layout/ImageRetry.tsx`：捕获阶段收 `error` + **挂载时补扫 `complete && naturalWidth===0`**（RST 秒回，首屏那批的失败在 hydration 之前，只挂监听器会漏），站内相对地址重发带 `?imgretry=N`、外链不动 query，最多 2 次。CSS `background-image` 不在覆盖范围。若 RST 仍在 → 查容器是否被杀（`RestartCount` / 137）或代理侧重置，代码改不掉。
 
 ## UI 语言
 - 像素风 + Fusion Pixel + 点阵背景 + 赤陶橙 brand + 全站 `rounded-none`；类型图标唯一来源 `resource/type-icon.tsx`。
@@ -52,4 +53,5 @@
 - 切 P 只改 `src`+`load()`，**禁用 `key={src}` 重挂载**；**画面上一律不留浮层按钮** —— 上一/下一、字幕开关、选集开关全在底部控件行（直链播放器与 `av-embed` 一致）。控件行分「左组（上/下一 + 播放 + 时间）/ 右组（显示 + 设置）」两个容器 + `flex-wrap`：窄屏放不下时右组整体折到第二行，宽屏 spacer 顶到两端。分P 列表面板打开时控件条整条让位；面板窄屏 `inset-x-0 bottom-0 max-h-full`（贴底铺满）、宽屏 `sm:right-3 sm:w-72 sm:max-h-[70%]`（右下浮层），header 里有收起按钮（窄屏面板盖住控件条，开关点不到）。`av-embed.tsx` 只服务多 P 视频；字幕唯一来源 `lib/captions.ts`（`meta.ts → captions.ts` 单向），文本**内联**在 meta；自绘不用 `<track>`；音频歌词板**滚动手算 `scrollTop`、禁 `scrollIntoView`**；按钮原语 `av-btn.tsx`；`parseMeta` 降级链：整块 → 丢 captions → 再丢 tracks → 兜底。
 - 视频字幕叠层（`CaptionLayer`）挂在底部控件区外层、用 `bottom-full` 贴控件条上沿，且**不在**做淡出的那层里（字幕是内容，不跟控件一起消失）。
 - `AvTrackList` **不再自带默认限高**（原来 inline `45vh` 会压过宿主的响应式 class）：限高由宿主 class 给 —— 音频/嵌入页 `max-h-[45vh]`，视频面板用上面的定位类。它外层是 flex-col（可选 `header` 槽位，`<ol>` 只允许 li 所以头部得放外面），`<ol>` 是 `flex-1 min-h-0 overflow-y-auto`。
-- 视频控件淡出计时**必须由 effect 按 `playing`/`listOpen` 驱动**（列表开着不挂计时），只在 `pointermove` 里补挂会漏「关列表」「非指针触发播放」两种；`react-hooks/set-state-in-effect` 在本仓库是 **error**，effect 里禁止同步 setState（异步 `setTimeout` 回调里的可以）。
+- 视频控件淡出计时**必须由 effect 按 `playing`/`listOpen`/`moreOpen` 驱动**（任一面板开着都不挂计时），只在 `pointermove` 里补挂会漏「关面板」「非指针触发播放」两种；面板自行收起（点外部 / Esc）也要走宿主 `onClose` 把计时补回来。`react-hooks/set-state-in-effect` 在本仓库是 **error**，effect 里禁止同步 setState（异步 `setTimeout` 回调里的可以）。
+- **「更多」溢出菜单**（`av-more.tsx`）：`AvMoreMenu`（触发按钮 + `bottom-full` 自下往上弹的面板，往下弹会被画面裁）+ `AvMoreItem`（图标/文案/hint/check，tone 由 MenuCtx 注入）。**open 状态由宿主持有**（视频淡出要读它），收起三条路径都调宿主 `onClose`。视频行收 倍速/循环/全屏、音频行收 倍速/循环，行内只留高频项（播放 / 上一下一 / 时间 / 字幕 / 选集 / 音量 / 下载）。开关型项必须 `role="menuitemcheckbox"` + `aria-checked`（`aria-pressed` 挂 `menuitem` 会被 `jsx-a11y/role-supports-aria-props` 拦），由「是否传 `active`」判定角色。

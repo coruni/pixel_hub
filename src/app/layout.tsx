@@ -7,6 +7,7 @@ import PageTracker from "@/components/layout/PageTracker";
 import PresencePing from "@/components/layout/PresencePing";
 import RealtimeBridge from "@/components/layout/RealtimeBridge";
 import ColorModeSync from "@/components/layout/ColorModeSync";
+import ImageRetry from "@/components/layout/ImageRetry";
 import GlobalProfileBgLoader from "@/components/layout/GlobalProfileBgLoader";
 import { auth } from "@/lib/auth";
 import { fromDbColorMode } from "@/lib/color-mode";
@@ -93,6 +94,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           />
         )}
         <ColorModeSync />
+        {/* 图片请求被连接级重置时自动重发，避免用户手动刷新（见组件注释） */}
+        <ImageRetry />
         <GlobalProfileBgLoader />
         <PageTracker />
         <PresencePing signedIn={Boolean(session?.user)} />
