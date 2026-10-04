@@ -82,7 +82,14 @@ export default function AvEmbed({
       </div>
 
       {open && (
-        <AvTrackList className="mt-2" items={items} index={at} avKind={avKind} tone="onSurface" onPick={setIdx} />
+        <AvTrackList
+          className="mt-2 max-h-[45vh]"
+          items={items}
+          index={at}
+          avKind={avKind}
+          tone="onSurface"
+          onPick={setIdx}
+        />
       )}
     </div>
   );

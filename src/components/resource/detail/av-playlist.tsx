@@ -9,7 +9,7 @@
  * tone 与播放器控件同一套（见 lib/ui/cls.ts）：onDark = 压在视频画面上，onSurface = 落在暖白卡片里。
  */
 
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { ListMusic, SkipBack, SkipForward } from "lucide-react";
 import { avItemLabel, avStepLabel, type AvPlayItem } from "@/lib/av-tracks";
 import type { AvKind } from "@/lib/av";
@@ -106,6 +106,10 @@ export function AvListToggle({
 /**
  * 分P 列表本体。整行是一个按钮（点标题即切换），当前项加底色 + `aria-current`。
  * 列表可能很长（上限 60），容器限高并自己滚动，避免把视频浮层撑出画面。
+ *
+ * **限高由宿主用 class 给**（视频铺满画面、音频/嵌入页 45vh），组件不再自带默认值 ——
+ * 内联 maxHeight 会压过宿主的响应式 class，视频那种「窄屏贴底铺满 / 宽屏右下浮层」就写不出来。
+ * `header` 是可选槽位（标题 + 收起按钮）：它不能塞进 `<ol>`（ol 只允许 li），所以外面套一层 flex 容器。
  */
 export function AvTrackList({
   items,
@@ -115,6 +119,7 @@ export function AvTrackList({
   onPick,
   className,
   style,
+  header,
 }: {
   items: AvPlayItem[];
   index: number;
@@ -122,50 +127,57 @@ export function AvTrackList({
   tone: AvTone;
   onPick: (next: number) => void;
   className?: string;
-  /** 限高随宿主不同（音频卡片 45vh、视频浮层要跟画面高度走），故用内联样式而非 class */
+  /** 宿主确实需要按运行期算高度时才用内联；能写成 class 就写 class */
   style?: CSSProperties;
+  /** 列表头（标题 / 收起按钮），由宿主给 */
+  header?: ReactNode;
 }) {
   const dark = tone === "onDark";
   return (
-    <ol
-      style={{ maxHeight: "45vh", ...style }}
-      className={`overflow-y-auto rounded-none border ${
-        dark
-          ? "border-white/20 bg-black/85"
-          : "divide-y-2 divide-dashed divide-brand-300 border-brand-300 bg-surface"
+    <div
+      style={style}
+      className={`flex flex-col overflow-hidden rounded-none border ${
+        dark ? "border-white/20 bg-black/85" : "border-brand-300 bg-surface"
       } ${className ?? ""}`}
     >
-      {items.map((it, i) => {
-        const active = i === index;
-        // 行线：亮色分支由 <ol> 的 divide-y-2 divide-dashed 统一画虚线，逐行不再加边框；
-        // 暗色分支压在视频画面上，是固定深底，走白色半透明实线（不参与主题与调色）。
-        return (
-          <li
-            key={`${i}-${it.url}`}
-            className={dark ? "border-b border-white/10 last:border-b-0" : undefined}
-          >
-            <button
-              type="button"
-              onClick={() => onPick(i)}
-              aria-current={active ? "true" : undefined}
-              className={`flex min-h-9 w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs transition ${
-                active
-                  ? dark
-                    ? "bg-brand-500/35 text-white"
-                    : "bg-brand-100 text-brand-800"
-                  : dark
-                    ? "text-white/85 hover:bg-white/10"
-                    : "text-neutral-700 hover:bg-brand-50"
-              }`}
+      {header}
+      <ol
+        className={`min-h-0 flex-1 overflow-y-auto ${
+          dark ? "" : "divide-y-2 divide-dashed divide-brand-300"
+        }`}
+      >
+        {items.map((it, i) => {
+          const active = i === index;
+          // 行线：亮色分支由 <ol> 的 divide-y-2 divide-dashed 统一画虚线，逐行不再加边框；
+          // 暗色分支压在视频画面上，是固定深底，走白色半透明实线（不参与主题与调色）。
+          return (
+            <li
+              key={`${i}-${it.url}`}
+              className={dark ? "border-b border-white/10 last:border-b-0" : undefined}
             >
-              <span className={`w-6 shrink-0 tabular-nums ${dark ? "text-white/55" : "text-neutral-400"}`}>
-                {i + 1}
-              </span>
-              <span className="min-w-0 flex-1 truncate">{avItemLabel(it, i, avKind)}</span>
-            </button>
-          </li>
-        );
-      })}
-    </ol>
+              <button
+                type="button"
+                onClick={() => onPick(i)}
+                aria-current={active ? "true" : undefined}
+                className={`flex min-h-9 w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs transition ${
+                  active
+                    ? dark
+                      ? "bg-brand-500/35 text-white"
+                      : "bg-brand-100 text-brand-800"
+                    : dark
+                      ? "text-white/85 hover:bg-white/10"
+                      : "text-neutral-700 hover:bg-brand-50"
+                }`}
+              >
+                <span className={`w-6 shrink-0 tabular-nums ${dark ? "text-white/55" : "text-neutral-400"}`}>
+                  {i + 1}
+                </span>
+                <span className="min-w-0 flex-1 truncate">{avItemLabel(it, i, avKind)}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }

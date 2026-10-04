@@ -18,17 +18,33 @@
  *
  * 字幕 / 歌词（见 av-captions.tsx）：**跟着播放项走** —— 每首曲目 / 每个分P 各带一份，
  * 切 P 即换字幕，没有「整份资源共用一份、多轨切换」的概念。
- * 视频渲染成压在画面上的叠层（开关放在右上角浮层，和分P 列表开关并排 ——
- * 底下那行控件在 320px 已经排满，塞不进第三个按钮）；
- * 音频渲染成卡片内的滚动歌词板（开关进控件行，那行本来就是 flex-wrap）。
+ * 视频字幕是压在画面上的叠层，但开关和别的控件一样在底部控件行；音频的歌词板落在卡片里。
  * 同一个开关既切显隐也切歌词板的存亡，不额外做折叠。
+ *
+ * **视频画面上一律不留浮层按钮**：上一/下一、字幕开关、选集开关全部在底部控件行
+ * （音频那行本来就是 flex-wrap，两种形态的位置就此统一）。窄屏一行放不下这么多控件，
+ * 所以控件行分成「左组 + 右组」两个容器，放不下时右组整体折到第二行。
+ * 分P 列表：开关在控件条里，面板自己铺开（窄屏贴底铺满画面、宽屏右下浮层），
+ * 打开时控件条整条让位。控件自动淡出（仅视频）由状态驱动 —— 详见下方那个 effect。
  *
  * 与宿主的契约：`downloadSlot` 是宿主（av-player，服务端组件）注入的控件位——下载入口由宿主渲染
  * （保留登录墙与下载计数的唯一实现），这里只负责把它排进控件行并保证色调一致。多 P 时它指向第一 P。
  */
 
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
-import { Loader, Maximize, Minimize, Pause, Play, Repeat, Volume1, Volume2, VolumeX } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import {
+  ListMusic,
+  Loader,
+  Maximize,
+  Minimize,
+  Pause,
+  Play,
+  Repeat,
+  Volume1,
+  Volume2,
+  VolumeX,
+  X,
+} from "lucide-react";
 import {
   AV_CTRL_BTN as BTN_BASE,
   AV_CTRL_ON_DARK as VIDEO_OFF,
@@ -36,7 +52,7 @@ import {
   AV_CTRL_ON_SURFACE as AUDIO_OFF,
   AV_CTRL_ON_SURFACE_ACTIVE as AUDIO_ON,
 } from "@/lib/ui/cls";
-import { avItemLabel, type AvPlayItem } from "@/lib/av-tracks";
+import { avItemLabel, avUnitLabel, type AvPlayItem } from "@/lib/av-tracks";
 import { AvListToggle, AvStepButton, AvTrackList } from "./av-playlist";
 import { CaptionControls, CaptionLayer, captionName, cueAt, LyricsPanel, useAvCaption } from "./av-captions";
 import Bar from "./av-bar";
@@ -142,25 +158,51 @@ export default function AvControls({
   }, [src]);
 
   /** 视频控件淡出计时器：指针静止一段时间后收起，避免一直压在画面上 */
-  const armHide = () => {
+  const armHide = useCallback(() => {
     if (hideRef.current !== null) window.clearTimeout(hideRef.current);
     hideRef.current = window.setTimeout(() => {
       hideRef.current = null;
       setUiOn(false);
     }, HIDE_AFTER_MS);
-  };
-  const clearHide = () => {
+  }, []);
+  const clearHide = useCallback(() => {
     if (hideRef.current !== null) {
       window.clearTimeout(hideRef.current);
       hideRef.current = null;
     }
-  };
+  }, []);
   /** 任何指针/键盘活动都让控件重新现身并重置计时 */
-  const reveal = () => {
+  const reveal = useCallback(() => {
     setUiOn(true);
     armHide();
+  }, [armHide]);
+  useEffect(() => clearHide, [clearHide]);
+
+  // 淡出计时器必须由状态驱动，不能只在 pointermove 里补挂 —— 后者会漏掉「播放不由指针触发」的情况
+  // （媒体键、列表自动续播），此后指针不再移动，计时器就永远没人补挂 → 控件永不淡出。
+  // 列表开着时不挂计时：正看着选集，控件消失会把面板一起带走。
+  useEffect(() => {
+    if (!isVideo || listOpen) {
+      clearHide();
+      return;
+    }
+    if (playing) armHide();
+    else clearHide();
+  }, [isVideo, playing, listOpen, armHide, clearHide]);
+
+  /**
+   * 展开 / 收起分P 列表。开关挪到底部控件行后，面板与浮层同生共死，所以这里要顺带管一次计时：
+   * 打开时清掉（列表开着不淡出），关闭时按当前播放态补回去 ——
+   * 后者正是原实现漏掉的一步：关列表那一刻没有新的 pointermove，计时器早被清空，控件从此再不淡出。
+   */
+  const toggleList = () => {
+    const next = !listOpen;
+    setListOpen(next);
+    if (!isVideo) return; // 音频卡片里的控件常驻，不涉及淡出
+    setUiOn(true);
+    if (!next && playing) armHide();
+    else clearHide();
   };
-  useEffect(() => clearHide, []);
 
   // 全屏状态以 document 为准（Esc 退出、浏览器原生按钮退出都要同步回按钮图标）
   useEffect(() => {
@@ -299,12 +341,17 @@ export default function AvControls({
       ref={shellRef}
       className="relative bg-black"
       onPointerMove={() => {
-        // 列表展开时不让浮层淡出：正看着选集，控件消失会把面板一起带走
-        if (listOpen) {
-          setUiOn(true);
-          clearHide();
-        } else if (!uiOn) reveal();
-        else if (playing) armHide();
+        // 列表展开时不让浮层淡出（计时器由上面的 effect 统一管，这里只别去补挂即可）
+        if (listOpen) return;
+        // 非播放态（暂停 / 待播 / 播完）控件常驻：只把已经淡出的补回来，不挂计时
+        if (!playing) {
+          if (!uiOn) {
+            clearHide();
+            setUiOn(true);
+          }
+          return;
+        }
+        reveal();
       }}
       onFocusCapture={() => {
         if (!listOpen) reveal();
@@ -327,6 +374,7 @@ export default function AvControls({
           type="button"
           onClick={toggle}
           aria-label={playing ? "暂停" : "播放"}
+          title={playing ? "暂停" : "播放"}
           className="group/av absolute inset-0 grid place-items-center focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-400"
         >
           <span
@@ -342,151 +390,161 @@ export default function AvControls({
           </span>
         </button>
 
-        {/* 字幕叠层：压在画面底部、控件行之上（bottom-14 正好避开那行渐变浮层）。
-            指针穿透，不挡画面点击。 */}
-        <CaptionLayer text={cap.on ? cueText : null} />
+        {/* 画面不再放任何浮层按钮：上一/下一、字幕开关、选集开关全部下移到底部控件行（见下方控件区） */}
 
-        {/* 多 P 浮层：上一/下一在画面两侧。
-            不放进下方控件行是有原因的——320px 下那一行已经排满，再塞两个按钮必然横向溢出。 */}
-        {multi && (
-          <>
-            <div
-              className={`absolute left-2 top-1/2 -translate-y-1/2 border border-white/25 bg-black/55 transition-opacity ${
-                uiOn ? "opacity-100" : "pointer-events-none opacity-0"
-              }`}
-            >
-              <AvStepButton
-                dir={-1}
-                avKind={avKind}
-                index={at}
-                count={items.length}
-                onGo={goTo}
-                tone="onDark"
-                size="lg"
-              />
-            </div>
-            <div
-              className={`absolute right-2 top-1/2 -translate-y-1/2 border border-white/25 bg-black/55 transition-opacity ${
-                uiOn ? "opacity-100" : "pointer-events-none opacity-0"
-              }`}
-            >
-              <AvStepButton
-                dir={1}
-                avKind={avKind}
-                index={at}
-                count={items.length}
-                onGo={goTo}
-                tone="onDark"
-                size="lg"
-              />
-            </div>
-          </>
-        )}
-
-        {/* 右上角：字幕开关 + 分P 列表开关并排（两者都是压在画面上的大按钮，尺寸必须同一档） */}
-        {(multi || capReady) && (
+        {/* 底部控件区 = 字幕 + 控件条。字幕挂在这层外层、控件条自己单独做淡出 ——
+            字幕是内容，不该跟着控件一起消失；`bottom-full` 也让它永远贴着控件条上沿，
+            控件行在窄屏折成两行时不会被压住。 */}
+        <div className="absolute inset-x-0 bottom-0">
+          <CaptionLayer text={cap.on ? cueText : null} />
+          {/* 列表打开时整条淡出：面板要占满画面（尤其手机），控件条留着也点不到 */}
           <div
-            className={`absolute right-2 top-2 flex items-center gap-0.5 border border-white/25 bg-black/55 px-0.5 transition-opacity ${
-              uiOn ? "opacity-100" : "pointer-events-none opacity-0"
+            className={`transition-opacity ${
+              uiOn && !listOpen ? "opacity-100" : "pointer-events-none opacity-0"
             }`}
           >
-            {capReady && (
-              <CaptionControls
-                on={cap.on}
-                name={capName}
-                tone="onDark"
-                onToggle={cap.toggle}
-                size="lg"
-              />
-            )}
-            {multi && (
-              <AvListToggle
-                open={listOpen}
-                index={at}
-                count={items.length}
-                tone="onDark"
-                size="lg"
-                onToggle={() => setListOpen((v) => !v)}
-              />
-            )}
+            <div className="bg-[linear-gradient(to_top,rgba(0,0,0,.85)_0%,rgba(0,0,0,.5)_60%,transparent_100%)] px-3 pb-1.5 pt-8">
+              <Bar tone="onDark" label="播放进度" ratio={ratio} buffer={bufRatio} onScrub={seek} />
+              {/* 控件全部集中在这一行，画面上一律不留浮层按钮。
+                  窄屏一行放不下 10 个控件，所以分「左组（跳转 / 播放 / 时间）」和
+                  「右组（显示 / 设置）」两个容器：放不下时右组整体折到第二行，放得下时 spacer 把两组顶到两端。 */}
+              <div className="flex flex-wrap items-center gap-x-0.5 gap-y-1">
+                <div className="flex items-center gap-0.5">
+                  {multi && (
+                    <AvStepButton
+                      dir={-1}
+                      avKind={avKind}
+                      index={at}
+                      count={items.length}
+                      onGo={goTo}
+                      tone="onDark"
+                    />
+                  )}
+                  <button
+                    type="button"
+                    onClick={toggle}
+                    aria-label={playing ? "暂停" : "播放"}
+                    title={playing ? "暂停" : "播放"}
+                    className={`${BTN_BASE} ${VIDEO_OFF}`}
+                  >
+                    <PlayIcon size={16} aria-hidden />
+                  </button>
+                  {multi && (
+                    <AvStepButton
+                      dir={1}
+                      avKind={avKind}
+                      index={at}
+                      count={items.length}
+                      onGo={goTo}
+                      tone="onDark"
+                    />
+                  )}
+                  <span className="ml-1.5 shrink-0 text-xs tabular-nums text-white/85">
+                    {fmt(current)}
+                    {/* 320–374px：控件行本来就满，这里只留当前时间（总长由进度条表达） */}
+                    <span className="max-[374px]:hidden"> / {total}</span>
+                  </span>
+                </div>
+                <span className="flex-1" />
+                <div className="flex items-center gap-0.5">
+                  {capReady && (
+                    <CaptionControls
+                      on={cap.on}
+                      name={capName}
+                      tone="onDark"
+                      onToggle={cap.toggle}
+                    />
+                  )}
+                  {/* 选集（分P / 曲目）：与嵌入页播放器同一位置 —— 底部控件行 */}
+                  {multi && (
+                    <AvListToggle
+                      open={listOpen}
+                      index={at}
+                      count={items.length}
+                      tone="onDark"
+                      onToggle={toggleList}
+                    />
+                  )}
+                  {/* 窄屏藏音量组：控件行容不下，音量交给设备按键 */}
+                  <div className="hidden items-center gap-0.5 sm:flex">
+                    <div className="w-16">
+                      <Bar tone="onDark" label="音量" ratio={volRatio} onScrub={changeVolume} live />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={toggleMute}
+                      aria-label={muted ? "取消静音" : "静音"}
+                      title={muted ? "取消静音" : "静音"}
+                      className={`${BTN_BASE} ${muted ? VIDEO_ON : VIDEO_OFF}`}
+                    >
+                      <VolIcon size={16} aria-hidden />
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={cycleRate}
+                    aria-label={`播放速度 ${rate} 倍`}
+                    title={`播放速度 ${rate} 倍`}
+                    className={`${BTN_BASE} min-w-[46px] px-1 text-xs tabular-nums ${VIDEO_OFF}`}
+                  >
+                    {rate}×
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLoop((v) => !v)}
+                    aria-pressed={loop}
+                    aria-label="循环播放"
+                    title="循环播放"
+                    className={`${BTN_BASE} ${loop ? VIDEO_ON : VIDEO_OFF}`}
+                  >
+                    <Repeat size={16} aria-hidden />
+                  </button>
+                  {downloadSlot}
+                  <button
+                    type="button"
+                    onClick={() => void toggleFullscreen()}
+                    aria-label={fullscreen ? "退出全屏" : "全屏"}
+                    title={fullscreen ? "退出全屏" : "全屏"}
+                    className={`${BTN_BASE} ${VIDEO_OFF}`}
+                  >
+                    {fullscreen ? <Minimize size={16} aria-hidden /> : <Maximize size={16} aria-hidden />}
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
-        )}
+        </div>
 
+        {/* 分P / 曲目列表。开关在控件条里，面板自己铺开：
+            窄屏贴底铺满画面（手机竖屏视频就 180–220px 高，右下角浮层塞不下两行），
+            宽屏回到右下浮层、限高 70%。header 带收起按钮 —— 窄屏面板盖住控件条，必须留个明确出口。 */}
         {multi && listOpen && (
           <AvTrackList
-            className="absolute right-2 top-14 w-56 max-w-[calc(100%-1rem)]"
-            style={{ maxHeight: "62%" }}
+            className="absolute inset-x-0 bottom-0 max-h-full sm:inset-x-auto sm:right-3 sm:w-72 sm:max-h-[70%]"
             items={items}
             index={at}
             avKind={avKind}
             tone="onDark"
             onPick={goTo}
-          />
-        )}
-
-        <div
-          className={`absolute inset-x-0 bottom-0 transition-opacity ${
-            uiOn ? "opacity-100" : "pointer-events-none opacity-0"
-          }`}
-        >
-          <div className="bg-[linear-gradient(to_top,rgba(0,0,0,.85)_0%,rgba(0,0,0,.5)_60%,transparent_100%)] px-3 pb-1.5 pt-8">
-            <Bar tone="onDark" label="播放进度" ratio={ratio} buffer={bufRatio} onScrub={seek} />
-            <div className="flex items-center gap-0.5">
-              <button
-                type="button"
-                onClick={toggle}
-                aria-label={playing ? "暂停" : "播放"}
-                className={`${BTN_BASE} ${VIDEO_OFF}`}
-              >
-                <PlayIcon size={16} aria-hidden />
-              </button>
-              <span className="ml-1.5 shrink-0 text-xs tabular-nums text-white/85">
-                {fmt(current)} / {total}
-              </span>
-              <span className="flex-1" />
-              {/* 窄屏藏音量组：320px 下控件行容不下，音量交给设备按键 */}
-              <div className="hidden items-center gap-0.5 sm:flex">
-                <div className="w-16">
-                  <Bar tone="onDark" label="音量" ratio={volRatio} onScrub={changeVolume} live />
-                </div>
+            header={
+              <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/15 px-2.5 py-1.5">
+                <span className="flex items-center gap-1.5 text-xs text-white/85">
+                  <ListMusic size={13} aria-hidden />
+                  {avUnitLabel(avKind)} {at + 1}/{items.length}
+                </span>
                 <button
                   type="button"
-                  onClick={toggleMute}
-                  aria-label={muted ? "取消静音" : "静音"}
-                  className={`${BTN_BASE} ${muted ? VIDEO_ON : VIDEO_OFF}`}
+                  onClick={toggleList}
+                  aria-label="收起列表"
+                  title="收起列表"
+                  className="grid h-7 w-7 shrink-0 place-items-center rounded-none text-white/80 transition hover:bg-white/15 hover:text-white focus-visible:ring-2 focus-visible:ring-brand-400"
                 >
-                  <VolIcon size={16} aria-hidden />
+                  <X size={14} aria-hidden />
                 </button>
               </div>
-              <button
-                type="button"
-                onClick={cycleRate}
-                aria-label={`播放速度 ${rate} 倍`}
-                className={`${BTN_BASE} min-w-[46px] px-1 text-xs tabular-nums ${VIDEO_OFF}`}
-              >
-                {rate}×
-              </button>
-              <button
-                type="button"
-                onClick={() => setLoop((v) => !v)}
-                aria-pressed={loop}
-                aria-label="循环播放"
-                className={`${BTN_BASE} ${loop ? VIDEO_ON : VIDEO_OFF}`}
-              >
-                <Repeat size={16} aria-hidden />
-              </button>
-              {downloadSlot}
-              <button
-                type="button"
-                onClick={() => void toggleFullscreen()}
-                aria-label={fullscreen ? "退出全屏" : "全屏"}
-                className={`${BTN_BASE} ${VIDEO_OFF}`}
-              >
-                {fullscreen ? <Minimize size={16} aria-hidden /> : <Maximize size={16} aria-hidden />}
-              </button>
-            </div>
-          </div>
-        </div>
+            }
+          />
+        )}
 
         {failed && (
           <p className="absolute inset-x-0 top-0 bg-red-600/90 px-3 py-1.5 text-xs text-white">
@@ -522,6 +580,7 @@ export default function AvControls({
             type="button"
             onClick={toggle}
             aria-label={playing ? "暂停" : "播放"}
+            title={playing ? "暂停" : "播放"}
             className="grid h-11 w-11 shrink-0 place-items-center rounded-none border border-brand-300 bg-brand-50 text-brand-700 transition hover:border-brand-500 hover:bg-brand-100 focus-visible:ring-2 focus-visible:ring-brand-400"
           >
             <PlayIcon
@@ -560,6 +619,7 @@ export default function AvControls({
             type="button"
             onClick={toggleMute}
             aria-label={muted ? "取消静音" : "静音"}
+            title={muted ? "取消静音" : "静音"}
             className={`${BTN_BASE} ${muted ? AUDIO_ON : AUDIO_OFF}`}
           >
             <VolIcon size={16} aria-hidden />
@@ -568,6 +628,7 @@ export default function AvControls({
             type="button"
             onClick={cycleRate}
             aria-label={`播放速度 ${rate} 倍`}
+            title={`播放速度 ${rate} 倍`}
             className={`${BTN_BASE} min-w-[46px] px-1 text-xs tabular-nums ${AUDIO_OFF}`}
           >
             {rate}×
@@ -577,6 +638,7 @@ export default function AvControls({
             onClick={() => setLoop((v) => !v)}
             aria-pressed={loop}
             aria-label="循环播放"
+            title="循环播放"
             className={`${BTN_BASE} ${loop ? AUDIO_ON : AUDIO_OFF}`}
           >
             <Repeat size={16} aria-hidden />
@@ -587,7 +649,7 @@ export default function AvControls({
               index={at}
               count={items.length}
               tone="onSurface"
-              onToggle={() => setListOpen((v) => !v)}
+              onToggle={toggleList}
             />
           )}
           {capReady && (
@@ -609,7 +671,7 @@ export default function AvControls({
       {/* 音频卡片里的列表常驻在卡片内（不像视频那样浮在画面上）：卡片本来就占位，撑开即可 */}
       {multi && listOpen && (
         <AvTrackList
-          className="mt-3"
+          className="mt-3 max-h-[45vh]"
           items={items}
           index={at}
           avKind={avKind}
