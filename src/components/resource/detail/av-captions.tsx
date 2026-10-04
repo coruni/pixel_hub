@@ -94,14 +94,15 @@ export function CaptionControls({
 
 /**
  * 视频字幕叠层。没有当前行（空档 / 关闭 / 播完）就整块不渲染，别留一条空条。
- * 定位用 `bottom-full`：它挂在「底部控件区」那个容器里、贴着控件条上沿 ——
- * 控件行在窄屏会折成两行，写死 bottom-14 会有一行压在字幕上；跟着控件条走就永远让得开。
- * 注意它在外层容器里、**不在**控制淡出的那层 opacity 里：字幕是内容，不跟着控件一起消失。
+ * **不自己 `absolute`**：它是宿主「底部控件区」那一列（`flex-col justify-end`）里的一格，
+ * 靠列顺序被顶在控件条上沿 —— 控件行窄屏折成两行、或分P 面板把这一列撑高，
+ * 字幕都自动让得开（原来写 `bottom-full` 是假定「控件条就是这一列的最后一格」）。
+ * `pointer-events-none`：看得见、点不到。它还在做淡出的那层**外面**：字幕是内容，不跟控件一起消失。
  */
 export function CaptionLayer({ text }: { text: string | null }) {
   if (!text) return null;
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-full flex justify-center px-3 pb-2">
+    <div className="pointer-events-none flex shrink-0 justify-center px-3 pb-2">
       <p
         className="max-w-[92%] whitespace-pre-line rounded-none bg-black/65 px-2 py-1 text-center text-sm leading-snug text-white sm:text-base"
         style={{ textShadow: "0 1px 2px rgba(0,0,0,.9)" }}

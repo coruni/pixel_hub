@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * 音视频「分P / 曲目」列表 UI —— 详情页三种播放形态共用（音频卡片、视频浮层、嵌入页）。
+ * 音视频「分P / 曲目」列表 UI —— 详情页三种播放形态共用（音频卡片、视频里贴着控件条弹出的一列、嵌入页）。
  *
  * 抽出来的原因：三处的列表长得一样、文案规则一样（音频=曲目 / 视频=分P），
  * 各写一遍必然只改到其中一处；这里只负责「展示 + 回调」，当前播到第几 P 由宿主持有。
@@ -9,7 +9,7 @@
  * tone 与播放器控件同一套（见 lib/ui/cls.ts）：onDark = 压在视频画面上，onSurface = 落在暖白卡片里。
  */
 
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { ListMusic, SkipBack, SkipForward } from "lucide-react";
 import { avItemLabel, avStepLabel, type AvPlayItem } from "@/lib/av-tracks";
 import type { AvKind } from "@/lib/av";
@@ -105,10 +105,13 @@ export function AvListToggle({
 
 /**
  * 分P 列表本体。整行是一个按钮（点标题即切换），当前项加底色 + `aria-current`。
- * 列表可能很长（上限 60），容器限高并自己滚动，避免把视频浮层撑出画面。
+ * 列表可能很长（上限 60），所以根是 `flex flex-col`、`<ol>` 是 `flex-1 min-h-0 overflow-y-auto`：
+ * 外层给多少高度就在多少高度里滚。
  *
- * **限高由宿主用 class 给**（视频铺满画面、音频/嵌入页 45vh），组件不再自带默认值 ——
- * 内联 maxHeight 会压过宿主的响应式 class，视频那种「窄屏贴底铺满 / 宽屏右下浮层」就写不出来。
+ * **限高由宿主给**，组件不自带默认值 —— 内联 maxHeight 会压过宿主的响应式 class。
+ * 三种形态：音频卡片与嵌入页写死 `max-h-[45vh]`；视频是「贴着控件条弹出的一列」，
+ * 靠宿主那层 `flex-col` 收缩（`sm:` 及以上 `max-h-full` 的百分比落在**播放器框**上；窄屏改 `45vh` 视口量级，
+ * 手机竖屏视频夹在画面里只剩一行可看，只能让它越过上沿长出去）。
  * `header` 是可选槽位（标题 + 收起按钮）：它不能塞进 `<ol>`（ol 只允许 li），所以外面套一层 flex 容器。
  */
 export function AvTrackList({
@@ -118,7 +121,6 @@ export function AvTrackList({
   tone,
   onPick,
   className,
-  style,
   header,
 }: {
   items: AvPlayItem[];
@@ -126,16 +128,14 @@ export function AvTrackList({
   avKind: AvKind;
   tone: AvTone;
   onPick: (next: number) => void;
+  /** 限高与定位全在这里给（见文件头「限高由宿主给」） */
   className?: string;
-  /** 宿主确实需要按运行期算高度时才用内联；能写成 class 就写 class */
-  style?: CSSProperties;
   /** 列表头（标题 / 收起按钮），由宿主给 */
   header?: ReactNode;
 }) {
   const dark = tone === "onDark";
   return (
     <div
-      style={style}
       className={`flex flex-col overflow-hidden rounded-none border ${
         dark ? "border-white/20 bg-black/85" : "border-brand-300 bg-surface"
       } ${className ?? ""}`}

@@ -24,9 +24,10 @@
  * **视频画面上一律不留浮层按钮**：上一/下一、字幕开关、选集开关、全屏全部在底部控件行
  * （音频那行本来就是 flex-wrap，两种形态的位置就此统一）。倍速 / 循环 / 下载原件这类
  * 「一次播放只碰一次」的动作收进行尾的「更多」菜单（见 av-more.tsx）—— 控件行窄屏一行放不下，
- * 折行只能兜底，让高频动作先占住主行。分P 列表：开关在控件条里，面板自己铺开（窄屏贴底铺满画面、
- * 宽屏右下浮层），打开时控件条整条让位。控件自动淡出（仅视频）由状态驱动 —— 详见下方那个 effect。
- * 「列表 / 更多」两个面板互斥且都会暂停淡出计时：面板开着时控件消失会把面板一起带走。
+ * 折行只能兜底，让高频动作先占住主行。分P 列表：开关在控件条里，面板从控件条上沿弹出、右对齐一列
+ * （和「更多」同源），控件条**保持可见** —— 关列表的开关就在条里，条一淡出就没了出口。
+ * 控件自动淡出（仅视频）由状态驱动 —— 详见下方那个 effect；「列表 / 更多」两个面板互斥，
+ * 且任一面板开着都不挂淡出计时。
  *
  * 与宿主的契约：`downloadSlot` 是宿主（av-player，服务端组件）注入的控件位——下载入口由宿主渲染
  * （保留登录墙与下载计数的唯一实现），这里只负责把它排进「更多」菜单并保证行样式一致。
@@ -185,7 +186,7 @@ export default function AvControls({
 
   // 淡出计时器必须由状态驱动，不能只在 pointermove 里补挂 —— 后者会漏掉「播放不由指针触发」的情况
   // （媒体键、列表自动续播），此后指针不再移动，计时器就永远没人补挂 → 控件永不淡出。
-  // 任一面板开着时不挂计时：正看着选集 / 菜单，控件消失会把面板一起带走。
+  // 任一面板开着时不挂计时：控件条得留住 —— 关列表的开关就在条里，条淡出就没有出口了。
   useEffect(() => {
     if (!isVideo || listOpen || moreOpen) {
       clearHide();
@@ -196,8 +197,8 @@ export default function AvControls({
   }, [isVideo, playing, listOpen, moreOpen, armHide, clearHide]);
 
   /**
-   * 展开 / 收起分P 列表。开关挪到底部控件行后，面板与浮层同生共死，所以这里要顺带管一次计时：
-   * 打开时清掉（列表开着不淡出），关闭时按当前播放态补回去 ——
+   * 展开 / 收起分P 列表。开关在底部控件条里，打开时要顺带管一次淡出计时：
+   * 打开时清掉（列表开着期间控件常驻），关闭时按当前播放态补回去 ——
    * 后者正是原实现漏掉的一步：关列表那一刻没有新的 pointermove，计时器早被清空，控件从此再不淡出。
    */
   const toggleList = () => {
@@ -420,15 +421,49 @@ export default function AvControls({
 
         {/* 画面不再放任何浮层按钮：上一/下一、字幕开关、选集开关全部下移到底部控件行（见下方控件区） */}
 
-        {/* 底部控件区 = 字幕 + 控件条。字幕挂在这层外层、控件条自己单独做淡出 ——
-            字幕是内容，不该跟着控件一起消失；`bottom-full` 也让它永远贴着控件条上沿，
-            控件行在窄屏折成两行时不会被压住。 */}
-        <div className="absolute inset-x-0 bottom-0">
+        {/* 底部控件区 = 分P 列表 + 字幕 + 控件条，自下往上叠（`flex-col justify-end`）。
+            这一层 `pointer-events-none`：面板会把整层撑高，留白处不能吞掉画面点击，交互元素各自 `pointer-events-auto`。
+            限高两个断点：
+              · `sm:` 及以上用 `max-h-full` —— 百分比落在**播放器框**上（`bottom-0` 的包含块），面板顶多长到画面上沿；
+              · 窄屏用 `45vh` 视口量级 —— 手机竖屏视频才 180–220px 高，控件条就占掉一大半，
+                夹在画面里只剩一行可看，只能让面板越过上沿长出去。45vh 是「视频底边到视口顶」那段空间的保守值，
+                再多就会顶出屏幕、列表顶部的项点不到（它是绝对定位，页面滚动也追不回来）。
+            面板在淡出层**外面**：列表开着时控件条要留着 —— 关列表的开关就在条里。 */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex max-h-[45vh] flex-col justify-end sm:max-h-full">
+          {/* 分P / 曲目列表：与「更多」同源，从控件条上沿弹出，右对齐一列。
+              开关在控件条里，位置与嵌入页/音频那两套一致；header 给标题与收起按钮（面板挡住画面时也有明确出口）。 */}
+          {multi && listOpen && (
+            <AvTrackList
+              className="pointer-events-auto mb-1 mr-3 min-h-0 w-64 max-w-[calc(100%-1.5rem)] self-end sm:w-72"
+              items={items}
+              index={at}
+              avKind={avKind}
+              tone="onDark"
+              onPick={goTo}
+              header={
+                <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/15 px-2.5 py-1.5">
+                  <span className="flex items-center gap-1.5 text-xs text-white/85">
+                    <ListMusic size={13} aria-hidden />
+                    {avUnitLabel(avKind)} {at + 1}/{items.length}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={toggleList}
+                    aria-label="收起列表"
+                    title="收起列表"
+                    className="grid h-7 w-7 shrink-0 place-items-center rounded-none text-white/80 transition hover:bg-white/15 hover:text-white focus-visible:ring-2 focus-visible:ring-brand-400"
+                  >
+                    <X size={14} aria-hidden />
+                  </button>
+                </div>
+              }
+            />
+          )}
           <CaptionLayer text={cap.on ? cueText : null} />
-          {/* 列表打开时整条淡出：面板要占满画面（尤其手机），控件条留着也点不到 */}
+          {/* `shrink-0`：这一列限高（`max-h-*`）时被压的只能是面板 —— 控件条和字幕永远保持原样 */}
           <div
-            className={`transition-opacity ${
-              uiOn && !listOpen ? "opacity-100" : "pointer-events-none opacity-0"
+            className={`shrink-0 transition-opacity ${
+              uiOn ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
             }`}
           >
             <div className="bg-[linear-gradient(to_top,rgba(0,0,0,.85)_0%,rgba(0,0,0,.5)_60%,transparent_100%)] px-3 pb-1.5 pt-8">
@@ -540,37 +575,6 @@ export default function AvControls({
             </div>
           </div>
         </div>
-
-        {/* 分P / 曲目列表。开关在控件条里，面板自己铺开：
-            窄屏贴底铺满画面（手机竖屏视频就 180–220px 高，右下角浮层塞不下两行），
-            宽屏回到右下浮层、限高 70%。header 带收起按钮 —— 窄屏面板盖住控件条，必须留个明确出口。 */}
-        {multi && listOpen && (
-          <AvTrackList
-            className="absolute inset-x-0 bottom-0 max-h-full sm:inset-x-auto sm:right-3 sm:w-72 sm:max-h-[70%]"
-            items={items}
-            index={at}
-            avKind={avKind}
-            tone="onDark"
-            onPick={goTo}
-            header={
-              <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/15 px-2.5 py-1.5">
-                <span className="flex items-center gap-1.5 text-xs text-white/85">
-                  <ListMusic size={13} aria-hidden />
-                  {avUnitLabel(avKind)} {at + 1}/{items.length}
-                </span>
-                <button
-                  type="button"
-                  onClick={toggleList}
-                  aria-label="收起列表"
-                  title="收起列表"
-                  className="grid h-7 w-7 shrink-0 place-items-center rounded-none text-white/80 transition hover:bg-white/15 hover:text-white focus-visible:ring-2 focus-visible:ring-brand-400"
-                >
-                  <X size={14} aria-hidden />
-                </button>
-              </div>
-            }
-          />
-        )}
 
         {failed && (
           <p className="absolute inset-x-0 top-0 bg-red-600/90 px-3 py-1.5 text-xs text-white">
